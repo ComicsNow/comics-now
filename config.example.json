@@ -1,0 +1,28 @@
+{
+  "port": 3000,
+  "baseUrl": "/comics",
+  "comictaggerPath": "/path/to/comictagger",
+  "comicsLocation": "/path/to/comics",
+  "comicsDirectories": ["/path/to/comics/directory1", "/path/to/comics/directory2"],
+  "cors": {
+    "enabled": true,
+    "allowedOrigins": [
+      "https://your-domain.com",
+      "http://localhost:3000",
+      "http://127.0.0.1:3000"
+    ]
+  },
+  "authentication": {
+    "enabled": false,
+    "adminEmail": "admin@example.com",
+    "cloudflare": {
+      "teamDomain": "yourteam.cloudflareaccess.com",
+      "audience": "your-application-audience-tag-from-cloudflare"
+    },
+    "trustedIPs": [
+      "127.0.0.1",
+      "::1",
+      "192.168.1.*"
+    ]
+  }
+}
