@@ -153,7 +153,7 @@ async function convertCbrToCbz(cbrPath) {
 
       log('INFO', 'CONVERT', `Zip → ${path.basename(cbzPath)} …`);
       const output = fs.createWriteStream(cbzPath);
-      const archive = archiver('zip', { zlib: { level: 9 } });
+      const archive = archiver('zip', { store: true });
       archive.on('error', (err) => { throw err; });
       archive.pipe(output);
       archive.directory(tempDir, false);
