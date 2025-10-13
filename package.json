@@ -1,0 +1,27 @@
+{
+  "name": "comics-now",
+  "version": "1.0.0",
+  "description": "A simple comic reader app.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "build:css": "tailwindcss -i ./styles/tailwind.css -o ./public/tailwind.css --minify"
+  },
+  "license": "CC-BY-NC-SA-4.0",
+  "dependencies": {
+    "archiver": "^5.3.1",
+    "express": "^4.19.2",
+    "helmet": "^8.1.0",
+    "jsonwebtoken": "^9.0.2",
+    "jszip": "^3.10.1",
+    "jwks-rsa": "^3.2.0",
+    "node-fetch": "^3.3.2",
+    "sharp": "^0.33.3",
+    "sqlite3": "^5.1.7",
+    "xml2js": "^0.6.2",
+    "yauzl": "^2.10.0"
+  },
+  "devDependencies": {
+    "tailwindcss": "^3.4.1"
+  }
+}

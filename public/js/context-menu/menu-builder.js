@@ -1,0 +1,102 @@
+/**
+ * Context Menu Builder - Core utilities for creating and managing context menus
+ */
+(function (global) {
+  'use strict';
+
+  let activeContextMenu = null;
+
+  // ============================================================================
+  // SVG ICON CONSTANTS
+  // ============================================================================
+
+  const ICONS = {
+    // Success/Checkmark icon (filled circle with check)
+    SUCCESS: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" /></svg>',
+
+    // Download arrow icon
+    DOWNLOAD: '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>',
+
+    // Eye/Read icon
+    EYE: '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>',
+
+    // Simple checkmark icon (for manga mode enabled)
+    CHECKMARK: '<svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>',
+
+    // Book icon (for manga mode)
+    BOOK: '<svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg>'
+  };
+
+  // ============================================================================
+  // CONTEXT MENU UTILITIES
+  // ============================================================================
+
+  /**
+   * Position a context menu at the event coordinates and adjust if off-screen
+   * @param {HTMLElement} menu - The menu element to position
+   * @param {Event} event - The event containing coordinates
+   */
+  function positionContextMenu(menu, event) {
+    const x = event.clientX || (event.touches && event.touches[0].clientX) || 0;
+    const y = event.clientY || (event.touches && event.touches[0].clientY) || 0;
+
+    menu.style.left = `${x}px`;
+    menu.style.top = `${y}px`;
+
+    document.body.appendChild(menu);
+    activeContextMenu = menu;
+
+    // Adjust position if menu goes off-screen
+    setTimeout(() => {
+      const rect = menu.getBoundingClientRect();
+      if (rect.right > window.innerWidth) {
+        menu.style.left = `${window.innerWidth - rect.width - 10}px`;
+      }
+      if (rect.bottom > window.innerHeight) {
+        menu.style.top = `${window.innerHeight - rect.height - 10}px`;
+      }
+    }, 0);
+  }
+
+  /**
+   * Attach click-outside close handler to a context menu
+   * @param {HTMLElement} menu - The menu element to attach handler to
+   */
+  function attachCloseHandler(menu) {
+    const closeHandler = (e) => {
+      if (!menu.contains(e.target)) {
+        e.preventDefault();
+        e.stopPropagation();
+        closeContextMenu();
+        document.removeEventListener('click', closeHandler);
+        document.removeEventListener('touchstart', closeHandler);
+        document.removeEventListener('touchend', closeHandler);
+      }
+    };
+
+    setTimeout(() => {
+      document.addEventListener('click', closeHandler);
+      document.addEventListener('touchstart', closeHandler);
+      document.addEventListener('touchend', closeHandler);
+    }, 100);
+  }
+
+  /**
+   * Close the active context menu
+   */
+  function closeContextMenu() {
+    if (activeContextMenu) {
+      activeContextMenu.remove();
+      activeContextMenu = null;
+    }
+  }
+
+  // Expose public API
+  global.ContextMenuBuilder = {
+    ICONS,
+    positionContextMenu,
+    attachCloseHandler,
+    closeContextMenu
+  };
+
+})(typeof window !== 'undefined' ? window : globalThis);

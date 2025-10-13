@@ -1,0 +1,832 @@
+[
+  {
+    "publisher": "215 INK",
+    "homepage": "http://www.215ink.com",
+    "status": "error: Only HTTP(S) protocols are supported"
+  },
+  {
+    "publisher": "2dcloud",
+    "homepage": "http://2dcloud.com",
+    "status": "no-logo-detected"
+  },
+  {
+    "publisher": "AAM/Markosia",
+    "homepage": "https://markosia.com",
+    "status": "ok",
+    "file": "logos/aam-markosia.png",
+    "contentType": "image/png",
+    "bytes": 41269,
+    "source": "https://markosia.com/wp-content/uploads/2021/06/cropped-markosia-header-transparent-resize.png",
+    "hash": "6ce942a0"
+  },
+  {
+    "publisher": "Ablaze",
+    "homepage": "https://www.ablaze.net/",
+    "status": "ok",
+    "file": "logos/ablaze.png",
+    "contentType": "image/png",
+    "bytes": 18485,
+    "source": "https://ablazecomics.myshopify.com/cdn/shop/files/ABLAZE_Logo.png?v=1727832510&width=600",
+    "hash": "3ba5d0e2"
+  },
+  {
+    "publisher": "Active Images",
+    "homepage": "",
+    "status": "skipped (no homepage)"
+  },
+  {
+    "publisher": "Aftershock Comics",
+    "homepage": "https://aftershockcomics.com/",
+    "status": "ok",
+    "file": "logos/aftershock-comics.png",
+    "contentType": "image/png",
+    "bytes": 21023,
+    "source": "https://aftershockcomics.com/cdn/shop/files/logo-white2_340x.png?v=1629327231",
+    "hash": "9a7c4a33"
+  },
+  {
+    "publisher": "Ahoy Comics",
+    "homepage": "",
+    "status": "skipped (no homepage)"
+  },
+  {
+    "publisher": "Alternative Comics",
+    "homepage": "https://alternative-comics.com/",
+    "status": "ok",
+    "file": "logos/alternative-comics.jpg",
+    "contentType": "image/jpeg",
+    "bytes": 14996,
+    "source": "https://i0.wp.com/alternative-comics.com/wp-content/uploads/2023/01/cropped-logo.jpg?fit=248%2C248&ssl=1",
+    "hash": "c2da9304"
+  },
+  {
+    "publisher": "Amalgam Comics",
+    "homepage": "",
+    "status": "skipped (no homepage)"
+  },
+  {
+    "publisher": "America's Best Comics",
+    "homepage": "",
+    "status": "skipped (no homepage)"
+  },
+  {
+    "publisher": "Amulet Books",
+    "homepage": "https://www.amuletbooks.com/",
+    "status": "error: request to https://www.amuletbooks.com/ failed, reason: Client network socket disconnected before secure TLS connection was established"
+  },
+  {
+    "publisher": "Archaia",
+    "homepage": "https://www.boom-studios.com/",
+    "status": "ok",
+    "file": "logos/archaia.webp",
+    "contentType": "image/webp",
+    "bytes": 610,
+    "source": "https://www.boom-studios.com/wp-content/uploads/2023/02/boom-logo-header.webp",
+    "hash": "2b776110"
+  },
+  {
+    "publisher": "Art of Fiction",
+    "homepage": "",
+    "status": "skipped (no homepage)"
+  },
+  {
+    "publisher": "Avery Hill Publishing",
+    "homepage": "https://averyhillpublishing.com/",
+    "status": "error: HTTP 404"
+  },
+  {
+    "publisher": "BOOM! - Archaia",
+    "homepage": "https://www.boom-studios.com/",
+    "status": "ok",
+    "file": "logos/boom-archaia.webp",
+    "contentType": "image/webp",
+    "bytes": 610,
+    "source": "https://www.boom-studios.com/wp-content/uploads/2023/02/boom-logo-header.webp",
+    "hash": "2b776110"
+  },
+  {
+    "publisher": "Black Label Comics",
+    "homepage": "https://blackmaskstudios.com/",
+    "status": "ok",
+    "file": "logos/black-label-comics.png",
+    "contentType": "image/png",
+    "bytes": 271492,
+    "source": "http://blackmaskstudios.com/wp-content/uploads/2015/12/headerimage.png",
+    "hash": "a29a94be"
+  },
+  {
+    "publisher": "Black Mask Studios",
+    "homepage": "",
+    "status": "skipped (no homepage)"
+  },
+  {
+    "publisher": "Bloomsbury Publishing",
+    "homepage": "https://www.bloomsbury.com/",
+    "status": "error: HTTP 403"
+  },
+  {
+    "publisher": "BoilerRoom Studios",
+    "homepage": "",
+    "status": "skipped (no homepage)"
+  },
+  {
+    "publisher": "Bonanza",
+    "homepage": "",
+    "status": "skipped (no homepage)"
+  },
+  {
+    "publisher": "Boom! Studios",
+    "homepage": "https://www.boom-studios.com/",
+    "status": "ok",
+    "file": "logos/boom-studios.webp",
+    "contentType": "image/webp",
+    "bytes": 610,
+    "source": "https://www.boom-studios.com/wp-content/uploads/2023/02/boom-logo-header.webp",
+    "hash": "2b776110"
+  },
+  {
+    "publisher": "Caliber Comics",
+    "homepage": "https://www.calibercomics.com/",
+    "status": "ok",
+    "file": "logos/caliber-comics.jpg",
+    "contentType": "image/jpeg",
+    "bytes": 115928,
+    "source": "https://img1.wsimg.com/isteam/ip/59a8c811-e203-43a2-8722-076aed8aa847/CaliberStore720x720test-0001.jpg",
+    "hash": "5def8b82"
+  },
+  {
+    "publisher": "Canongate Books",
+    "homepage": "https://canongate.co.uk/",
+    "status": "ok",
+    "file": "logos/canongate-books.png",
+    "contentType": "image/png",
+    "bytes": 3244,
+    "source": "https://cgassets-1d48b.kxcdn.com/site/templates/assets/images/canongate-fb-share.png",
+    "hash": "296992d3"
+  },
+  {
+    "publisher": "Casterman",
+    "homepage": "https://www.casterman.com/",
+    "status": "ok",
+    "file": "logos/casterman.png",
+    "contentType": "image/png",
+    "bytes": 12026,
+    "source": "https://www.casterman.com/bundles/castermanstatic/images/logo/casterman_og4.png",
+    "hash": "a26387eb"
+  },
+  {
+    "publisher": "Catalyst Press",
+    "homepage": "https://catalystpress.org/",
+    "status": "ok",
+    "file": "logos/catalyst-press.png",
+    "contentType": "image/png",
+    "bytes": 2442,
+    "source": "https://static.wixstatic.com/media/303d1b_5f11133d754441c6b36a1246c1212b26~mv2.png/v1/crop/x_0,y_359,w_1080,h_352/fill/w_49,h_16,al_c,q_85,usm_0.66_1.00_0.01,blur_2,enc_avif,quality_auto/Logos%20(1).png",
+    "hash": "0278ac44"
+  },
+  {
+    "publisher": "Chronicle Books",
+    "homepage": "https://www.chroniclebooks.com/",
+    "status": "ok",
+    "file": "logos/chronicle-books.png",
+    "contentType": "image/png",
+    "bytes": 11532,
+    "source": "https://www.chroniclebooks.com/cdn/shop/files/CB_WebLogo_MAIN_01_350x.png?v=1613718154",
+    "hash": "b74e714f"
+  },
+  {
+    "publisher": "Cinebook",
+    "homepage": "https://www.cinebook.com/",
+    "status": "error: request to https://www.cinebook.com/ failed, reason: Client network socket disconnected before secure TLS connection was established"
+  },
+  {
+    "publisher": "Clover Press",
+    "homepage": "https://cloverpress.us/",
+    "status": "ok",
+    "file": "logos/clover-press.png",
+    "contentType": "image/png",
+    "bytes": 13299,
+    "source": "https://cloverpress.us/cdn/shop/files/CP-CLASSIC-Final_Logo-BLACK_300x300.png?v=1749745151",
+    "hash": "b772bf87"
+  },
+  {
+    "publisher": "Cross Cult",
+    "homepage": "https://www.cross-cult.de/",
+    "status": "ok",
+    "file": "logos/cross-cult.svg",
+    "contentType": "image/svg+xml",
+    "bytes": 5603,
+    "source": "https://www.cross-cult.de/fileadmin/cross_cult/manga-cult.svg",
+    "hash": "883aa65f"
+  },
+  {
+    "publisher": "DC Comics",
+    "homepage": "https://www.dc.com/",
+    "status": "ok",
+    "file": "logos/dc-comics.svg",
+    "contentType": "image/svg+xml",
+    "bytes": 8735014,
+    "source": "https://static.dc.com/2024-08/dc-logo-313x313.svg",
+    "hash": "85f43198"
+  },
+  {
+    "publisher": "DMG/Valiant Entertainment",
+    "homepage": "https://valiantentertainment.com/",
+    "status": "ok",
+    "file": "logos/dmg-valiant-entertainment.jpg",
+    "contentType": "image/jpeg",
+    "bytes": 8897,
+    "source": "https://valiantentertainment.com/wp-content/themes/valiant/images/facebook.jpg",
+    "hash": "7c0ee14f"
+  },
+  {
+    "publisher": "Dargaud",
+    "homepage": "https://www.dargaud.com/",
+    "status": "ok",
+    "file": "logos/dargaud.png",
+    "contentType": "image/png",
+    "bytes": 14369,
+    "source": "https://www.dargaud.com/sites/dargaud.com/files/styles/max_325x325/public/2020-01/leslibrairesfr.png?itok=0Vx2EEo-",
+    "hash": "1f7f5f75"
+  },
+  {
+    "publisher": "Dark Horse",
+    "homepage": "https://www.darkhorse.com/",
+    "status": "ok",
+    "file": "logos/dark-horse.svg",
+    "contentType": "image/svg+xml",
+    "bytes": 11474,
+    "source": "https://www.darkhorse.com/assets/dh-logo-2021-861fd5c9b6aeab3ea926775bec792f9d.svg",
+    "hash": "e2f756a1"
+  },
+  {
+    "publisher": "Dark Horse Comics",
+    "homepage": "https://www.darkhorse.com/",
+    "status": "ok",
+    "file": "logos/dark-horse-comics.svg",
+    "contentType": "image/svg+xml",
+    "bytes": 11474,
+    "source": "https://www.darkhorse.com/assets/dh-logo-2021-861fd5c9b6aeab3ea926775bec792f9d.svg",
+    "hash": "e2f756a1"
+  },
+  {
+    "publisher": "Dead Reckoning",
+    "homepage": "https://naval-institute-press.myshopify.com/collections/dead-reckoning",
+    "status": "error: HTTP 404"
+  },
+  {
+    "publisher": "Delcourt",
+    "homepage": "https://www.editions-delcourt.fr/",
+    "status": "ok",
+    "file": "logos/delcourt.png",
+    "contentType": "image/png",
+    "bytes": 4254,
+    "source": "https://www.editions-delcourt.fr/themes/custom/delcourt/assets/images/delcourt.png",
+    "hash": "337e0774"
+  },
+  {
+    "publisher": "Double Diamond Press",
+    "homepage": "",
+    "status": "skipped (no homepage)"
+  },
+  {
+    "publisher": "Drawn & Quarterly",
+    "homepage": "https://www.drawnandquarterly.com/",
+    "status": "ok",
+    "file": "logos/drawn-quarterly.png",
+    "contentType": "image/png",
+    "bytes": 22681,
+    "source": "https://drawnandquarterly.com/wp-content/uploads/2021/11/DQ-header.png",
+    "hash": "bac9fb32"
+  },
+  {
+    "publisher": "Dupuis",
+    "homepage": "https://www.dupuis.com/",
+    "status": "error: Only HTTP(S) protocols are supported"
+  },
+  {
+    "publisher": "Dynamite Entertainment",
+    "homepage": "https://www.dynamite.com/",
+    "status": "ok",
+    "file": "logos/dynamite-entertainment.png",
+    "contentType": "image/vnd.microsoft.icon",
+    "bytes": 894,
+    "source": "https://www.dynamite.com/favicon.ico",
+    "hash": "274e222e"
+  },
+  {
+    "publisher": "Errata Naturae",
+    "homepage": "",
+    "status": "skipped (no homepage)"
+  },
+  {
+    "publisher": "Europe Comics",
+    "homepage": "https://www.europecomics.com/",
+    "status": "ok",
+    "file": "logos/europe-comics.png",
+    "contentType": "image/png",
+    "bytes": 2295,
+    "source": "https://www.europecomics.com/assets/uploads/2018/02/Logo_Ankama05.png",
+    "hash": "35ff4729"
+  },
+  {
+    "publisher": "Evil Twin Comics",
+    "homepage": "https://evil-twin-comics.square.site/",
+    "status": "error: HTTP 403"
+  },
+  {
+    "publisher": "Express Publications",
+    "homepage": "",
+    "status": "skipped (no homepage)"
+  },
+  {
+    "publisher": "Fantagraphics",
+    "homepage": "https://fantagraphics.com/",
+    "status": "ok",
+    "file": "logos/fantagraphics.svg",
+    "contentType": "image/svg+xml",
+    "bytes": 5788,
+    "source": "https://www.fantagraphics.com/cdn/shop/t/15/assets/Fanta-logo-mobile.svg?v=25654880973743384381728599916",
+    "hash": "54bdf00c"
+  },
+  {
+    "publisher": "Farrar",
+    "homepage": "https://us.macmillan.com/farrarstrausgiroux",
+    "status": "error: HTTP 403"
+  },
+  {
+    "publisher": "Fat Man Press",
+    "homepage": "",
+    "status": "skipped (no homepage)"
+  },
+  {
+    "publisher": "Federal",
+    "homepage": "",
+    "status": "skipped (no homepage)"
+  },
+  {
+    "publisher": "First",
+    "homepage": "",
+    "status": "skipped (no homepage)"
+  },
+  {
+    "publisher": "First Second Books",
+    "homepage": "https://firstsecondbooks.com/",
+    "status": "ok",
+    "file": "logos/first-second-books.png",
+    "contentType": "image/png",
+    "bytes": 3860,
+    "source": "https://firstsecondbooks.com/wp-content/uploads/2019/04/FirstSecond_logo_100x117.png",
+    "hash": "3e4cdf78"
+  },
+  {
+    "publisher": "Focus",
+    "homepage": "",
+    "status": "skipped (no homepage)"
+  },
+  {
+    "publisher": "Gallery 13",
+    "homepage": "https://www.simonandschusterpublishing.com/gallery13/",
+    "status": "ok",
+    "file": "logos/gallery-13.svg",
+    "contentType": "image/svg+xml",
+    "bytes": 46691,
+    "source": "https://www.simonandschusterpublishing.com/gallery13/images/Gallery-13_Logo.svg",
+    "hash": "acc7996a"
+  },
+  {
+    "publisher": "Gemstone",
+    "homepage": "",
+    "status": "skipped (no homepage)"
+  },
+  {
+    "publisher": "H1",
+    "homepage": "https://www.humanoids.com/",
+    "status": "ok",
+    "file": "logos/h1.png",
+    "contentType": "image/png",
+    "bytes": 19548,
+    "source": "https://www.humanoids.com/images/design_humanoidscom/y-logo-full.png",
+    "hash": "dea148df"
+  },
+  {
+    "publisher": "Hachette",
+    "homepage": "https://www.hachettebookgroup.com/",
+    "status": "ok",
+    "file": "logos/hachette.svg",
+    "contentType": "image/svg+xml",
+    "bytes": 348,
+    "source": "https://www.hachettebookgroup.com/wp-content/themes/hachette-book-group-2023/client/src/svg/hbg-logomark.svg",
+    "hash": "36994a56"
+  },
+  {
+    "publisher": "HarperCollins",
+    "homepage": "https://www.harpercollins.com/",
+    "status": "error: HTTP 403"
+  },
+  {
+    "publisher": "Harry N. Abrams",
+    "homepage": "https://www.abramsbooks.com/",
+    "status": "ok",
+    "file": "logos/harry-n-abrams.png",
+    "contentType": "image/png",
+    "bytes": 7970,
+    "source": "https://www.abramsbooks.com/wp-content/themes/abrams_1.2/images/AbramsLogo2_sm.png",
+    "hash": "5a97cf3c"
+  },
+  {
+    "publisher": "Heavy Metal",
+    "homepage": "https://www.heavymetal.com/",
+    "status": "ok",
+    "file": "logos/heavy-metal.png",
+    "contentType": "image/png",
+    "bytes": 81079,
+    "source": "https://cdn.prod.website-files.com/655b88560f63bd649e49c4dd/665767647f01781e7979ef6a_HeavyMetal2023_logo-RED%201-Cropped.png",
+    "hash": "227b5d1b"
+  },
+  {
+    "publisher": "Henry Holt and Co.",
+    "homepage": "https://us.macmillan.com/henryholt",
+    "status": "error: HTTP 403"
+  },
+  {
+    "publisher": "Homage Comics",
+    "homepage": "",
+    "status": "skipped (no homepage)"
+  },
+  {
+    "publisher": "Houghton Mifflin",
+    "homepage": "https://www.hmhco.com/",
+    "status": "ok",
+    "file": "logos/houghton-mifflin.svg",
+    "contentType": "image/svg+xml",
+    "bytes": 3326,
+    "source": "https://s3.amazonaws.com/prod-hmhco-vmg-craftcms-public/hmh-logo-white.svg",
+    "hash": "7f30ee36"
+  },
+  {
+    "publisher": "Humanoids",
+    "homepage": "https://www.humanoids.com/",
+    "status": "ok",
+    "file": "logos/humanoids.png",
+    "contentType": "image/png",
+    "bytes": 19548,
+    "source": "https://www.humanoids.com/images/design_humanoidscom/y-logo-full.png",
+    "hash": "dea148df"
+  },
+  {
+    "publisher": "IDW Publishing",
+    "homepage": "https://www.idwpublishing.com/",
+    "status": "ok",
+    "file": "logos/idw-publishing.png",
+    "contentType": "image/png",
+    "bytes": 38991,
+    "source": "https://idwpublishing.com/cdn/shop/files/IDW_2025_ext.logo_coral.png?height=160&v=1730151973",
+    "hash": "6e7fef56"
+  },
+  {
+    "publisher": "Image Comics",
+    "homepage": "https://imagecomics.com/",
+    "status": "ok",
+    "file": "logos/image-comics.png",
+    "contentType": "image/png",
+    "bytes": 11887,
+    "source": "https://imagecomics.com/assets/img/image-comics-logo.png",
+    "hash": "becbcf61"
+  },
+  {
+    "publisher": "J. David Spurlock",
+    "homepage": "",
+    "status": "skipped (no homepage)"
+  },
+  {
+    "publisher": "Joe Books",
+    "homepage": "",
+    "status": "skipped (no homepage)"
+  },
+  {
+    "publisher": "John Wiley & Sons",
+    "homepage": "https://www.wiley.com/",
+    "status": "error: HTTP 403"
+  },
+  {
+    "publisher": "Jules Feiffer",
+    "homepage": "",
+    "status": "skipped (no homepage)"
+  },
+  {
+    "publisher": "Knopf",
+    "homepage": "https://knopfdoubleday.com/",
+    "status": "ok",
+    "file": "logos/knopf.png",
+    "contentType": "image/png",
+    "bytes": 408,
+    "source": "https://knopfdoubleday.com/wp-content/uploads/2023/08/KDPG_favicon_3.png",
+    "hash": "2776ab4f"
+  },
+  {
+    "publisher": "Kodansha Comics",
+    "homepage": "https://kodanshacomics.com/",
+    "status": "ok",
+    "file": "logos/kodansha-comics.png",
+    "contentType": "text/html",
+    "bytes": 1049,
+    "source": "https://kodanshacomics.com/kodansha-favicon.png",
+    "hash": "ea61b8b7"
+  },
+  {
+    "publisher": "Koyama Press",
+    "homepage": "https://koyamapress.com/",
+    "status": "error: request to https://koyamapress.com/ failed, reason: getaddrinfo ENOTFOUND koyamapress.com"
+  },
+  {
+    "publisher": "Legendary Comics",
+    "homepage": "https://legendary.com/comics/",
+    "status": "ok",
+    "file": "logos/legendary-comics.jpg",
+    "contentType": "image/jpeg",
+    "bytes": 64161,
+    "source": "https://www.legendary.com/wp-content/uploads/2021/04/YA-logo-1600x900.jpg",
+    "hash": "7617c792"
+  },
+  {
+    "publisher": "Lion Forge Comics",
+    "homepage": "https://www.viz.com/",
+    "status": "ok",
+    "file": "logos/lion-forge-comics.png",
+    "contentType": "image/png",
+    "bytes": 18068,
+    "source": "https://assets.viz.com/assets/logo@2x-b76f649f933ea15f45147ff5445a2501c85c7f863ba0aba5ea7bec93c3272cc6.png",
+    "hash": "74a2e569"
+  },
+  {
+    "publisher": "Macmillan",
+    "homepage": "https://us.macmillan.com/",
+    "status": "error: HTTP 403"
+  },
+  {
+    "publisher": "Mad Cave Studios",
+    "homepage": "https://madcavestudios.com/",
+    "status": "ok",
+    "file": "logos/mad-cave-studios.svg",
+    "contentType": "image/svg+xml",
+    "bytes": 4603,
+    "source": "https://madcavestudios.com/wp-content/uploads/2018/03/MCS-LOGO-01.svg",
+    "hash": "df1e1d06"
+  },
+  {
+    "publisher": "Marvel",
+    "homepage": "https://www.marvel.com/",
+    "status": "ok",
+    "file": "logos/marvel.png",
+    "contentType": "image/png",
+    "bytes": 2756,
+    "source": "https://cdn.marvel.com/u/prod/marvel/images/mu/web/2021/icon-mu-shield.png",
+    "hash": "ffddfade"
+  },
+  {
+    "publisher": "Marvel Comics",
+    "homepage": "https://www.marvel.com/",
+    "status": "ok",
+    "file": "logos/marvel-comics.png",
+    "contentType": "image/png",
+    "bytes": 2756,
+    "source": "https://cdn.marvel.com/u/prod/marvel/images/mu/web/2021/icon-mu-shield.png",
+    "hash": "ffddfade"
+  },
+  {
+    "publisher": "NBM Publishing",
+    "homepage": "https://nbmpub.com/",
+    "status": "ok",
+    "file": "logos/nbm-publishing.jpg",
+    "contentType": "image/jpeg",
+    "bytes": 4866,
+    "source": "https://nbmpub.com/cdn/shop/files/NBM_graphic_novels_logo_beige_120x.jpg?v=1673967648",
+    "hash": "69b840e5"
+  },
+  {
+    "publisher": "Nobrow Press",
+    "homepage": "https://nobrow.net/",
+    "status": "ok",
+    "file": "logos/nobrow-press.svg",
+    "contentType": "image/svg+xml",
+    "bytes": 10868,
+    "source": "https://nobrow.net/wp-content/themes/nobrow2020/assets/nobrow_logo.svg",
+    "hash": "636bd604"
+  },
+  {
+    "publisher": "Oni Press",
+    "homepage": "https://www.onipress.com/",
+    "status": "ok",
+    "file": "logos/oni-press.webp",
+    "contentType": "image/webp",
+    "bytes": 42832,
+    "source": "https://images.squarespace-cdn.com/content/v1/651302f86c2c335a35c606d6/4748d5d5-68b0-49b5-ad5a-b01327a96a22/ONI-LOGO-FNL.png?format=1500w",
+    "hash": "49957878"
+  },
+  {
+    "publisher": "Pantheon",
+    "homepage": "https://pantheon.knopfdoubleday.com/",
+    "status": "error: request to https://pantheon.knopfdoubleday.com/ failed, reason: getaddrinfo ENOTFOUND pantheon.knopfdoubleday.com"
+  },
+  {
+    "publisher": "Penguin Random House",
+    "homepage": "https://www.penguinrandomhouse.com/",
+    "status": "ok",
+    "file": "logos/penguin-random-house.svg",
+    "contentType": "image/svg+xml",
+    "bytes": 800,
+    "source": "https://www.penguinrandomhouse.com/wp-content/themes/penguinrandomhouse/images/nav-account-icon.svg",
+    "hash": "a909ce2f"
+  },
+  {
+    "publisher": "Rebellion",
+    "homepage": "https://rebellion.com/",
+    "status": "ok",
+    "file": "logos/rebellion.png",
+    "contentType": "image/png",
+    "bytes": 5464,
+    "source": "https://rebellion.com/wp-content/uploads/2022/10/rebellion-icon-white-256-1.png",
+    "hash": "a206d074"
+  },
+  {
+    "publisher": "Scholastic",
+    "homepage": "https://www.scholastic.com/",
+    "status": "ok",
+    "file": "logos/scholastic.svg",
+    "contentType": "image/svg+xml",
+    "bytes": 4440,
+    "source": "https://d3ddkgxe55ca6c.cloudfront.net/web-assets/logos/logo-b4308e12118bf9f1b184ff6487ccc8d43b5138d52e3cfb9577af7bd9af0eaae5.svg",
+    "hash": "fb12f672"
+  },
+  {
+    "publisher": "Scout Comics",
+    "homepage": "https://www.scoutcomics.com/",
+    "status": "ok",
+    "file": "logos/scout-comics.jpg",
+    "contentType": "image/jpeg",
+    "bytes": 73420,
+    "source": "https://www.scoutcomics.com/cdn/shop/files/site_header6_1050x.jpg?v=1614818000",
+    "hash": "698185f1"
+  },
+  {
+    "publisher": "Seven Seas Entertainment",
+    "homepage": "https://sevenseasentertainment.com/",
+    "status": "ok",
+    "file": "logos/seven-seas-entertainment.png",
+    "contentType": "image/png",
+    "bytes": 2397,
+    "source": "https://sevenseasentertainment.com/wp-content/themes/gomanga2025/images/SevenSeas-logo-sm.png",
+    "hash": "4852fa5e"
+  },
+  {
+    "publisher": "Simon & Schuster",
+    "homepage": "https://www.simonandschuster.com/",
+    "status": "ok",
+    "file": "logos/simon-schuster.png",
+    "contentType": "image/png",
+    "bytes": 7702,
+    "source": "https://d1dyndsnc54cq8.cloudfront.net/assets/sns-large-logo.png",
+    "hash": "a64c2aff"
+  },
+  {
+    "publisher": "Skybound",
+    "homepage": "https://www.skybound.com/",
+    "status": "ok",
+    "file": "logos/skybound.png",
+    "contentType": "image/png",
+    "bytes": 91174,
+    "source": "https://images.ctfassets.net/84397xriksdw/4oIyLJJbTUEhin5jnkUI8J/1367c5918a616503f6a3da160ffb4e3d/TAG_Logo.png",
+    "hash": "b8742275"
+  },
+  {
+    "publisher": "Skyhorse Publishing",
+    "homepage": "https://www.skyhorsepublishing.com/",
+    "status": "ok",
+    "file": "logos/skyhorse-publishing.png",
+    "contentType": "image/png",
+    "bytes": 7983,
+    "source": "https://dhjhkxawhe8q4.cloudfront.net/skyhorse-wp/wp-content/uploads/2018/06/02193621/Allworth-Press_web-logo.png",
+    "hash": "86b484b2"
+  },
+  {
+    "publisher": "Soaring Penguin Press",
+    "homepage": "https://soaringpenguinpress.com/",
+    "status": "ok",
+    "file": "logos/soaring-penguin-press.jpg",
+    "contentType": "image/jpeg",
+    "bytes": 305514,
+    "source": "https://soaringpenguinpress.com/wp-content/uploads/2021/05/Mw10_Ksbanner_760x510.jpg",
+    "hash": "1fd772e3"
+  },
+  {
+    "publisher": "Source Point Press",
+    "homepage": "https://sourcepointpress.com/",
+    "status": "ok",
+    "file": "logos/source-point-press.png",
+    "contentType": "image/png",
+    "bytes": 113393,
+    "source": "https://whalebacker.com/cdn/shop/files/Screenshot_2025-05-19_at_12.40.26_PM_912b5c1c-2a55-4001-9920-dc045ce5af54.png?v=1747682362&width=600",
+    "hash": "51b4970f"
+  },
+  {
+    "publisher": "St. Martin's Press",
+    "homepage": "https://us.macmillan.com/smp/",
+    "status": "error: HTTP 403"
+  },
+  {
+    "publisher": "Sterling Publishing",
+    "homepage": "https://www.sterlingpublishing.com/",
+    "status": "error: HTTP 526"
+  },
+  {
+    "publisher": "Stone Arch Books",
+    "homepage": "https://stonearchbooks.com/",
+    "status": "error: request to https://stonearchbooks.com/ failed, reason: Hostname/IP does not match certificate's altnames: Host: stonearchbooks.com. is not in the cert's altnames: DNS:*.azurewebsites.net, DNS:*.scm.azurewebsites.net, DNS:*.sso.azurewebsites.net, DNS:*.centralus-01.azurewebsites.net, DNS:*.scm.centralus-01.azurewebsites.net, DNS:*.sso.centralus-01.azurewebsites.net, DNS:*.centralus.c.azurewebsites.net, DNS:*.scm.centralus.c.azurewebsites.net, DNS:*.sso.centralus.c.azurewebsites.net, DNS:*.azure-mobile.net, DNS:*.scm.azure-mobile.net"
+  },
+  {
+    "publisher": "Sunday Press",
+    "homepage": "https://www.sundaypressbooks.com/",
+    "status": "ok",
+    "file": "logos/sunday-press.gif",
+    "contentType": "image/gif",
+    "bytes": 38299,
+    "source": "https://www.sundaypressbooks.com/images/logo.gif",
+    "hash": "c962ba08"
+  },
+  {
+    "publisher": "Titan Comics",
+    "homepage": "https://titan-comics.com/",
+    "status": "error: HTTP 403"
+  },
+  {
+    "publisher": "Top Cow",
+    "homepage": "https://topcow.com/",
+    "status": "ok",
+    "file": "logos/top-cow.png",
+    "contentType": "image/png",
+    "bytes": 119556,
+    "source": "https://topcow.com/wp-content/uploads/2023/10/Logo-TCP.png",
+    "hash": "7d8f0a64"
+  },
+  {
+    "publisher": "Top Shelf Productions",
+    "homepage": "https://www.topshelfcomix.com/",
+    "status": "ok",
+    "file": "logos/top-shelf-productions.png",
+    "contentType": "image/png",
+    "bytes": 929,
+    "source": "https://www.topshelfcomix.com/favicon.png?ckcachebust=F4AC4C8417614951578076816783E4CE",
+    "hash": "b473a19f"
+  },
+  {
+    "publisher": "United Plankton Pictures",
+    "homepage": "https://unitedplankton.com/",
+    "status": "no-logo-detected"
+  },
+  {
+    "publisher": "Valiant Comics",
+    "homepage": "https://valiantentertainment.com/",
+    "status": "ok",
+    "file": "logos/valiant-comics.jpg",
+    "contentType": "image/jpeg",
+    "bytes": 8897,
+    "source": "https://valiantentertainment.com/wp-content/themes/valiant/images/facebook.jpg",
+    "hash": "7c0ee14f"
+  },
+  {
+    "publisher": "Vertigo",
+    "homepage": "https://www.dc.com/vertigo",
+    "status": "error: HTTP 403"
+  },
+  {
+    "publisher": "Viz Media",
+    "homepage": "https://www.viz.com/",
+    "status": "ok",
+    "file": "logos/viz-media.png",
+    "contentType": "image/png",
+    "bytes": 18068,
+    "source": "https://assets.viz.com/assets/logo@2x-b76f649f933ea15f45147ff5445a2501c85c7f863ba0aba5ea7bec93c3272cc6.png",
+    "hash": "74a2e569"
+  },
+  {
+    "publisher": "Yen Press",
+    "homepage": "https://yenpress.com/",
+    "status": "ok",
+    "file": "logos/yen-press.svg",
+    "contentType": "image/svg+xml",
+    "bytes": 11073,
+    "source": "https://yenpress.com/images/header/logo.svg",
+    "hash": "504edfd9"
+  },
+  {
+    "publisher": "Z2 Comics",
+    "homepage": "https://z2comics.com/",
+    "status": "ok",
+    "file": "logos/z2-comics.svg",
+    "contentType": "image/svg+xml",
+    "bytes": 2660,
+    "source": "https://z2comics.com/cdn/shop/files/Z2WHITE-logo.svg?v=1727231734&width=600",
+    "hash": "8178f209"
+  }
+]

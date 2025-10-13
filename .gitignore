@@ -1,0 +1,12 @@
+node_modules/
+.env
+package-lock.json
+config.json
+config.json.bak
+thumbnails/
+
+# SQLite database files
+*.db
+*.db-shm
+*.db-wal
+*.db.bak
