@@ -126,7 +126,7 @@ async function convertCbrToCbz(cbrPath) {
     const start = t0();
     log('INFO', 'CONVERT', `Converting: ${path.basename(cbrPath)}`);
     const cbzPath = cbrPath.replace(/\.cbr$/i, '.cbz');
-    const tempDir = path.join(TEMP_DIRECTORY, createId(cbrPath));
+    const tempDir = path.join(path.dirname(cbrPath), `.tmp-${createId(cbrPath)}`);
     try {
       await fs.promises.rm(tempDir, { recursive: true, force: true });
       await fs.promises.mkdir(tempDir, { recursive: true });
