@@ -5,6 +5,7 @@
   'use strict';
 
   let activeContextMenu = null;
+  let activeOverlay = null;
 
   // ============================================================================
   // SVG ICON CONSTANTS
@@ -32,6 +33,40 @@
   // ============================================================================
 
   /**
+   * Create an overlay element to prevent interaction with underlying elements
+   * @returns {HTMLElement} The overlay element
+   */
+  function createOverlay() {
+    const overlay = document.createElement('div');
+    overlay.className = 'context-menu-overlay';
+    overlay.style.cssText = `
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      z-index: 9998;
+      background: transparent;
+      cursor: default;
+    `;
+
+    // Close menu when overlay is clicked
+    overlay.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      closeContextMenu();
+    });
+
+    overlay.addEventListener('touchend', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      closeContextMenu();
+    });
+
+    return overlay;
+  }
+
+  /**
    * Position a context menu at the event coordinates and adjust if off-screen
    * @param {HTMLElement} menu - The menu element to position
    * @param {Event} event - The event containing coordinates
@@ -42,7 +77,14 @@
 
     menu.style.left = `${x}px`;
     menu.style.top = `${y}px`;
+    menu.style.zIndex = '9999'; // Ensure menu is above overlay
 
+    // Create and add overlay first (lower z-index)
+    const overlay = createOverlay();
+    document.body.appendChild(overlay);
+    activeOverlay = overlay;
+
+    // Then add menu (higher z-index)
     document.body.appendChild(menu);
     activeContextMenu = menu;
 
@@ -61,33 +103,43 @@
   /**
    * Attach click-outside close handler to a context menu
    * @param {HTMLElement} menu - The menu element to attach handler to
+   * Note: With overlay in place, this is primarily for desktop right-click + Esc key
    */
   function attachCloseHandler(menu) {
-    const closeHandler = (e) => {
-      if (!menu.contains(e.target)) {
-        e.preventDefault();
-        e.stopPropagation();
+    // Handle Escape key to close menu
+    const keyHandler = (e) => {
+      if (e.key === 'Escape') {
         closeContextMenu();
-        document.removeEventListener('click', closeHandler);
-        document.removeEventListener('touchstart', closeHandler);
-        document.removeEventListener('touchend', closeHandler);
+        document.removeEventListener('keydown', keyHandler);
       }
     };
 
+    document.addEventListener('keydown', keyHandler);
+
+    // Desktop right-click outside menu area (overlay handles mobile)
+    const clickHandler = (e) => {
+      if (activeOverlay && !menu.contains(e.target) && e.target !== activeOverlay) {
+        return; // Let overlay handle it
+      }
+    };
+
+    // Add a small delay to avoid immediate closure from the triggering event
     setTimeout(() => {
-      document.addEventListener('click', closeHandler);
-      document.addEventListener('touchstart', closeHandler);
-      document.addEventListener('touchend', closeHandler);
+      document.addEventListener('click', clickHandler, true);
     }, 100);
   }
 
   /**
-   * Close the active context menu
+   * Close the active context menu and remove overlay
    */
   function closeContextMenu() {
     if (activeContextMenu) {
       activeContextMenu.remove();
       activeContextMenu = null;
+    }
+    if (activeOverlay) {
+      activeOverlay.remove();
+      activeOverlay = null;
     }
   }
 

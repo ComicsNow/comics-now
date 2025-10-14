@@ -730,6 +730,7 @@ function showRootFolderList(options = {}) {
 
     // Add context menu support (right-click and long-press)
     let longPressTimer = null;
+    let contextMenuShown = false;
     const libraryContextData = {
       folderPath,
       rootData
@@ -743,17 +744,25 @@ function showRootFolderList(options = {}) {
 
     // Long-press for mobile
     card.addEventListener('touchstart', (e) => {
+      contextMenuShown = false;
       longPressTimer = setTimeout(() => {
         if (typeof global.showLibraryContextMenu === 'function') {
+          contextMenuShown = true;
           global.showLibraryContextMenu(e, libraryContextData);
         }
       }, 500); // 500ms long press
     });
 
-    card.addEventListener('touchend', () => {
+    card.addEventListener('touchend', (e) => {
       if (longPressTimer) {
         clearTimeout(longPressTimer);
         longPressTimer = null;
+      }
+      // Prevent click if context menu was just shown
+      if (contextMenuShown) {
+        e.preventDefault();
+        e.stopPropagation();
+        contextMenuShown = false;
       }
     });
 
@@ -924,6 +933,7 @@ function renderPublisherCards(publishersToShow) {
 
     // Add context menu support (right-click and long-press)
     let longPressTimer = null;
+    let contextMenuShown = false;
     const publisherContextData = {
       publisherName: publisher,
       publisherInfo: publisherData,
@@ -938,17 +948,25 @@ function renderPublisherCards(publishersToShow) {
 
     // Long-press for mobile
     card.addEventListener('touchstart', (e) => {
+      contextMenuShown = false;
       longPressTimer = setTimeout(() => {
         if (typeof global.showPublisherContextMenu === 'function') {
+          contextMenuShown = true;
           global.showPublisherContextMenu(e, publisherContextData);
         }
       }, 500); // 500ms long press
     });
 
-    card.addEventListener('touchend', () => {
+    card.addEventListener('touchend', (e) => {
       if (longPressTimer) {
         clearTimeout(longPressTimer);
         longPressTimer = null;
+      }
+      // Prevent click if context menu was just shown
+      if (contextMenuShown) {
+        e.preventDefault();
+        e.stopPropagation();
+        contextMenuShown = false;
       }
     });
 
@@ -1189,6 +1207,7 @@ function renderSeriesCards(seriesToRender) {
 
     // Add context menu support (right-click and long-press)
     let longPressTimer = null;
+    let contextMenuShown = false;
     const seriesContextData = {
       seriesName,
       comicsInSeries,
@@ -1204,17 +1223,25 @@ function renderSeriesCards(seriesToRender) {
 
     // Long-press for mobile
     card.addEventListener('touchstart', (e) => {
+      contextMenuShown = false;
       longPressTimer = setTimeout(() => {
         if (typeof global.showSeriesContextMenu === 'function') {
+          contextMenuShown = true;
           global.showSeriesContextMenu(e, seriesContextData);
         }
       }, 500); // 500ms long press
     });
 
-    card.addEventListener('touchend', () => {
+    card.addEventListener('touchend', (e) => {
       if (longPressTimer) {
         clearTimeout(longPressTimer);
         longPressTimer = null;
+      }
+      // Prevent click if context menu was just shown
+      if (contextMenuShown) {
+        e.preventDefault();
+        e.stopPropagation();
+        contextMenuShown = false;
       }
     });
 
@@ -1422,6 +1449,8 @@ if (downloadedComicIds.has(comic.id)) {
 
     // Add context menu support (right-click and long-press)
     let longPressTimer = null;
+    let contextMenuShown = false;
+
     card.addEventListener('contextmenu', (e) => {
       if (typeof global.showComicContextMenu === 'function') {
         global.showComicContextMenu(e, comic);
@@ -1430,17 +1459,25 @@ if (downloadedComicIds.has(comic.id)) {
 
     // Long-press for mobile
     card.addEventListener('touchstart', (e) => {
+      contextMenuShown = false;
       longPressTimer = setTimeout(() => {
         if (typeof global.showComicContextMenu === 'function') {
+          contextMenuShown = true;
           global.showComicContextMenu(e, comic);
         }
       }, 500); // 500ms long press
     });
 
-    card.addEventListener('touchend', () => {
+    card.addEventListener('touchend', (e) => {
       if (longPressTimer) {
         clearTimeout(longPressTimer);
         longPressTimer = null;
+      }
+      // Prevent click if context menu was just shown
+      if (contextMenuShown) {
+        e.preventDefault();
+        e.stopPropagation();
+        contextMenuShown = false;
       }
     });
 
