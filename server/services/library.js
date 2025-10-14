@@ -457,7 +457,8 @@ async function buildLibrary(userId = 'default-user') {
           `logos/${encodeURIComponent(folderName)}/${encodeURIComponent(logoFile)}`;
         lib[rootDir].publishers[publisherName].logoNeedsBackground = needsBackground;
       } else {
-        lib[rootDir].publishers[publisherName].logoUrl = null;
+        // Use default blank logo when no publisher logo exists
+        lib[rootDir].publishers[publisherName].logoUrl = 'logos/6373148-blank.png';
         lib[rootDir].publishers[publisherName].logoNeedsBackground = false;
       }
     }
