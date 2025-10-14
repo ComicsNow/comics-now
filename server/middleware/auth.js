@@ -108,7 +108,6 @@ async function extractUserFromJWT(req, res, next) {
       userId = testUserId;
       email = testUserEmail || `${testUserId}@test.local`;
       role = testUserRole || 'user';
-      `);
     }
 
     req.user = {
@@ -143,8 +142,6 @@ async function extractUserFromJWT(req, res, next) {
       const clientIP = req.ip || req.connection.remoteAddress || req.socket.remoteAddress;
       const normalizedIP = clientIP?.replace(/^::ffff:/, ''); // Remove IPv6 prefix
 
-      }`);
-
       if (isIPInTrustedList(normalizedIP, trustedIPs)) {
         
         req.user = {
@@ -174,8 +171,7 @@ async function extractUserFromJWT(req, res, next) {
 
   // Debug logging
   if (!jwtToken && req.path.includes('/api/')) {
-    
-    );
+
   }
 
   // Development bypass (only if NODE_ENV is development)
