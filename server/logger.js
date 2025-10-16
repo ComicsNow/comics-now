@@ -41,7 +41,10 @@ function log(level, category, message) {
   const timestamp = new Date().toISOString();
   const entry = { timestamp, level, category, message };
   pushWithLimit(logs, entry);
-  rawConsole.log(`[${timestamp}] [${level}] [${category}] ${message}`);
+  // Only output ERROR level logs to console
+  if (level === 'ERROR') {
+    rawConsole.error(`[${timestamp}] [${level}] [${category}] ${message}`);
+  }
 }
 
 function registerCtClient(res) {

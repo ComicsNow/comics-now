@@ -10,8 +10,10 @@ const rawConsole = {
   error: console.error.bind(console)
 };
 
-// Don't suppress console in production - let users use browser's built-in filtering
-// If you want to disable logs, use the browser console filter or developer tools
+// Silence all non-error console output
+console.log = function() {};
+console.info = function() {};
+console.debug = function() {};
 
 
 const DEBUG_LOG_STATE = {

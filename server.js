@@ -83,10 +83,7 @@ loadConfigFromDisk();
 
 // Initialize JWKS client if auth is enabled
 if (isAuthEnabled()) {
-  console.log('✓ Authentication enabled - Cloudflare Zero Trust mode');
   initJwksClient();
-} else {
-  console.log('ℹ️  Authentication disabled - Open access mode');
 }
 
 const app = express();
