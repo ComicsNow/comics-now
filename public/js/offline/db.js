@@ -8,10 +8,29 @@
   function getCurrentUserId() {
     // Try syncManager first
     if (window.syncManager && window.syncManager.userId) {
-      return window.syncManager.userId;
+      const userId = window.syncManager.userId;
+      // Cache it in localStorage for offline access
+      try {
+        localStorage.setItem('comics-now-cached-user-id', userId);
+      } catch (e) {
+        // Ignore storage errors
+      }
+      return userId;
     }
 
-    // Fallback to default
+    // When offline, try to get cached userId from localStorage
+    try {
+      const cachedUserId = localStorage.getItem('comics-now-cached-user-id');
+      if (cachedUserId) {
+        console.log('[OFFLINE] Using cached userId from localStorage:', cachedUserId);
+        return cachedUserId;
+      }
+    } catch (e) {
+      // Ignore storage errors
+    }
+
+    // Final fallback to default
+    console.log('[OFFLINE] No cached userId found, using default-user');
     return 'default-user';
   }
 
