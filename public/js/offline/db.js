@@ -328,25 +328,52 @@
   }
 
   async function getAllDownloadedComicIds() {
-    if (!db) await openOfflineDB();
+    console.log('[OFFLINE] getAllDownloadedComicIds called');
+
+    if (!db) {
+      console.log('[OFFLINE] DB not initialized, opening...');
+      await openOfflineDB();
+    }
 
     // Get current userId from syncManager or default
     const currentUserId = getCurrentUserId();
+    console.log('[OFFLINE] Current user ID:', currentUserId);
 
     return new Promise((resolve, reject) => {
-      const tx = db.transaction(['comics'], 'readonly');
-      const store = tx.objectStore('comics');
-      const request = store.getAll();
-      request.onsuccess = (event) => {
-        const allComics = event.target.result || [];
-        // Filter by userId and extract IDs
-        const userComicIds = allComics
-          .filter(comic => !comic.userId || comic.userId === currentUserId)
-          .map(comic => comic.id);
-        downloadedComicIds = new Set(userComicIds);
-        resolve(downloadedComicIds);
-      };
-      request.onerror = (event) => reject(new Error(`Failed to get comics: ${event.target.errorCode}`));
+      try {
+        const tx = db.transaction(['comics'], 'readonly');
+        const store = tx.objectStore('comics');
+        const request = store.getAll();
+        request.onsuccess = (event) => {
+          const allComics = event.target.result || [];
+          console.log('[OFFLINE] Total comics in DB:', allComics.length);
+
+          // Filter by userId and extract IDs
+          const userComicIds = allComics
+            .filter(comic => !comic.userId || comic.userId === currentUserId)
+            .map(comic => comic.id);
+
+          console.log('[OFFLINE] User comics after filtering:', userComicIds.length);
+          console.log('[OFFLINE] Comic IDs:', userComicIds);
+
+          downloadedComicIds = new Set(userComicIds);
+
+          // Also set it globally to ensure it's accessible
+          if (typeof window !== 'undefined') {
+            window.downloadedComicIds = downloadedComicIds;
+          }
+
+          console.log('[OFFLINE] downloadedComicIds Set updated, size:', downloadedComicIds.size);
+          resolve(downloadedComicIds);
+        };
+        request.onerror = (event) => {
+          console.error('[OFFLINE] Error getting comics from DB:', event.target.error);
+          reject(new Error(`Failed to get comics: ${event.target.errorCode}`));
+        };
+      } catch (error) {
+        console.error('[OFFLINE] Exception in getAllDownloadedComicIds:', error);
+        reject(error);
+      }
     });
   }
 

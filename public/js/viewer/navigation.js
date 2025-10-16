@@ -155,6 +155,10 @@
       series: global.currentSeries,
     };
     global.currentView = 'comic';
+    // Also update the global currentView variable (not just window.currentView)
+    if (typeof currentView !== 'undefined') {
+      currentView = 'comic';
+    }
 
     setLibraryControlsVisibility(false);
     global.updateOrientationButtons?.();

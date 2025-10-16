@@ -145,10 +145,18 @@ async function loadLibraryOfflineFirst() {
     // Load downloaded comic IDs early so indicators show immediately
     if (typeof getAllDownloadedComicIds === 'function') {
       try {
-        await getAllDownloadedComicIds();
+        console.log('[DEBUG] Loading downloaded comic IDs...');
+        const ids = await getAllDownloadedComicIds();
+        console.log('[DEBUG] Loaded', ids ? ids.size : 0, 'downloaded comic IDs');
       } catch (error) {
-        // Failed to load downloaded comic IDs
+        console.error('[DEBUG] Failed to load downloaded comic IDs:', error);
+        // Initialize empty set to prevent errors in UI
+        if (!global.downloadedComicIds) {
+          global.downloadedComicIds = new Set();
+        }
       }
+    } else {
+      console.warn('[DEBUG] getAllDownloadedComicIds function not available');
     }
 
     if (cachedLibrary) {
@@ -202,15 +210,23 @@ async function loadLibraryOfflineFirst() {
 
     // If we're online, refresh from the server
     if (!isOffline) {
+      console.log('[DEBUG] Online, attempting to fetch library from server');
       const serverFetchStart = performance.now();
       try {
         await fetchLibraryFromServer();
         hasLibraryData = true;
       } catch (error) {
+        console.error('[DEBUG] fetchLibraryFromServer error:', error);
+        // Network error - if we have cached data, continue using it silently
         if (!hasLibraryData) {
           showOfflineLibraryUnavailableMessage();
+        } else {
+          // We have cached data, so just log the error and continue
+          console.warn('[OFFLINE] Server fetch failed but using cached library data:', error.message);
         }
       }
+    } else {
+      console.log('[DEBUG] Offline, not fetching from server');
     }
 
     // Run background operations
@@ -232,15 +248,19 @@ async function loadLibraryOfflineFirst() {
 
 // Modified function to fetch from server and cache
 async function fetchLibraryFromServer() {
-  
+  console.log('[DEBUG] fetchLibraryFromServer called');
+  console.log('[DEBUG] window.tryProgressiveLoading exists?', typeof window.tryProgressiveLoading);
+  console.log('[DEBUG] window.fetchLibraryFull exists?', typeof window.fetchLibraryFull);
 
   try {
     // Try lazy loading first, fallback to full loading
-    const useProgressiveLoading = await tryProgressiveLoading();
+    console.log('[DEBUG] About to call tryProgressiveLoading');
+    const useProgressiveLoading = await window.tryProgressiveLoading();
+    console.log('[DEBUG] tryProgressiveLoading returned:', useProgressiveLoading);
 
     if (!useProgressiveLoading) {
       // Fallback to original full loading
-      await fetchLibraryFull();
+      await window.fetchLibraryFull();
       return;
     }
 
@@ -382,6 +402,12 @@ function hideAdminUI() {
 
   // Note: We don't throw errors if elements don't exist - they might not be loaded yet
   // The UI will gracefully handle missing elements
+}
+
+// Expose functions globally for library/data.js
+if (typeof window !== 'undefined') {
+  window.loadLibraryOfflineFirst = loadLibraryOfflineFirst;
+  window.fetchLibraryFromServer = fetchLibraryFromServer;
 }
 
 initializeApp();

@@ -264,11 +264,14 @@
     const image = global.fullscreenImage;
     if (!isFullscreenPanning) return;
 
-    if (image && typeof pointerId === 'number' && typeof image.releasePointerCapture === 'function') {
+    // Use the provided pointerId or fallback to the stored one
+    const pointerIdToRelease = typeof pointerId === 'number' ? pointerId : fullscreenPanPointerId;
+
+    if (image && typeof pointerIdToRelease === 'number' && typeof image.releasePointerCapture === 'function') {
       try {
-        image.releasePointerCapture(pointerId);
+        image.releasePointerCapture(pointerIdToRelease);
       } catch (error) {
-        
+
       }
     }
 

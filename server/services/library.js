@@ -414,12 +414,20 @@ async function buildLibrary(userId = 'default-user') {
       lib[rootDir].publishers[r.publisher].series[r.series] = [];
     }
 
-    let metadata = {};
+    let fullMetadata = {};
     try {
-      metadata = JSON.parse(r.metadata || '{}');
+      fullMetadata = JSON.parse(r.metadata || '{}');
     } catch {
-      metadata = {};
+      fullMetadata = {};
     }
+
+    // Only include minimal metadata fields needed for display
+    // Full metadata can be fetched via /api/v1/comics/info when needed
+    const metadata = {
+      Number: fullMetadata.Number || fullMetadata.Issue || fullMetadata.IssueNumber || fullMetadata.SortNumber || fullMetadata.AlternateNumber || '',
+      Series: fullMetadata.Series || fullMetadata.SeriesName || fullMetadata.AlternateSeries || '',
+      Title: fullMetadata.Title || fullMetadata.DisplayTitle || fullMetadata.SortName || fullMetadata.FullTitle || fullMetadata.StoryTitle || ''
+    };
 
     // Use per-user progress if available, otherwise default to 0
     const progress = progressMap[r.id] || { lastReadPage: 0, totalPages: r.totalPages || 0 };

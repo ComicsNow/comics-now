@@ -21,7 +21,7 @@
   }
 
   async function fetchLibrary() {
-    await loadLibraryOfflineFirst();
+    await fetchLibraryFull();
   }
 
   async function tryProgressiveLoading() {
@@ -50,6 +50,11 @@
   async function fetchLibraryFull() {
     debugLog('LAZY', 'Using full library loading');
     const response = await fetch(`${API_BASE_URL}/api/v1/comics`);
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch library: ${response.status} ${response.statusText}`);
+    }
+
     library = await response.json();
     applyDisplayInfoToLibrary(library);
 

@@ -418,10 +418,17 @@ function resetFullscreenZoom() {
   fullscreenViewer.scrollLeft = 0;
   fullscreenNavLeft.classList.remove('hidden');
   fullscreenNavRight.classList.remove('hidden');
+  // Update both local variables and window properties for consistency
   isFullscreenZoomed = false;
   fullscreenZoomScale = 1;
   fullscreenZoomBaseWidth = 0;
   fullscreenZoomBaseHeight = 0;
+  if (typeof window !== 'undefined') {
+    window.isFullscreenZoomed = false;
+    window.fullscreenZoomScale = 1;
+    window.fullscreenZoomBaseWidth = 0;
+    window.fullscreenZoomBaseHeight = 0;
+  }
   if (typeof onFullscreenReset === 'function') {
     onFullscreenReset();
   }
@@ -449,6 +456,10 @@ if (typeof window !== 'undefined') {
   window.PRELOAD_AHEAD_COUNT = PRELOAD_AHEAD_COUNT;
   window.isFitToHeight = isFitToHeight;
   window.isLandscapeOrientation = isLandscapeOrientation;
+  window.isFullscreenZoomed = isFullscreenZoomed;
+  window.fullscreenZoomScale = fullscreenZoomScale;
+  window.fullscreenZoomBaseWidth = fullscreenZoomBaseWidth;
+  window.fullscreenZoomBaseHeight = fullscreenZoomBaseHeight;
 
   // Expose UI elements
   window.comicViewerDiv = comicViewerDiv;

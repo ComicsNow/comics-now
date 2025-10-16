@@ -486,10 +486,10 @@
 
   async function enhancedBackgroundSync() {
     try {
-      
+
 
       if (navigator.onLine === false) {
-        
+
         return;
       }
 
@@ -501,29 +501,13 @@
         await syncOfflineStatuses();
       }
 
-      let cacheTimestamp = null;
-      if (typeof loadLibraryCacheFromDB === 'function') {
-        try {
-          const cachedRecord = await loadLibraryCacheFromDB();
-          cacheTimestamp = cachedRecord?.timestamp || null;
-        } catch (error) {
-          
-        }
-      }
+      // NOTE: Library fetching is handled by app initialization and manual refreshes.
+      // Automatic background fetching can cause duplicate requests on slow connections.
+      // Removed automatic library refetch from background sync.
 
-      const now = Date.now();
-      const cacheAge = cacheTimestamp ? now - cacheTimestamp : Infinity;
 
-      if (cacheAge > 5 * 60 * 1000) {
-        
-        if (typeof global.fetchLibraryFromServer === 'function') {
-          await global.fetchLibraryFromServer();
-        }
-      }
-
-      
     } catch (error) {
-      
+
     }
   }
 

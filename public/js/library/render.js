@@ -37,6 +37,12 @@ function showLatestAddedSmartList() {
   currentRootFolder = null;
   currentPublisher = null;
   currentSeries = null;
+  if (typeof window !== 'undefined') {
+    window.currentView = currentView;
+    window.currentRootFolder = currentRootFolder;
+    window.currentPublisher = currentPublisher;
+    window.currentSeries = currentSeries;
+  }
   SmartLists.rebuildLatestComics();
   renderLatestSmartList();
 }
@@ -46,6 +52,12 @@ function showLatestConvertedSmartList() {
   currentRootFolder = null;
   currentPublisher = null;
   currentSeries = null;
+  if (typeof window !== 'undefined') {
+    window.currentView = currentView;
+    window.currentRootFolder = currentRootFolder;
+    window.currentPublisher = currentPublisher;
+    window.currentSeries = currentSeries;
+  }
   SmartLists.rebuildLatestConvertedComics();
   renderConvertedSmartList();
 }
@@ -55,6 +67,12 @@ async function showDownloadedSmartList() {
   currentRootFolder = null;
   currentPublisher = null;
   currentSeries = null;
+  if (typeof window !== 'undefined') {
+    window.currentView = currentView;
+    window.currentRootFolder = currentRootFolder;
+    window.currentPublisher = currentPublisher;
+    window.currentSeries = currentSeries;
+  }
 
   setLatestButtonActive(false);
   setConvertedButtonActive(false);
