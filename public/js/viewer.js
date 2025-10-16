@@ -95,8 +95,10 @@
   }
 
   async function renderPage() {
+    console.log('[renderPage] START - currentPageIndex:', global.currentPageIndex);
     const pages = global.getViewerPages?.() || [];
     if (!Array.isArray(pages) || pages.length === 0) {
+      console.log('[renderPage] No pages found');
       if (global.viewerPagesDiv) {
         global.viewerPagesDiv.innerHTML = `<div class="text-center text-gray-400">No pages found.</div>`;
       }
@@ -106,19 +108,32 @@
 
     global.currentPageIndex = Math.max(0, Math.min(global.currentPageIndex, pages.length - 1));
     const requestedIndex = global.currentPageIndex;
+    console.log('[renderPage] Rendering page index:', requestedIndex);
 
     global.updateViewerPageCounter?.(pages);
     global.hidePageJumpInput?.({ focusButton: false });
 
     if (global.pageLoader) {
+      console.log('[renderPage] Showing normal page loader');
       global.pageLoader.classList.remove('hidden');
       global.pageLoader.classList.add('flex');
+    }
+
+    // Show fullscreen loader if in fullscreen mode
+    const fullscreenPageLoader = document.getElementById('fullscreen-page-loader');
+    const isFullscreenActive = global.fullscreenViewer && !global.fullscreenViewer.classList.contains('hidden');
+    console.log('[renderPage] Fullscreen active?', isFullscreenActive, 'Loader element?', !!fullscreenPageLoader);
+    if (isFullscreenActive && fullscreenPageLoader) {
+      console.log('[renderPage] Showing fullscreen loader');
+      fullscreenPageLoader.classList.remove('hidden');
+      fullscreenPageLoader.classList.add('flex');
     }
 
     try {
       // In manga mode, button roles are reversed, so disable logic must be reversed too
       const isMangaMode = global.currentComic?.mangaMode || false;
 
+      // Update normal viewer navigation buttons
       if (global.prevPageBtn) {
         global.prevPageBtn.disabled = isMangaMode
           ? requestedIndex === pages.length - 1  // In manga mode, prev goes forward
@@ -130,23 +145,49 @@
           : requestedIndex === pages.length - 1; // In normal mode, next goes forward
       }
 
+      // Update fullscreen navigation buttons with same logic
+      if (global.fullscreenPrevPageBtn) {
+        global.fullscreenPrevPageBtn.disabled = isMangaMode
+          ? requestedIndex === pages.length - 1
+          : requestedIndex === 0;
+      }
+      if (global.fullscreenNextPageBtn) {
+        global.fullscreenNextPageBtn.disabled = isMangaMode
+          ? requestedIndex === 0
+          : requestedIndex === pages.length - 1;
+      }
+
+      console.log('[renderPage] Getting page URL for page:', pages[requestedIndex]);
       const pageUrl = await getPageUrl(pages[requestedIndex]);
+      console.log('[renderPage] Got page URL:', pageUrl);
       let img = global.preloadedImages?.get(pageUrl);
+      console.log('[renderPage] Image in cache?', !!img);
       if (!img) {
+        console.log('[renderPage] Creating new image element');
         img = new Image();
         img.crossOrigin = 'anonymous';
         img.src = pageUrl;
         global.preloadedImages?.set(pageUrl, img);
       }
 
+      console.log('[renderPage] Waiting for image to load, img.complete=', img.complete);
       await new Promise((resolve, reject) => {
         if (img.complete) {
+          console.log('[renderPage] Image already complete');
           resolve();
         } else {
-          img.onload = resolve;
-          img.onerror = reject;
+          console.log('[renderPage] Waiting for image onload...');
+          img.onload = () => {
+            console.log('[renderPage] Image loaded successfully');
+            resolve();
+          };
+          img.onerror = (err) => {
+            console.error('[renderPage] Image load error:', err);
+            reject(err);
+          };
         }
       });
+      console.log('[renderPage] Image loading complete');
 
       img.alt = `Page ${requestedIndex + 1}`;
       img.className = 'viewer-image rounded-lg shadow-xl';
@@ -176,18 +217,30 @@
 
       prunePreloadedImages(global.currentPageIndex, pages);
       preloadPages(global.currentPageIndex, pages);
+      console.log('[renderPage] SUCCESS - returning true');
       return true;
     } catch (error) {
-      
+      console.error('[renderPage] ERROR:', error);
       if (global.viewerPagesDiv) {
         global.viewerPagesDiv.innerHTML = `<div class="text-center text-red-400">Failed to load page.</div>`;
       }
       return false;
     } finally {
+      console.log('[renderPage] FINALLY - hiding loaders');
       if (global.pageLoader) {
         global.pageLoader.classList.add('hidden');
         global.pageLoader.classList.remove('flex');
       }
+
+      // Hide fullscreen loader if in fullscreen mode
+      const fullscreenPageLoader = document.getElementById('fullscreen-page-loader');
+      const isFullscreenActive = global.fullscreenViewer && !global.fullscreenViewer.classList.contains('hidden');
+      if (isFullscreenActive && fullscreenPageLoader) {
+        console.log('[renderPage] Hiding fullscreen loader');
+        fullscreenPageLoader.classList.add('hidden');
+        fullscreenPageLoader.classList.remove('flex');
+      }
+      console.log('[renderPage] END');
     }
   }
 
@@ -213,26 +266,54 @@
     }
   }
 
+  let isNavigating = false;
+
   async function navigatePage(direction) {
-    if (global.isFullscreenZoomed) return;
+    console.log('[navigatePage] Called with direction:', direction, 'currentPageIndex:', global.currentPageIndex, 'isNavigating:', isNavigating);
+
+    // PREVENT CONCURRENT NAVIGATIONS
+    if (isNavigating) {
+      console.log('[navigatePage] BLOCKED - Already navigating, ignoring this call');
+      return;
+    }
+
+    if (global.isFullscreenZoomed) {
+      console.log('[navigatePage] Blocked - fullscreen is zoomed');
+      return;
+    }
     if (typeof global.hideFullscreenControls === 'function') {
       global.hideFullscreenControls();
     }
 
+    isNavigating = true;
+    console.log('[navigatePage] Set isNavigating = true');
+
     const pages = global.getViewerPages?.() || [];
-    if (!Array.isArray(pages) || pages.length === 0) return;
+    if (!Array.isArray(pages) || pages.length === 0) {
+      console.log('[navigatePage] No pages available');
+      isNavigating = false;
+      return;
+    }
 
     // Apply manga mode direction reversal
     const effectiveDirection = global.getNavigationDirection ? global.getNavigationDirection(direction) : direction;
+    console.log('[navigatePage] Effective direction:', effectiveDirection);
 
     const newIndex = global.currentPageIndex + effectiveDirection;
-    if (newIndex < 0 || newIndex >= pages.length) return;
+    console.log('[navigatePage] New index would be:', newIndex, 'pages.length:', pages.length);
+    if (newIndex < 0 || newIndex >= pages.length) {
+      console.log('[navigatePage] New index out of bounds, returning');
+      isNavigating = false;
+      return;
+    }
 
     const scrollY = global.window.scrollY;
     global.currentPageIndex = newIndex;
+    console.log('[navigatePage] Updated currentPageIndex to:', global.currentPageIndex);
     global.hidePageJumpInput?.({ focusButton: false });
 
     try {
+      console.log('[navigatePage] Starting page load and progress save...');
       const comicFromDB = await global.getComicFromDB?.(global.currentComic.id);
       const isDownloaded = global.downloadedComicIds?.has(global.currentComic.id) || !!comicFromDB;
 
@@ -273,12 +354,18 @@
         }
       }
 
+      console.log('[navigatePage] Calling renderPage...');
       const rendered = await renderPage();
+      console.log('[navigatePage] renderPage returned:', rendered);
       if (rendered) {
         global.window.scrollTo(0, scrollY);
       }
+      console.log('[navigatePage] COMPLETE');
     } catch (error) {
-      
+      console.error('[navigatePage] ERROR:', error);
+    } finally {
+      isNavigating = false;
+      console.log('[navigatePage] Set isNavigating = false (released lock)');
     }
   }
 

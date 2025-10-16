@@ -12,7 +12,7 @@
   <link rel="icon" type="image/png" href="icons/icon-192x192.png">
   <link rel="stylesheet" href="tailwind.css">
   <script src="jszip.min.js"></script>
-  <link rel="stylesheet" href="style.css?v=1.2">
+  <link rel="stylesheet" href="style.css?v=1.4">
 </head>
 <body class="p-4 sm:p-8">
  
@@ -291,13 +291,22 @@
         <span aria-hidden="true">&times;</span>
       </button>
 
-      <!-- Bottom info bar - ALWAYS VISIBLE with page info and close button -->
+      <!-- Fullscreen loading spinner -->
+      <div id="fullscreen-page-loader" class="hidden absolute inset-0 items-center justify-center bg-black bg-opacity-50 z-10">
+        <svg class="animate-spin h-12 w-12 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+        </svg>
+      </div>
+
+      <!-- Bottom info bar - ALWAYS VISIBLE with page info and navigation -->
       <div
         id="fullscreen-info-bar"
         class="fullscreen-info-bar"
         role="status"
         aria-live="polite"
       >
+        <!-- Progress indicator -->
         <span
           id="fullscreen-progress-indicator"
           class="fullscreen-progress-indicator"
@@ -305,13 +314,57 @@
         >
           0% read
         </span>
-        <span
-          id="fullscreen-page-indicator"
-          class="fullscreen-page-indicator"
-          aria-label="Current page"
+
+        <!-- Previous page button -->
+        <button
+          id="fullscreen-prev-page-btn"
+          type="button"
+          class="fullscreen-nav-button"
+          aria-label="Previous page"
+          title="Previous page"
         >
-          &mdash; / &mdash;
-        </span>
+          ←
+        </button>
+
+        <!-- Page counter with jump functionality -->
+        <div class="fullscreen-page-counter-wrapper">
+          <button
+            id="fullscreen-page-counter"
+            type="button"
+            class="fullscreen-page-counter-button"
+            title="Jump to page"
+            aria-label="Current page. Tap to jump to a specific page."
+            aria-expanded="false"
+          >
+            &mdash; / &mdash;
+          </button>
+          <input
+            id="fullscreen-page-jump-input"
+            type="number"
+            inputmode="numeric"
+            pattern="[0-9]*"
+            class="fullscreen-page-jump-input hidden"
+            min="1"
+            step="1"
+            autocomplete="off"
+            enterkeyhint="go"
+            placeholder="Page #"
+            aria-label="Enter a page number to jump to"
+          />
+        </div>
+
+        <!-- Next page button -->
+        <button
+          id="fullscreen-next-page-btn"
+          type="button"
+          class="fullscreen-nav-button"
+          aria-label="Next page"
+          title="Next page"
+        >
+          →
+        </button>
+
+        <!-- Close button -->
         <button
           id="fullscreen-close-btn-bottom"
           type="button"

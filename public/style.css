@@ -256,11 +256,11 @@ body {
     left: 50%;
     transform: translateX(-50%);
     display: grid;
-    grid-template-columns: auto 1fr auto;
+    grid-template-columns: auto auto auto auto auto;
     align-items: center;
     justify-items: center;
-    column-gap: 1rem;
-    width: min(400px, calc(100% - 32px));
+    column-gap: 0.75rem;
+    width: min(500px, calc(100% - 32px));
     padding: 0.65rem 1rem;
     border-radius: 9999px;
     background-color: rgba(0, 0, 0, 0.75);
@@ -320,6 +320,116 @@ body {
     transform: scale(0.95);
 }
 
+/* Fullscreen navigation buttons */
+.fullscreen-nav-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    border-radius: 50%;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    background-color: rgba(255, 255, 255, 0.15);
+    color: rgba(255, 255, 255, 0.95);
+    font-size: 1.1rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.fullscreen-nav-button:hover:not([disabled]) {
+    background-color: rgba(147, 51, 234, 0.7);
+    border-color: rgba(255, 255, 255, 0.5);
+    transform: scale(1.1);
+}
+
+.fullscreen-nav-button:active:not([disabled]) {
+    transform: scale(0.95);
+}
+
+.fullscreen-nav-button[disabled] {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+/* Fullscreen page counter wrapper (contains button and input) */
+.fullscreen-page-counter-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 5rem;
+}
+
+.fullscreen-page-counter-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 5rem;
+    padding: 0.35rem 0.75rem;
+    border-radius: 9999px;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    background-color: rgba(255, 255, 255, 0.15);
+    color: rgba(255, 255, 255, 0.95);
+    font-family: 'JetBrains Mono', 'Fira Code', 'SFMono-Regular', Menlo, Monaco, Consolas, monospace;
+    font-size: 0.85rem;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.fullscreen-page-counter-button:hover {
+    background-color: rgba(255, 255, 255, 0.25);
+    border-color: rgba(129, 140, 248, 0.6);
+}
+
+.fullscreen-page-counter-button:active {
+    transform: scale(0.98);
+}
+
+.fullscreen-page-jump-input {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    min-width: 5rem;
+    padding: 0.4rem 0.65rem;
+    border-radius: 0.75rem;
+    border: 1px solid rgba(96, 165, 250, 0.65);
+    background-color: rgba(17, 24, 39, 0.98);
+    color: #f9fafb;
+    font-family: 'JetBrains Mono', 'Fira Code', 'SFMono-Regular', Menlo, Monaco, Consolas, monospace;
+    font-size: 0.9rem;
+    font-variant-numeric: tabular-nums;
+    text-align: center;
+    box-shadow: 0 18px 36px rgba(0, 0, 0, 0.55);
+    z-index: 80;
+    transition: all 0.2s ease;
+}
+
+.fullscreen-page-jump-input:focus {
+    outline: none;
+    border-color: rgba(168, 85, 247, 0.8);
+    box-shadow: 0 0 0 3px rgba(168, 85, 247, 0.35);
+}
+
+.fullscreen-page-jump-input::placeholder {
+    color: rgba(156, 163, 175, 0.75);
+}
+
+.fullscreen-page-jump-input::-webkit-outer-spin-button,
+.fullscreen-page-jump-input::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+
+.fullscreen-page-jump-input[type=number] {
+    -moz-appearance: textfield;
+}
+
 /* Portrait toggle controls - shown on tap */
 .fullscreen-controls {
     position: fixed;
@@ -341,19 +451,37 @@ body {
 @media (max-width: 640px) {
     .fullscreen-info-bar {
         bottom: calc(10px + env(safe-area-inset-bottom));
-        width: min(320px, calc(100% - 24px));
-        padding: 0.45rem 0.65rem 0.45rem 0.85rem;
-        column-gap: 0.85rem;
+        width: min(420px, calc(100% - 16px));
+        padding: 0.5rem 0.75rem;
+        column-gap: 0.5rem;
+        grid-template-columns: auto minmax(0, auto) auto auto auto;
     }
 
     .fullscreen-progress-indicator {
-        font-size: 0.7rem;
+        font-size: 0.65rem;
         letter-spacing: 0.02em;
     }
 
-    .fullscreen-page-indicator {
-        font-size: 0.7rem;
-        letter-spacing: 0.05em;
+    .fullscreen-nav-button {
+        width: 28px;
+        height: 28px;
+        font-size: 1rem;
+    }
+
+    .fullscreen-page-counter-button {
+        min-width: 4.5rem;
+        padding: 0.3rem 0.6rem;
+        font-size: 0.75rem;
+    }
+
+    .fullscreen-page-counter-wrapper {
+        min-width: 4.5rem;
+    }
+
+    .fullscreen-page-jump-input {
+        min-width: 4.5rem;
+        padding: 0.35rem 0.55rem;
+        font-size: 0.8rem;
     }
 }
 

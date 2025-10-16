@@ -106,10 +106,13 @@ async function initializeApp() {
     await loadLibraryOfflineFirst();
 
   } catch (e) {
-    
+    console.error('[APP INIT ERROR]', e);
+    console.error('[APP INIT ERROR] Stack:', e.stack);
     document.body.innerHTML =
       `<div class="text-red-400 text-center p-8">
          Could not load app configuration from server. Is it running and accessible?
+         <br><br>
+         <div class="text-sm text-gray-400">Error: ${e.message}</div>
        </div>`;
   }
 }

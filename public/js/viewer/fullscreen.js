@@ -62,8 +62,12 @@
     if (!viewer || !image) return;
 
     const currentImage = document.querySelector('.viewer-image');
-    if (currentImage) {
+    if (currentImage && currentImage.src && currentImage.src !== '') {
+      console.log('[openFullscreen] Copying src from viewer image:', currentImage.src);
       image.src = currentImage.src;
+    } else {
+      console.log('[openFullscreen] No viewer image or src available, will be set by renderPage');
+      // Image will be set by renderPage when it updates
     }
 
     viewer.classList.remove('hidden');
@@ -89,6 +93,16 @@
     const closeBtn = global.fullscreenCloseBtn;
     if (closeBtn) {
       closeBtn.focus();
+    }
+
+    // If no image src was copied, trigger renderPage to load it
+    if (!image.src || image.src === '') {
+      console.log('[openFullscreen] No image src, calling renderPage to load current page');
+      if (typeof global.renderPage === 'function') {
+        global.renderPage().catch((err) => {
+          console.error('[openFullscreen] Error calling renderPage:', err);
+        });
+      }
     }
   }
 
@@ -429,21 +443,69 @@
 
   function updateFullscreenPageStatus(currentPage, totalPages) {
     const progressIndicator = global.fullscreenProgressIndicator;
-    const pageIndicator = global.fullscreenPageIndicator;
+    const pageCounter = global.fullscreenPageCounter;
 
-    if (!progressIndicator || !pageIndicator) {
+    if (!progressIndicator || !pageCounter) {
       return;
     }
 
     if (!totalPages || totalPages <= 0) {
-      pageIndicator.textContent = '-- / --';
       progressIndicator.textContent = '0% read';
+      pageCounter.textContent = '-- / --';
       return;
     }
 
-    pageIndicator.textContent = `${currentPage} / ${totalPages}`;
+    const pageText = `${currentPage} / ${totalPages}`;
     const progressPercent = Math.round((currentPage / totalPages) * 100);
     progressIndicator.textContent = `${progressPercent}% read`;
+    pageCounter.textContent = pageText;
+  }
+
+  function showFullscreenPageJumpInput() {
+    const counter = global.fullscreenPageCounter;
+    const input = global.fullscreenPageJumpInput;
+    if (!counter || !input) return;
+
+    counter.classList.add('hidden');
+    input.classList.remove('hidden');
+    input.value = '';
+
+    // Focus with a slight delay to ensure it's visible
+    setTimeout(() => {
+      input.focus();
+      input.select();
+    }, 50);
+  }
+
+  function hideFullscreenPageJumpInput() {
+    const counter = global.fullscreenPageCounter;
+    const input = global.fullscreenPageJumpInput;
+    if (!counter || !input) return;
+
+    input.classList.add('hidden');
+    counter.classList.remove('hidden');
+  }
+
+  function commitFullscreenPageJump() {
+    const input = global.fullscreenPageJumpInput;
+    if (!input) return;
+
+    const pages = global.getViewerPages?.() || [];
+    const totalPages = pages.length;
+
+    const targetPage = parseInt(input.value, 10);
+    if (isNaN(targetPage) || targetPage < 1 || targetPage > totalPages) {
+      hideFullscreenPageJumpInput();
+      return;
+    }
+
+    const targetIndex = targetPage - 1;
+    global.currentPageIndex = targetIndex;
+    hideFullscreenPageJumpInput();
+
+    if (typeof global.renderPage === 'function') {
+      global.renderPage();
+    }
   }
 
   function updateFullscreenViewerCentering() {
@@ -527,8 +589,64 @@
     updateFullscreenPageStatus,
     updateFullscreenViewerCentering,
     applyFullscreenFitMode,
+    showFullscreenPageJumpInput,
+    hideFullscreenPageJumpInput,
+    commitFullscreenPageJump,
   };
 
   global.ViewerFullscreen = ViewerFullscreen;
   Object.assign(global, ViewerFullscreen);
+
+  // Initialize event listeners for fullscreen navigation
+  function initFullscreenNavigation() {
+    // Prev/Next page buttons
+    if (global.fullscreenPrevPageBtn && !global.fullscreenPrevPageBtn._navListener) {
+      global.fullscreenPrevPageBtn._navListener = (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        if (typeof global.navigatePage === 'function') {
+          global.navigatePage(-1);
+        }
+      };
+      global.fullscreenPrevPageBtn.addEventListener('click', global.fullscreenPrevPageBtn._navListener);
+    }
+
+    if (global.fullscreenNextPageBtn && !global.fullscreenNextPageBtn._navListener) {
+      global.fullscreenNextPageBtn._navListener = (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        if (typeof global.navigatePage === 'function') {
+          global.navigatePage(1);
+        }
+      };
+      global.fullscreenNextPageBtn.addEventListener('click', global.fullscreenNextPageBtn._navListener);
+    }
+
+    // Page counter click to show jump input
+    if (global.fullscreenPageCounter && !global.fullscreenPageCounter._jumpListener) {
+      global.fullscreenPageCounter._jumpListener = (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        showFullscreenPageJumpInput();
+      };
+      global.fullscreenPageCounter.addEventListener('click', global.fullscreenPageCounter._jumpListener);
+    }
+
+    // Page jump input handlers
+    if (global.fullscreenPageJumpInput && !global.fullscreenPageJumpInput._submitListener) {
+      global.fullscreenPageJumpInput._submitListener = (event) => {
+        if (event.type === 'keydown' && event.key !== 'Enter') return;
+        event.preventDefault();
+        event.stopPropagation();
+        commitFullscreenPageJump();
+      };
+      global.fullscreenPageJumpInput.addEventListener('keydown', global.fullscreenPageJumpInput._submitListener);
+      global.fullscreenPageJumpInput.addEventListener('blur', () => {
+        hideFullscreenPageJumpInput();
+      });
+    }
+  }
+
+  // Initialize on load
+  initFullscreenNavigation();
 })(typeof window !== 'undefined' ? window : globalThis);

@@ -987,6 +987,7 @@ function createApiRouter({
             sent = true;
             zip.openReadStream(entry, (e, rs) => {
               if (e) { zip.close(); return res.status(500).end(); }
+              res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
               res.setHeader('Content-Type', getMimeFromExt(entry.fileName));
               rs.pipe(res);
               rs.on('end', () => zip.close());
@@ -1175,6 +1176,7 @@ function createApiRouter({
       // CORS headers now set by global middleware in server.js
       // Keep expose headers for range requests
       res.setHeader('Access-Control-Expose-Headers', 'Content-Disposition, Content-Length, Content-Range');
+      res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
 
       const stat = await fs.promises.stat(p);
       const fileSize = stat.size;

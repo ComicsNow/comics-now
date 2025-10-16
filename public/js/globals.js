@@ -330,7 +330,10 @@ const clearSearchBtn = document.getElementById('clear-search-btn');
 const fullscreenViewer = document.getElementById('fullscreen-viewer');
 const fullscreenInfoBar = document.getElementById('fullscreen-info-bar');
 const fullscreenProgressIndicator = document.getElementById('fullscreen-progress-indicator');
-const fullscreenPageIndicator = document.getElementById('fullscreen-page-indicator');
+const fullscreenPageCounter = document.getElementById('fullscreen-page-counter');
+const fullscreenPageJumpInput = document.getElementById('fullscreen-page-jump-input');
+const fullscreenPrevPageBtn = document.getElementById('fullscreen-prev-page-btn');
+const fullscreenNextPageBtn = document.getElementById('fullscreen-next-page-btn');
 const fullscreenImage = document.getElementById('fullscreen-image');
 fullscreenImage.crossOrigin = 'anonymous';
 const fullscreenCloseBtn = document.getElementById('fullscreen-close-btn');
@@ -503,7 +506,10 @@ if (typeof window !== 'undefined') {
   window.fullscreenControls = fullscreenControls;
   window.fullscreenInfoBar = fullscreenInfoBar;
   window.fullscreenProgressIndicator = fullscreenProgressIndicator;
-  window.fullscreenPageIndicator = fullscreenPageIndicator;
+  window.fullscreenPageCounter = fullscreenPageCounter;
+  window.fullscreenPageJumpInput = fullscreenPageJumpInput;
+  window.fullscreenPrevPageBtn = fullscreenPrevPageBtn;
+  window.fullscreenNextPageBtn = fullscreenNextPageBtn;
 
   // Expose navigation functions (will be set by render.js)
   window.showView = window.showView || showView;

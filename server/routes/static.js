@@ -52,10 +52,10 @@ function createStaticRouter({ getConfig, getComicsDirectories }) {
   router.get('/index.html', sendAppShell);
 
   router.use(express.static(PUBLIC_DIR, { index: false }));
-  router.use('/thumbnails', express.static(THUMBNAILS_DIRECTORY));
-  router.use('/icons', express.static(ICONS_DIRECTORY));
-  router.use('/logos', express.static(LOGOS_DIRECTORY));
-  router.use('/screenshots', express.static(SCREENSHOTS_DIRECTORY));
+  router.use('/thumbnails', express.static(THUMBNAILS_DIRECTORY, { maxAge: '1y', immutable: true }));
+  router.use('/icons', express.static(ICONS_DIRECTORY, { maxAge: '1y', immutable: true }));
+  router.use('/logos', express.static(LOGOS_DIRECTORY, { maxAge: '1y', immutable: true }));
+  router.use('/screenshots', express.static(SCREENSHOTS_DIRECTORY, { maxAge: '1y', immutable: true }));
 
   router.get('*', sendAppShell);
 
