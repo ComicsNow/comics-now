@@ -839,43 +839,54 @@ function createApiRouter({
   // Get library tree structure for access control
   router.get('/api/v1/library-tree', requireAdmin, async (req, res) => {
     try {
-      // Get all unique libraries, publishers, series from comics
+      // Get all comics with their full info
       const comics = await dbAll(`
-        SELECT DISTINCT
-          publisher as library,
-          publisher,
-          series
+        SELECT id, path, publisher, series, name
         FROM comics
-        WHERE publisher IS NOT NULL
-        ORDER BY publisher, series
+        ORDER BY path
       `);
 
-      // Build hierarchical tree structure
+      // Get root folders from config
+      const rootFolders = getComicsDirectories();
+
+      // Helper: determine which root folder a comic belongs to
+      const getRootFolder = (comicPath) => {
+        for (const folder of rootFolders) {
+          if (comicPath.startsWith(folder)) {
+            return folder;
+          }
+        }
+        return 'Unknown';
+      };
+
+      // Build hierarchical tree: root_folder -> publisher -> series -> comics
       const tree = {};
+
       for (const comic of comics) {
-        const lib = comic.library || 'Unknown Library';
+        const rootFolder = getRootFolder(comic.path);
         const pub = comic.publisher || 'Unknown Publisher';
         const ser = comic.series || 'Unknown Series';
 
-        if (!tree[lib]) {
-          tree[lib] = {};
+        // Initialize structure
+        if (!tree[rootFolder]) {
+          tree[rootFolder] = {};
         }
-        if (!tree[lib][pub]) {
-          tree[lib][pub] = new Set();
+        if (!tree[rootFolder][pub]) {
+          tree[rootFolder][pub] = {};
         }
-        tree[lib][pub].add(ser);
+        if (!tree[rootFolder][pub][ser]) {
+          tree[rootFolder][pub][ser] = [];
+        }
+
+        // Add comic to its series
+        tree[rootFolder][pub][ser].push({
+          id: comic.id,
+          name: comic.name,
+          path: comic.path
+        });
       }
 
-      // Convert Sets to arrays for JSON serialization
-      const result = {};
-      for (const lib in tree) {
-        result[lib] = {};
-        for (const pub in tree[lib]) {
-          result[lib][pub] = Array.from(tree[lib][pub]);
-        }
-      }
-
-      res.json({ ok: true, tree: result });
+      res.json({ ok: true, tree });
     } catch (error) {
       log('ERROR', 'ACCESS', `Failed to fetch library tree: ${error.message}`);
       res.status(500).json({ ok: false, message: formatErrorMessage(error, req, 'Failed to fetch library tree') });
@@ -906,7 +917,7 @@ function createApiRouter({
 
       // Get user's access permissions
       const access = await dbAll(
-        'SELECT accessType, accessValue, granted FROM user_library_access WHERE userId = ? AND granted = 1',
+        'SELECT accessType, accessValue, direct_access, recursive_access FROM user_library_access WHERE userId = ? AND (direct_access = 1 OR recursive_access = 1)',
         [userId]
       );
 
@@ -927,7 +938,7 @@ function createApiRouter({
   router.post('/api/v1/users/:userId/access', requireAdmin, async (req, res) => {
     try {
       const { userId } = req.params;
-      const { access } = req.body; // access is an array of { accessType, accessValue, granted }
+      const { access } = req.body; // access is an array of { accessType, accessValue, direct_access, recursive_access }
 
       if (!Array.isArray(access)) {
         return res.status(400).json({ ok: false, message: 'Invalid access data: expected array' });
@@ -951,11 +962,16 @@ function createApiRouter({
       if (access.length > 0) {
         for (const item of access) {
           if (!item.accessType || !item.accessValue) continue;
-          const granted = item.granted === false ? 0 : 1; // Default to granted
-          await dbRun(
-            'INSERT INTO user_library_access (userId, accessType, accessValue, granted) VALUES (?, ?, ?, ?)',
-            [userId, item.accessType, item.accessValue, granted]
-          );
+          const directAccess = item.direct_access === true ? 1 : 0;
+          const recursiveAccess = item.recursive_access === true ? 1 : 0;
+
+          // Only insert if at least one access type is enabled
+          if (directAccess || recursiveAccess) {
+            await dbRun(
+              'INSERT INTO user_library_access (userId, accessType, accessValue, direct_access, recursive_access) VALUES (?, ?, ?, ?, ?)',
+              [userId, item.accessType, item.accessValue, directAccess, recursiveAccess]
+            );
+          }
         }
       }
 

@@ -2,6 +2,12 @@
 async function checkPendingMatch() {
   try {
     const res = await fetch(`${API_BASE_URL}/api/v1/comictagger/pending`);
+
+    // If forbidden (not admin), silently ignore
+    if (res.status === 403) {
+      return;
+    }
+
     const pending = await res.json();
 
     if (pending && pending.waitingForResponse) {
@@ -286,6 +292,12 @@ function handleCtConfirmNo() {
 async function updateCtButtonIndicator() {
   try {
     const res = await fetch(`${API_BASE_URL}/api/v1/comictagger/pending`);
+
+    // If forbidden (not admin), silently ignore
+    if (res.status === 403) {
+      return;
+    }
+
     const pending = await res.json();
 
     if (pending && pending.waitingForResponse) {

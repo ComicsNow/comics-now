@@ -649,10 +649,14 @@ async function loadLibraryTreeAndUserAccess(userId) {
     libraryTreeData = treeData.tree || {};
     userAccessData = accessData.access || [];
 
-    // Build access lookup for quick checking
-    const accessMap = new Set();
+    // Build access lookup map with direct/recursive flags
+    const accessMap = new Map();
     userAccessData.forEach(item => {
-      accessMap.add(`${item.accessType}:${item.accessValue}`);
+      const key = `${item.accessType}:${item.accessValue}`;
+      accessMap.set(key, {
+        direct: item.direct_access === 1 || item.direct_access === true,
+        recursive: item.recursive_access === 1 || item.recursive_access === true
+      });
     });
 
     // Render tree
@@ -669,109 +673,152 @@ async function loadLibraryTreeAndUserAccess(userId) {
 function renderLibraryAccessTree(tree, accessMap, container) {
   container.innerHTML = '';
 
-  const libraries = Object.keys(tree).sort();
+  const rootFolders = Object.keys(tree).sort();
 
-  if (libraries.length === 0) {
-    container.innerHTML = '<div class="text-center text-gray-400 py-4">No libraries found</div>';
+  if (rootFolders.length === 0) {
+    container.innerHTML = '<div class="text-center text-gray-400 py-4">No content found</div>';
     return;
   }
 
-  libraries.forEach(library => {
-    const publishers = tree[library];
-    const libraryDiv = createTreeNode('library', library, publishers, accessMap);
-    container.appendChild(libraryDiv);
+  // Hierarchy: root_folder → publisher → series → comic
+  rootFolders.forEach(rootFolder => {
+    const publishers = tree[rootFolder];
+    const rootDiv = createTreeNode('root_folder', rootFolder, publishers, accessMap);
+    container.appendChild(rootDiv);
   });
 }
 
 function createTreeNode(type, value, children, accessMap) {
   const key = `${type}:${value}`;
-  const isChecked = accessMap.has(key);
+  const access = accessMap.get(key) || { direct: false, recursive: false };
+  const hasChildren = children && ((Array.isArray(children) && children.length > 0) || (typeof children === 'object' && Object.keys(children).length > 0));
+  const isLeaf = type === 'comic'; // Comics are leaf nodes
 
   const nodeDiv = document.createElement('div');
-  nodeDiv.className = 'border border-gray-700 rounded-lg overflow-hidden';
+  nodeDiv.className = 'border border-gray-700 rounded-lg overflow-hidden mb-2';
 
-  // Create header with checkbox
+  // Create header
   const header = document.createElement('div');
-  header.className = 'flex items-center gap-2 p-3 bg-gray-900 hover:bg-gray-800 cursor-pointer transition-colors';
+  header.className = 'flex items-center gap-2 p-3 bg-gray-900 hover:bg-gray-800 transition-colors';
 
-  const checkbox = document.createElement('input');
-  checkbox.type = 'checkbox';
-  checkbox.checked = isChecked;
-  checkbox.className = 'w-4 h-4 rounded border-gray-600 text-purple-600 focus:ring-purple-500 focus:ring-2';
-  checkbox.dataset.accessType = type;
-  checkbox.dataset.accessValue = value;
+  // For non-leaf nodes: show two checkboxes (Direct and Recursive)
+  // For leaf nodes (comics): show single checkbox
+  if (!isLeaf && hasChildren) {
+    // Two checkboxes container
+    const checkboxesContainer = document.createElement('div');
+    checkboxesContainer.className = 'flex flex-col gap-1';
 
+    // Direct access checkbox
+    const directCheckbox = document.createElement('input');
+    directCheckbox.type = 'checkbox';
+    directCheckbox.checked = access.direct;
+    directCheckbox.className = 'w-3.5 h-3.5 rounded border-gray-600 text-blue-600 focus:ring-blue-500 focus:ring-1';
+    directCheckbox.dataset.accessType = type;
+    directCheckbox.dataset.accessValue = value;
+    directCheckbox.dataset.accessMode = 'direct';
+    directCheckbox.title = 'Direct access (items at this level only)';
+
+    // Recursive access checkbox
+    const recursiveCheckbox = document.createElement('input');
+    recursiveCheckbox.type = 'checkbox';
+    recursiveCheckbox.checked = access.recursive;
+    recursiveCheckbox.className = 'w-3.5 h-3.5 rounded border-gray-600 text-purple-600 focus:ring-purple-500 focus:ring-1';
+    recursiveCheckbox.dataset.accessType = type;
+    recursiveCheckbox.dataset.accessValue = value;
+    recursiveCheckbox.dataset.accessMode = 'recursive';
+    recursiveCheckbox.title = 'Recursive access (all children)';
+
+    checkboxesContainer.appendChild(directCheckbox);
+    checkboxesContainer.appendChild(recursiveCheckbox);
+    header.appendChild(checkboxesContainer);
+
+    // Add event listener to recursive checkbox to auto-check/uncheck children
+    recursiveCheckbox.addEventListener('change', (e) => {
+      e.stopPropagation();
+      const childrenContainer = nodeDiv.querySelector('.children-container');
+      if (childrenContainer) {
+        // Check/uncheck all descendant checkboxes
+        childrenContainer.querySelectorAll('input[type="checkbox"]').forEach(checkbox => {
+          checkbox.checked = recursiveCheckbox.checked;
+        });
+      }
+    });
+
+    // Add labels for the checkboxes
+    const labelsContainer = document.createElement('div');
+    labelsContainer.className = 'flex flex-col text-xs text-gray-500';
+    labelsContainer.innerHTML = '<span>D</span><span>R</span>';
+    header.appendChild(labelsContainer);
+
+  } else {
+    // Single checkbox for leaf nodes or nodes without children
+    const checkbox = document.createElement('input');
+    checkbox.type = 'checkbox';
+    checkbox.checked = access.direct || access.recursive;
+    checkbox.className = 'w-4 h-4 rounded border-gray-600 text-purple-600 focus:ring-purple-500 focus:ring-2';
+    checkbox.dataset.accessType = type;
+    checkbox.dataset.accessValue = value;
+    checkbox.dataset.accessMode = 'both';
+    header.appendChild(checkbox);
+  }
+
+  // Label
   const label = document.createElement('label');
-  label.className = 'flex-1 text-white cursor-pointer';
-  label.textContent = value;
-
-  const expandIcon = document.createElement('span');
-  expandIcon.className = 'text-gray-400 transition-transform';
-  expandIcon.innerHTML = children && Object.keys(children).length > 0 ? '▼' : '';
-
-  header.appendChild(checkbox);
+  label.className = 'flex-1 text-white cursor-pointer text-sm';
+  label.textContent = type === 'comic' ? value.name || value : value;
   header.appendChild(label);
-  header.appendChild(expandIcon);
+
+  // Expand icon (only for non-leaf nodes with children)
+  if (hasChildren && !isLeaf) {
+    const expandIcon = document.createElement('span');
+    expandIcon.className = 'text-gray-400 transition-transform cursor-pointer';
+    expandIcon.innerHTML = '▼';
+    header.appendChild(expandIcon);
+
+    // Toggle expansion on header click
+    header.addEventListener('click', (e) => {
+      if (e.target.tagName !== 'INPUT') {
+        const childrenContainer = nodeDiv.querySelector('.children-container');
+        if (childrenContainer) {
+          childrenContainer.classList.toggle('hidden');
+          expandIcon.classList.toggle('rotate-180');
+        }
+      }
+    });
+  }
+
   nodeDiv.appendChild(header);
 
-  // Handle checkbox change
-  checkbox.addEventListener('change', (e) => {
-    e.stopPropagation();
-    const isNowChecked = checkbox.checked;
-
-    // Update access map
-    if (isNowChecked) {
-      accessMap.add(key);
-    } else {
-      accessMap.delete(key);
-    }
-
-    // Cascade to children if expanded
-    const childrenContainer = nodeDiv.querySelector('.children-container');
-    if (childrenContainer) {
-      childrenContainer.querySelectorAll('input[type="checkbox"]').forEach(childCheckbox => {
-        childCheckbox.checked = isNowChecked;
-        const childKey = `${childCheckbox.dataset.accessType}:${childCheckbox.dataset.accessValue}`;
-        if (isNowChecked) {
-          accessMap.add(childKey);
-        } else {
-          accessMap.delete(childKey);
-        }
-      });
-    }
-  });
-
   // Create children container
-  if (children && Object.keys(children).length > 0) {
+  if (hasChildren && !isLeaf) {
     const childrenContainer = document.createElement('div');
     childrenContainer.className = 'children-container pl-6 pr-3 pb-2 bg-gray-900 hidden';
 
-    if (type === 'library') {
-      // Children are publishers (object with series arrays)
+    if (type === 'root_folder') {
+      // Children are publishers (object with series objects)
       Object.keys(children).sort().forEach(publisher => {
         const series = children[publisher];
         const publisherNode = createTreeNode('publisher', publisher, series, accessMap);
         childrenContainer.appendChild(publisherNode);
       });
     } else if (type === 'publisher') {
-      // Children are series (array)
+      // Children are series (object with comics arrays)
+      Object.keys(children).sort().forEach(seriesName => {
+        const comics = children[seriesName];
+        const seriesNode = createTreeNode('series', seriesName, comics, accessMap);
+        childrenContainer.appendChild(seriesNode);
+      });
+    } else if (type === 'series') {
+      // Children are comics (array of comic objects)
       if (Array.isArray(children)) {
-        children.sort().forEach(seriesName => {
-          const seriesNode = createTreeNode('series', seriesName, null, accessMap);
-          childrenContainer.appendChild(seriesNode);
+        children.forEach(comic => {
+          const comicNode = createTreeNode('comic', comic, null, accessMap);
+          childrenContainer.appendChild(comicNode);
         });
       }
     }
 
     nodeDiv.appendChild(childrenContainer);
-
-    // Toggle expansion on header click (but not checkbox)
-    header.addEventListener('click', (e) => {
-      if (e.target !== checkbox) {
-        childrenContainer.classList.toggle('hidden');
-        expandIcon.classList.toggle('rotate-180');
-      }
-    });
   }
 
   return nodeDiv;
@@ -798,15 +845,41 @@ async function saveUserAccess() {
     statusDiv.textContent = 'Saving access permissions...';
     statusDiv.className = 'text-sm text-gray-400';
 
-    // Collect all checked items
-    const access = [];
-    document.querySelectorAll('#access-tree-container input[type="checkbox"]:checked').forEach(checkbox => {
-      access.push({
-        accessType: checkbox.dataset.accessType,
-        accessValue: checkbox.dataset.accessValue,
-        granted: true
-      });
+    // Collect access data from checkboxes
+    // Group by accessType:accessValue to combine direct/recursive
+    const accessMap = new Map();
+
+    document.querySelectorAll('#access-tree-container input[type="checkbox"]').forEach(checkbox => {
+      const accessType = checkbox.dataset.accessType;
+      const accessValue = checkbox.dataset.accessValue;
+      const accessMode = checkbox.dataset.accessMode;
+      const key = `${accessType}:${accessValue}`;
+
+      if (!accessMap.has(key)) {
+        accessMap.set(key, {
+          accessType,
+          accessValue,
+          direct_access: false,
+          recursive_access: false
+        });
+      }
+
+      const item = accessMap.get(key);
+      if (accessMode === 'direct') {
+        item.direct_access = checkbox.checked;
+      } else if (accessMode === 'recursive') {
+        item.recursive_access = checkbox.checked;
+      } else if (accessMode === 'both') {
+        // For leaf nodes (comics)
+        item.direct_access = checkbox.checked;
+        item.recursive_access = checkbox.checked;
+      }
     });
+
+    // Convert map to array, filtering out items with no access
+    const access = Array.from(accessMap.values()).filter(item =>
+      item.direct_access || item.recursive_access
+    );
 
     const response = await fetch(`${API_BASE_URL}/api/v1/users/${currentAccessUser.userId}/access`, {
       method: 'POST',

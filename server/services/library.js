@@ -5,7 +5,7 @@ const sharp = require('sharp');
 const { spawn } = require('child_process');
 const archiver = require('archiver');
 
-const { dbGet, dbRun, dbAll, getUserAccessibleResources } = require('../db');
+const { dbGet, dbRun, dbAll, getUserAccessibleResources, checkComicAccess } = require('../db');
 const { log, t0, ms } = require('../logger');
 const { getConfig, getComicsDirectories, getScanIntervalMs } = require('../config');
 const { getComicInfoFromZip } = require('./metadata');
@@ -389,16 +389,6 @@ async function buildLibrary(userId = 'default-user') {
   const user = await dbGet('SELECT role FROM users WHERE userId = ?', [userId]);
   const userRole = user?.role || 'user';
 
-  // Get accessible resources for this user (null means all resources for admin)
-  const accessibleLibraries = await getUserAccessibleResources(userId, userRole, 'library');
-  const accessiblePublishers = await getUserAccessibleResources(userId, userRole, 'publisher');
-  const accessibleSeries = await getUserAccessibleResources(userId, userRole, 'series');
-
-  // Convert to sets for faster lookup
-  const librariesSet = accessibleLibraries ? new Set(accessibleLibraries) : null;
-  const publishersSet = accessiblePublishers ? new Set(accessiblePublishers) : null;
-  const seriesSet = accessibleSeries ? new Set(accessibleSeries) : null;
-
   // Get all comics and their per-user progress/status
   const rows = await dbAll('SELECT * FROM comics');
   log('INFO', 'SERVER', `Build library for UI with ${rows.length} rows for user ${userId} (role: ${userRole})`);
@@ -419,23 +409,20 @@ async function buildLibrary(userId = 'default-user') {
   const directories = getComicsDirectories();
 
   for (const r of rows) {
-    // Access control: Check if user has access to this comic
-    // Admin (null sets) has access to everything
-    // For non-admin, check hierarchical access: library, publisher, or series level
+    // Access control: Check if user has access to this comic using hierarchical access control
+    // Admin has access to everything
+    // For non-admin, check hierarchical access: root_folder -> publisher -> series
+    const hasAccess = await checkComicAccess(
+      userId,
+      userRole,
+      r.path,
+      r.publisher,
+      r.series,
+      directories
+    );
 
-    // Check library-level access (publisher is the library in this structure)
-    if (librariesSet !== null && !librariesSet.has(r.publisher)) {
-      continue; // User doesn't have library-level access, skip this comic
-    }
-
-    // Check publisher-level access
-    if (publishersSet !== null && !publishersSet.has(r.publisher)) {
-      continue; // User doesn't have publisher-level access, skip this comic
-    }
-
-    // Check series-level access
-    if (seriesSet !== null && !seriesSet.has(r.series)) {
-      continue; // User doesn't have series-level access, skip this comic
+    if (!hasAccess) {
+      continue; // User doesn't have access to this comic, skip it
     }
 
     // User has access to this comic, include it in the library
@@ -503,12 +490,6 @@ async function buildLibrary(userId = 'default-user') {
         lib[rootDir].publishers[publisherName].logoUrl = 'logos/6373148-blank.png';
         lib[rootDir].publishers[publisherName].logoNeedsBackground = false;
       }
-    }
-  }
-
-  for (const configuredDir of directories) {
-    if (!lib[configuredDir]) {
-      lib[configuredDir] = { publishers: {} };
     }
   }
 

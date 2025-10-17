@@ -95,12 +95,16 @@ function initializeDatabase() {
     )`);
 
     // User library access control
-    // Supports hierarchical access: library -> publisher -> series -> comic
+    // Supports hierarchical access: root_folder -> publisher -> series -> comic
+    // Two access modes per level:
+    //   - direct_access: items directly at this level only
+    //   - recursive_access: all descendants under this level
     db.run(`CREATE TABLE IF NOT EXISTS user_library_access (
       userId TEXT NOT NULL,
       accessType TEXT NOT NULL,
       accessValue TEXT NOT NULL,
-      granted INTEGER DEFAULT 1,
+      direct_access INTEGER DEFAULT 0,
+      recursive_access INTEGER DEFAULT 0,
       created INTEGER DEFAULT (strftime('%s', 'now') * 1000),
       PRIMARY KEY (userId, accessType, accessValue),
       FOREIGN KEY (userId) REFERENCES users(userId) ON DELETE CASCADE
@@ -152,6 +156,44 @@ function initializeDatabase() {
       }
     });
 
+    // Migration: Add new access columns to existing table
+    db.all('PRAGMA table_info(user_library_access)', (err, cols) => {
+      if (err || !cols) return;
+
+      // Check if old 'granted' column exists
+      const hasGranted = cols.some(c => c.name === 'granted');
+      const hasDirectAccess = cols.some(c => c.name === 'direct_access');
+      const hasRecursiveAccess = cols.some(c => c.name === 'recursive_access');
+
+      if (hasGranted && !hasDirectAccess && !hasRecursiveAccess) {
+        // Migrate from old schema to new schema
+        log('INFO', 'DB', 'Migrating user_library_access table to new schema...');
+
+        db.run(`ALTER TABLE user_library_access ADD COLUMN direct_access INTEGER DEFAULT 0`, (err) => {
+          if (err) {
+            log('ERROR', 'DB', `Failed to add direct_access column: ${err.message}`);
+            return;
+          }
+
+          db.run(`ALTER TABLE user_library_access ADD COLUMN recursive_access INTEGER DEFAULT 0`, (err) => {
+            if (err) {
+              log('ERROR', 'DB', `Failed to add recursive_access column: ${err.message}`);
+              return;
+            }
+
+            // Migrate old 'granted' values to 'recursive_access' (old system gave full access)
+            db.run(`UPDATE user_library_access SET recursive_access = granted, direct_access = granted WHERE granted = 1`, (err) => {
+              if (err) {
+                log('ERROR', 'DB', `Failed to migrate granted values: ${err.message}`);
+              } else {
+                log('INFO', 'DB', 'Successfully migrated access control schema');
+              }
+            });
+          });
+        });
+      }
+    });
+
     // Migration: Grant full access to existing users (one-time)
     // New users will have no access by default
     db.get(`SELECT name FROM sqlite_master WHERE type='table' AND name='user_library_access'`, (err, table) => {
@@ -161,34 +203,34 @@ function initializeDatabase() {
       }
       if (table) {
         // Check if migration has been run (marked by a special setting)
-        db.get(`SELECT value FROM settings WHERE key = 'access_migration_v1'`, (err, row) => {
+        db.get(`SELECT value FROM settings WHERE key = 'access_migration_v2'`, (err, row) => {
           if (err || row) return; // Already migrated or error
 
-          // Get all existing users and grant them full access to all libraries
-          db.all(`SELECT DISTINCT publisher FROM comics`, (err, libraries) => {
-            if (err || !libraries) return;
+          // Get all existing users and grant them full access to all root folders
+          db.all(`SELECT userId, role FROM users`, (err, users) => {
+            if (err || !users || users.length === 0) return;
 
-            db.all(`SELECT userId, role FROM users`, (err, users) => {
-              if (err || !users) return;
+            // Get root folders from config (this will be loaded at runtime)
+            const { getComicsDirectories } = require('./config');
+            const rootFolders = getComicsDirectories();
 
-              const stmt = db.prepare(`INSERT OR IGNORE INTO user_library_access (userId, accessType, accessValue, granted) VALUES (?, ?, ?, 1)`);
+            if (rootFolders.length === 0) return;
 
-              users.forEach(user => {
-                // Skip admins (they always have full access)
-                if (user.role === 'admin') return;
+            const stmt = db.prepare(`INSERT OR IGNORE INTO user_library_access (userId, accessType, accessValue, direct_access, recursive_access) VALUES (?, ?, ?, 1, 1)`);
 
-                // Grant access to each library for existing non-admin users
-                libraries.forEach(lib => {
-                  if (lib.publisher) {
-                    stmt.run(user.userId, 'library', lib.publisher);
-                  }
-                });
+            users.forEach(user => {
+              // Skip admins (they always have full access)
+              if (user.role === 'admin') return;
+
+              // Grant full access to each root folder for existing non-admin users
+              rootFolders.forEach(folder => {
+                stmt.run(user.userId, 'root_folder', folder);
               });
+            });
 
-              stmt.finalize(() => {
-                db.run(`INSERT INTO settings (key, value) VALUES ('access_migration_v1', 'completed')`);
-                log('INFO', 'DB', 'Completed user access migration for existing users');
-              });
+            stmt.finalize(() => {
+              db.run(`INSERT OR REPLACE INTO settings (key, value) VALUES ('access_migration_v2', 'completed')`);
+              log('INFO', 'DB', 'Completed user access migration v2 for existing users');
             });
           });
         });
@@ -215,7 +257,7 @@ async function checkUserAccess(userId, userRole, accessType, accessValue) {
   return access && access.granted === 1;
 }
 
-// Helper function to get all accessible resources for a user
+// Helper function to get all accessible resources for a user with access mode info
 async function getUserAccessibleResources(userId, userRole, accessType) {
   // Admins have access to everything
   if (userRole === 'admin') {
@@ -223,12 +265,69 @@ async function getUserAccessibleResources(userId, userRole, accessType) {
   }
 
   const resources = await dbAll(
-    `SELECT accessValue FROM user_library_access
-     WHERE userId = ? AND accessType = ? AND granted = 1`,
+    `SELECT accessValue, direct_access, recursive_access FROM user_library_access
+     WHERE userId = ? AND accessType = ? AND (direct_access = 1 OR recursive_access = 1)`,
     [userId, accessType]
   );
 
-  return resources.map(r => r.accessValue);
+  return resources.map(r => ({
+    value: r.accessValue,
+    direct: r.direct_access === 1,
+    recursive: r.recursive_access === 1
+  }));
+}
+
+// Helper function to check if user has access to a specific comic
+// Uses hierarchical access control: root_folder -> publisher -> series -> comic
+async function checkComicAccess(userId, userRole, comicPath, publisher, series, rootFolders) {
+  // Admins have access to everything
+  if (userRole === 'admin') {
+    return true;
+  }
+
+  // Determine which root folder this comic belongs to
+  let rootFolder = 'Unknown';
+  for (const folder of rootFolders) {
+    if (comicPath.startsWith(folder)) {
+      rootFolder = folder;
+      break;
+    }
+  }
+
+  // Get user's access permissions (all at once for efficiency)
+  const accessList = await dbAll(
+    `SELECT accessType, accessValue, direct_access, recursive_access
+     FROM user_library_access
+     WHERE userId = ? AND (direct_access = 1 OR recursive_access = 1)`,
+    [userId]
+  );
+
+  // Check if user has recursive access at any parent level
+  for (const access of accessList) {
+    if (access.recursive_access === 1) {
+      // Check root folder recursive access
+      if (access.accessType === 'root_folder' && access.accessValue === rootFolder) {
+        return true;
+      }
+      // Check publisher recursive access
+      if (access.accessType === 'publisher' && access.accessValue === publisher) {
+        return true;
+      }
+      // Check series recursive access
+      if (access.accessType === 'series' && access.accessValue === series) {
+        return true;
+      }
+    }
+
+    // For series level, direct access also grants access to comics in that series
+    if (access.direct_access === 1 || access.recursive_access === 1) {
+      if (access.accessType === 'series' && access.accessValue === series) {
+        return true;
+      }
+    }
+  }
+
+  return false;
 }
 
 module.exports = {
@@ -238,5 +337,6 @@ module.exports = {
   dbAll,
   initializeDatabase,
   checkUserAccess,
-  getUserAccessibleResources
+  getUserAccessibleResources,
+  checkComicAccess
 };
