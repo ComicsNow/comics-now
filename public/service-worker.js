@@ -3,7 +3,7 @@
 
 const SCOPE_URL = new URL(self.registration.scope);
 const BASE_PATH = SCOPE_URL.pathname;
-const CACHE_VERSION = 'v4.4';
+const CACHE_VERSION = 'v4.5';
 const CACHE_NAME = `comics-now-${CACHE_VERSION}-${BASE_PATH}`;
 
 // Assets relative to the scope. DO NOT start with "/" (root) here.
