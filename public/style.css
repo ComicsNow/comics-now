@@ -252,7 +252,7 @@ body {
 /* Bottom info bar with page info and orientation toggle */
 .fullscreen-info-bar {
     position: fixed;
-    bottom: calc(20px + env(safe-area-inset-bottom));
+    bottom: env(safe-area-inset-bottom);
     left: 50%;
     transform: translateX(-50%);
     display: grid;
@@ -261,7 +261,7 @@ body {
     justify-items: center;
     column-gap: 0.75rem;
     width: min(500px, calc(100% - 32px));
-    padding: 0.65rem 1rem;
+    padding: 0.25rem 1rem;
     border-radius: 9999px;
     background-color: rgba(0, 0, 0, 0.75);
     border: 1px solid rgba(255, 255, 255, 0.25);
@@ -433,7 +433,7 @@ body {
 /* Portrait toggle controls - shown on tap */
 .fullscreen-controls {
     position: fixed;
-    bottom: calc(70px + env(safe-area-inset-bottom));
+    bottom: calc(50px + env(safe-area-inset-bottom));
     left: 50%;
     transform: translateX(-50%);
     z-index: 75;
@@ -450,9 +450,9 @@ body {
 
 @media (max-width: 640px) {
     .fullscreen-info-bar {
-        bottom: calc(10px + env(safe-area-inset-bottom));
+        bottom: env(safe-area-inset-bottom);
         width: min(420px, calc(100% - 16px));
-        padding: 0.5rem 0.75rem;
+        padding: 0.25rem 1rem;
         column-gap: 0.5rem;
         grid-template-columns: auto minmax(0, auto) auto auto auto;
     }

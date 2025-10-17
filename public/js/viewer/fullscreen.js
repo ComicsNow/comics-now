@@ -13,6 +13,9 @@
   let fullscreenPanScrollLeft = 0;
   let fullscreenPanScrollTop = 0;
   let fullscreenPanPointerType = '';
+  let fullscreenPanCurrentX = 0;
+  let fullscreenPanCurrentY = 0;
+  let fullscreenPanRAF = null;
   const fullscreenTouchPointers = new Map();
   let fullscreenInitialPinchDistance = 0;
   let fullscreenInitialPinchScale = 1;
@@ -114,11 +117,17 @@
 
     viewer.classList.add('hidden');
 
+    // Cancel RAF before releasing pointer capture
+    if (fullscreenPanRAF) {
+      cancelAnimationFrame(fullscreenPanRAF);
+      fullscreenPanRAF = null;
+    }
+
     if (fullscreenPanPointerId !== null && image && typeof image.releasePointerCapture === 'function') {
       try {
         image.releasePointerCapture(fullscreenPanPointerId);
       } catch (error) {
-        
+
       }
     }
 
@@ -230,6 +239,32 @@
     updateFullscreenViewerCentering();
   }
 
+  function animateFullscreenPan() {
+    const viewer = global.fullscreenViewer;
+    const image = global.fullscreenImage;
+    if (!viewer || !image || !isFullscreenPanning) {
+      fullscreenPanRAF = null;
+      return;
+    }
+
+    const deltaX = fullscreenPanCurrentX - fullscreenPanStartX;
+    const deltaY = fullscreenPanCurrentY - fullscreenPanStartY;
+
+    const proposedScrollLeft = fullscreenPanScrollLeft - deltaX;
+    const proposedScrollTop = fullscreenPanScrollTop - deltaY;
+
+    // Use the image's actual rendered dimensions
+    const imageRect = image.getBoundingClientRect();
+    const maxScrollLeft = imageRect.width - viewer.clientWidth;
+    const maxScrollTop = imageRect.height - viewer.clientHeight;
+
+    viewer.scrollLeft = clamp(proposedScrollLeft, 0, Math.max(maxScrollLeft, 0));
+    viewer.scrollTop = clamp(proposedScrollTop, 0, Math.max(maxScrollTop, 0));
+
+    // Continue the animation loop
+    fullscreenPanRAF = requestAnimationFrame(animateFullscreenPan);
+  }
+
   function beginFullscreenPan(pointerId, pointerType, clientX, clientY) {
     const viewer = global.fullscreenViewer;
     const image = global.fullscreenImage;
@@ -240,6 +275,8 @@
     fullscreenPanPointerType = pointerType;
     fullscreenPanStartX = clientX;
     fullscreenPanStartY = clientY;
+    fullscreenPanCurrentX = clientX;
+    fullscreenPanCurrentY = clientY;
     fullscreenPanScrollLeft = viewer.scrollLeft;
     fullscreenPanScrollTop = viewer.scrollTop;
 
@@ -247,31 +284,26 @@
       try {
         image.setPointerCapture(pointerId);
       } catch (error) {
-        
+
       }
     }
 
     if (image && (pointerType === 'mouse' || pointerType === 'pen')) {
       image.style.cursor = 'grabbing';
     }
+
+    // Start the animation loop for smooth panning
+    if (!fullscreenPanRAF) {
+      fullscreenPanRAF = requestAnimationFrame(animateFullscreenPan);
+    }
   }
 
   function updateFullscreenPanPosition(clientX, clientY) {
-    const viewer = global.fullscreenViewer;
-    const image = global.fullscreenImage;
-    if (!viewer || !image) return;
+    if (!isFullscreenPanning) return;
 
-    const deltaX = clientX - fullscreenPanStartX;
-    const deltaY = clientY - fullscreenPanStartY;
-
-    const proposedScrollLeft = fullscreenPanScrollLeft - deltaX;
-    const proposedScrollTop = fullscreenPanScrollTop - deltaY;
-
-    const maxScrollLeft = image.scrollWidth - viewer.clientWidth;
-    const maxScrollTop = image.scrollHeight - viewer.clientHeight;
-
-    viewer.scrollLeft = clamp(proposedScrollLeft, 0, Math.max(maxScrollLeft, 0));
-    viewer.scrollTop = clamp(proposedScrollTop, 0, Math.max(maxScrollTop, 0));
+    // Just update the current position, the RAF loop will handle the actual scrolling
+    fullscreenPanCurrentX = clientX;
+    fullscreenPanCurrentY = clientY;
   }
 
   function endFullscreenPan(pointerId) {
@@ -292,6 +324,12 @@
     isFullscreenPanning = false;
     fullscreenPanPointerId = null;
     fullscreenPanPointerType = '';
+
+    // Cancel the animation loop
+    if (fullscreenPanRAF) {
+      cancelAnimationFrame(fullscreenPanRAF);
+      fullscreenPanRAF = null;
+    }
 
     if (image && (image.style.cursor === 'grabbing' || image.style.cursor === 'grab')) {
       image.style.cursor = global.isFullscreenZoomed ? 'grab' : 'zoom-in';
@@ -344,6 +382,7 @@
       return;
     }
 
+    event.preventDefault();
     beginFullscreenPan(event.pointerId, event.pointerType, event.clientX, event.clientY);
   }
 

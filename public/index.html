@@ -17,7 +17,7 @@
 <body class="p-4 sm:p-8">
  
   <!-- Offline Indicator -->
-  <div id="offline-indicator" class="hidden fixed bottom-20 left-4 sm:top-8 sm:left-8 sm:bottom-auto z-30 bg-orange-600 text-white px-3 py-1 rounded-full text-sm font-medium shadow-lg">
+  <div id="offline-indicator" class="hidden absolute bottom-20 left-4 sm:top-8 sm:left-8 sm:bottom-auto z-30 bg-orange-600 text-white px-3 py-1 rounded-full text-sm font-medium shadow-lg">
     <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 inline mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 5.636l-12.728 12.728m0-12.728l12.728 12.728" />
     </svg>
@@ -25,7 +25,7 @@
   </div>
 
   <!-- Logout Button (left side) -->
-  <div class="fixed top-4 left-4 sm:top-8 sm:left-8 z-30">
+  <div class="absolute top-4 left-4 sm:top-8 sm:left-8 z-30">
     <button id="logout-button" aria-label="Logout" class="hidden bg-red-600 hover:bg-red-500 text-white font-bold p-2 rounded-full transition-colors" onclick="handleLogout()">
       <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
         <path stroke-linecap="round" stroke-linejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
@@ -34,7 +34,7 @@
   </div>
 
   <!-- Settings and CT Buttons (right side) -->
-  <div class="fixed top-4 right-4 sm:top-8 sm:right-8 z-30 flex flex-wrap justify-end gap-2">
+  <div class="absolute top-4 right-4 sm:top-8 sm:right-8 z-30 flex flex-wrap justify-end gap-2">
     <button id="ct-button" aria-label="ComicTagger" class="bg-blue-600 hover:bg-blue-500 text-white font-bold p-2 rounded-full transition-colors">CT</button>
     <button onclick="openSettingsModal()" aria-label="Settings" class="bg-gray-700 hover:bg-gray-600 text-white font-bold p-2 rounded-full transition-colors">
       <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -44,15 +44,13 @@
     </button>
   </div>
 
-  <!-- Ko-fi Support Button (bottom right) -->
-  <div class="fixed bottom-4 right-4 sm:bottom-8 sm:right-8 z-50">
-    <a href="https://ko-fi.com/comicsnow" target="_blank" rel="noopener noreferrer" aria-label="Support on Ko-fi" class="bg-red-600 hover:bg-red-500 text-white font-bold p-3 rounded-full transition-colors shadow-lg block text-lg">
-      ☕
-    </a>
-  </div>
-
   <!-- Download Queue -->
   <div id="download-queue" class="hidden fixed bottom-20 right-4 sm:bottom-24 sm:right-8 z-40 space-y-2 w-64"></div>
+
+  <!-- Ko-fi Support Button -->
+  <a href="https://ko-fi.com/comicsnow" target="_blank" rel="noopener noreferrer" aria-label="Support on Ko-fi" class="fixed bottom-4 right-4 bg-red-600 hover:bg-red-500 text-white font-bold p-3 rounded-full transition-colors shadow-lg z-50 text-lg">
+    ☕
+  </a>
 
   <!-- Directory Selection Modal -->
   <div id="directory-selection-modal" class="hidden fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center" style="z-index: 9999;">

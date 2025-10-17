@@ -322,15 +322,17 @@ function showUserBadge() {
   const badge = document.createElement('div');
   badge.id = 'user-badge';
   badge.className = 'z-30 bg-gray-700 text-white text-xs sm:text-sm font-medium shadow-lg';
-  badge.style.cssText = 'position: fixed; bottom: 1rem; left: 1rem; padding: 0.25rem 0.75rem; border-radius: 9999px; display: inline-flex; align-items: center; gap: 0.5rem; white-space: nowrap; width: fit-content; max-width: 250px;';
+  badge.style.cssText = 'position: absolute; padding: 0.25rem 0.75rem; border-radius: 9999px; display: inline-flex; align-items: center; gap: 0.5rem; white-space: nowrap; width: fit-content; max-width: 250px;';
 
-  // Update position for desktop - position horizontally to the right of logout button
+  // Position below logout button for both mobile and desktop
   if (window.matchMedia('(min-width: 640px)').matches) {
-    // Logout button is at left: 2rem and is ~40px wide (p-2 + icon)
-    // Position badge to the right of it with some gap
-    badge.style.top = '2rem';
-    badge.style.left = '5.5rem';  // 2rem (logout position) + 2.5rem (button width) + 1rem (gap)
-    badge.style.bottom = 'auto';
+    // Desktop: Logout button is at top: 2rem (32px), position badge below it
+    badge.style.top = '4rem';  // 2rem (logout top position) + ~2rem (button height + gap)
+    badge.style.left = '2rem';
+  } else {
+    // Mobile: Logout button is at top: 1rem (16px), position badge below it
+    badge.style.top = '3.5rem';  // 1rem (logout top position) + ~2.5rem (button height + gap)
+    badge.style.left = '1rem';
   }
 
   // Add role indicator color
