@@ -471,7 +471,7 @@ async function refreshUsersList() {
     setUsersStatus(`${users.length} user${users.length === 1 ? '' : 's'} registered`, 'info', false);
 
     usersListDiv.innerHTML = users.map(user => `
-      <div class="border border-gray-700 rounded-lg p-4 bg-gray-900">
+      <div class="border border-gray-700 rounded-lg p-4 bg-gray-900 hover:bg-gray-800 cursor-pointer transition-colors user-card" data-user-id="${escapeHtml(user.userId)}" data-user-email="${escapeHtml(user.email)}" data-user-role="${escapeHtml(user.role)}">
         <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
           <div class="flex-1">
             <div class="flex items-center gap-2 mb-1">
@@ -494,12 +494,23 @@ async function refreshUsersList() {
               </div>
             </div>
           </div>
+          ${user.role !== 'admin' ? '<div class="text-gray-500 text-sm">Click to manage library access →</div>' : '<div class="text-gray-500 text-sm">Full access (Admin)</div>'}
         </div>
       </div>
     `).join('');
 
+    // Add click handlers to user cards
+    document.querySelectorAll('.user-card').forEach(card => {
+      card.addEventListener('click', () => {
+        const userId = card.dataset.userId;
+        const userEmail = card.dataset.userEmail;
+        const userRole = card.dataset.userRole;
+        showUserAccessView(userId, userEmail, userRole);
+      });
+    });
+
   } catch (error) {
-    
+
     setUsersStatus(`Failed to load users: ${error.message}`, 'error', false);
     usersListDiv.innerHTML = '<p class="text-red-400 text-center py-4">Failed to load users</p>';
   }
@@ -523,6 +534,306 @@ if (refreshUsersBtn) {
   refreshUsersBtn.addEventListener('click', () => {
     refreshUsersList();
   });
+}
+
+// --- USER LIBRARY ACCESS MANAGEMENT ---
+let currentAccessUser = null;
+let libraryTreeData = null;
+let userAccessData = null;
+
+async function showUserAccessView(userId, userEmail, userRole) {
+  if (userRole === 'admin') {
+    alert('Admin users have full access to all libraries automatically.');
+    return;
+  }
+
+  currentAccessUser = { userId, userEmail, userRole };
+
+  // Hide users list, show access view
+  usersListDiv.classList.add('hidden');
+  setUsersStatus('', 'info', false);
+
+  // Create access view UI
+  const accessView = document.createElement('div');
+  accessView.id = 'user-access-view';
+  accessView.className = 'space-y-4';
+  accessView.innerHTML = `
+    <div class="flex items-center justify-between mb-4">
+      <div>
+        <button id="back-to-users-btn" class="text-gray-400 hover:text-white transition-colors mb-2">
+          ← Back to Users
+        </button>
+        <h3 class="text-lg font-semibold text-white">Library Access for ${escapeHtml(userEmail)}</h3>
+        <p class="text-sm text-gray-400">Select which libraries, publishers, series, and comics this user can access</p>
+      </div>
+    </div>
+
+    <div id="access-status" class="text-sm text-gray-400"></div>
+
+    <div class="bg-gray-800 rounded-lg p-4">
+      <div class="flex items-center justify-between mb-4">
+        <h4 class="font-semibold text-white">Library Access</h4>
+        <div class="flex gap-2">
+          <button id="select-all-btn" class="text-xs bg-gray-700 hover:bg-gray-600 text-white px-3 py-1 rounded transition-colors">
+            Select All
+          </button>
+          <button id="deselect-all-btn" class="text-xs bg-gray-700 hover:bg-gray-600 text-white px-3 py-1 rounded transition-colors">
+            Deselect All
+          </button>
+        </div>
+      </div>
+
+      <div id="access-tree-container" class="space-y-2 max-h-96 overflow-y-auto">
+        <div class="text-center text-gray-400 py-4">Loading library structure...</div>
+      </div>
+    </div>
+
+    <div class="flex justify-end gap-2">
+      <button id="cancel-access-btn" class="bg-gray-600 hover:bg-gray-500 text-white font-bold py-2 px-4 rounded-full transition-colors">
+        Cancel
+      </button>
+      <button id="save-access-btn" class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-full transition-colors">
+        Save Access
+      </button>
+    </div>
+  `;
+
+  usersListDiv.parentElement.appendChild(accessView);
+
+  // Add event listeners
+  document.getElementById('back-to-users-btn').addEventListener('click', hideUserAccessView);
+  document.getElementById('cancel-access-btn').addEventListener('click', hideUserAccessView);
+  document.getElementById('save-access-btn').addEventListener('click', saveUserAccess);
+  document.getElementById('select-all-btn').addEventListener('click', () => toggleAllAccess(true));
+  document.getElementById('deselect-all-btn').addEventListener('click', () => toggleAllAccess(false));
+
+  // Load data
+  await loadLibraryTreeAndUserAccess(userId);
+}
+
+function hideUserAccessView() {
+  const accessView = document.getElementById('user-access-view');
+  if (accessView) {
+    accessView.remove();
+  }
+  usersListDiv.classList.remove('hidden');
+  currentAccessUser = null;
+  libraryTreeData = null;
+  userAccessData = null;
+}
+
+async function loadLibraryTreeAndUserAccess(userId) {
+  const statusDiv = document.getElementById('access-status');
+  const treeContainer = document.getElementById('access-tree-container');
+
+  try {
+    statusDiv.textContent = 'Loading library structure and user access...';
+
+    // Load library tree and user access in parallel
+    const [treeResponse, accessResponse] = await Promise.all([
+      fetch(`${API_BASE_URL}/api/v1/library-tree`),
+      fetch(`${API_BASE_URL}/api/v1/users/${userId}/access`)
+    ]);
+
+    const treeData = await treeResponse.json();
+    const accessData = await accessResponse.json();
+
+    if (!treeResponse.ok) {
+      throw new Error(treeData.message || 'Failed to load library tree');
+    }
+
+    if (!accessResponse.ok) {
+      throw new Error(accessData.message || 'Failed to load user access');
+    }
+
+    libraryTreeData = treeData.tree || {};
+    userAccessData = accessData.access || [];
+
+    // Build access lookup for quick checking
+    const accessMap = new Set();
+    userAccessData.forEach(item => {
+      accessMap.add(`${item.accessType}:${item.accessValue}`);
+    });
+
+    // Render tree
+    renderLibraryAccessTree(libraryTreeData, accessMap, treeContainer);
+    statusDiv.textContent = '';
+
+  } catch (error) {
+    statusDiv.textContent = `Error: ${error.message}`;
+    statusDiv.className = 'text-sm text-red-400';
+    treeContainer.innerHTML = '<div class="text-center text-red-400 py-4">Failed to load library data</div>';
+  }
+}
+
+function renderLibraryAccessTree(tree, accessMap, container) {
+  container.innerHTML = '';
+
+  const libraries = Object.keys(tree).sort();
+
+  if (libraries.length === 0) {
+    container.innerHTML = '<div class="text-center text-gray-400 py-4">No libraries found</div>';
+    return;
+  }
+
+  libraries.forEach(library => {
+    const publishers = tree[library];
+    const libraryDiv = createTreeNode('library', library, publishers, accessMap);
+    container.appendChild(libraryDiv);
+  });
+}
+
+function createTreeNode(type, value, children, accessMap) {
+  const key = `${type}:${value}`;
+  const isChecked = accessMap.has(key);
+
+  const nodeDiv = document.createElement('div');
+  nodeDiv.className = 'border border-gray-700 rounded-lg overflow-hidden';
+
+  // Create header with checkbox
+  const header = document.createElement('div');
+  header.className = 'flex items-center gap-2 p-3 bg-gray-900 hover:bg-gray-800 cursor-pointer transition-colors';
+
+  const checkbox = document.createElement('input');
+  checkbox.type = 'checkbox';
+  checkbox.checked = isChecked;
+  checkbox.className = 'w-4 h-4 rounded border-gray-600 text-purple-600 focus:ring-purple-500 focus:ring-2';
+  checkbox.dataset.accessType = type;
+  checkbox.dataset.accessValue = value;
+
+  const label = document.createElement('label');
+  label.className = 'flex-1 text-white cursor-pointer';
+  label.textContent = value;
+
+  const expandIcon = document.createElement('span');
+  expandIcon.className = 'text-gray-400 transition-transform';
+  expandIcon.innerHTML = children && Object.keys(children).length > 0 ? '▼' : '';
+
+  header.appendChild(checkbox);
+  header.appendChild(label);
+  header.appendChild(expandIcon);
+  nodeDiv.appendChild(header);
+
+  // Handle checkbox change
+  checkbox.addEventListener('change', (e) => {
+    e.stopPropagation();
+    const isNowChecked = checkbox.checked;
+
+    // Update access map
+    if (isNowChecked) {
+      accessMap.add(key);
+    } else {
+      accessMap.delete(key);
+    }
+
+    // Cascade to children if expanded
+    const childrenContainer = nodeDiv.querySelector('.children-container');
+    if (childrenContainer) {
+      childrenContainer.querySelectorAll('input[type="checkbox"]').forEach(childCheckbox => {
+        childCheckbox.checked = isNowChecked;
+        const childKey = `${childCheckbox.dataset.accessType}:${childCheckbox.dataset.accessValue}`;
+        if (isNowChecked) {
+          accessMap.add(childKey);
+        } else {
+          accessMap.delete(childKey);
+        }
+      });
+    }
+  });
+
+  // Create children container
+  if (children && Object.keys(children).length > 0) {
+    const childrenContainer = document.createElement('div');
+    childrenContainer.className = 'children-container pl-6 pr-3 pb-2 bg-gray-900 hidden';
+
+    if (type === 'library') {
+      // Children are publishers (object with series arrays)
+      Object.keys(children).sort().forEach(publisher => {
+        const series = children[publisher];
+        const publisherNode = createTreeNode('publisher', publisher, series, accessMap);
+        childrenContainer.appendChild(publisherNode);
+      });
+    } else if (type === 'publisher') {
+      // Children are series (array)
+      if (Array.isArray(children)) {
+        children.sort().forEach(seriesName => {
+          const seriesNode = createTreeNode('series', seriesName, null, accessMap);
+          childrenContainer.appendChild(seriesNode);
+        });
+      }
+    }
+
+    nodeDiv.appendChild(childrenContainer);
+
+    // Toggle expansion on header click (but not checkbox)
+    header.addEventListener('click', (e) => {
+      if (e.target !== checkbox) {
+        childrenContainer.classList.toggle('hidden');
+        expandIcon.classList.toggle('rotate-180');
+      }
+    });
+  }
+
+  return nodeDiv;
+}
+
+function toggleAllAccess(selectAll) {
+  const treeContainer = document.getElementById('access-tree-container');
+  if (!treeContainer) return;
+
+  treeContainer.querySelectorAll('input[type="checkbox"]').forEach(checkbox => {
+    checkbox.checked = selectAll;
+  });
+}
+
+async function saveUserAccess() {
+  const statusDiv = document.getElementById('access-status');
+  const saveBtn = document.getElementById('save-access-btn');
+
+  if (!currentAccessUser) return;
+
+  try {
+    saveBtn.disabled = true;
+    saveBtn.textContent = 'Saving...';
+    statusDiv.textContent = 'Saving access permissions...';
+    statusDiv.className = 'text-sm text-gray-400';
+
+    // Collect all checked items
+    const access = [];
+    document.querySelectorAll('#access-tree-container input[type="checkbox"]:checked').forEach(checkbox => {
+      access.push({
+        accessType: checkbox.dataset.accessType,
+        accessValue: checkbox.dataset.accessValue,
+        granted: true
+      });
+    });
+
+    const response = await fetch(`${API_BASE_URL}/api/v1/users/${currentAccessUser.userId}/access`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ access })
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.message || 'Failed to save access permissions');
+    }
+
+    statusDiv.textContent = 'Access permissions saved successfully!';
+    statusDiv.className = 'text-sm text-green-400';
+
+    setTimeout(() => {
+      hideUserAccessView();
+      refreshUsersList();
+    }, 1500);
+
+  } catch (error) {
+    statusDiv.textContent = `Error: ${error.message}`;
+    statusDiv.className = 'text-sm text-red-400';
+    saveBtn.disabled = false;
+    saveBtn.textContent = 'Save Access';
+  }
 }
 
 // --- COMICS MANAGEMENT ---
