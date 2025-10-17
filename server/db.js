@@ -94,6 +94,22 @@ function initializeDatabase() {
       FOREIGN KEY (userId) REFERENCES users(userId) ON DELETE CASCADE
     )`);
 
+    // User library access control
+    // Supports hierarchical access: library -> publisher -> series -> comic
+    db.run(`CREATE TABLE IF NOT EXISTS user_library_access (
+      userId TEXT NOT NULL,
+      accessType TEXT NOT NULL,
+      accessValue TEXT NOT NULL,
+      granted INTEGER DEFAULT 1,
+      created INTEGER DEFAULT (strftime('%s', 'now') * 1000),
+      PRIMARY KEY (userId, accessType, accessValue),
+      FOREIGN KEY (userId) REFERENCES users(userId) ON DELETE CASCADE
+    )`);
+
+    // Create index for faster access queries
+    db.run(`CREATE INDEX IF NOT EXISTS idx_user_library_access_lookup
+      ON user_library_access(userId, accessType)`);
+
 
     db.all('PRAGMA table_info(comics)', (err, cols) => {
       if (err) {
@@ -135,7 +151,84 @@ function initializeDatabase() {
         });
       }
     });
+
+    // Migration: Grant full access to existing users (one-time)
+    // New users will have no access by default
+    db.get(`SELECT name FROM sqlite_master WHERE type='table' AND name='user_library_access'`, (err, table) => {
+      if (err) {
+        log('ERROR', 'DB', `Migration check error: ${err.message}`);
+        return;
+      }
+      if (table) {
+        // Check if migration has been run (marked by a special setting)
+        db.get(`SELECT value FROM settings WHERE key = 'access_migration_v1'`, (err, row) => {
+          if (err || row) return; // Already migrated or error
+
+          // Get all existing users and grant them full access to all libraries
+          db.all(`SELECT DISTINCT publisher FROM comics`, (err, libraries) => {
+            if (err || !libraries) return;
+
+            db.all(`SELECT userId, role FROM users`, (err, users) => {
+              if (err || !users) return;
+
+              const stmt = db.prepare(`INSERT OR IGNORE INTO user_library_access (userId, accessType, accessValue, granted) VALUES (?, ?, ?, 1)`);
+
+              users.forEach(user => {
+                // Skip admins (they always have full access)
+                if (user.role === 'admin') return;
+
+                // Grant access to each library for existing non-admin users
+                libraries.forEach(lib => {
+                  if (lib.publisher) {
+                    stmt.run(user.userId, 'library', lib.publisher);
+                  }
+                });
+              });
+
+              stmt.finalize(() => {
+                db.run(`INSERT INTO settings (key, value) VALUES ('access_migration_v1', 'completed')`);
+                log('INFO', 'DB', 'Completed user access migration for existing users');
+              });
+            });
+          });
+        });
+      }
+    });
   });
+}
+
+// Helper function to check if a user has access to a resource
+// Admin users always have access
+async function checkUserAccess(userId, userRole, accessType, accessValue) {
+  // Admins have access to everything
+  if (userRole === 'admin') {
+    return true;
+  }
+
+  // Check if user has explicit access
+  const access = await dbGet(
+    `SELECT granted FROM user_library_access
+     WHERE userId = ? AND accessType = ? AND accessValue = ?`,
+    [userId, accessType, accessValue]
+  );
+
+  return access && access.granted === 1;
+}
+
+// Helper function to get all accessible resources for a user
+async function getUserAccessibleResources(userId, userRole, accessType) {
+  // Admins have access to everything
+  if (userRole === 'admin') {
+    return null; // null means "all resources"
+  }
+
+  const resources = await dbAll(
+    `SELECT accessValue FROM user_library_access
+     WHERE userId = ? AND accessType = ? AND granted = 1`,
+    [userId, accessType]
+  );
+
+  return resources.map(r => r.accessValue);
 }
 
 module.exports = {
@@ -143,5 +236,7 @@ module.exports = {
   dbGet,
   dbRun,
   dbAll,
-  initializeDatabase
+  initializeDatabase,
+  checkUserAccess,
+  getUserAccessibleResources
 };

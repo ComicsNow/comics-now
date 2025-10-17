@@ -836,6 +836,137 @@ function createApiRouter({
     }
   });
 
+  // Get library tree structure for access control
+  router.get('/api/v1/library-tree', requireAdmin, async (req, res) => {
+    try {
+      // Get all unique libraries, publishers, series from comics
+      const comics = await dbAll(`
+        SELECT DISTINCT
+          publisher as library,
+          publisher,
+          series
+        FROM comics
+        WHERE publisher IS NOT NULL
+        ORDER BY publisher, series
+      `);
+
+      // Build hierarchical tree structure
+      const tree = {};
+      for (const comic of comics) {
+        const lib = comic.library || 'Unknown Library';
+        const pub = comic.publisher || 'Unknown Publisher';
+        const ser = comic.series || 'Unknown Series';
+
+        if (!tree[lib]) {
+          tree[lib] = {};
+        }
+        if (!tree[lib][pub]) {
+          tree[lib][pub] = new Set();
+        }
+        tree[lib][pub].add(ser);
+      }
+
+      // Convert Sets to arrays for JSON serialization
+      const result = {};
+      for (const lib in tree) {
+        result[lib] = {};
+        for (const pub in tree[lib]) {
+          result[lib][pub] = Array.from(tree[lib][pub]);
+        }
+      }
+
+      res.json({ ok: true, tree: result });
+    } catch (error) {
+      log('ERROR', 'ACCESS', `Failed to fetch library tree: ${error.message}`);
+      res.status(500).json({ ok: false, message: formatErrorMessage(error, req, 'Failed to fetch library tree') });
+    }
+  });
+
+  // Get user's access permissions
+  router.get('/api/v1/users/:userId/access', requireAdmin, async (req, res) => {
+    try {
+      const { userId } = req.params;
+
+      // Check if user exists
+      const user = await dbGet('SELECT userId, email, role FROM users WHERE userId = ?', [userId]);
+      if (!user) {
+        return res.status(404).json({ ok: false, message: 'User not found' });
+      }
+
+      // Admins have access to everything (no need to query database)
+      if (user.role === 'admin') {
+        return res.json({
+          ok: true,
+          userId,
+          role: 'admin',
+          hasFullAccess: true,
+          access: []
+        });
+      }
+
+      // Get user's access permissions
+      const access = await dbAll(
+        'SELECT accessType, accessValue, granted FROM user_library_access WHERE userId = ? AND granted = 1',
+        [userId]
+      );
+
+      res.json({
+        ok: true,
+        userId,
+        role: user.role,
+        hasFullAccess: false,
+        access
+      });
+    } catch (error) {
+      log('ERROR', 'ACCESS', `Failed to fetch user access: ${error.message}`);
+      res.status(500).json({ ok: false, message: formatErrorMessage(error, req, 'Failed to fetch user access') });
+    }
+  });
+
+  // Update user's access permissions
+  router.post('/api/v1/users/:userId/access', requireAdmin, async (req, res) => {
+    try {
+      const { userId } = req.params;
+      const { access } = req.body; // access is an array of { accessType, accessValue, granted }
+
+      if (!Array.isArray(access)) {
+        return res.status(400).json({ ok: false, message: 'Invalid access data: expected array' });
+      }
+
+      // Check if user exists
+      const user = await dbGet('SELECT userId, role FROM users WHERE userId = ?', [userId]);
+      if (!user) {
+        return res.status(404).json({ ok: false, message: 'User not found' });
+      }
+
+      // Cannot modify admin access through this endpoint
+      if (user.role === 'admin') {
+        return res.status(400).json({ ok: false, message: 'Cannot modify admin user access (admins have full access)' });
+      }
+
+      // Clear existing access for this user
+      await dbRun('DELETE FROM user_library_access WHERE userId = ?', [userId]);
+
+      // Insert new access permissions
+      if (access.length > 0) {
+        for (const item of access) {
+          if (!item.accessType || !item.accessValue) continue;
+          const granted = item.granted === false ? 0 : 1; // Default to granted
+          await dbRun(
+            'INSERT INTO user_library_access (userId, accessType, accessValue, granted) VALUES (?, ?, ?, ?)',
+            [userId, item.accessType, item.accessValue, granted]
+          );
+        }
+      }
+
+      log('INFO', 'ACCESS', `Updated access permissions for user ${userId}: ${access.length} entries`);
+      res.json({ ok: true, message: 'Access permissions updated successfully' });
+    } catch (error) {
+      log('ERROR', 'ACCESS', `Failed to update user access: ${error.message}`);
+      res.status(500).json({ ok: false, message: formatErrorMessage(error, req, 'Failed to update user access') });
+    }
+  });
+
   router.get('/api/v1/sync/devices/:comicId', async (req, res) => {
     try {
       const { comicId } = req.params;
