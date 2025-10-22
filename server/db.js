@@ -98,13 +98,13 @@ function initializeDatabase() {
     // Supports hierarchical access: root_folder -> publisher -> series -> comic
     // Two access modes per level:
     //   - direct_access: items directly at this level only
-    //   - recursive_access: all descendants under this level
+    //   - child_access: all descendants under this level (children, grandchildren, etc.)
     db.run(`CREATE TABLE IF NOT EXISTS user_library_access (
       userId TEXT NOT NULL,
       accessType TEXT NOT NULL,
       accessValue TEXT NOT NULL,
       direct_access INTEGER DEFAULT 0,
-      recursive_access INTEGER DEFAULT 0,
+      child_access INTEGER DEFAULT 0,
       created INTEGER DEFAULT (strftime('%s', 'now') * 1000),
       PRIMARY KEY (userId, accessType, accessValue),
       FOREIGN KEY (userId) REFERENCES users(userId) ON DELETE CASCADE
@@ -160,14 +160,15 @@ function initializeDatabase() {
     db.all('PRAGMA table_info(user_library_access)', (err, cols) => {
       if (err || !cols) return;
 
-      // Check if old 'granted' column exists
+      // Check what columns exist
       const hasGranted = cols.some(c => c.name === 'granted');
       const hasDirectAccess = cols.some(c => c.name === 'direct_access');
       const hasRecursiveAccess = cols.some(c => c.name === 'recursive_access');
+      const hasChildAccess = cols.some(c => c.name === 'child_access');
 
+      // Migration 1: From granted to direct_access/recursive_access
       if (hasGranted && !hasDirectAccess && !hasRecursiveAccess) {
-        // Migrate from old schema to new schema
-        log('INFO', 'DB', 'Migrating user_library_access table to new schema...');
+        log('INFO', 'DB', 'Migrating user_library_access from granted to direct_access/recursive_access...');
 
         db.run(`ALTER TABLE user_library_access ADD COLUMN direct_access INTEGER DEFAULT 0`, (err) => {
           if (err) {
@@ -181,14 +182,34 @@ function initializeDatabase() {
               return;
             }
 
-            // Migrate old 'granted' values to 'recursive_access' (old system gave full access)
             db.run(`UPDATE user_library_access SET recursive_access = granted, direct_access = granted WHERE granted = 1`, (err) => {
               if (err) {
                 log('ERROR', 'DB', `Failed to migrate granted values: ${err.message}`);
               } else {
-                log('INFO', 'DB', 'Successfully migrated access control schema');
+                log('INFO', 'DB', 'Successfully migrated from granted to direct_access/recursive_access');
               }
             });
+          });
+        });
+      }
+
+      // Migration 2: From recursive_access to child_access
+      if (hasRecursiveAccess && !hasChildAccess) {
+        log('INFO', 'DB', 'Migrating user_library_access from recursive_access to child_access...');
+
+        db.run(`ALTER TABLE user_library_access ADD COLUMN child_access INTEGER DEFAULT 0`, (err) => {
+          if (err) {
+            log('ERROR', 'DB', `Failed to add child_access column: ${err.message}`);
+            return;
+          }
+
+          // Copy recursive_access data to child_access
+          db.run(`UPDATE user_library_access SET child_access = recursive_access`, (err) => {
+            if (err) {
+              log('ERROR', 'DB', `Failed to migrate recursive_access to child_access: ${err.message}`);
+            } else {
+              log('INFO', 'DB', 'Successfully migrated from recursive_access to child_access');
+            }
           });
         });
       }
@@ -216,7 +237,7 @@ function initializeDatabase() {
 
             if (rootFolders.length === 0) return;
 
-            const stmt = db.prepare(`INSERT OR IGNORE INTO user_library_access (userId, accessType, accessValue, direct_access, recursive_access) VALUES (?, ?, ?, 1, 1)`);
+            const stmt = db.prepare(`INSERT OR IGNORE INTO user_library_access (userId, accessType, accessValue, direct_access, child_access) VALUES (?, ?, ?, 1, 1)`);
 
             users.forEach(user => {
               // Skip admins (they always have full access)
@@ -296,58 +317,97 @@ async function checkComicAccess(userId, userRole, comicPath, publisher, series, 
 
   // Get user's access permissions (all at once for efficiency)
   const accessList = await dbAll(
-    `SELECT accessType, accessValue, direct_access, recursive_access
+    `SELECT accessType, accessValue, direct_access, child_access
      FROM user_library_access
-     WHERE userId = ? AND (direct_access = 1 OR recursive_access = 1)`,
+     WHERE userId = ? AND (direct_access = 1 OR child_access = 1)`,
     [userId]
   );
 
   // Hierarchical access control: Check from top to bottom
   // User MUST have access at root folder level first, then publisher, then series
+  // Child access at any parent level grants access to all descendants
 
-  // Step 1: Check ROOT FOLDER access (mandatory first check)
-  const rootAccess = accessList.find(a =>
+  // Check if any parent has child_access that would grant access to this comic
+  // Check root folder child_access
+  const rootChildAccess = accessList.find(a =>
     a.accessType === 'root_folder' &&
     a.accessValue === rootFolder &&
-    (a.direct_access === 1 || a.recursive_access === 1)
+    a.child_access === 1
   );
-
-  if (!rootAccess) {
-    // No root folder access = no access to anything in it, regardless of publisher/series access
-    return false;
+  if (rootChildAccess) {
+    return true; // Root folder child_access grants access to everything under it
   }
 
-  // If root folder has recursive access, grant access to everything under it
-  if (rootAccess.recursive_access === 1) {
-    return true;
-  }
-
-  // Step 2: Root folder has direct_access only, check PUBLISHER level
-  const publisherAccess = accessList.find(a =>
+  // Check publisher child_access
+  const publisherChildAccess = accessList.find(a =>
     a.accessType === 'publisher' &&
     a.accessValue === publisher &&
-    (a.direct_access === 1 || a.recursive_access === 1)
+    a.child_access === 1
   );
-
-  if (!publisherAccess) {
-    // No publisher access = can't access comics from this publisher
-    return false;
+  if (publisherChildAccess) {
+    // Publisher has child_access, but we still need root folder access
+    const rootAccess = accessList.find(a =>
+      a.accessType === 'root_folder' &&
+      a.accessValue === rootFolder &&
+      (a.direct_access === 1 || a.child_access === 1)
+    );
+    if (rootAccess) {
+      return true; // Publisher child_access + root access grants access to all series/comics
+    }
   }
 
-  // If publisher has recursive access, grant access to all its series/comics
-  if (publisherAccess.recursive_access === 1) {
-    return true;
-  }
-
-  // Step 3: Publisher has direct_access only, check SERIES level
-  const seriesAccess = accessList.find(a =>
+  // Check series child_access
+  const seriesChildAccess = accessList.find(a =>
     a.accessType === 'series' &&
     a.accessValue === series &&
-    (a.direct_access === 1 || a.recursive_access === 1)
+    a.child_access === 1
+  );
+  if (seriesChildAccess) {
+    // Series has child_access, check if we have publisher and root access
+    const rootAccess = accessList.find(a =>
+      a.accessType === 'root_folder' &&
+      a.accessValue === rootFolder &&
+      (a.direct_access === 1 || a.child_access === 1)
+    );
+    const publisherAccess = accessList.find(a =>
+      a.accessType === 'publisher' &&
+      a.accessValue === publisher &&
+      (a.direct_access === 1 || a.child_access === 1)
+    );
+    if (rootAccess && publisherAccess) {
+      return true; // Series child_access + publisher + root access grants access to all comics
+    }
+  }
+
+  // No child_access found, check for direct_access at each level
+  // Step 1: Check ROOT FOLDER direct access (mandatory)
+  const rootDirectAccess = accessList.find(a =>
+    a.accessType === 'root_folder' &&
+    a.accessValue === rootFolder &&
+    a.direct_access === 1
+  );
+  if (!rootDirectAccess) {
+    return false; // No root folder access at all
+  }
+
+  // Step 2: Check PUBLISHER direct access
+  const publisherDirectAccess = accessList.find(a =>
+    a.accessType === 'publisher' &&
+    a.accessValue === publisher &&
+    a.direct_access === 1
+  );
+  if (!publisherDirectAccess) {
+    return false; // No publisher access
+  }
+
+  // Step 3: Check SERIES direct access
+  const seriesDirectAccess = accessList.find(a =>
+    a.accessType === 'series' &&
+    a.accessValue === series &&
+    a.direct_access === 1
   );
 
-  // Grant access if series access exists (either direct or recursive)
-  return !!seriesAccess;
+  return !!seriesDirectAccess; // Must have series access to access the comic
 }
 
 module.exports = {

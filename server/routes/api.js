@@ -917,7 +917,7 @@ function createApiRouter({
 
       // Get user's access permissions
       const access = await dbAll(
-        'SELECT accessType, accessValue, direct_access, recursive_access FROM user_library_access WHERE userId = ? AND (direct_access = 1 OR recursive_access = 1)',
+        'SELECT accessType, accessValue, direct_access, child_access FROM user_library_access WHERE userId = ? AND (direct_access = 1 OR child_access = 1)',
         [userId]
       );
 
@@ -938,7 +938,7 @@ function createApiRouter({
   router.post('/api/v1/users/:userId/access', requireAdmin, async (req, res) => {
     try {
       const { userId } = req.params;
-      const { access } = req.body; // access is an array of { accessType, accessValue, direct_access, recursive_access }
+      const { access } = req.body; // access is an array of { accessType, accessValue, direct_access, child_access }
 
       if (!Array.isArray(access)) {
         return res.status(400).json({ ok: false, message: 'Invalid access data: expected array' });
@@ -963,13 +963,13 @@ function createApiRouter({
         for (const item of access) {
           if (!item.accessType || !item.accessValue) continue;
           const directAccess = item.direct_access === true ? 1 : 0;
-          const recursiveAccess = item.recursive_access === true ? 1 : 0;
+          const childAccess = item.child_access === true ? 1 : 0;
 
           // Only insert if at least one access type is enabled
-          if (directAccess || recursiveAccess) {
+          if (directAccess || childAccess) {
             await dbRun(
-              'INSERT INTO user_library_access (userId, accessType, accessValue, direct_access, recursive_access) VALUES (?, ?, ?, ?, ?)',
-              [userId, item.accessType, item.accessValue, directAccess, recursiveAccess]
+              'INSERT INTO user_library_access (userId, accessType, accessValue, direct_access, child_access) VALUES (?, ?, ?, ?, ?)',
+              [userId, item.accessType, item.accessValue, directAccess, childAccess]
             );
           }
         }

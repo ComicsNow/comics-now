@@ -649,13 +649,13 @@ async function loadLibraryTreeAndUserAccess(userId) {
     libraryTreeData = treeData.tree || {};
     userAccessData = accessData.access || [];
 
-    // Build access lookup map with direct/recursive flags
+    // Build access lookup map with direct/child flags
     const accessMap = new Map();
     userAccessData.forEach(item => {
       const key = `${item.accessType}:${item.accessValue}`;
       accessMap.set(key, {
         direct: item.direct_access === 1 || item.direct_access === true,
-        recursive: item.recursive_access === 1 || item.recursive_access === true
+        child: item.child_access === 1 || item.child_access === true
       });
     });
 
@@ -683,14 +683,14 @@ function renderLibraryAccessTree(tree, accessMap, container) {
   // Hierarchy: root_folder → publisher → series → comic
   rootFolders.forEach(rootFolder => {
     const publishers = tree[rootFolder];
-    const rootDiv = createTreeNode('root_folder', rootFolder, publishers, accessMap);
+    const rootDiv = createTreeNode('root_folder', rootFolder, publishers, accessMap, null);
     container.appendChild(rootDiv);
   });
 }
 
-function createTreeNode(type, value, children, accessMap) {
+function createTreeNode(type, value, children, accessMap, parentNodeDiv) {
   const key = `${type}:${value}`;
-  const access = accessMap.get(key) || { direct: false, recursive: false };
+  const access = accessMap.get(key) || { direct: false, child: false };
   const hasChildren = children && ((Array.isArray(children) && children.length > 0) || (typeof children === 'object' && Object.keys(children).length > 0));
   const isLeaf = type === 'comic'; // Comics are leaf nodes
 
@@ -701,14 +701,14 @@ function createTreeNode(type, value, children, accessMap) {
   const header = document.createElement('div');
   header.className = 'flex items-center gap-2 p-3 bg-gray-900 hover:bg-gray-800 transition-colors';
 
-  // For non-leaf nodes: show two checkboxes (Direct and Recursive)
+  // For non-leaf nodes: show three checkboxes (Direct, Recursive, Child)
   // For leaf nodes (comics): show single checkbox
   if (!isLeaf && hasChildren) {
-    // Two checkboxes container
+    // Three checkboxes container
     const checkboxesContainer = document.createElement('div');
     checkboxesContainer.className = 'flex flex-col gap-1';
 
-    // Direct access checkbox
+    // Direct access checkbox (D)
     const directCheckbox = document.createElement('input');
     directCheckbox.type = 'checkbox';
     directCheckbox.checked = access.direct;
@@ -716,45 +716,65 @@ function createTreeNode(type, value, children, accessMap) {
     directCheckbox.dataset.accessType = type;
     directCheckbox.dataset.accessValue = value;
     directCheckbox.dataset.accessMode = 'direct';
-    directCheckbox.title = 'Direct access (items at this level only)';
+    directCheckbox.title = 'Direct access (this item only)';
 
-    // Recursive access checkbox
+    // Recursive checkbox (R) - UI helper to select all siblings
     const recursiveCheckbox = document.createElement('input');
     recursiveCheckbox.type = 'checkbox';
-    recursiveCheckbox.checked = access.recursive;
-    recursiveCheckbox.className = 'w-3.5 h-3.5 rounded border-gray-600 text-purple-600 focus:ring-purple-500 focus:ring-1';
+    recursiveCheckbox.checked = false; // Never checked by default (UI helper only)
+    recursiveCheckbox.className = 'w-3.5 h-3.5 rounded border-gray-600 text-yellow-600 focus:ring-yellow-500 focus:ring-1';
     recursiveCheckbox.dataset.accessType = type;
     recursiveCheckbox.dataset.accessValue = value;
     recursiveCheckbox.dataset.accessMode = 'recursive';
-    recursiveCheckbox.title = 'Recursive access (all children)';
+    recursiveCheckbox.title = 'Recursive (select all siblings at this level)';
+
+    // Child access checkbox (C)
+    const childCheckbox = document.createElement('input');
+    childCheckbox.type = 'checkbox';
+    childCheckbox.checked = access.child;
+    childCheckbox.className = 'w-3.5 h-3.5 rounded border-gray-600 text-purple-600 focus:ring-purple-500 focus:ring-1';
+    childCheckbox.dataset.accessType = type;
+    childCheckbox.dataset.accessValue = value;
+    childCheckbox.dataset.accessMode = 'child';
+    childCheckbox.title = 'Child access (all descendants)';
 
     checkboxesContainer.appendChild(directCheckbox);
     checkboxesContainer.appendChild(recursiveCheckbox);
+    checkboxesContainer.appendChild(childCheckbox);
     header.appendChild(checkboxesContainer);
 
-    // Add event listener to recursive checkbox to auto-check/uncheck children
+    // Add event listener to recursive checkbox to select all siblings
     recursiveCheckbox.addEventListener('change', (e) => {
       e.stopPropagation();
-      const childrenContainer = nodeDiv.querySelector('.children-container');
-      if (childrenContainer) {
-        // Check/uncheck all descendant checkboxes
-        childrenContainer.querySelectorAll('input[type="checkbox"]').forEach(checkbox => {
-          checkbox.checked = recursiveCheckbox.checked;
-        });
+      if (recursiveCheckbox.checked && parentNodeDiv) {
+        // Find all sibling nodes at the same level
+        const siblingsContainer = parentNodeDiv.querySelector('.children-container');
+        if (siblingsContainer) {
+          // Find all direct child nodes (siblings of this node)
+          siblingsContainer.querySelectorAll(':scope > .border').forEach(siblingNode => {
+            // Find the Direct checkbox in each sibling
+            const siblingDirectCheckbox = siblingNode.querySelector('input[data-access-mode="direct"]');
+            if (siblingDirectCheckbox) {
+              siblingDirectCheckbox.checked = true;
+            }
+          });
+        }
       }
+      // Uncheck the recursive checkbox itself (it's just a trigger, not stored)
+      setTimeout(() => { recursiveCheckbox.checked = false; }, 100);
     });
 
     // Add labels for the checkboxes
     const labelsContainer = document.createElement('div');
     labelsContainer.className = 'flex flex-col text-xs text-gray-500';
-    labelsContainer.innerHTML = '<span>D</span><span>R</span>';
+    labelsContainer.innerHTML = '<span>D</span><span>R</span><span>C</span>';
     header.appendChild(labelsContainer);
 
   } else {
     // Single checkbox for leaf nodes or nodes without children
     const checkbox = document.createElement('input');
     checkbox.type = 'checkbox';
-    checkbox.checked = access.direct || access.recursive;
+    checkbox.checked = access.direct || access.child;
     checkbox.className = 'w-4 h-4 rounded border-gray-600 text-purple-600 focus:ring-purple-500 focus:ring-2';
     checkbox.dataset.accessType = type;
     checkbox.dataset.accessValue = value;
@@ -798,21 +818,21 @@ function createTreeNode(type, value, children, accessMap) {
       // Children are publishers (object with series objects)
       Object.keys(children).sort().forEach(publisher => {
         const series = children[publisher];
-        const publisherNode = createTreeNode('publisher', publisher, series, accessMap);
+        const publisherNode = createTreeNode('publisher', publisher, series, accessMap, nodeDiv);
         childrenContainer.appendChild(publisherNode);
       });
     } else if (type === 'publisher') {
       // Children are series (object with comics arrays)
       Object.keys(children).sort().forEach(seriesName => {
         const comics = children[seriesName];
-        const seriesNode = createTreeNode('series', seriesName, comics, accessMap);
+        const seriesNode = createTreeNode('series', seriesName, comics, accessMap, nodeDiv);
         childrenContainer.appendChild(seriesNode);
       });
     } else if (type === 'series') {
       // Children are comics (array of comic objects)
       if (Array.isArray(children)) {
         children.forEach(comic => {
-          const comicNode = createTreeNode('comic', comic, null, accessMap);
+          const comicNode = createTreeNode('comic', comic, null, accessMap, nodeDiv);
           childrenContainer.appendChild(comicNode);
         });
       }
@@ -846,7 +866,8 @@ async function saveUserAccess() {
     statusDiv.className = 'text-sm text-gray-400';
 
     // Collect access data from checkboxes
-    // Group by accessType:accessValue to combine direct/recursive
+    // Group by accessType:accessValue to combine direct/child
+    // Skip 'recursive' mode as it's UI-only (not saved to database)
     const accessMap = new Map();
 
     document.querySelectorAll('#access-tree-container input[type="checkbox"]').forEach(checkbox => {
@@ -855,30 +876,35 @@ async function saveUserAccess() {
       const accessMode = checkbox.dataset.accessMode;
       const key = `${accessType}:${accessValue}`;
 
+      // Skip recursive checkbox - it's just a UI helper
+      if (accessMode === 'recursive') {
+        return;
+      }
+
       if (!accessMap.has(key)) {
         accessMap.set(key, {
           accessType,
           accessValue,
           direct_access: false,
-          recursive_access: false
+          child_access: false
         });
       }
 
       const item = accessMap.get(key);
       if (accessMode === 'direct') {
         item.direct_access = checkbox.checked;
-      } else if (accessMode === 'recursive') {
-        item.recursive_access = checkbox.checked;
+      } else if (accessMode === 'child') {
+        item.child_access = checkbox.checked;
       } else if (accessMode === 'both') {
         // For leaf nodes (comics)
         item.direct_access = checkbox.checked;
-        item.recursive_access = checkbox.checked;
+        item.child_access = checkbox.checked;
       }
     });
 
     // Convert map to array, filtering out items with no access
     const access = Array.from(accessMap.values()).filter(item =>
-      item.direct_access || item.recursive_access
+      item.direct_access || item.child_access
     );
 
     const response = await fetch(`${API_BASE_URL}/api/v1/users/${currentAccessUser.userId}/access`, {
