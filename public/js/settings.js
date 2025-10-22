@@ -746,7 +746,7 @@ function createTreeNode(type, value, children, accessMap, parentNodeDiv) {
     // Add event listener to recursive checkbox to select all siblings
     recursiveCheckbox.addEventListener('change', (e) => {
       e.stopPropagation();
-      if (recursiveCheckbox.checked && parentNodeDiv) {
+      if (parentNodeDiv) {
         // Find all sibling nodes at the same level
         const siblingsContainer = parentNodeDiv.querySelector('.children-container');
         if (siblingsContainer) {
@@ -755,13 +755,46 @@ function createTreeNode(type, value, children, accessMap, parentNodeDiv) {
             // Find the Direct checkbox in each sibling
             const siblingDirectCheckbox = siblingNode.querySelector('input[data-access-mode="direct"]');
             if (siblingDirectCheckbox) {
-              siblingDirectCheckbox.checked = true;
+              // Bidirectional: check R = check all sibling D, uncheck R = uncheck all sibling D
+              siblingDirectCheckbox.checked = recursiveCheckbox.checked;
             }
           });
         }
       }
-      // Uncheck the recursive checkbox itself (it's just a trigger, not stored)
-      setTimeout(() => { recursiveCheckbox.checked = false; }, 100);
+    });
+
+    // Add event listener to child checkbox to cascade down and auto-check parent D
+    childCheckbox.addEventListener('change', (e) => {
+      e.stopPropagation();
+
+      if (childCheckbox.checked) {
+        // Auto-check Direct on this same node (need direct access if you have child access)
+        directCheckbox.checked = true;
+
+        // Recursively check all D and C on all descendants
+        const childrenContainer = nodeDiv.querySelector('.children-container');
+        if (childrenContainer) {
+          childrenContainer.querySelectorAll('input[type="checkbox"]').forEach(checkbox => {
+            const mode = checkbox.dataset.accessMode;
+            // Check all Direct and Child checkboxes, skip Recursive (UI helper)
+            if (mode === 'direct' || mode === 'child' || mode === 'both') {
+              checkbox.checked = true;
+            }
+          });
+        }
+      } else {
+        // Uncheck C: optionally uncheck all descendant D and C
+        const childrenContainer = nodeDiv.querySelector('.children-container');
+        if (childrenContainer) {
+          childrenContainer.querySelectorAll('input[type="checkbox"]').forEach(checkbox => {
+            const mode = checkbox.dataset.accessMode;
+            // Uncheck all Direct and Child checkboxes
+            if (mode === 'direct' || mode === 'child' || mode === 'both') {
+              checkbox.checked = false;
+            }
+          });
+        }
+      }
     });
 
     // Add labels for the checkboxes
