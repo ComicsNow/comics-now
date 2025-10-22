@@ -300,6 +300,16 @@
     return downloadedSmartListError;
   }
 
+  function updateDownloadedSmartListComic(comicId, updates) {
+    if (!comicId || !updates) return false;
+
+    const target = findDownloadedComicById(comicId);
+    if (!target) return false;
+
+    Object.assign(target, updates);
+    return true;
+  }
+
   const LibrarySmartLists = {
     LATEST_ADDED_DAYS,
     LATEST_CONVERTED_DAYS,
@@ -316,6 +326,7 @@
     getLatestConvertedComics,
     getDownloadedSmartListComics,
     getDownloadedSmartListError,
+    updateDownloadedSmartListComic,
   };
 
   global.LibrarySmartLists = LibrarySmartLists;
@@ -330,8 +341,10 @@
     updateDownloadedComicProgressData,
     syncDownloadedComicStatusFromLibrary,
     rebuildDownloadedComics,
+    updateDownloadedSmartListComic,
   });
 
   global.updateDownloadedComicProgressData = updateDownloadedComicProgressData;
   global.rebuildDownloadedComics = rebuildDownloadedComics;
+  global.updateDownloadedSmartListComic = updateDownloadedSmartListComic;
 })(typeof window !== 'undefined' ? window : globalThis);

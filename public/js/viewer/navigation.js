@@ -194,6 +194,61 @@
     global.hidePageJumpInput?.({ focusButton: false });
     global.updateViewerPageCounter?.([]);
 
+    // Automatically sync manga mode from library if available (no user prompt)
+    // This ensures downloaded comics get the latest manga mode setting
+    if (navigator.onLine && typeof global.library !== 'undefined') {
+      try {
+        // Find the comic in the main library to get the latest manga mode
+        let libraryComic = null;
+        for (const rootFolder of Object.keys(global.library)) {
+          const publishers = global.library[rootFolder]?.publishers || {};
+          for (const publisherName of Object.keys(publishers)) {
+            const seriesEntries = publishers[publisherName]?.series || {};
+            for (const seriesName of Object.keys(seriesEntries)) {
+              const comics = seriesEntries[seriesName];
+              if (Array.isArray(comics)) {
+                libraryComic = comics.find(c => c.id === comic.id);
+                if (libraryComic) break;
+              }
+            }
+            if (libraryComic) break;
+          }
+          if (libraryComic) break;
+        }
+
+        // If found in library, use its manga mode (it's synced from server)
+        if (libraryComic && libraryComic.mangaMode !== undefined) {
+          const syncedMangaMode = libraryComic.mangaMode;
+
+          // Update current comic's manga mode if different
+          if (comic.mangaMode !== syncedMangaMode) {
+            console.log('[MANGA] Auto-syncing manga mode from library:', syncedMangaMode);
+            comic.mangaMode = syncedMangaMode;
+            global.currentComic.mangaMode = syncedMangaMode;
+
+            // Update downloaded comic in IndexedDB if it's downloaded
+            const isDownloaded = global.downloadedComicIds?.has(comic.id);
+            if (isDownloaded && typeof global.updateDownloadedComicInfo === 'function') {
+              try {
+                await global.updateDownloadedComicInfo(comic.id, { mangaMode: syncedMangaMode });
+                console.log('[MANGA] Auto-updated downloaded comic manga mode in IndexedDB');
+              } catch (error) {
+                console.error('[MANGA] Failed to auto-update downloaded comic:', error);
+              }
+            }
+
+            // Update downloaded smart list if loaded
+            if (typeof global.updateDownloadedSmartListComic === 'function') {
+              global.updateDownloadedSmartListComic(comic.id, { mangaMode: syncedMangaMode });
+            }
+          }
+        }
+      } catch (error) {
+        console.error('[MANGA] Error during automatic manga mode sync:', error);
+        // Continue with existing manga mode value
+      }
+    }
+
     // Update manga mode UI based on comic's manga mode setting
     if (typeof global.updateMangaModeUI === 'function') {
       global.updateMangaModeUI(comic.mangaMode || false);

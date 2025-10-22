@@ -145,6 +145,18 @@
           : requestedIndex === pages.length - 1; // In normal mode, next goes forward
       }
 
+      // Update bottom navigation buttons with same logic
+      if (global.prevPageBtnBottom) {
+        global.prevPageBtnBottom.disabled = isMangaMode
+          ? requestedIndex === pages.length - 1
+          : requestedIndex === 0;
+      }
+      if (global.nextPageBtnBottom) {
+        global.nextPageBtnBottom.disabled = isMangaMode
+          ? requestedIndex === 0
+          : requestedIndex === pages.length - 1;
+      }
+
       // Update fullscreen navigation buttons with same logic
       if (global.fullscreenPrevPageBtn) {
         global.fullscreenPrevPageBtn.disabled = isMangaMode
@@ -488,6 +500,26 @@
       });
     }
 
+    if (global.pageCounterSpanBottom && !global.pageCounterSpanBottom._jumpListener) {
+      global.pageCounterSpanBottom._jumpListener = (event) => {
+        event.preventDefault();
+        global.showPageJumpInputBottom?.();
+      };
+      global.pageCounterSpanBottom.addEventListener('click', global.pageCounterSpanBottom._jumpListener);
+    }
+
+    if (global.pageJumpInputBottom && !global.pageJumpInputBottom._submitListener) {
+      global.pageJumpInputBottom._submitListener = (event) => {
+        if (event.type === 'keydown' && event.key !== 'Enter') return;
+        event.preventDefault();
+        global.commitPageJumpBottom?.();
+      };
+      global.pageJumpInputBottom.addEventListener('keydown', global.pageJumpInputBottom._submitListener);
+      global.pageJumpInputBottom.addEventListener('blur', () => {
+        global.hidePageJumpInputBottom?.({ focusButton: false });
+      });
+    }
+
     if (global.prevPageBtn && !global.prevPageBtn._navListener) {
       global.prevPageBtn._navListener = (event) => {
         event.preventDefault();
@@ -502,6 +534,22 @@
         navigatePage(1);
       };
       global.nextPageBtn.addEventListener('click', global.nextPageBtn._navListener);
+    }
+
+    if (global.prevPageBtnBottom && !global.prevPageBtnBottom._navListener) {
+      global.prevPageBtnBottom._navListener = (event) => {
+        event.preventDefault();
+        navigatePage(-1);
+      };
+      global.prevPageBtnBottom.addEventListener('click', global.prevPageBtnBottom._navListener);
+    }
+
+    if (global.nextPageBtnBottom && !global.nextPageBtnBottom._navListener) {
+      global.nextPageBtnBottom._navListener = (event) => {
+        event.preventDefault();
+        navigatePage(1);
+      };
+      global.nextPageBtnBottom.addEventListener('click', global.nextPageBtnBottom._navListener);
     }
 
     if (global.viewerTabBtn && !global.viewerTabBtn._toggleListener) {

@@ -308,10 +308,14 @@ const comicSummaryToggle = document.getElementById('comic-summary-toggle');
 const comicSummaryContent = document.getElementById('comic-summary');
 const pageCounterSpan = document.getElementById('page-counter');
 const pageJumpInput = document.getElementById('page-jump-input');
+const pageCounterSpanBottom = document.getElementById('page-counter-bottom');
+const pageJumpInputBottom = document.getElementById('page-jump-input-bottom');
 const viewerPagesDiv = document.getElementById('viewer-pages');
 const pageLoader = document.getElementById('page-loader');
 const prevPageBtn = document.getElementById('prev-page-btn');
 const nextPageBtn = document.getElementById('next-page-btn');
+const prevPageBtnBottom = document.getElementById('prev-page-btn-bottom');
+const nextPageBtnBottom = document.getElementById('next-page-btn-bottom');
 const fullscreenBtn = document.getElementById('fullscreen-btn');
 const viewerTabBtn = document.getElementById('viewer-tab');
 const metadataTabBtn = document.getElementById('metadata-tab');
@@ -484,8 +488,12 @@ if (typeof window !== 'undefined') {
   window.pageLoader = pageLoader;
   window.pageCounterSpan = pageCounterSpan;
   window.pageJumpInput = pageJumpInput;
+  window.pageCounterSpanBottom = pageCounterSpanBottom;
+  window.pageJumpInputBottom = pageJumpInputBottom;
   window.prevPageBtn = prevPageBtn;
   window.nextPageBtn = nextPageBtn;
+  window.prevPageBtnBottom = prevPageBtnBottom;
+  window.nextPageBtnBottom = nextPageBtnBottom;
   window.viewerTabBtn = viewerTabBtn;
 
   // Expose viewer navigation buttons

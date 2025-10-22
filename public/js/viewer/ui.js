@@ -30,39 +30,68 @@
 
   function updateViewerPageCounter(pages) {
     const counter = global.pageCounterSpan;
-    if (!counter) return;
+    const counterBottom = global.pageCounterSpanBottom;
+    if (!counter && !counterBottom) return;
 
     const pageList = Array.isArray(pages) ? pages : getViewerPages();
     const totalPages = pageList.length;
 
     if (totalPages <= 0) {
-      counter.textContent = PAGE_COUNTER_PLACEHOLDER;
-      counter.dataset.totalPages = '0';
-      counter.disabled = true;
-      counter.setAttribute('aria-disabled', 'true');
-      counter.setAttribute('aria-expanded', 'false');
-      counter.setAttribute('aria-label', 'Page navigation unavailable');
+      if (counter) {
+        counter.textContent = PAGE_COUNTER_PLACEHOLDER;
+        counter.dataset.totalPages = '0';
+        counter.disabled = true;
+        counter.setAttribute('aria-disabled', 'true');
+        counter.setAttribute('aria-expanded', 'false');
+        counter.setAttribute('aria-label', 'Page navigation unavailable');
+      }
+      if (counterBottom) {
+        counterBottom.textContent = PAGE_COUNTER_PLACEHOLDER;
+        counterBottom.dataset.totalPages = '0';
+        counterBottom.disabled = true;
+        counterBottom.setAttribute('aria-disabled', 'true');
+        counterBottom.setAttribute('aria-expanded', 'false');
+        counterBottom.setAttribute('aria-label', 'Page navigation unavailable');
+      }
       if (global.pageJumpInput) {
         global.pageJumpInput.setAttribute('max', '0');
+      }
+      if (global.pageJumpInputBottom) {
+        global.pageJumpInputBottom.setAttribute('max', '0');
       }
       updateFullscreenPageStatusProxy(0, 0);
       return;
     }
 
     const current = Math.min(totalPages, Math.max(1, global.currentPageIndex + 1));
-    counter.textContent = `${current} / ${totalPages}`;
-    counter.dataset.totalPages = String(totalPages);
-    counter.disabled = false;
-    counter.removeAttribute('aria-disabled');
-    counter.setAttribute(
-      'aria-label',
-      `Current page ${current} of ${totalPages}. Activate to jump to a specific page.`
-    );
-    counter.setAttribute('aria-expanded', isPageJumpInputOpen ? 'true' : 'false');
-    counter.classList.toggle('page-counter-hidden', isPageJumpInputOpen);
+    const text = `${current} / ${totalPages}`;
+    const ariaLabel = `Current page ${current} of ${totalPages}. Activate to jump to a specific page.`;
+
+    if (counter) {
+      counter.textContent = text;
+      counter.dataset.totalPages = String(totalPages);
+      counter.disabled = false;
+      counter.removeAttribute('aria-disabled');
+      counter.setAttribute('aria-label', ariaLabel);
+      counter.setAttribute('aria-expanded', isPageJumpInputOpen ? 'true' : 'false');
+      counter.classList.toggle('page-counter-hidden', isPageJumpInputOpen);
+    }
+
+    if (counterBottom) {
+      counterBottom.textContent = text;
+      counterBottom.dataset.totalPages = String(totalPages);
+      counterBottom.disabled = false;
+      counterBottom.removeAttribute('aria-disabled');
+      counterBottom.setAttribute('aria-label', ariaLabel);
+      counterBottom.setAttribute('aria-expanded', 'false');
+    }
 
     if (global.pageJumpInput) {
       global.pageJumpInput.setAttribute('max', String(totalPages));
+    }
+
+    if (global.pageJumpInputBottom) {
+      global.pageJumpInputBottom.setAttribute('max', String(totalPages));
     }
 
     updateFullscreenPageStatusProxy(current, totalPages);
@@ -161,7 +190,107 @@
       }
     } catch (error) {
       global.currentPageIndex = previousIndex;
-      
+
+      updateViewerPageCounter(totalPages);
+    } finally {
+      if (!counter.disabled) {
+        counter.focus();
+      }
+    }
+  }
+
+  function showPageJumpInputBottom() {
+    const counter = global.pageCounterSpanBottom;
+    const input = global.pageJumpInputBottom;
+    if (!counter || !input || counter.disabled) return;
+
+    const totalPages = getPageCounterTotal();
+    if (totalPages <= 0) return;
+
+    const currentPage = Math.min(totalPages, Math.max(1, global.currentPageIndex + 1));
+    input.setAttribute('min', '1');
+    input.setAttribute('max', String(totalPages));
+    input.value = String(currentPage);
+    input.classList.remove('hidden');
+    counter.classList.add('page-counter-hidden');
+    counter.setAttribute('aria-expanded', 'true');
+
+    requestAnimationFrame(() => {
+      input.focus();
+      input.select();
+    });
+  }
+
+  function hidePageJumpInputBottom({ focusButton = true, resetValue = true } = {}) {
+    const counter = global.pageCounterSpanBottom;
+    const input = global.pageJumpInputBottom;
+    if (!counter || !input) return;
+
+    if (resetValue) {
+      input.value = '';
+    }
+
+    if (input.classList.contains('hidden')) {
+      return;
+    }
+
+    input.classList.add('hidden');
+    counter.classList.remove('page-counter-hidden');
+    counter.setAttribute('aria-expanded', 'false');
+
+    if (focusButton && !counter.disabled) {
+      counter.focus();
+    }
+  }
+
+  async function commitPageJumpBottom() {
+    const counter = global.pageCounterSpanBottom;
+    const input = global.pageJumpInputBottom;
+    if (!counter || !input) return;
+
+    const totalPages = getPageCounterTotal();
+    if (totalPages <= 0) {
+      hidePageJumpInputBottom({ focusButton: false });
+      return;
+    }
+
+    const rawValue = input.value.trim();
+    if (rawValue === '') {
+      hidePageJumpInputBottom({ focusButton: true });
+      return;
+    }
+
+    const targetPage = Number.parseInt(rawValue, 10);
+    if (Number.isNaN(targetPage)) {
+      const currentPage = Math.min(totalPages, Math.max(1, global.currentPageIndex + 1));
+      input.value = String(currentPage);
+      input.select();
+      return;
+    }
+
+    const clampedPage = Math.min(totalPages, Math.max(1, targetPage));
+    hidePageJumpInputBottom({ focusButton: false });
+
+    if (clampedPage - 1 === global.currentPageIndex) {
+      updateViewerPageCounter(totalPages);
+      if (!counter.disabled) {
+        counter.focus();
+      }
+      return;
+    }
+
+    const previousIndex = global.currentPageIndex;
+    global.currentPageIndex = clampedPage - 1;
+
+    try {
+      const rendered = await global.renderPage?.();
+      if (rendered === false) {
+        global.currentPageIndex = previousIndex;
+        updateViewerPageCounter(totalPages);
+      }
+    } catch (error) {
+      global.currentPageIndex = previousIndex;
+
       updateViewerPageCounter(totalPages);
     } finally {
       if (!counter.disabled) {
@@ -452,6 +581,9 @@
     showPageJumpInput,
     hidePageJumpInput,
     commitPageJump,
+    showPageJumpInputBottom,
+    hidePageJumpInputBottom,
+    commitPageJumpBottom,
     computeViewerAvailableHeight,
     applyOrientationToElement,
     applyViewerOrientation,

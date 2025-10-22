@@ -104,13 +104,16 @@
    * @returns {Promise<boolean>} - The new manga mode value
    */
   async function toggleMangaMode(comicId, currentMode) {
+    const newMode = !currentMode;
+
+    // Try to update via API, but don't fail if offline
     try {
       const response = await fetch(`${API_BASE_URL}/api/v1/comics/manga-mode`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           comicId,
-          mangaMode: !currentMode
+          mangaMode: newMode
         })
       });
 
@@ -121,8 +124,9 @@
 
       return data.mangaMode;
     } catch (error) {
-
-      throw error;
+      // If offline or API fails, still allow local manga mode toggle
+      console.log('[MANGA] API call failed, using local manga mode toggle:', error.message);
+      return newMode;
     }
   }
 
@@ -199,8 +203,24 @@
 
         // Update library cache in IndexedDB
         await updateLibraryCache(global.currentComic, newMode);
-      } catch (error) {
 
+        // Update downloaded comic in IndexedDB if it's downloaded
+        const isDownloaded = global.downloadedComicIds?.has(global.currentComic.id);
+        if (isDownloaded && typeof global.updateDownloadedComicInfo === 'function') {
+          try {
+            await global.updateDownloadedComicInfo(global.currentComic.id, { mangaMode: newMode });
+            console.log('[MANGA] Updated downloaded comic manga mode in IndexedDB');
+          } catch (error) {
+            console.error('[MANGA] Failed to update downloaded comic:', error);
+          }
+        }
+
+        // Also update in the downloaded smart list if it exists
+        if (typeof global.updateDownloadedSmartListComic === 'function') {
+          global.updateDownloadedSmartListComic(global.currentComic.id, { mangaMode: newMode });
+        }
+      } catch (error) {
+        console.error('[MANGA] Error toggling manga mode:', error);
         alert('Failed to toggle manga mode. Please try again.');
       }
     });

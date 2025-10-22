@@ -3,7 +3,7 @@
 
 const SCOPE_URL = new URL(self.registration.scope);
 const BASE_PATH = SCOPE_URL.pathname;
-const CACHE_VERSION = 'v4.5';
+const CACHE_VERSION = 'v4.6';
 const CACHE_NAME = `comics-now-${CACHE_VERSION}-${BASE_PATH}`;
 
 // Assets relative to the scope. DO NOT start with "/" (root) here.
@@ -25,6 +25,9 @@ const ASSET_PATHS = [
   'js/library/smartlists.js',
   'js/library/render.js',
   'js/library.js',
+  'js/context-menu/menu-builder.js',
+  'js/context-menu/menu-actions.js',
+  'js/manga.js',
   'js/metadata.js',
   'js/viewer/fullscreen.js',
   'js/viewer/navigation.js',
@@ -35,7 +38,8 @@ const ASSET_PATHS = [
   'js/events.js',
   'js/comicvine.js',
   'js/progress.js',
-  'js/sync.js'
+  'js/sync.js',
+  'js/auth.js'
 ];
 
 // Build absolute URLs for caching within this scope

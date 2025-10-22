@@ -12,7 +12,7 @@
   <link rel="icon" type="image/png" href="icons/icon-192x192.png">
   <link rel="stylesheet" href="tailwind.css">
   <script src="jszip.min.js"></script>
-  <link rel="stylesheet" href="style.css?v=1.5">
+  <link rel="stylesheet" href="style.css?v=1.6">
 </head>
 <body class="p-4 sm:p-8">
  
@@ -661,6 +661,40 @@
               <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
             </svg>
           </div>
+        </div>
+        <div class="flex justify-between items-center mt-4">
+          <button id="prev-page-btn-bottom" type="button" class="pill-button bg-gray-700 hover:bg-gray-600 text-white transition-colors" aria-label="Previous page">←</button>
+          <div class="flex items-center gap-2">
+            <div class="page-counter-wrapper">
+              <button
+                id="page-counter-bottom"
+                type="button"
+                class="page-counter-button"
+                title="Jump to page"
+                aria-label="Current page. Activate to jump to a specific page."
+                aria-expanded="false"
+                aria-live="polite"
+                data-total-pages="0"
+                disabled
+              >
+                &mdash; / &mdash;
+              </button>
+              <input
+                id="page-jump-input-bottom"
+                type="number"
+                inputmode="numeric"
+                pattern="[0-9]*"
+                class="page-jump-input hidden"
+                min="1"
+                step="1"
+                autocomplete="off"
+                enterkeyhint="go"
+                placeholder="Page #"
+                aria-label="Enter a page number to jump to"
+              />
+            </div>
+          </div>
+          <button id="next-page-btn-bottom" type="button" class="pill-button bg-gray-700 hover:bg-gray-600 text-white transition-colors" aria-label="Next page">→</button>
         </div>
       </div>
 <!-- Metadata tab content -->

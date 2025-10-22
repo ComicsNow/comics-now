@@ -704,7 +704,7 @@
       try {
         await openOfflineDB();
       } catch (error) {
-        
+
         return null;
       }
     }
@@ -742,17 +742,76 @@
             };
             req.onerror = () => resolve(null);
           } catch (error) {
-            
+
             resolve(null);
           }
         });
         if (record) return record;
       } catch (error) {
-        
+
       }
     }
 
     return null;
+  }
+
+  async function updateDownloadedComicInfo(comicId, updates) {
+    if (!comicId || !updates) return false;
+
+    if (!db) await openOfflineDB();
+
+    // Get current userId
+    const currentUserId = getCurrentUserId();
+
+    return new Promise((resolve, reject) => {
+      try {
+        const tx = db.transaction(['comics'], 'readwrite');
+        const store = tx.objectStore('comics');
+        const getRequest = store.get(comicId);
+
+        getRequest.onsuccess = (event) => {
+          const comic = event.target.result;
+
+          if (!comic) {
+            resolve(false);
+            return;
+          }
+
+          // Verify userId matches (or comic has no userId for legacy support)
+          if (comic.userId && comic.userId !== currentUserId) {
+            debugLog('PROGRESS', `updateDownloadedComicInfo - comic ${comicId} belongs to different user, denying update`);
+            resolve(false);
+            return;
+          }
+
+          // Update comicInfo with the new data
+          if (!comic.comicInfo) {
+            comic.comicInfo = {};
+          }
+
+          Object.assign(comic.comicInfo, updates);
+
+          // Save back to DB
+          const putRequest = store.put(comic);
+
+          putRequest.onsuccess = () => {
+            debugLog('PROGRESS', `updateDownloadedComicInfo - successfully updated comic ${comicId}`, updates);
+            resolve(true);
+          };
+
+          putRequest.onerror = (event) => {
+            reject(new Error(`Failed to update comic: ${event.target.errorCode}`));
+          };
+        };
+
+        getRequest.onerror = (event) => {
+          reject(new Error(`Failed to get comic: ${event.target.errorCode}`));
+        };
+      } catch (error) {
+
+        reject(error);
+      }
+    });
   }
 
   const OfflineDB = {
@@ -773,6 +832,7 @@
     forceStorageCleanup,
     formatBytes,
     getOfflineComicRecordById,
+    updateDownloadedComicInfo,
   };
 
   global.OfflineDB = OfflineDB;
