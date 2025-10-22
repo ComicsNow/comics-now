@@ -958,9 +958,101 @@ function createApiRouter({
       // Clear existing access for this user
       await dbRun('DELETE FROM user_library_access WHERE userId = ?', [userId]);
 
-      // Insert new access permissions
+      // Smart normalization: If a parent has child_access but some children are missing,
+      // convert to direct_access on parent + direct_access on each present child
+      const normalizedAccess = [];
+
       if (access.length > 0) {
+        // Build hierarchy map from comics database
+        const comics = await dbAll('SELECT path, publisher, series FROM comics');
+        const rootFolders = getComicsDirectories();
+
+        // Map: root_folder -> Set of publishers
+        // Map: publisher -> Set of series
+        const rootToPublishers = new Map();
+        const publisherToSeries = new Map();
+
+        for (const comic of comics) {
+          // Determine root folder
+          let rootFolder = 'Unknown';
+          for (const folder of rootFolders) {
+            if (comic.path.startsWith(folder)) {
+              rootFolder = folder;
+              break;
+            }
+          }
+
+          // Map root -> publishers
+          if (!rootToPublishers.has(rootFolder)) {
+            rootToPublishers.set(rootFolder, new Set());
+          }
+          if (comic.publisher) {
+            rootToPublishers.get(rootFolder).add(comic.publisher);
+          }
+
+          // Map publisher -> series
+          if (comic.publisher) {
+            if (!publisherToSeries.has(comic.publisher)) {
+              publisherToSeries.set(comic.publisher, new Set());
+            }
+            if (comic.series) {
+              publisherToSeries.get(comic.publisher).add(comic.series);
+            }
+          }
+        }
+
+        // Build set of what children are present in access list
+        const accessSet = new Map();
         for (const item of access) {
+          const key = `${item.accessType}:${item.accessValue}`;
+          accessSet.set(key, item);
+        }
+
+        // Process each access item
+        for (const item of access) {
+          let shouldNormalize = false;
+          let allChildren = [];
+
+          // If parent has child_access, check if all children are present
+          if (item.child_access) {
+            if (item.accessType === 'root_folder') {
+              // Get all publishers under this root folder
+              allChildren = Array.from(rootToPublishers.get(item.accessValue) || []);
+              const presentChildren = allChildren.filter(pub =>
+                accessSet.has(`publisher:${pub}`)
+              );
+              shouldNormalize = presentChildren.length < allChildren.length;
+
+            } else if (item.accessType === 'publisher') {
+              // Get all series under this publisher
+              allChildren = Array.from(publisherToSeries.get(item.accessValue) || []);
+              const presentChildren = allChildren.filter(series =>
+                accessSet.has(`series:${series}`)
+              );
+              shouldNormalize = presentChildren.length < allChildren.length;
+            }
+          }
+
+          if (shouldNormalize && allChildren.length > 0) {
+            // Convert: remove child_access, add direct_access to parent
+            normalizedAccess.push({
+              accessType: item.accessType,
+              accessValue: item.accessValue,
+              direct_access: true,
+              child_access: false
+            });
+
+            log('INFO', 'ACCESS', `Normalized ${item.accessType}:${item.accessValue} - removed child_access due to selective child access`);
+          } else {
+            // Keep as-is
+            normalizedAccess.push(item);
+          }
+        }
+      }
+
+      // Insert normalized access permissions
+      if (normalizedAccess.length > 0) {
+        for (const item of normalizedAccess) {
           if (!item.accessType || !item.accessValue) continue;
           const directAccess = item.direct_access === true ? 1 : 0;
           const childAccess = item.child_access === true ? 1 : 0;
@@ -975,7 +1067,7 @@ function createApiRouter({
         }
       }
 
-      log('INFO', 'ACCESS', `Updated access permissions for user ${userId}: ${access.length} entries`);
+      log('INFO', 'ACCESS', `Updated access permissions for user ${userId}: ${normalizedAccess.length} entries`);
       res.json({ ok: true, message: 'Access permissions updated successfully' });
     } catch (error) {
       log('ERROR', 'ACCESS', `Failed to update user access: ${error.message}`);
