@@ -302,32 +302,52 @@ async function checkComicAccess(userId, userRole, comicPath, publisher, series, 
     [userId]
   );
 
-  // Check if user has recursive access at any parent level
-  for (const access of accessList) {
-    if (access.recursive_access === 1) {
-      // Check root folder recursive access
-      if (access.accessType === 'root_folder' && access.accessValue === rootFolder) {
-        return true;
-      }
-      // Check publisher recursive access
-      if (access.accessType === 'publisher' && access.accessValue === publisher) {
-        return true;
-      }
-      // Check series recursive access
-      if (access.accessType === 'series' && access.accessValue === series) {
-        return true;
-      }
-    }
+  // Hierarchical access control: Check from top to bottom
+  // User MUST have access at root folder level first, then publisher, then series
 
-    // For series level, direct access also grants access to comics in that series
-    if (access.direct_access === 1 || access.recursive_access === 1) {
-      if (access.accessType === 'series' && access.accessValue === series) {
-        return true;
-      }
-    }
+  // Step 1: Check ROOT FOLDER access (mandatory first check)
+  const rootAccess = accessList.find(a =>
+    a.accessType === 'root_folder' &&
+    a.accessValue === rootFolder &&
+    (a.direct_access === 1 || a.recursive_access === 1)
+  );
+
+  if (!rootAccess) {
+    // No root folder access = no access to anything in it, regardless of publisher/series access
+    return false;
   }
 
-  return false;
+  // If root folder has recursive access, grant access to everything under it
+  if (rootAccess.recursive_access === 1) {
+    return true;
+  }
+
+  // Step 2: Root folder has direct_access only, check PUBLISHER level
+  const publisherAccess = accessList.find(a =>
+    a.accessType === 'publisher' &&
+    a.accessValue === publisher &&
+    (a.direct_access === 1 || a.recursive_access === 1)
+  );
+
+  if (!publisherAccess) {
+    // No publisher access = can't access comics from this publisher
+    return false;
+  }
+
+  // If publisher has recursive access, grant access to all its series/comics
+  if (publisherAccess.recursive_access === 1) {
+    return true;
+  }
+
+  // Step 3: Publisher has direct_access only, check SERIES level
+  const seriesAccess = accessList.find(a =>
+    a.accessType === 'series' &&
+    a.accessValue === series &&
+    (a.direct_access === 1 || a.recursive_access === 1)
+  );
+
+  // Grant access if series access exists (either direct or recursive)
+  return !!seriesAccess;
 }
 
 module.exports = {
