@@ -723,12 +723,17 @@ function showRootFolderList(options = {}) {
          </div>`;
     }
 
+    // Randomly select one of the library images
+    const libraryImageIndex = Math.floor(Math.random() * 11);
+    const libraryImageName = libraryImageIndex === 0 ? 'Library.jpg' : `Library${libraryImageIndex}.jpg`;
+    const libraryImageUrl = `/logos/${libraryImageName}`;
+
     card.innerHTML = `
       <div class="relative">
         ${mangaBannerHtml}
         ${downloadButtonHtml}
-        <div class="h-48 w-full bg-gray-700 rounded-lg flex items-center justify-center text-gray-400">
-          <svg class="w-16 h-16" fill="currentColor" viewBox="0 0 20 20"><path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 0 1-2 2H4a2 2 0 01-2-2V6z"></path></svg>
+        <div class="h-48 w-full bg-gray-700 rounded-lg overflow-hidden">
+          <img src="${libraryImageUrl}" alt="${folderName}" class="w-full h-full object-cover">
         </div>
       </div>
       <h3 class="text-lg font-semibold mt-4 text-center text-white truncate w-full px-2">${folderName}</h3>
