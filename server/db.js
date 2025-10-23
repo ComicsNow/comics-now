@@ -5,8 +5,79 @@ const { log } = require('./logger');
 
 const db = new sqlite3.Database(DB_FILE);
 const dbGet = promisify(db.get.bind(db));
-const dbRun = promisify(db.run.bind(db));
 const dbAll = promisify(db.all.bind(db));
+
+// Custom wrapper for db.run that returns the execution context with changes property
+function dbRun(sql, params = []) {
+  return new Promise((resolve, reject) => {
+    db.run(sql, params, function(err) {
+      if (err) {
+        reject(err);
+      } else {
+        // 'this' contains lastID, changes, etc.
+        resolve({
+          lastID: this.lastID,
+          changes: this.changes
+        });
+      }
+    });
+  });
+}
+
+// Helper function to drop mangaMode column from comics table
+function dropMangaModeColumn() {
+  log('INFO', 'DB', 'Dropping mangaMode column from comics table...');
+
+  db.serialize(() => {
+    // Step 1: Create new table without mangaMode column
+    db.run(`CREATE TABLE IF NOT EXISTS comics_new (
+      id TEXT PRIMARY KEY,
+      publisher TEXT,
+      series TEXT,
+      name TEXT,
+      path TEXT UNIQUE,
+      metadata TEXT,
+      lastReadPage INTEGER DEFAULT 0,
+      totalPages INTEGER DEFAULT 0,
+      updatedAt INTEGER,
+      thumbnailPath TEXT,
+      convertedAt INTEGER
+    )`, (err) => {
+      if (err) {
+        log('ERROR', 'DB', `Failed to create comics_new table: ${err.message}`);
+        return;
+      }
+
+      // Step 2: Copy data from old table to new table (excluding mangaMode)
+      db.run(`INSERT INTO comics_new (id, publisher, series, name, path, metadata, lastReadPage, totalPages, updatedAt, thumbnailPath, convertedAt)
+              SELECT id, publisher, series, name, path, metadata, lastReadPage, totalPages, updatedAt, thumbnailPath, convertedAt
+              FROM comics`, (err) => {
+        if (err) {
+          log('ERROR', 'DB', `Failed to copy data to comics_new: ${err.message}`);
+          return;
+        }
+
+        // Step 3: Drop old table
+        db.run(`DROP TABLE comics`, (err) => {
+          if (err) {
+            log('ERROR', 'DB', `Failed to drop old comics table: ${err.message}`);
+            return;
+          }
+
+          // Step 4: Rename new table to original name
+          db.run(`ALTER TABLE comics_new RENAME TO comics`, (err) => {
+            if (err) {
+              log('ERROR', 'DB', `Failed to rename comics_new to comics: ${err.message}`);
+              return;
+            }
+
+            log('INFO', 'DB', 'Successfully dropped mangaMode column from comics table');
+          });
+        });
+      });
+    });
+  });
+}
 
 function initializeDatabase() {
   log('INFO', 'DB', 'Initializing database...');
@@ -95,7 +166,8 @@ function initializeDatabase() {
     )`);
 
     // User library access control
-    // Supports hierarchical access: root_folder -> publisher -> series -> comic
+    // Supports hierarchical access: root_folder -> publisher -> series
+    // Series is the lowest level - having series access grants access to all comics in that series
     // Two access modes per level:
     //   - direct_access: items directly at this level only
     //   - child_access: all descendants under this level (children, grandchildren, etc.)
@@ -126,17 +198,66 @@ function initializeDatabase() {
       if (!cols.some(c => c.name === 'convertedAt')) {
         db.run('ALTER TABLE comics ADD COLUMN convertedAt INTEGER');
       }
-      if (!cols.some(c => c.name === 'mangaMode')) {
-        db.run('ALTER TABLE comics ADD COLUMN mangaMode INTEGER DEFAULT 0', (alterErr) => {
-          if (alterErr) {
-            log('ERROR', 'DB', `Failed to add mangaMode column: ${alterErr.message}`);
-          } else {
-            log('INFO', 'DB', 'Added mangaMode column to comics table');
+
+      // Migration: Move mangaMode from comics table to user_reading_preferences
+      if (cols.some(c => c.name === 'mangaMode')) {
+        log('INFO', 'DB', 'Detected mangaMode column in comics table - starting migration...');
+
+        // Check if migration has already been done
+        db.get(`SELECT value FROM settings WHERE key = 'manga_mode_migration_v1'`, (err, row) => {
+          if (err || row) {
+            log('INFO', 'DB', 'Manga mode migration already completed or error checking');
+            return;
           }
+
+          // Get all comics with mangaMode = 1
+          db.all(`SELECT id FROM comics WHERE mangaMode = 1`, (err, comics) => {
+            if (err || !comics || comics.length === 0) {
+              log('INFO', 'DB', 'No comics with manga mode enabled, skipping migration');
+              db.run(`INSERT OR REPLACE INTO settings (key, value) VALUES ('manga_mode_migration_v1', 'completed')`);
+              dropMangaModeColumn();
+              return;
+            }
+
+            // Get all users
+            db.all(`SELECT userId FROM users`, (err, users) => {
+              if (err || !users || users.length === 0) {
+                log('INFO', 'DB', 'No users found, skipping manga mode data migration');
+                db.run(`INSERT OR REPLACE INTO settings (key, value) VALUES ('manga_mode_migration_v1', 'completed')`);
+                dropMangaModeColumn();
+                return;
+              }
+
+              log('INFO', 'DB', `Migrating manga mode for ${comics.length} comics to ${users.length} users...`);
+
+              const stmt = db.prepare(`
+                INSERT INTO user_reading_preferences (userId, preferenceType, targetId, mangaMode, createdAt, updatedAt)
+                VALUES (?, 'comic', ?, 1, ?, ?)
+                ON CONFLICT(userId, preferenceType, targetId) DO UPDATE SET
+                  mangaMode = 1,
+                  updatedAt = excluded.updatedAt
+              `);
+
+              const now = Date.now();
+              let migrated = 0;
+
+              users.forEach(user => {
+                comics.forEach(comic => {
+                  stmt.run(user.userId, comic.id, now, now);
+                  migrated++;
+                });
+              });
+
+              stmt.finalize(() => {
+                log('INFO', 'DB', `Migrated ${migrated} manga mode preferences`);
+                db.run(`INSERT OR REPLACE INTO settings (key, value) VALUES ('manga_mode_migration_v1', 'completed')`, () => {
+                  dropMangaModeColumn();
+                });
+              });
+            });
+          });
         });
       }
-      // Old sync columns (lastSyncTimestamp, lastSyncDeviceId, lastSyncDeviceName) are deprecated
-      // in favor of per-device progress tracking via device_progress table
     });
 
     // Add userId column to devices table (nullable for backward compatibility)
@@ -299,8 +420,9 @@ async function getUserAccessibleResources(userId, userRole, accessType) {
 }
 
 // Helper function to check if user has access to a specific comic
-// Uses hierarchical access control: root_folder -> publisher -> series -> comic
-async function checkComicAccess(userId, userRole, comicPath, publisher, series, rootFolders) {
+// Uses hierarchical access control: root_folder -> publisher -> series
+// Series is the lowest level - having series access grants access to all comics in that series
+async function checkComicAccess(userId, userRole, comicPath, publisher, series, rootFolders, comicId = null) {
   // Admins have access to everything
   if (userRole === 'admin') {
     return true;
@@ -334,6 +456,7 @@ async function checkComicAccess(userId, userRole, comicPath, publisher, series, 
     a.accessValue === rootFolder &&
     a.child_access === 1
   );
+
   if (rootChildAccess) {
     return true; // Root folder child_access grants access to everything under it
   }
@@ -400,14 +523,121 @@ async function checkComicAccess(userId, userRole, comicPath, publisher, series, 
     return false; // No publisher access
   }
 
-  // Step 3: Check SERIES direct access
+  // Step 3: Check SERIES access
+  // Series is the lowest level - having series access grants access to all comics in that series
   const seriesDirectAccess = accessList.find(a =>
     a.accessType === 'series' &&
     a.accessValue === series &&
     a.direct_access === 1
   );
+  if (!seriesDirectAccess) {
+    return false; // No series access
+  }
 
-  return !!seriesDirectAccess; // Must have series access to access the comic
+  // Series access granted - user has access to all comics in this series
+  return true;
+}
+
+// ============================================================================
+// PER-USER MANGA MODE PREFERENCES (HIERARCHICAL)
+// ============================================================================
+
+/**
+ * Get manga mode preference for a specific comic with hierarchical fallback
+ * Hierarchy: comic -> series -> publisher -> library (root folder)
+ * Returns the most specific preference found, or false if none set
+ */
+async function getMangaModePreference(userId, comicId, series, publisher, rootFolder) {
+  try {
+    // 1. Check comic-level preference (most specific)
+    const comicPref = await dbGet(
+      `SELECT mangaMode FROM user_reading_preferences
+       WHERE userId = ? AND preferenceType = 'comic' AND targetId = ?`,
+      [userId, comicId]
+    );
+    if (comicPref !== undefined && comicPref !== null) {
+      return comicPref.mangaMode === 1;
+    }
+
+    // 2. Check series-level preference
+    const seriesPref = await dbGet(
+      `SELECT mangaMode FROM user_reading_preferences
+       WHERE userId = ? AND preferenceType = 'series' AND targetId = ?`,
+      [userId, series]
+    );
+    if (seriesPref !== undefined && seriesPref !== null) {
+      return seriesPref.mangaMode === 1;
+    }
+
+    // 3. Check publisher-level preference
+    const publisherPref = await dbGet(
+      `SELECT mangaMode FROM user_reading_preferences
+       WHERE userId = ? AND preferenceType = 'publisher' AND targetId = ?`,
+      [userId, publisher]
+    );
+    if (publisherPref !== undefined && publisherPref !== null) {
+      return publisherPref.mangaMode === 1;
+    }
+
+    // 4. Check library-level preference (root folder)
+    const libraryPref = await dbGet(
+      `SELECT mangaMode FROM user_reading_preferences
+       WHERE userId = ? AND preferenceType = 'library' AND targetId = ?`,
+      [userId, rootFolder]
+    );
+    if (libraryPref !== undefined && libraryPref !== null) {
+      return libraryPref.mangaMode === 1;
+    }
+
+    // No preference found - default to false (not manga mode)
+    return false;
+  } catch (error) {
+    log('ERROR', 'MANGA_PREFS', `Failed to get manga mode preference: ${error.message}`);
+    return false;
+  }
+}
+
+/**
+ * Set manga mode preference for a user at a specific level
+ * @param {string} userId - User ID
+ * @param {string} preferenceType - 'comic', 'series', 'publisher', or 'library'
+ * @param {string} targetId - The ID/name of the target (comic ID, series name, etc.)
+ * @param {boolean} mangaMode - The manga mode value
+ */
+async function setMangaModePreference(userId, preferenceType, targetId, mangaMode) {
+  try {
+    const now = Date.now();
+    await dbRun(
+      `INSERT INTO user_reading_preferences (userId, preferenceType, targetId, mangaMode, createdAt, updatedAt)
+       VALUES (?, ?, ?, ?, ?, ?)
+       ON CONFLICT(userId, preferenceType, targetId) DO UPDATE SET
+         mangaMode = excluded.mangaMode,
+         updatedAt = excluded.updatedAt`,
+      [userId, preferenceType, targetId, mangaMode ? 1 : 0, now, now]
+    );
+    log('INFO', 'MANGA_PREFS', `Set ${preferenceType} '${targetId}' manga mode to ${mangaMode} for user ${userId}`);
+    return true;
+  } catch (error) {
+    log('ERROR', 'MANGA_PREFS', `Failed to set manga mode preference: ${error.message}`);
+    return false;
+  }
+}
+
+/**
+ * Get all manga mode preferences for a user (bulk query for efficiency)
+ */
+async function getAllMangaModePreferences(userId) {
+  try {
+    const prefs = await dbAll(
+      `SELECT preferenceType, targetId, mangaMode FROM user_reading_preferences
+       WHERE userId = ?`,
+      [userId]
+    );
+    return prefs;
+  } catch (error) {
+    log('ERROR', 'MANGA_PREFS', `Failed to get all manga mode preferences: ${error.message}`);
+    return [];
+  }
 }
 
 module.exports = {
@@ -418,5 +648,8 @@ module.exports = {
   initializeDatabase,
   checkUserAccess,
   getUserAccessibleResources,
-  checkComicAccess
+  checkComicAccess,
+  getMangaModePreference,
+  setMangaModePreference,
+  getAllMangaModePreferences
 };

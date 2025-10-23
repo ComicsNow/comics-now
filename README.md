@@ -20,6 +20,7 @@ A modern, self-hosted Progressive Web App (PWA) for managing and reading your di
   - [Context Menus](#context-menus)
   - [Offline Reading](#offline-reading)
   - [Multi-Device Sync](#multi-device-sync)
+  - [Library Access Control](#library-access-control-admin-only)
 - [API Endpoints](#api-endpoints)
 - [Security](#security)
 
@@ -27,14 +28,15 @@ A modern, self-hosted Progressive Web App (PWA) for managing and reading your di
 
 - 📚 Browse your comic collection by publisher, series, and issues
 - 📖 Built-in comic reader with page navigation
-- 📕 Manga mode with right-to-left reading support
+- 📕 Hierarchical manga mode with right-to-left reading support (per-user)
+- 🔒 Granular library access control with hierarchical permissions (admin)
 - 🖱️ Context menus for quick actions (right-click or long-press)
 - 🔄 Cross-device sync with progress tracking
 - 📱 Offline support - download comics for offline reading
 - 🏷️ ComicVine integration for metadata
 - 🤖 ComicTagger integration for automated metadata tagging with visual comparison
 - 🔐 Optional Cloudflare Zero Trust authentication
-- 👥 Multi-user support with user roles
+- 👥 Multi-user support with user roles and access control
 - 📊 Reading progress tracking across devices
 
 ## Installation
@@ -328,7 +330,9 @@ Access the web interface at `http://localhost:3000` (or your configured baseUrl)
 
 ### Manga Mode
 
-Enable right-to-left reading for manga and comics that follow this format:
+Enable right-to-left reading for manga and comics that follow this format. **Manga mode is per-user** - each user has independent manga preferences that never affect other users.
+
+#### Setting Manga Mode
 
 **Per Comic:**
 1. Right-click (or long-press on mobile) on a comic card
@@ -338,13 +342,34 @@ Enable right-to-left reading for manga and comics that follow this format:
 **Bulk Operations:**
 - **Series Level**: Right-click a series card → "Set to Manga Mode" (applies to all comics in series)
 - **Publisher Level**: Right-click a publisher card → "Set to Manga Mode" (applies to all comics from publisher)
-- **Library Level**: Right-click a library/root folder → "Set to Manga Mode" (applies to entire library)
+- **Library Level**: Settings → Comics Defaults tab → Toggle manga mode switch (applies to entire library)
+
+#### Hierarchical Manga Mode System
+
+Manga mode uses a **hierarchical inheritance system** for each user:
+
+```
+Library (Default) → Publisher → Series → Comic (Most Specific)
+```
+
+**How it works:**
+1. **Library Level**: Set your default reading mode. All new comics inherit this preference.
+2. **Publisher Level**: Override library default for specific publishers (e.g., "Kodansha" always manga)
+3. **Series Level**: Override publisher setting for specific series
+4. **Comic Level**: Override any parent setting for individual comics
+
+**Example:**
+- Set library to Standard mode
+- Set publisher "Viz Media" to Manga mode → All Viz comics read right-to-left
+- Set series "One Piece" to Manga mode → Only One Piece reads right-to-left
+- Newly added comics automatically inherit the appropriate mode
 
 **Features:**
 - Page navigation automatically reverses (right-to-left)
 - Purple checkmark indicator on manga mode comics
-- Settings sync across all your devices
+- Settings are per-user and sync across all your devices
 - Works in both normal and fullscreen reader modes
+- New comics automatically inherit parent-level preferences
 
 ### Context Menus
 
@@ -387,26 +412,88 @@ When authentication is enabled:
 2. Reading progress syncs across all your devices
 3. View and manage devices in Settings → Devices tab
 
+### Library Access Control (Admin Only)
+
+Admins can control which libraries, publishers, and series each user can access using a **hierarchical access control system**.
+
+#### Managing User Access
+
+1. Go to **Settings → Users** tab (admin only)
+2. Click on a user to view their access settings
+3. Configure access using the three-checkbox system
+
+#### Understanding the Checkboxes
+
+Each folder/item has three checkboxes:
+
+- **D (Direct)**: User has access to this specific item only, not its children
+- **R (Recursive)**: UI helper to select/deselect all siblings at this level (not saved to database)
+- **C (Child)**: User has access to all descendants of this item
+
+#### Access Control Hierarchy
+
+Access is controlled at three levels:
+
+```
+Library (Root Folder) → Publisher → Series
+```
+
+**How it works:**
+1. **Library Level**: Control access to entire comic libraries/directories
+2. **Publisher Level**: Grant or restrict access to specific publishers within accessible libraries
+3. **Series Level**: Fine-tune access to individual series within accessible publishers
+
+**Important Notes:**
+- Users can only access content within libraries they have access to (root folder restriction)
+- If a user has no library access, they cannot see any publishers/series regardless of other permissions
+- The system automatically handles cascading permissions
+- Admins always have full access to everything
+
+**Example Scenarios:**
+
+1. **Grant access to entire library:**
+   - Check library's **C** checkbox → User can see everything in that library
+
+2. **Grant access to specific publisher only:**
+   - Check library's **D** checkbox (direct access to library)
+   - Check publisher's **C** checkbox → User sees all series from that publisher
+
+3. **Grant access to specific series only:**
+   - Check library's **D** checkbox
+   - Check publisher's **D** checkbox
+   - Check series's **D** or **C** checkbox → User only sees that series
+
+4. **Remove specific series while keeping others:**
+   - Uncheck the series checkbox → User loses access to that series but keeps others
+
 ## API Endpoints
 
 See `server/routes/api.js` for full API documentation.
 
 Key endpoints:
-- `GET /api/v1/comics` - Get library
+- `GET /api/v1/comics` - Get library (filtered by user access permissions)
 - `GET /api/v1/comics/pages` - Get comic pages
 - `POST /api/v1/progress` - Update reading progress
-- `POST /api/v1/comics/manga-mode` - Toggle manga mode for comic
+- `POST /api/v1/comics/manga-mode` - Toggle manga mode for specific comic (per-user)
+- `POST /api/v1/comics/set-all-manga-mode` - Set manga mode at hierarchy level (library/publisher/series)
+- `GET /api/v1/manga-mode-preference` - Get current library-level manga mode preference
 - `GET /api/v1/sync/check/:comicId` - Check sync status
 - `POST /api/v1/sync/update` - Update sync progress
+- `GET /api/v1/users` - List all users (admin only)
+- `GET /api/v1/users/:userId/access` - Get user's access permissions (admin only)
+- `POST /api/v1/users/:userId/access` - Update user's access permissions (admin only)
 
 ## Security
 
 - All admin operations require admin role
+- Hierarchical access control system restricts user access to authorized libraries/publishers/series
+- Per-user preferences (manga mode, reading progress) are isolated and never affect other users
 - Role-based error messages (detailed for admins, generic for users)
 - Cloudflare Zero Trust integration for enterprise authentication
 - Support for trusted IP bypass for local network access
 - CORS protection
 - JWT token validation for authenticated users
+- Access control enforced at database query level for defense in depth
 
 ## License
 

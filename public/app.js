@@ -322,16 +322,16 @@ function showUserBadge() {
   const badge = document.createElement('div');
   badge.id = 'user-badge';
   badge.className = 'z-30 bg-gray-700 text-white text-xs sm:text-sm font-medium shadow-lg';
-  badge.style.cssText = 'position: absolute; padding: 0.25rem 0.75rem; border-radius: 9999px; display: inline-flex; align-items: center; gap: 0.5rem; white-space: nowrap; width: fit-content; max-width: 250px;';
+  badge.style.cssText = 'position: relative; padding: 0.25rem 0.75rem; border-radius: 9999px; display: inline-flex; align-items: center; gap: 0.5rem; white-space: nowrap; width: fit-content; max-width: 250px;';
 
-  // Position below logout button for both mobile and desktop
+  // Position at bottom left of page for both mobile and desktop
   if (window.matchMedia('(min-width: 640px)').matches) {
-    // Desktop: Logout button is at top: 2rem (32px), position badge below it
-    badge.style.top = '4rem';  // 2rem (logout top position) + ~2rem (button height + gap)
+    // Desktop: Position at bottom left
+    badge.style.bottom = '0.01rem';
     badge.style.left = '2rem';
   } else {
-    // Mobile: Logout button is at top: 1rem (16px), position badge below it
-    badge.style.top = '3.5rem';  // 1rem (logout top position) + ~2.5rem (button height + gap)
+    // Mobile: Position at bottom left
+    badge.style.bottom = '0.01rem';
     badge.style.left = '1rem';
   }
 

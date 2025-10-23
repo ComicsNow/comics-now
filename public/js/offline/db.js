@@ -41,7 +41,7 @@
 
     return new Promise((resolve, reject) => {
       debugLog('PROGRESS', 'Opening IndexedDB connection...');
-      const request = indexedDB.open('comics-now-offline', 8);
+      const request = indexedDB.open('comics-now-offline', 10);
 
       request.onerror = (event) => {
         

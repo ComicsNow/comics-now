@@ -859,7 +859,8 @@ function createApiRouter({
         return 'Unknown';
       };
 
-      // Build hierarchical tree: root_folder -> publisher -> series -> comics
+      // Build hierarchical tree: root_folder -> publisher -> series
+      // Series is the lowest level for access control (comics not included)
       const tree = {};
 
       for (const comic of comics) {
@@ -875,15 +876,8 @@ function createApiRouter({
           tree[rootFolder][pub] = {};
         }
         if (!tree[rootFolder][pub][ser]) {
-          tree[rootFolder][pub][ser] = [];
+          tree[rootFolder][pub][ser] = true; // Just mark that series exists, don't store comics
         }
-
-        // Add comic to its series
-        tree[rootFolder][pub][ser].push({
-          id: comic.id,
-          name: comic.name,
-          path: comic.path
-        });
       }
 
       res.json({ ok: true, tree });
@@ -960,7 +954,7 @@ function createApiRouter({
 
       // Smart normalization: If a parent has child_access but some children are missing,
       // convert to direct_access on parent + direct_access on each present child
-      const normalizedAccess = [];
+      let normalizedAccess = [];
 
       if (access.length > 0) {
         // Build hierarchy map from comics database
@@ -969,6 +963,7 @@ function createApiRouter({
 
         // Map: root_folder -> Set of publishers
         // Map: publisher -> Set of series
+        // No need to map series -> comics since series is the lowest level for access control
         const rootToPublishers = new Map();
         const publisherToSeries = new Map();
 
@@ -1013,7 +1008,7 @@ function createApiRouter({
           let shouldNormalize = false;
           let allChildren = [];
 
-          // If parent has child_access, check if all children are present
+          // If parent has child_access, check how many children are present
           if (item.child_access) {
             if (item.accessType === 'root_folder') {
               // Get all publishers under this root folder
@@ -1021,7 +1016,20 @@ function createApiRouter({
               const presentChildren = allChildren.filter(pub =>
                 accessSet.has(`publisher:${pub}`)
               );
-              shouldNormalize = presentChildren.length < allChildren.length;
+
+              // Only normalize if SOME (but not all) children are present
+              // If ALL children are present, keep child_access and remove redundant children
+              // If NO children or SOME children, convert child_access to direct_access only
+              if (presentChildren.length === allChildren.length && allChildren.length > 0) {
+                // All children present - keep child_access, will remove redundant children later
+                shouldNormalize = false;
+              } else if (presentChildren.length > 0) {
+                // Some children present - remove child_access (selective access)
+                shouldNormalize = true;
+              } else {
+                // No children present - this is fine, child_access covers everything
+                shouldNormalize = false;
+              }
 
             } else if (item.accessType === 'publisher') {
               // Get all series under this publisher
@@ -1029,7 +1037,25 @@ function createApiRouter({
               const presentChildren = allChildren.filter(series =>
                 accessSet.has(`series:${series}`)
               );
-              shouldNormalize = presentChildren.length < allChildren.length;
+              // Same logic as root_folder
+              if (presentChildren.length === allChildren.length && allChildren.length > 0) {
+                shouldNormalize = false;
+              } else if (presentChildren.length > 0) {
+                shouldNormalize = true;
+              } else {
+                shouldNormalize = false;
+              }
+
+            } else if (item.accessType === 'series') {
+              // Series is the lowest level for access control
+              // Series doesn't support child_access (it automatically grants access to all comics)
+              // If somehow child_access was set, we should normalize it away
+              if (item.child_access) {
+                shouldNormalize = true;
+                allChildren = ['dummy']; // Set to non-empty to trigger normalization
+              } else {
+                shouldNormalize = false;
+              }
             }
           }
 
@@ -1042,20 +1068,109 @@ function createApiRouter({
               child_access: false
             });
 
-            log('INFO', 'ACCESS', `Normalized ${item.accessType}:${item.accessValue} - removed child_access due to selective child access`);
+            log('INFO', 'ACCESS', `Normalized ${item.accessType}:${item.accessValue} - removed child_access${item.accessType === 'series' ? ' (series is lowest level)' : ' due to selective child access'}`);
           } else {
             // Keep as-is
             normalizedAccess.push(item);
           }
         }
+
+        // Remove redundant child entries when parent has child_access
+        // If root_folder has child_access, remove all publisher/series under it
+        // If publisher has child_access, remove all series under it
+        const finalAccess = [];
+        const rootFoldersWithChildAccess = new Set();
+        const publishersWithChildAccess = new Set();
+
+        // Build maps for hierarchy
+        const publisherToRootFolder = new Map();
+        const seriesToPublisher = new Map();
+        for (const comic of comics) {
+          // Determine root folder for this comic
+          let rootFolder = 'Unknown';
+          for (const folder of rootFolders) {
+            if (comic.path.startsWith(folder)) {
+              rootFolder = folder;
+              break;
+            }
+          }
+          if (comic.publisher) {
+            publisherToRootFolder.set(comic.publisher, rootFolder);
+          }
+          if (comic.series && comic.publisher) {
+            seriesToPublisher.set(comic.series, comic.publisher);
+          }
+        }
+
+        // First pass: identify parents with child_access
+        for (const item of normalizedAccess) {
+          if (item.child_access) {
+            if (item.accessType === 'root_folder') {
+              rootFoldersWithChildAccess.add(item.accessValue);
+            } else if (item.accessType === 'publisher') {
+              publishersWithChildAccess.add(item.accessValue);
+            }
+          }
+        }
+
+        // Second pass: filter out redundant entries
+        for (const item of normalizedAccess) {
+          // Always keep root_folder entries
+          if (item.accessType === 'root_folder') {
+            finalAccess.push(item);
+            continue;
+          }
+
+          // Skip publishers if their root folder has child_access
+          if (item.accessType === 'publisher') {
+            const rootFolder = publisherToRootFolder.get(item.accessValue);
+            if (rootFolder && rootFoldersWithChildAccess.has(rootFolder)) {
+              // This publisher is covered by root folder's child_access, skip it
+              continue;
+            }
+          }
+
+          // Skip series if their publisher has child_access OR their root folder has child_access
+          if (item.accessType === 'series') {
+            const publisher = seriesToPublisher.get(item.accessValue);
+            if (publisher) {
+              // Check if publisher has child_access
+              if (publishersWithChildAccess.has(publisher)) {
+                continue; // Skip - covered by publisher's child_access
+              }
+              // Check if root folder has child_access
+              const rootFolder = publisherToRootFolder.get(publisher);
+              if (rootFolder && rootFoldersWithChildAccess.has(rootFolder)) {
+                continue; // Skip - covered by root folder's child_access
+              }
+            }
+          }
+
+          finalAccess.push(item);
+        }
+
+        normalizedAccess = finalAccess;
       }
 
       // Insert normalized access permissions
       if (normalizedAccess.length > 0) {
         for (const item of normalizedAccess) {
           if (!item.accessType || !item.accessValue) continue;
+
+          // Skip comic-level access (series is the lowest level)
+          if (item.accessType === 'comic') {
+            log('WARN', 'ACCESS', `Skipping comic-level access for user ${userId} - series is the lowest level`);
+            continue;
+          }
+
           const directAccess = item.direct_access === true ? 1 : 0;
-          const childAccess = item.child_access === true ? 1 : 0;
+          // Series doesn't support child_access (it grants access to all comics by default)
+          let childAccess = (item.accessType === 'series') ? 0 : (item.child_access === true ? 1 : 0);
+
+          // Can't have child_access without direct_access
+          if (!directAccess) {
+            childAccess = 0;
+          }
 
           // Only insert if at least one access type is enabled
           if (directAccess || childAccess) {
@@ -1155,7 +1270,27 @@ function createApiRouter({
     try {
       const { query = '', field = 'all' } = req.query;
       const q = query.toLowerCase();
+      const userId = req.user?.userId || 'default-user';
+
       const rows = await dbAll('SELECT * FROM comics');
+
+      // Load user manga mode preferences
+      const { getAllMangaModePreferences } = require('../db');
+      const allPrefs = await getAllMangaModePreferences(userId);
+
+      // Create maps for each preference type
+      const prefMaps = {
+        comic: new Map(),
+        series: new Map(),
+        publisher: new Map()
+      };
+
+      for (const pref of allPrefs) {
+        if (prefMaps[pref.preferenceType]) {
+          prefMaps[pref.preferenceType].set(pref.targetId, pref.mangaMode === 1);
+        }
+      }
+
       const results = [];
       for (const r of rows) {
         const meta = (() => { try { return JSON.parse(r.metadata || '{}'); } catch { return {}; } })();
@@ -1167,6 +1302,16 @@ function createApiRouter({
           all: `${r.name} ${r.series} ${r.publisher} ${meta.Characters || ''} ${meta.Summary || ''}`
         };
         if ((hay[field] || hay.all).toLowerCase().includes(q)) {
+          // Apply hierarchical manga mode preference
+          let mangaMode = false;
+          if (prefMaps.comic.has(r.id)) {
+            mangaMode = prefMaps.comic.get(r.id);
+          } else if (prefMaps.series.has(r.series)) {
+            mangaMode = prefMaps.series.get(r.series);
+          } else if (prefMaps.publisher.has(r.publisher)) {
+            mangaMode = prefMaps.publisher.get(r.publisher);
+          }
+
           results.push({
             id: r.id,
             name: r.name,
@@ -1175,7 +1320,7 @@ function createApiRouter({
             progress: { lastReadPage: r.lastReadPage || 0, totalPages: r.totalPages || 0 },
             metadata: meta,
             series: r.series,
-            mangaMode: r.mangaMode === 1 || r.mangaMode === true
+            mangaMode: mangaMode
           });
         }
       }
@@ -1369,7 +1514,7 @@ function createApiRouter({
     }
   });
 
-  // Toggle manga mode for a comic
+  // Toggle manga mode for a comic (PER-USER preference)
   router.post('/api/v1/comics/manga-mode', requireAuth, async (req, res) => {
     try {
       const { comicId, mangaMode } = req.body;
@@ -1377,14 +1522,19 @@ function createApiRouter({
         return res.status(400).json({ ok: false, message: 'Bad request' });
       }
 
+      // Get userId from authenticated user
+      const userId = req.user?.userId || 'default-user';
+
       const comic = await dbGet('SELECT id FROM comics WHERE id = ?', [comicId]);
       if (!comic) {
         return res.status(404).json({ ok: false, message: 'Comic not found' });
       }
 
-      await dbRun('UPDATE comics SET mangaMode = ? WHERE id = ?', [mangaMode ? 1 : 0, comicId]);
+      // Store manga mode preference per-user (not in comics table)
+      const { setMangaModePreference } = require('../db');
+      await setMangaModePreference(userId, 'comic', comicId, mangaMode);
 
-      log('INFO', 'MANGA_MODE', `Comic ${comicId} manga mode set to ${mangaMode}`);
+      log('INFO', 'MANGA_MODE', `User ${userId} set comic ${comicId} manga mode to ${mangaMode}`);
 
       res.json({
         ok: true,
@@ -1393,6 +1543,98 @@ function createApiRouter({
     } catch (e) {
       log('ERROR', 'MANGA_MODE', `Failed to update manga mode: ${e.message}`);
       res.status(500).json({ ok: false, message: formatErrorMessage(e, req, 'Failed to update manga mode') });
+    }
+  });
+
+  // Get current library-level manga mode preference for the user
+  router.get('/api/v1/manga-mode-preference', requireAuth, async (req, res) => {
+    try {
+      const userId = req.user?.userId || 'default-user';
+      const directories = getComicsDirectories();
+
+      // Check if any library has manga mode enabled
+      // If at least one library has it, return true
+      let hasAnyMangaMode = false;
+
+      for (const dir of directories) {
+        const pref = await dbGet(
+          `SELECT mangaMode FROM user_reading_preferences
+           WHERE userId = ? AND preferenceType = 'library' AND targetId = ?`,
+          [userId, dir]
+        );
+
+        if (pref && pref.mangaMode === 1) {
+          hasAnyMangaMode = true;
+          break;
+        }
+      }
+
+      res.json({ ok: true, mangaMode: hasAnyMangaMode });
+    } catch (e) {
+      log('ERROR', 'MANGA_MODE', `Failed to get manga mode preference: ${e.message}`);
+      res.status(500).json({ ok: false, message: formatErrorMessage(e, req, 'Failed to get manga mode preference') });
+    }
+  });
+
+  // Set manga mode for all comics or at hierarchy level (PER-USER preference)
+  router.post('/api/v1/comics/set-all-manga-mode', requireAuth, async (req, res) => {
+    try {
+      const { mangaMode, preferenceType, targetId } = req.body;
+      if (typeof mangaMode !== 'boolean') {
+        return res.status(400).json({ ok: false, message: 'Bad request: mangaMode must be boolean' });
+      }
+
+      const userId = req.user?.userId || 'default-user';
+      const { setMangaModePreference } = require('../db');
+
+      // If preferenceType and targetId are provided, set at that level
+      // Otherwise, set at library level for all root folders
+      if (preferenceType && targetId) {
+        // Validate preferenceType
+        if (!['comic', 'series', 'publisher', 'library'].includes(preferenceType)) {
+          return res.status(400).json({ ok: false, message: 'Invalid preferenceType' });
+        }
+
+        await setMangaModePreference(userId, preferenceType, targetId, mangaMode);
+
+        log('INFO', 'MANGA_MODE', `User ${userId} set ${preferenceType} '${targetId}' manga mode to ${mangaMode}`);
+
+        res.json({
+          ok: true,
+          preferenceType,
+          targetId,
+          mangaMode
+        });
+      } else {
+        // Set at library level for all root folders (user wants ALL comics in manga mode)
+        // IMPORTANT: Clear all more specific preferences first to avoid hierarchy conflicts
+        const deleteResult = await dbRun(
+          `DELETE FROM user_reading_preferences
+           WHERE userId = ? AND preferenceType IN ('comic', 'series', 'publisher')`,
+          [userId]
+        );
+        const deletedCount = deleteResult.changes || 0;
+
+        log('INFO', 'MANGA_MODE', `Cleared ${deletedCount} specific manga preferences for user ${userId}`);
+
+        // Now set library-level preferences
+        const directories = getComicsDirectories();
+        for (const dir of directories) {
+          await setMangaModePreference(userId, 'library', dir, mangaMode);
+        }
+
+        log('INFO', 'MANGA_MODE', `User ${userId} set all libraries (${directories.length} root folders) manga mode to ${mangaMode}`);
+
+        res.json({
+          ok: true,
+          updatedCount: directories.length,
+          clearedCount: deletedCount,
+          mangaMode
+        });
+      }
+    } catch (e) {
+      log('ERROR', 'MANGA_MODE', `Failed to set manga modes: ${e.message}`);
+      res.status(500).json({ ok: false, message: formatErrorMessage(e, req, 'Failed to update manga modes') });
     }
   });
 
