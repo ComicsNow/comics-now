@@ -204,16 +204,21 @@ function buildComicDisplayInfo(comic = {}) {
   }
   const titleText = pickMetadataValue(metadata, ['Title', 'DisplayTitle', 'SortName', 'FullTitle', 'StoryTitle']);
 
+  // If there's no real metadata (series is "Unknown Series"), use filename directly
+  const hasNoMetadata = seriesName === 'Unknown Series' && !titleText && !issueNumber;
+
   const seriesWithIssue = seriesName
     ? (issueNumber ? `${seriesName} #${issueNumber}` : seriesName)
     : (issueNumber ? `Issue ${issueNumber}` : '');
 
-  const displayTitle = [
-    seriesWithIssue,
-    titleText,
-    toTrimmedString(comic.title),
-    toTrimmedString(comic.name)
-  ].find(Boolean) || 'Untitled Comic';
+  const displayTitle = hasNoMetadata
+    ? (toTrimmedString(comic.name) || 'Untitled Comic')
+    : ([
+        seriesWithIssue,
+        titleText,
+        toTrimmedString(comic.title),
+        toTrimmedString(comic.name)
+      ].find(Boolean) || 'Untitled Comic');
 
   const subtitleCandidates = [
     titleText,
