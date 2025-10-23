@@ -726,7 +726,7 @@ function showRootFolderList(options = {}) {
     // Randomly select one of the library images
     const libraryImageIndex = Math.floor(Math.random() * 11);
     const libraryImageName = libraryImageIndex === 0 ? 'Library.jpg' : `Library${libraryImageIndex}.jpg`;
-    const libraryImageUrl = `/logos/${libraryImageName}`;
+    const libraryImageUrl = `${API_BASE_URL}/logos/${libraryImageName}`;
 
     card.innerHTML = `
       <div class="relative">
