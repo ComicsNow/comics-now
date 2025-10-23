@@ -513,3 +513,5 @@ Unless explicitly noted otherwise, all code, assets, and documentation in this r
 ⚠️ Limited/no maintenance - I'm sharing the code as-is. I won't be actively maintaining it or accepting pull requests
 
 ⚠️ Use at your own risk - Please read the documentation carefully and understand what you're installing. Again, this is a vibe-coded app!
+
+Feel free to fork it and make it your own - just follow the license terms (attribution, non commercial, share-alike).
