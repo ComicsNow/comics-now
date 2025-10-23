@@ -506,4 +506,10 @@ Unless explicitly noted otherwise, all code, assets, and documentation in this r
 
 ## Contributing
 
-[Add contribution guidelines here]
+⚠️ This is vibe-coded - I built this casually over 3 months for my own setup. It works for me, but it's not enterprise-grade code
+
+⚠️ This is a personal project - Built for my specific use case, your mileage may vary
+
+⚠️ Limited/no maintenance - I'm sharing the code as-is. I won't be actively maintaining it or accepting pull requests
+
+⚠️ Use at your own risk - Please read the documentation carefully and understand what you're installing. Again, this is a vibe-coded app!
