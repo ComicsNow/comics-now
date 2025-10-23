@@ -232,6 +232,31 @@
             };
           }
 
+          // Sync manga mode from library if available (similar to read status sync)
+          if (typeof global !== 'undefined' && typeof global.library !== 'undefined') {
+            let libraryComic = null;
+            for (const rootFolder of Object.keys(global.library)) {
+              const publishers = global.library[rootFolder]?.publishers || {};
+              for (const publisherName of Object.keys(publishers)) {
+                const seriesEntries = publishers[publisherName]?.series || {};
+                for (const seriesName of Object.keys(seriesEntries)) {
+                  const comics = seriesEntries[seriesName];
+                  if (Array.isArray(comics)) {
+                    libraryComic = comics.find(c => c.id === baseComic.id);
+                    if (libraryComic) break;
+                  }
+                }
+                if (libraryComic) break;
+              }
+              if (libraryComic) break;
+            }
+
+            // Sync manga mode from library if found
+            if (libraryComic && libraryComic.mangaMode !== undefined) {
+              baseComic.mangaMode = libraryComic.mangaMode;
+            }
+          }
+
           applyDisplayInfoToComic(baseComic);
 
           const timestampCandidates = [
