@@ -5,7 +5,7 @@ const sharp = require('sharp');
 const { spawn } = require('child_process');
 const archiver = require('archiver');
 
-const { dbGet, dbRun, dbAll } = require('../db');
+const { dbGet, dbRun, dbAll, getUserAccessibleResources, checkComicAccess } = require('../db');
 const { log, t0, ms } = require('../logger');
 const { getConfig, getComicsDirectories, getScanIntervalMs } = require('../config');
 const { getComicInfoFromZip } = require('./metadata');
@@ -385,9 +385,13 @@ function scheduleNextScan() {
 }
 
 async function buildLibrary(userId = 'default-user') {
+  // Get user role to determine access level
+  const user = await dbGet('SELECT role FROM users WHERE userId = ?', [userId]);
+  const userRole = user?.role || 'user';
+
   // Get all comics and their per-user progress/status
   const rows = await dbAll('SELECT * FROM comics');
-  log('INFO', 'SERVER', `Build library for UI with ${rows.length} rows for user ${userId}`);
+  log('INFO', 'SERVER', `Build library for UI with ${rows.length} rows for user ${userId} (role: ${userRole})`);
 
   // Get per-user progress for all comics in one query
   const userProgress = await dbAll(
@@ -401,10 +405,45 @@ async function buildLibrary(userId = 'default-user') {
     progressMap[p.comicId] = { lastReadPage: p.lastReadPage, totalPages: p.totalPages };
   }
 
+  // Load all manga mode preferences for this user in one query
+  const { getAllMangaModePreferences } = require('../db');
+  const allPrefs = await getAllMangaModePreferences(userId);
+
+  // Create maps for each preference type for efficient lookup
+  const prefMaps = {
+    comic: new Map(),
+    series: new Map(),
+    publisher: new Map(),
+    library: new Map()
+  };
+
+  for (const pref of allPrefs) {
+    if (prefMaps[pref.preferenceType]) {
+      prefMaps[pref.preferenceType].set(pref.targetId, pref.mangaMode === 1);
+    }
+  }
+
   const lib = {};
   const directories = getComicsDirectories();
 
   for (const r of rows) {
+    // Access control: Check if user has access to this comic using hierarchical access control
+    // Admin has access to everything
+    // For non-admin, check hierarchical access: root_folder -> publisher -> series
+    const hasAccess = await checkComicAccess(
+      userId,
+      userRole,
+      r.path,
+      r.publisher,
+      r.series,
+      directories
+    );
+
+    if (!hasAccess) {
+      continue; // User doesn't have access to this comic, skip it
+    }
+
+    // User has access to this comic, include it in the library
     const rootDir = (directories.find(d => r.path.startsWith(d)) || 'Library');
     if (!lib[rootDir]) lib[rootDir] = { publishers: {} };
     if (!lib[rootDir].publishers[r.publisher]) {
@@ -431,6 +470,20 @@ async function buildLibrary(userId = 'default-user') {
 
     // Use per-user progress if available, otherwise default to 0
     const progress = progressMap[r.id] || { lastReadPage: 0, totalPages: r.totalPages || 0 };
+
+    // Apply hierarchical manga mode preference
+    // Check: comic -> series -> publisher -> library (most specific to least specific)
+    let mangaMode = false;
+    if (prefMaps.comic.has(r.id)) {
+      mangaMode = prefMaps.comic.get(r.id);
+    } else if (prefMaps.series.has(r.series)) {
+      mangaMode = prefMaps.series.get(r.series);
+    } else if (prefMaps.publisher.has(r.publisher)) {
+      mangaMode = prefMaps.publisher.get(r.publisher);
+    } else if (prefMaps.library.has(rootDir)) {
+      mangaMode = prefMaps.library.get(rootDir);
+    }
+
     lib[rootDir].publishers[r.publisher].series[r.series].push({
       id: r.id,
       name: r.name,
@@ -441,7 +494,7 @@ async function buildLibrary(userId = 'default-user') {
       convertedAt: r.convertedAt || null,
       metadata,
       series: r.series,
-      mangaMode: r.mangaMode === 1 || r.mangaMode === true
+      mangaMode: mangaMode
     });
   }
 
@@ -469,12 +522,6 @@ async function buildLibrary(userId = 'default-user') {
         lib[rootDir].publishers[publisherName].logoUrl = 'logos/6373148-blank.png';
         lib[rootDir].publishers[publisherName].logoNeedsBackground = false;
       }
-    }
-  }
-
-  for (const configuredDir of directories) {
-    if (!lib[configuredDir]) {
-      lib[configuredDir] = { publishers: {} };
     }
   }
 

@@ -471,7 +471,7 @@ async function refreshUsersList() {
     setUsersStatus(`${users.length} user${users.length === 1 ? '' : 's'} registered`, 'info', false);
 
     usersListDiv.innerHTML = users.map(user => `
-      <div class="border border-gray-700 rounded-lg p-4 bg-gray-900">
+      <div class="border border-gray-700 rounded-lg p-4 bg-gray-900 hover:bg-gray-800 cursor-pointer transition-colors user-card" data-user-id="${escapeHtml(user.userId)}" data-user-email="${escapeHtml(user.email)}" data-user-role="${escapeHtml(user.role)}">
         <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
           <div class="flex-1">
             <div class="flex items-center gap-2 mb-1">
@@ -494,12 +494,23 @@ async function refreshUsersList() {
               </div>
             </div>
           </div>
+          ${user.role !== 'admin' ? '<div class="text-gray-500 text-sm">Click to manage library access →</div>' : '<div class="text-gray-500 text-sm">Full access (Admin)</div>'}
         </div>
       </div>
     `).join('');
 
+    // Add click handlers to user cards
+    document.querySelectorAll('.user-card').forEach(card => {
+      card.addEventListener('click', () => {
+        const userId = card.dataset.userId;
+        const userEmail = card.dataset.userEmail;
+        const userRole = card.dataset.userRole;
+        showUserAccessView(userId, userEmail, userRole);
+      });
+    });
+
   } catch (error) {
-    
+
     setUsersStatus(`Failed to load users: ${error.message}`, 'error', false);
     usersListDiv.innerHTML = '<p class="text-red-400 text-center py-4">Failed to load users</p>';
   }
@@ -523,6 +534,509 @@ if (refreshUsersBtn) {
   refreshUsersBtn.addEventListener('click', () => {
     refreshUsersList();
   });
+}
+
+// --- USER LIBRARY ACCESS MANAGEMENT ---
+let currentAccessUser = null;
+let libraryTreeData = null;
+let userAccessData = null;
+
+async function showUserAccessView(userId, userEmail, userRole) {
+  if (userRole === 'admin') {
+    alert('Admin users have full access to all libraries automatically.');
+    return;
+  }
+
+  currentAccessUser = { userId, userEmail, userRole };
+
+  // Hide users list, show access view
+  usersListDiv.classList.add('hidden');
+  setUsersStatus('', 'info', false);
+
+  // Create access view UI
+  const accessView = document.createElement('div');
+  accessView.id = 'user-access-view';
+  accessView.className = 'space-y-4';
+  accessView.innerHTML = `
+    <div class="flex items-center justify-between mb-4">
+      <div>
+        <button id="back-to-users-btn" class="text-gray-400 hover:text-white transition-colors mb-2">
+          ← Back to Users
+        </button>
+        <h3 class="text-lg font-semibold text-white">Library Access for ${escapeHtml(userEmail)}</h3>
+        <p class="text-sm text-gray-400 mb-3">Select which libraries, publishers, series, and comics this user can access</p>
+
+        <!-- Collapsible Guide -->
+        <button id="access-guide-toggle" class="comic-summary-toggle" aria-expanded="false">
+          How to Use Library Access
+        </button>
+        <div id="access-guide-content" class="comic-summary-content hidden">
+          <h5 class="font-semibold text-white mb-2">Understanding Library Access Control</h5>
+          <p class="mb-3">This hierarchical access system allows you to control what content users can see:</p>
+
+          <div class="space-y-3">
+            <div>
+              <h6 class="font-semibold text-purple-400 text-sm mb-1">📚 Library Level (Root Folders)</h6>
+              <p class="text-sm">Grant or deny access to entire root library folders. All content within that folder will be affected.</p>
+            </div>
+
+            <div>
+              <h6 class="font-semibold text-green-400 text-sm mb-1">🏢 Publisher Level</h6>
+              <p class="text-sm">Control access to all comics from a specific publisher within an accessible library.</p>
+            </div>
+
+            <div>
+              <h6 class="font-semibold text-blue-400 text-sm mb-1">📖 Series Level</h6>
+              <p class="text-sm">Fine-tune access to specific series within accessible publishers.</p>
+            </div>
+
+            <div>
+              <h6 class="font-semibold text-yellow-400 text-sm mb-1">📕 Comic Level</h6>
+              <p class="text-sm">Grant or revoke access to individual comic books.</p>
+            </div>
+          </div>
+
+          <div class="mt-4 p-3 bg-purple-900/20 border border-purple-700/50 rounded-lg">
+            <h6 class="font-semibold text-white text-sm mb-2">💡 How the Checkboxes Work:</h6>
+            <ul class="text-sm space-y-1 list-disc list-inside">
+              <li><strong>D (Direct):</strong> User has access to <em>this specific item only</em>, not its children</li>
+              <li><strong>R (Recursive):</strong> UI helper to select/deselect <em>all siblings</em> at this level (not saved)</li>
+              <li><strong>C (Child):</strong> User has access to <em>all descendants</em> of this item</li>
+            </ul>
+          </div>
+
+          <div class="mt-3 p-3 bg-blue-900/20 border border-blue-700/50 rounded-lg">
+            <h6 class="font-semibold text-white text-sm mb-2">🔍 Tips:</h6>
+            <ul class="text-sm space-y-1 list-disc list-inside">
+              <li>Use <strong>D</strong> for specific folder/publisher/series access without giving access to children</li>
+              <li>Use <strong>C</strong> to give access to all items within a folder/publisher/series</li>
+              <li>Use <strong>R</strong> as a shortcut to check/uncheck all <strong>D</strong> checkboxes at the same level</li>
+              <li>Checking <strong>C</strong> automatically checks <strong>D</strong> for that item</li>
+              <li>Use "Select All" / "Deselect All" buttons for bulk changes</li>
+              <li>Click "Save Access" when done to apply changes</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="access-status" class="text-sm text-gray-400"></div>
+
+    <div class="bg-gray-800 rounded-lg p-4">
+      <div class="flex items-center justify-between mb-4">
+        <h4 class="font-semibold text-white">Library Access</h4>
+        <div class="flex gap-2">
+          <button id="select-all-btn" class="text-xs bg-gray-700 hover:bg-gray-600 text-white px-3 py-1 rounded transition-colors">
+            Select All
+          </button>
+          <button id="deselect-all-btn" class="text-xs bg-gray-700 hover:bg-gray-600 text-white px-3 py-1 rounded transition-colors">
+            Deselect All
+          </button>
+        </div>
+      </div>
+
+      <div id="access-tree-container" class="space-y-2 max-h-96 overflow-y-auto">
+        <div class="text-center text-gray-400 py-4">Loading library structure...</div>
+      </div>
+    </div>
+
+    <div class="flex justify-end gap-2">
+      <button id="cancel-access-btn" class="bg-gray-600 hover:bg-gray-500 text-white font-bold py-2 px-4 rounded-full transition-colors">
+        Cancel
+      </button>
+      <button id="save-access-btn" class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-full transition-colors">
+        Save Access
+      </button>
+    </div>
+  `;
+
+  usersListDiv.parentElement.appendChild(accessView);
+
+  // Add event listeners
+  document.getElementById('back-to-users-btn').addEventListener('click', hideUserAccessView);
+  document.getElementById('cancel-access-btn').addEventListener('click', hideUserAccessView);
+  document.getElementById('save-access-btn').addEventListener('click', saveUserAccess);
+  document.getElementById('select-all-btn').addEventListener('click', () => toggleAllAccess(true));
+  document.getElementById('deselect-all-btn').addEventListener('click', () => toggleAllAccess(false));
+
+  // Add guide toggle listener
+  const guideToggle = document.getElementById('access-guide-toggle');
+  const guideContent = document.getElementById('access-guide-content');
+  if (guideToggle && guideContent) {
+    guideToggle.addEventListener('click', (e) => {
+      e.preventDefault();
+      const isExpanded = guideToggle.getAttribute('aria-expanded') === 'true';
+      if (isExpanded) {
+        guideContent.classList.add('hidden');
+        guideToggle.setAttribute('aria-expanded', 'false');
+        guideToggle.textContent = 'How to Use Library Access';
+      } else {
+        guideContent.classList.remove('hidden');
+        guideToggle.setAttribute('aria-expanded', 'true');
+        guideToggle.textContent = 'Hide Guide';
+      }
+    });
+  }
+
+  // Load data
+  await loadLibraryTreeAndUserAccess(userId);
+}
+
+function hideUserAccessView() {
+  const accessView = document.getElementById('user-access-view');
+  if (accessView) {
+    accessView.remove();
+  }
+  usersListDiv.classList.remove('hidden');
+  currentAccessUser = null;
+  libraryTreeData = null;
+  userAccessData = null;
+}
+
+async function loadLibraryTreeAndUserAccess(userId) {
+  const statusDiv = document.getElementById('access-status');
+  const treeContainer = document.getElementById('access-tree-container');
+
+  try {
+    statusDiv.textContent = 'Loading library structure and user access...';
+
+    // Load library tree and user access in parallel
+    const [treeResponse, accessResponse] = await Promise.all([
+      fetch(`${API_BASE_URL}/api/v1/library-tree`),
+      fetch(`${API_BASE_URL}/api/v1/users/${userId}/access`)
+    ]);
+
+    const treeData = await treeResponse.json();
+    const accessData = await accessResponse.json();
+
+    if (!treeResponse.ok) {
+      throw new Error(treeData.message || 'Failed to load library tree');
+    }
+
+    if (!accessResponse.ok) {
+      throw new Error(accessData.message || 'Failed to load user access');
+    }
+
+    libraryTreeData = treeData.tree || {};
+    userAccessData = accessData.access || [];
+
+    // Build access lookup map with direct/child flags
+    const accessMap = new Map();
+    userAccessData.forEach(item => {
+      const key = `${item.accessType}:${item.accessValue}`;
+      accessMap.set(key, {
+        direct: item.direct_access === 1 || item.direct_access === true,
+        child: item.child_access === 1 || item.child_access === true
+      });
+    });
+
+    // Render tree
+    renderLibraryAccessTree(libraryTreeData, accessMap, treeContainer);
+    statusDiv.textContent = '';
+
+  } catch (error) {
+    statusDiv.textContent = `Error: ${error.message}`;
+    statusDiv.className = 'text-sm text-red-400';
+    treeContainer.innerHTML = '<div class="text-center text-red-400 py-4">Failed to load library data</div>';
+  }
+}
+
+function renderLibraryAccessTree(tree, accessMap, container) {
+  container.innerHTML = '';
+
+  const rootFolders = Object.keys(tree).sort();
+
+  if (rootFolders.length === 0) {
+    container.innerHTML = '<div class="text-center text-gray-400 py-4">No content found</div>';
+    return;
+  }
+
+  // Hierarchy: root_folder → publisher → series → comic
+  rootFolders.forEach(rootFolder => {
+    const publishers = tree[rootFolder];
+    const rootDiv = createTreeNode('root_folder', rootFolder, publishers, accessMap, null);
+    container.appendChild(rootDiv);
+  });
+}
+
+function createTreeNode(type, value, children, accessMap, parentNodeDiv) {
+  const key = `${type}:${value}`;
+  const access = accessMap.get(key) || { direct: false, child: false };
+  const hasChildren = children && ((Array.isArray(children) && children.length > 0) || (typeof children === 'object' && Object.keys(children).length > 0));
+  const isLeaf = type === 'comic'; // Comics are leaf nodes
+
+  const nodeDiv = document.createElement('div');
+  nodeDiv.className = 'border border-gray-700 rounded-lg overflow-hidden mb-2';
+
+  // Create header
+  const header = document.createElement('div');
+  header.className = 'flex items-center gap-2 p-3 bg-gray-900 hover:bg-gray-800 transition-colors';
+
+  // For non-leaf nodes: show three checkboxes (Direct, Recursive, Child)
+  // For leaf nodes (comics): show single checkbox
+  if (!isLeaf && hasChildren) {
+    // Three checkboxes container
+    const checkboxesContainer = document.createElement('div');
+    checkboxesContainer.className = 'flex flex-col gap-1';
+
+    // Direct access checkbox (D)
+    const directCheckbox = document.createElement('input');
+    directCheckbox.type = 'checkbox';
+    directCheckbox.checked = access.direct;
+    directCheckbox.className = 'w-3.5 h-3.5 rounded border-gray-600 text-blue-600 focus:ring-blue-500 focus:ring-1';
+    directCheckbox.dataset.accessType = type;
+    directCheckbox.dataset.accessValue = value;
+    directCheckbox.dataset.accessMode = 'direct';
+    directCheckbox.title = 'Direct access (this item only)';
+
+    // Recursive checkbox (R) - UI helper to select all siblings
+    const recursiveCheckbox = document.createElement('input');
+    recursiveCheckbox.type = 'checkbox';
+    recursiveCheckbox.checked = false; // Never checked by default (UI helper only)
+    recursiveCheckbox.className = 'w-3.5 h-3.5 rounded border-gray-600 text-yellow-600 focus:ring-yellow-500 focus:ring-1';
+    recursiveCheckbox.dataset.accessType = type;
+    recursiveCheckbox.dataset.accessValue = value;
+    recursiveCheckbox.dataset.accessMode = 'recursive';
+    recursiveCheckbox.title = 'Recursive (select all siblings at this level)';
+
+    // Child access checkbox (C)
+    const childCheckbox = document.createElement('input');
+    childCheckbox.type = 'checkbox';
+    childCheckbox.checked = access.child;
+    childCheckbox.className = 'w-3.5 h-3.5 rounded border-gray-600 text-purple-600 focus:ring-purple-500 focus:ring-1';
+    childCheckbox.dataset.accessType = type;
+    childCheckbox.dataset.accessValue = value;
+    childCheckbox.dataset.accessMode = 'child';
+    childCheckbox.title = 'Child access (all descendants)';
+
+    checkboxesContainer.appendChild(directCheckbox);
+    checkboxesContainer.appendChild(recursiveCheckbox);
+    checkboxesContainer.appendChild(childCheckbox);
+    header.appendChild(checkboxesContainer);
+
+    // Add event listener to recursive checkbox to select all siblings
+    recursiveCheckbox.addEventListener('change', (e) => {
+      e.stopPropagation();
+      if (parentNodeDiv) {
+        // Find all sibling nodes at the same level
+        const siblingsContainer = parentNodeDiv.querySelector('.children-container');
+        if (siblingsContainer) {
+          // Find all direct child nodes (siblings of this node)
+          siblingsContainer.querySelectorAll(':scope > .border').forEach(siblingNode => {
+            // Find the Direct checkbox in each sibling
+            const siblingDirectCheckbox = siblingNode.querySelector('input[data-access-mode="direct"]');
+            if (siblingDirectCheckbox) {
+              // Bidirectional: check R = check all sibling D, uncheck R = uncheck all sibling D
+              siblingDirectCheckbox.checked = recursiveCheckbox.checked;
+            }
+          });
+        }
+      }
+    });
+
+    // Add event listener to child checkbox to cascade down and auto-check parent D
+    childCheckbox.addEventListener('change', (e) => {
+      e.stopPropagation();
+
+      if (childCheckbox.checked) {
+        // Auto-check Direct on this same node (need direct access if you have child access)
+        directCheckbox.checked = true;
+
+        // Recursively check all D and C on all descendants
+        const childrenContainer = nodeDiv.querySelector('.children-container');
+        if (childrenContainer) {
+          childrenContainer.querySelectorAll('input[type="checkbox"]').forEach(checkbox => {
+            const mode = checkbox.dataset.accessMode;
+            // Check all Direct and Child checkboxes, skip Recursive (UI helper)
+            if (mode === 'direct' || mode === 'child' || mode === 'both') {
+              checkbox.checked = true;
+            }
+          });
+        }
+      } else {
+        // Uncheck C: optionally uncheck all descendant D and C
+        const childrenContainer = nodeDiv.querySelector('.children-container');
+        if (childrenContainer) {
+          childrenContainer.querySelectorAll('input[type="checkbox"]').forEach(checkbox => {
+            const mode = checkbox.dataset.accessMode;
+            // Uncheck all Direct and Child checkboxes
+            if (mode === 'direct' || mode === 'child' || mode === 'both') {
+              checkbox.checked = false;
+            }
+          });
+        }
+      }
+    });
+
+    // Add labels for the checkboxes
+    const labelsContainer = document.createElement('div');
+    labelsContainer.className = 'flex flex-col text-xs text-gray-500';
+    labelsContainer.innerHTML = '<span>D</span><span>R</span><span>C</span>';
+    header.appendChild(labelsContainer);
+
+  } else {
+    // Single checkbox for leaf nodes or nodes without children
+    const checkbox = document.createElement('input');
+    checkbox.type = 'checkbox';
+    checkbox.checked = access.direct || access.child;
+    checkbox.className = 'w-4 h-4 rounded border-gray-600 text-purple-600 focus:ring-purple-500 focus:ring-2';
+    checkbox.dataset.accessType = type;
+    checkbox.dataset.accessValue = value;
+    checkbox.dataset.accessMode = 'both';
+    header.appendChild(checkbox);
+  }
+
+  // Label
+  const label = document.createElement('label');
+  label.className = 'flex-1 text-white cursor-pointer text-sm';
+  label.textContent = type === 'comic' ? value.name || value : value;
+  header.appendChild(label);
+
+  // Expand icon (only for non-leaf nodes with children)
+  if (hasChildren && !isLeaf) {
+    const expandIcon = document.createElement('span');
+    expandIcon.className = 'text-gray-400 transition-transform cursor-pointer';
+    expandIcon.innerHTML = '▼';
+    header.appendChild(expandIcon);
+
+    // Toggle expansion on header click
+    header.addEventListener('click', (e) => {
+      if (e.target.tagName !== 'INPUT') {
+        const childrenContainer = nodeDiv.querySelector('.children-container');
+        if (childrenContainer) {
+          childrenContainer.classList.toggle('hidden');
+          expandIcon.classList.toggle('rotate-180');
+        }
+      }
+    });
+  }
+
+  nodeDiv.appendChild(header);
+
+  // Create children container
+  if (hasChildren && !isLeaf) {
+    const childrenContainer = document.createElement('div');
+    childrenContainer.className = 'children-container pl-6 pr-3 pb-2 bg-gray-900 hidden';
+
+    if (type === 'root_folder') {
+      // Children are publishers (object with series objects)
+      Object.keys(children).sort().forEach(publisher => {
+        const series = children[publisher];
+        const publisherNode = createTreeNode('publisher', publisher, series, accessMap, nodeDiv);
+        childrenContainer.appendChild(publisherNode);
+      });
+    } else if (type === 'publisher') {
+      // Children are series (object with comics arrays)
+      Object.keys(children).sort().forEach(seriesName => {
+        const comics = children[seriesName];
+        const seriesNode = createTreeNode('series', seriesName, comics, accessMap, nodeDiv);
+        childrenContainer.appendChild(seriesNode);
+      });
+    } else if (type === 'series') {
+      // Children are comics (array of comic objects)
+      if (Array.isArray(children)) {
+        children.forEach(comic => {
+          const comicNode = createTreeNode('comic', comic, null, accessMap, nodeDiv);
+          childrenContainer.appendChild(comicNode);
+        });
+      }
+    }
+
+    nodeDiv.appendChild(childrenContainer);
+  }
+
+  return nodeDiv;
+}
+
+function toggleAllAccess(selectAll) {
+  const treeContainer = document.getElementById('access-tree-container');
+  if (!treeContainer) return;
+
+  treeContainer.querySelectorAll('input[type="checkbox"]').forEach(checkbox => {
+    checkbox.checked = selectAll;
+  });
+}
+
+async function saveUserAccess() {
+  const statusDiv = document.getElementById('access-status');
+  const saveBtn = document.getElementById('save-access-btn');
+
+  if (!currentAccessUser) return;
+
+  try {
+    saveBtn.disabled = true;
+    saveBtn.textContent = 'Saving...';
+    statusDiv.textContent = 'Saving access permissions...';
+    statusDiv.className = 'text-sm text-gray-400';
+
+    // Collect access data from checkboxes
+    // Group by accessType:accessValue to combine direct/child
+    // Skip 'recursive' mode as it's UI-only (not saved to database)
+    const accessMap = new Map();
+
+    document.querySelectorAll('#access-tree-container input[type="checkbox"]').forEach(checkbox => {
+      const accessType = checkbox.dataset.accessType;
+      const accessValue = checkbox.dataset.accessValue;
+      const accessMode = checkbox.dataset.accessMode;
+      const key = `${accessType}:${accessValue}`;
+
+      // Skip recursive checkbox - it's just a UI helper
+      if (accessMode === 'recursive') {
+        return;
+      }
+
+      if (!accessMap.has(key)) {
+        accessMap.set(key, {
+          accessType,
+          accessValue,
+          direct_access: false,
+          child_access: false
+        });
+      }
+
+      const item = accessMap.get(key);
+      if (accessMode === 'direct') {
+        item.direct_access = checkbox.checked;
+      } else if (accessMode === 'child') {
+        item.child_access = checkbox.checked;
+      } else if (accessMode === 'both') {
+        // For leaf nodes (comics)
+        item.direct_access = checkbox.checked;
+        item.child_access = checkbox.checked;
+      }
+    });
+
+    // Convert map to array, filtering out items with no access
+    const access = Array.from(accessMap.values()).filter(item =>
+      item.direct_access || item.child_access
+    );
+
+    const response = await fetch(`${API_BASE_URL}/api/v1/users/${currentAccessUser.userId}/access`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ access })
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.message || 'Failed to save access permissions');
+    }
+
+    statusDiv.textContent = 'Access permissions saved successfully!';
+    statusDiv.className = 'text-sm text-green-400';
+
+    setTimeout(() => {
+      hideUserAccessView();
+      refreshUsersList();
+    }, 1500);
+
+  } catch (error) {
+    statusDiv.textContent = `Error: ${error.message}`;
+    statusDiv.className = 'text-sm text-red-400';
+    saveBtn.disabled = false;
+    saveBtn.textContent = 'Save Access';
+  }
 }
 
 // --- COMICS MANAGEMENT ---
@@ -849,5 +1363,181 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 });
+
+// --- COMICS DEFAULTS ---
+async function loadComicsDefaults() {
+  const toggleCheckbox = document.getElementById('manga-mode-library');
+  const labelStandard = document.getElementById('manga-mode-label-standard');
+  const labelManga = document.getElementById('manga-mode-label-manga');
+  const currentValue = document.getElementById('manga-mode-current-value');
+  const loadingIndicator = document.getElementById('manga-mode-loading');
+  const statusMessage = document.getElementById('manga-mode-status');
+
+  if (!toggleCheckbox) return;
+
+  // Function to update label visual state
+  function updateLabels(enabled) {
+    if (enabled) {
+      // Manga Mode - highlight Manga label
+      if (labelStandard) {
+        labelStandard.classList.remove('text-white', 'scale-110');
+        labelStandard.classList.add('text-gray-500', 'scale-100');
+      }
+      if (labelManga) {
+        labelManga.classList.remove('text-gray-400', 'scale-100');
+        labelManga.classList.add('text-purple-300', 'scale-110');
+      }
+      if (currentValue) {
+        currentValue.textContent = 'Manga Reading (Right-to-Left)';
+        currentValue.classList.remove('text-gray-300');
+        currentValue.classList.add('text-purple-300');
+      }
+    } else {
+      // Standard Mode - highlight Standard label
+      if (labelStandard) {
+        labelStandard.classList.remove('text-gray-500', 'scale-100');
+        labelStandard.classList.add('text-white', 'scale-110');
+      }
+      if (labelManga) {
+        labelManga.classList.remove('text-purple-300', 'scale-110');
+        labelManga.classList.add('text-gray-400', 'scale-100');
+      }
+      if (currentValue) {
+        currentValue.textContent = 'Standard Reading (Left-to-Right)';
+        currentValue.classList.remove('text-purple-300');
+        currentValue.classList.add('text-gray-300');
+      }
+    }
+  }
+
+  try {
+    // Load current library-level manga mode preference from server
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/v1/manga-mode-preference`);
+      const data = await response.json();
+
+      if (response.ok && data.ok) {
+        // Set toggle based on library-level preference
+        const isMangaModeEnabled = data.mangaMode === true;
+        toggleCheckbox.checked = isMangaModeEnabled;
+        updateLabels(isMangaModeEnabled);
+      } else {
+        // Fallback to unchecked if we can't load preference
+        toggleCheckbox.checked = false;
+        updateLabels(false);
+      }
+    } catch (error) {
+      console.error('Failed to load manga mode preference:', error);
+      // Fallback to unchecked on error
+      toggleCheckbox.checked = false;
+      updateLabels(false);
+    }
+
+    // Handle checkbox change events
+    toggleCheckbox.addEventListener('change', async (e) => {
+      const enabled = e.target.checked;
+
+      // Disable toggle during processing
+      toggleCheckbox.disabled = true;
+
+      // Show loading indicator
+      if (loadingIndicator) {
+        loadingIndicator.classList.remove('hidden');
+      }
+
+      // Hide any previous status message
+      if (statusMessage) {
+        statusMessage.classList.add('hidden');
+      }
+
+      try {
+        // Call API to set manga mode for all libraries
+        const response = await fetch(`${API_BASE_URL}/api/v1/comics/set-all-manga-mode`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ mangaMode: enabled })
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.message || 'Failed to set manga mode');
+        }
+
+        console.log(`Manga mode ${enabled ? 'enabled' : 'disabled'} for all comics. Refreshing library...`);
+
+        // Update label visual state
+        updateLabels(enabled);
+
+        // Force refresh from server to get updated manga mode values
+        if (typeof fetchLibraryFromServer === 'function') {
+          await fetchLibraryFromServer();
+        } else if (typeof fetchLibrary === 'function') {
+          await fetchLibrary();
+        }
+
+        // Hide loading indicator
+        if (loadingIndicator) {
+          loadingIndicator.classList.add('hidden');
+        }
+
+        // Show success message in the tab
+        if (statusMessage) {
+          statusMessage.className = 'mt-4 rounded-lg p-3 bg-green-600/20 border-2 border-green-500/50 transition-all duration-300';
+          statusMessage.innerHTML = `
+            <div class="flex items-center text-green-400">
+              <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 mr-2 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <span class="font-medium">Success! Manga mode ${enabled ? 'enabled' : 'disabled'} for all comics.</span>
+            </div>
+            <p class="text-xs text-gray-400 mt-2 ml-7">All manga badges have been updated across your library.</p>
+          `;
+          statusMessage.classList.remove('hidden');
+
+          // Auto-hide success message after 5 seconds
+          setTimeout(() => {
+            if (statusMessage) {
+              statusMessage.classList.add('hidden');
+            }
+          }, 5000);
+        }
+
+      } catch (error) {
+        console.error('Failed to set manga mode:', error);
+
+        // Hide loading indicator
+        if (loadingIndicator) {
+          loadingIndicator.classList.add('hidden');
+        }
+
+        // Show error message in the tab
+        if (statusMessage) {
+          statusMessage.className = 'mt-4 rounded-lg p-3 bg-red-600/20 border-2 border-red-500/50 transition-all duration-300';
+          statusMessage.innerHTML = `
+            <div class="flex items-center text-red-400">
+              <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 mr-2 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <span class="font-medium">Error: ${error.message}</span>
+            </div>
+            <p class="text-xs text-gray-400 mt-2 ml-7">Please try again or check your connection.</p>
+          `;
+          statusMessage.classList.remove('hidden');
+        }
+
+        // Revert checkbox on error
+        e.target.checked = !enabled;
+        updateLabels(!enabled);
+      } finally {
+        // Re-enable toggle
+        toggleCheckbox.disabled = false;
+      }
+    });
+
+  } catch (error) {
+    console.error('Failed to load comics defaults:', error);
+  }
+}
 
 

@@ -3,12 +3,14 @@ document.getElementById('settings-tab-general').addEventListener('click', () => 
   document.getElementById('settings-tab-general').classList.add('active');
   document.getElementById('settings-tab-logs').classList.remove('active');
   document.getElementById('settings-tab-downloads').classList.remove('active');
+  document.getElementById('settings-tab-comics-defaults')?.classList.remove('active');
   document.getElementById('settings-tab-devices').classList.remove('active');
   document.getElementById('settings-tab-users')?.classList.remove('active');
   document.getElementById('settings-tab-comics-management').classList.remove('active');
   document.getElementById('settings-content-general').classList.remove('hidden');
   document.getElementById('settings-content-logs').classList.add('hidden');
   document.getElementById('settings-content-downloads').classList.add('hidden');
+  document.getElementById('settings-content-comics-defaults')?.classList.add('hidden');
   document.getElementById('settings-content-devices').classList.add('hidden');
   document.getElementById('settings-content-users')?.classList.add('hidden');
   document.getElementById('settings-content-comics-management').classList.add('hidden');
@@ -19,12 +21,14 @@ document.getElementById('settings-tab-logs').addEventListener('click', () => {
   document.getElementById('settings-tab-logs').classList.add('active');
   document.getElementById('settings-tab-general').classList.remove('active');
   document.getElementById('settings-tab-downloads').classList.remove('active');
+  document.getElementById('settings-tab-comics-defaults')?.classList.remove('active');
   document.getElementById('settings-tab-devices').classList.remove('active');
   document.getElementById('settings-tab-users')?.classList.remove('active');
   document.getElementById('settings-tab-comics-management').classList.remove('active');
   document.getElementById('settings-content-logs').classList.remove('hidden');
   document.getElementById('settings-content-general').classList.add('hidden');
   document.getElementById('settings-content-downloads').classList.add('hidden');
+  document.getElementById('settings-content-comics-defaults')?.classList.add('hidden');
   document.getElementById('settings-content-devices').classList.add('hidden');
   document.getElementById('settings-content-users')?.classList.add('hidden');
   document.getElementById('settings-content-comics-management').classList.add('hidden');
@@ -37,12 +41,14 @@ document.getElementById('settings-tab-downloads').addEventListener('click', asyn
   document.getElementById('settings-tab-downloads').classList.add('active');
   document.getElementById('settings-tab-general').classList.remove('active');
   document.getElementById('settings-tab-logs').classList.remove('active');
+  document.getElementById('settings-tab-comics-defaults')?.classList.remove('active');
   document.getElementById('settings-tab-devices').classList.remove('active');
   document.getElementById('settings-tab-users')?.classList.remove('active');
   document.getElementById('settings-tab-comics-management').classList.remove('active');
   document.getElementById('settings-content-downloads').classList.remove('hidden');
   document.getElementById('settings-content-general').classList.add('hidden');
   document.getElementById('settings-content-logs').classList.add('hidden');
+  document.getElementById('settings-content-comics-defaults')?.classList.add('hidden');
   document.getElementById('settings-content-devices').classList.add('hidden');
   document.getElementById('settings-content-users')?.classList.add('hidden');
   document.getElementById('settings-content-comics-management').classList.add('hidden');
@@ -51,17 +57,40 @@ document.getElementById('settings-tab-downloads').addEventListener('click', asyn
   await refreshDownloadsInfo();
 });
 
+document.getElementById('settings-tab-comics-defaults')?.addEventListener('click', async () => {
+  document.getElementById('settings-tab-comics-defaults').classList.add('active');
+  document.getElementById('settings-tab-general').classList.remove('active');
+  document.getElementById('settings-tab-logs').classList.remove('active');
+  document.getElementById('settings-tab-downloads').classList.remove('active');
+  document.getElementById('settings-tab-devices').classList.remove('active');
+  document.getElementById('settings-tab-users')?.classList.remove('active');
+  document.getElementById('settings-tab-comics-management').classList.remove('active');
+  document.getElementById('settings-content-comics-defaults').classList.remove('hidden');
+  document.getElementById('settings-content-general').classList.add('hidden');
+  document.getElementById('settings-content-logs').classList.add('hidden');
+  document.getElementById('settings-content-downloads').classList.add('hidden');
+  document.getElementById('settings-content-devices').classList.add('hidden');
+  document.getElementById('settings-content-users')?.classList.add('hidden');
+  document.getElementById('settings-content-comics-management').classList.add('hidden');
+  if (logInterval) clearInterval(logInterval);
+
+  // Load user's manga mode preferences when tab is opened
+  await loadComicsDefaults();
+});
+
 document.getElementById('settings-tab-devices').addEventListener('click', async () => {
   document.getElementById('settings-tab-devices').classList.add('active');
   document.getElementById('settings-tab-general').classList.remove('active');
   document.getElementById('settings-tab-logs').classList.remove('active');
   document.getElementById('settings-tab-downloads').classList.remove('active');
+  document.getElementById('settings-tab-comics-defaults')?.classList.remove('active');
   document.getElementById('settings-tab-users')?.classList.remove('active');
   document.getElementById('settings-tab-comics-management').classList.remove('active');
   document.getElementById('settings-content-devices').classList.remove('hidden');
   document.getElementById('settings-content-general').classList.add('hidden');
   document.getElementById('settings-content-logs').classList.add('hidden');
   document.getElementById('settings-content-downloads').classList.add('hidden');
+  document.getElementById('settings-content-comics-defaults')?.classList.add('hidden');
   document.getElementById('settings-content-users')?.classList.add('hidden');
   document.getElementById('settings-content-comics-management').classList.add('hidden');
   if (logInterval) clearInterval(logInterval);
@@ -79,12 +108,14 @@ if (settingsTabUsersEl) {
     document.getElementById('settings-tab-general').classList.remove('active');
     document.getElementById('settings-tab-logs').classList.remove('active');
     document.getElementById('settings-tab-downloads').classList.remove('active');
+    document.getElementById('settings-tab-comics-defaults')?.classList.remove('active');
     document.getElementById('settings-tab-devices').classList.remove('active');
     document.getElementById('settings-tab-comics-management').classList.remove('active');
     document.getElementById('settings-content-users').classList.remove('hidden');
     document.getElementById('settings-content-general').classList.add('hidden');
     document.getElementById('settings-content-logs').classList.add('hidden');
     document.getElementById('settings-content-downloads').classList.add('hidden');
+    document.getElementById('settings-content-comics-defaults')?.classList.add('hidden');
     document.getElementById('settings-content-devices').classList.add('hidden');
     document.getElementById('settings-content-comics-management').classList.add('hidden');
     if (logInterval) clearInterval(logInterval);
@@ -117,12 +148,14 @@ document.getElementById('settings-tab-comics-management').addEventListener('clic
   document.getElementById('settings-tab-general').classList.remove('active');
   document.getElementById('settings-tab-logs').classList.remove('active');
   document.getElementById('settings-tab-downloads').classList.remove('active');
+  document.getElementById('settings-tab-comics-defaults')?.classList.remove('active');
   document.getElementById('settings-tab-devices').classList.remove('active');
   document.getElementById('settings-tab-users')?.classList.remove('active');
   document.getElementById('settings-content-comics-management').classList.remove('hidden');
   document.getElementById('settings-content-general').classList.add('hidden');
   document.getElementById('settings-content-logs').classList.add('hidden');
   document.getElementById('settings-content-downloads').classList.add('hidden');
+  document.getElementById('settings-content-comics-defaults')?.classList.add('hidden');
   document.getElementById('settings-content-devices').classList.add('hidden');
   document.getElementById('settings-content-users')?.classList.add('hidden');
   if (logInterval) clearInterval(logInterval);
