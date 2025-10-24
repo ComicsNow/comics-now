@@ -70,7 +70,7 @@
       const img = document.createElement('img');
       img.src = pageUrl;
       img.alt = `Page ${pageName}`;
-      img.className = 'max-w-full h-auto block';
+      img.className = 'w-full h-auto block';
       img.loading = 'lazy'; // Browser native lazy loading as backup
 
       // Clear placeholder and add image

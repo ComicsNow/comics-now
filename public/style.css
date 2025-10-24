@@ -1014,10 +1014,7 @@ body {
 }
 
 #fullscreen-pages-continuous img {
-    max-width: 100%;
-    width: auto;
-    height: auto;
-    display: block;
+    /* Sizing handled by Tailwind classes in JavaScript (w-full h-auto) */
 }
 
 /* Context Menu Active States */
