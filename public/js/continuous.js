@@ -16,6 +16,16 @@
   let scrollTimeout = null;
   let continuousClickHandler = null;
 
+  // Store original navigation state for restoration
+  let originalNavigationState = {
+    prevBtnText: '←',
+    nextBtnText: '→',
+    prevBtnHandler: null,
+    nextBtnHandler: null,
+    navLeftHandler: null,
+    navRightHandler: null
+  };
+
   // ============================================================================
   // INTERSECTION OBSERVER - LAZY LOADING
   // ============================================================================
@@ -218,6 +228,80 @@
     // Setup scroll progress tracking
     setupScrollProgressTracking();
 
+    // Replace left/right arrows with up/down arrows
+    const prevBtn = document.getElementById('fullscreen-prev-page-btn');
+    const nextBtn = document.getElementById('fullscreen-next-page-btn');
+    const navLeft = document.getElementById('fullscreen-nav-left');
+    const navRight = document.getElementById('fullscreen-nav-right');
+
+    if (prevBtn && nextBtn) {
+      // Store original handlers if not already stored
+      if (!originalNavigationState.prevBtnHandler) {
+        originalNavigationState.prevBtnText = prevBtn.textContent;
+        originalNavigationState.nextBtnText = nextBtn.textContent;
+        originalNavigationState.prevBtnHandler = prevBtn._navListener;
+        originalNavigationState.nextBtnHandler = nextBtn._navListener;
+      }
+
+      // Replace arrow text with up/down arrows
+      prevBtn.textContent = '↑';
+      nextBtn.textContent = '↓';
+
+      // Replace click handlers with continuous mode navigation
+      if (prevBtn._navListener) {
+        prevBtn.removeEventListener('click', prevBtn._navListener);
+      }
+      if (nextBtn._navListener) {
+        nextBtn.removeEventListener('click', nextBtn._navListener);
+      }
+
+      // Add new handlers for continuous mode
+      prevBtn._continuousListener = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        scrollToPreviousPage();
+      };
+      nextBtn._continuousListener = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        scrollToNextPage();
+      };
+
+      prevBtn.addEventListener('click', prevBtn._continuousListener);
+      nextBtn.addEventListener('click', nextBtn._continuousListener);
+
+      // Update button titles
+      prevBtn.setAttribute('title', 'Previous page (scroll up)');
+      prevBtn.setAttribute('aria-label', 'Previous page (scroll up)');
+      nextBtn.setAttribute('title', 'Next page (scroll down)');
+      nextBtn.setAttribute('aria-label', 'Next page (scroll down)');
+
+      console.log('[CONTINUOUS] Replaced navigation buttons with up/down arrows');
+    }
+
+    // Replace side navigation areas with up/down scroll
+    if (navLeft && navRight) {
+      // Store original handlers if not already stored
+      if (!originalNavigationState.navLeftHandler) {
+        originalNavigationState.navLeftHandler = navLeft.onclick;
+        originalNavigationState.navRightHandler = navRight.onclick;
+      }
+
+      // Replace with continuous mode navigation
+      navLeft.onclick = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        scrollToPreviousPage();
+      };
+      navRight.onclick = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        scrollToNextPage();
+      };
+
+      console.log('[CONTINUOUS] Replaced side navigation with up/down scroll');
+    }
+
     // Update UI
     updateContinuousModeUI(true);
 
@@ -282,6 +366,52 @@
       console.log('[CONTINUOUS] Disconnected observer');
     }
 
+    // Restore left/right arrows and original handlers
+    const prevBtn = document.getElementById('fullscreen-prev-page-btn');
+    const nextBtn = document.getElementById('fullscreen-next-page-btn');
+    const navLeft = document.getElementById('fullscreen-nav-left');
+    const navRight = document.getElementById('fullscreen-nav-right');
+
+    if (prevBtn && nextBtn) {
+      // Remove continuous mode handlers
+      if (prevBtn._continuousListener) {
+        prevBtn.removeEventListener('click', prevBtn._continuousListener);
+        prevBtn._continuousListener = null;
+      }
+      if (nextBtn._continuousListener) {
+        nextBtn.removeEventListener('click', nextBtn._continuousListener);
+        nextBtn._continuousListener = null;
+      }
+
+      // Restore original arrow text
+      prevBtn.textContent = originalNavigationState.prevBtnText;
+      nextBtn.textContent = originalNavigationState.nextBtnText;
+
+      // Restore original handlers
+      if (originalNavigationState.prevBtnHandler) {
+        prevBtn.addEventListener('click', originalNavigationState.prevBtnHandler);
+      }
+      if (originalNavigationState.nextBtnHandler) {
+        nextBtn.addEventListener('click', originalNavigationState.nextBtnHandler);
+      }
+
+      // Restore button titles
+      prevBtn.setAttribute('title', 'Previous page');
+      prevBtn.setAttribute('aria-label', 'Previous page');
+      nextBtn.setAttribute('title', 'Next page');
+      nextBtn.setAttribute('aria-label', 'Next page');
+
+      console.log('[CONTINUOUS] Restored navigation buttons to left/right arrows');
+    }
+
+    // Restore side navigation areas
+    if (navLeft && navRight) {
+      navLeft.onclick = originalNavigationState.navLeftHandler;
+      navRight.onclick = originalNavigationState.navRightHandler;
+
+      console.log('[CONTINUOUS] Restored side navigation');
+    }
+
     // Update UI
     updateContinuousModeUI(false);
 
@@ -324,14 +454,15 @@
     let closestPage = 0;
     let closestDistance = Infinity;
 
-    pageContainers.forEach((container, index) => {
+    pageContainers.forEach((container) => {
+      const pageIndex = parseInt(container.dataset.index, 10);
       const rect = container.getBoundingClientRect();
       const containerMiddle = rect.top + (rect.height / 2);
       const distance = Math.abs(containerMiddle - viewportMiddle);
 
       if (distance < closestDistance) {
         closestDistance = distance;
-        closestPage = index;
+        closestPage = pageIndex;
       }
     });
 
@@ -419,6 +550,108 @@
     });
 
     console.log('[CONTINUOUS] UI updated, active:', isActive);
+  }
+
+  /**
+   * Scroll to the next page in continuous mode
+   */
+  function scrollToNextPage() {
+    if (!continuousContainer) {
+      console.warn('[CONTINUOUS] Cannot scroll - no continuous container');
+      return;
+    }
+
+    const pageContainers = continuousContainer.querySelectorAll('.page-container');
+    if (!pageContainers.length) {
+      console.warn('[CONTINUOUS] No pages found');
+      return;
+    }
+
+    // Find currently visible page (closest to viewport middle)
+    const viewportMiddle = window.innerHeight / 2;
+    let currentPageIndex = 0;
+    let closestDistance = Infinity;
+
+    pageContainers.forEach((container) => {
+      const pageIndex = parseInt(container.dataset.index, 10);
+      const rect = container.getBoundingClientRect();
+      const containerMiddle = rect.top + (rect.height / 2);
+      const distance = Math.abs(containerMiddle - viewportMiddle);
+
+      if (distance < closestDistance) {
+        closestDistance = distance;
+        currentPageIndex = pageIndex;
+      }
+    });
+
+    // Scroll to next page
+    const nextPageIndex = currentPageIndex + 1;
+    const nextContainer = continuousContainer.querySelector(
+      `.page-container[data-index="${nextPageIndex}"]`
+    );
+
+    if (nextContainer) {
+      nextContainer.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      console.log('[CONTINUOUS] Scrolling to next page:', nextPageIndex);
+    } else {
+      // At last page, scroll to bottom
+      continuousContainer.scrollTo({
+        top: continuousContainer.scrollHeight,
+        behavior: 'smooth'
+      });
+      console.log('[CONTINUOUS] At last page, scrolling to bottom');
+    }
+  }
+
+  /**
+   * Scroll to the previous page in continuous mode
+   */
+  function scrollToPreviousPage() {
+    if (!continuousContainer) {
+      console.warn('[CONTINUOUS] Cannot scroll - no continuous container');
+      return;
+    }
+
+    const pageContainers = continuousContainer.querySelectorAll('.page-container');
+    if (!pageContainers.length) {
+      console.warn('[CONTINUOUS] No pages found');
+      return;
+    }
+
+    // Find currently visible page (closest to viewport middle)
+    const viewportMiddle = window.innerHeight / 2;
+    let currentPageIndex = 0;
+    let closestDistance = Infinity;
+
+    pageContainers.forEach((container) => {
+      const pageIndex = parseInt(container.dataset.index, 10);
+      const rect = container.getBoundingClientRect();
+      const containerMiddle = rect.top + (rect.height / 2);
+      const distance = Math.abs(containerMiddle - viewportMiddle);
+
+      if (distance < closestDistance) {
+        closestDistance = distance;
+        currentPageIndex = pageIndex;
+      }
+    });
+
+    // Scroll to previous page
+    const prevPageIndex = currentPageIndex - 1;
+    const prevContainer = continuousContainer.querySelector(
+      `.page-container[data-index="${prevPageIndex}"]`
+    );
+
+    if (prevContainer) {
+      prevContainer.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      console.log('[CONTINUOUS] Scrolling to previous page:', prevPageIndex);
+    } else {
+      // At first page, scroll to top
+      continuousContainer.scrollTo({
+        top: 0,
+        behavior: 'smooth'
+      });
+      console.log('[CONTINUOUS] At first page, scrolling to top');
+    }
   }
 
   // ============================================================================

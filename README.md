@@ -17,6 +17,7 @@ A modern, self-hosted Progressive Web App (PWA) for managing and reading your di
   - [Web Interface](#web-interface)
   - [ComicTagger Integration](#comictagger-integration)
   - [Manga Mode](#manga-mode)
+  - [Continuous Mode](#continuous-mode)
   - [Context Menus](#context-menus)
   - [Offline Reading](#offline-reading)
   - [Multi-Device Sync](#multi-device-sync)
@@ -28,6 +29,7 @@ A modern, self-hosted Progressive Web App (PWA) for managing and reading your di
 
 - 📚 Browse your comic collection by publisher, series, and issues
 - 📖 Built-in comic reader with page navigation
+- 📜 Continuous mode with vertical scrolling (webtoon-style reading)
 - 📕 Hierarchical manga mode with right-to-left reading support (per-user)
 - 🔒 Granular library access control with hierarchical permissions (admin)
 - 🖱️ Context menus for quick actions (right-click or long-press)
@@ -370,6 +372,33 @@ Library (Default) → Publisher → Series → Comic (Most Specific)
 - Settings are per-user and sync across all your devices
 - Works in both normal and fullscreen reader modes
 - New comics automatically inherit parent-level preferences
+
+### Continuous Mode
+
+Read comics with vertical scrolling like webtoons and manga readers. **Continuous mode is per-user** - each user has independent continuous mode preferences.
+
+#### Enabling Continuous Mode
+
+1. Open a comic in fullscreen mode
+2. Tap to reveal controls
+3. Click the "Continuous" button to toggle continuous mode
+4. Navigation arrows automatically change to up (↑) and down (↓) arrows
+
+#### Features
+
+- **Vertical Scrolling**: All pages load in a single scrollable view
+- **Lazy Loading**: Pages load automatically as you scroll down
+- **Up/Down Navigation**: Click ↑/↓ arrows to jump between pages smoothly
+- **Progress Tracking**: Reading progress automatically saves as you scroll
+- **Page Jumping**: Use the page counter to jump to specific pages
+- **Fullscreen Only**: Continuous mode is optimized for immersive fullscreen reading
+- **Preference Memory**: Your continuous mode preference is remembered per comic
+
+**Navigation:**
+- **↑ (Up arrow)**: Scroll to previous page
+- **↓ (Down arrow)**: Scroll to next page
+- **Scroll freely**: Use mouse wheel, trackpad, or touch gestures
+- **Click sides**: Click left/right sides of screen to navigate up/down
 
 ### Context Menus
 
