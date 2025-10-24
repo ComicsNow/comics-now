@@ -1009,10 +1009,6 @@ body {
     height: 100%;
     overflow-y: auto;
     overflow-x: hidden;
-    display: flex;
-    flex-direction: column;
-    gap: 0;
-    align-items: center;
     padding: 1rem 0;
     background-color: #000000;
     z-index: 1;
