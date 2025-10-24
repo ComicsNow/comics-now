@@ -552,8 +552,24 @@
     global.currentPageIndex = targetIndex;
     hideFullscreenPageJumpInput();
 
-    if (typeof global.renderPage === 'function') {
-      global.renderPage();
+    // Check if in continuous mode
+    if (global.isContinuousMode) {
+      // Scroll to the page in continuous view
+      const continuousContainer = document.getElementById('fullscreen-pages-continuous');
+      if (continuousContainer) {
+        const targetContainer = continuousContainer.querySelector(
+          `.page-container[data-index="${targetIndex}"]`
+        );
+        if (targetContainer) {
+          targetContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          console.log('[FULLSCREEN] Scrolled to page', targetPage, 'in continuous mode');
+        }
+      }
+    } else {
+      // Single page mode - render the page
+      if (typeof global.renderPage === 'function') {
+        global.renderPage();
+      }
     }
   }
 
