@@ -282,8 +282,8 @@
     const handleScroll = () => {
       // Debounce scroll events
       clearTimeout(scrollTimeout);
-      scrollTimeout = setTimeout(() => {
-        updateCurrentPageFromScroll();
+      scrollTimeout = setTimeout(async () => {
+        await updateCurrentPageFromScroll();
       }, 200); // 200ms debounce
     };
 
@@ -294,7 +294,7 @@
   /**
    * Update current page index based on scroll position
    */
-  function updateCurrentPageFromScroll() {
+  async function updateCurrentPageFromScroll() {
     if (!continuousContainer) return;
 
     const pageContainers = continuousContainer.querySelectorAll('.page-container');
@@ -324,6 +324,11 @@
       if (typeof global.updateViewerPageCounter === 'function') {
         const pages = global.getViewerPages?.() || [];
         global.updateViewerPageCounter(pages);
+      }
+
+      // Save progress to persist reading position
+      if (typeof global.saveProgress === 'function') {
+        await global.saveProgress(closestPage);
       }
 
       console.log('[CONTINUOUS] Current page updated to:', closestPage);
