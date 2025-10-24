@@ -393,16 +393,21 @@ async function buildLibrary(userId = 'default-user') {
   const rows = await dbAll('SELECT * FROM comics');
   log('INFO', 'SERVER', `Build library for UI with ${rows.length} rows for user ${userId} (role: ${userRole})`);
 
-  // Get per-user progress for all comics in one query
+  // Get per-user progress and continuous mode for all comics in one query
   const userProgress = await dbAll(
-    'SELECT comicId, lastReadPage, totalPages FROM user_comic_status WHERE userId = ?',
+    'SELECT comicId, lastReadPage, totalPages, continuousMode FROM user_comic_status WHERE userId = ?',
     [userId]
   );
 
-  // Create a map for quick lookup
+  // Create maps for quick lookup
   const progressMap = {};
+  const continuousModeMap = {};
   for (const p of userProgress) {
     progressMap[p.comicId] = { lastReadPage: p.lastReadPage, totalPages: p.totalPages };
+    // continuousMode: 1 = true, null/0 = false (null means use default)
+    if (p.continuousMode !== null && p.continuousMode !== undefined) {
+      continuousModeMap[p.comicId] = p.continuousMode === 1;
+    }
   }
 
   // Load all manga mode preferences for this user in one query
@@ -484,6 +489,9 @@ async function buildLibrary(userId = 'default-user') {
       mangaMode = prefMaps.library.get(rootDir);
     }
 
+    // Get continuous mode for this comic (per-user preference)
+    const continuousMode = continuousModeMap[r.id] !== undefined ? continuousModeMap[r.id] : false;
+
     lib[rootDir].publishers[r.publisher].series[r.series].push({
       id: r.id,
       name: r.name,
@@ -494,7 +502,8 @@ async function buildLibrary(userId = 'default-user') {
       convertedAt: r.convertedAt || null,
       metadata,
       series: r.series,
-      mangaMode: mangaMode
+      mangaMode: mangaMode,
+      continuousMode: continuousMode
     });
   }
 

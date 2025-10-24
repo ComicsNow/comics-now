@@ -241,6 +241,57 @@
               </div>
             </div>
 
+            <!-- Continuous Mode Section -->
+            <div class="border border-gray-700 rounded-lg p-4">
+              <h5 class="text-md font-semibold mb-3 flex items-center">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 mr-2 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                </svg>
+                Continuous Scroll Mode
+              </h5>
+              <p class="text-sm text-gray-400 mb-4">Enable vertical continuous scrolling for all pages (like webtoon readers):</p>
+
+              <div class="space-y-4">
+                <!-- Library Level -->
+                <div class="bg-gradient-to-r from-blue-900/30 to-cyan-900/30 border-2 border-blue-700/50 rounded-xl p-6 shadow-lg hover:shadow-blue-900/20 transition-all duration-300">
+                  <!-- Header -->
+                  <div class="flex items-center mb-4">
+                    <div class="bg-blue-600/20 p-2 rounded-lg mr-3">
+                      <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                      </svg>
+                    </div>
+                    <div>
+                      <h6 class="text-lg font-bold text-white">Default Continuous Mode</h6>
+                      <p class="text-sm text-gray-400 mt-0.5">Enable vertical scroll by default for new comics</p>
+                    </div>
+                  </div>
+
+                  <!-- Description -->
+                  <div class="flex items-start mb-6 pl-14">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 mr-2 text-cyan-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <p class="text-xs text-gray-400 leading-relaxed">
+                      When enabled, comics will display all pages vertically in a scrollable view. You can toggle continuous mode for individual comics while reading.
+                    </p>
+                  </div>
+
+                  <!-- Toggle Switch -->
+                  <div class="flex items-center justify-between py-4 px-6 bg-black/20 rounded-lg border border-blue-500/30">
+                    <div>
+                      <span class="text-sm font-medium text-white">Default Continuous Mode</span>
+                      <p class="text-xs text-gray-400 mt-1">Scroll through all pages vertically</p>
+                    </div>
+                    <label class="toggle-switch">
+                      <input type="checkbox" id="continuous-mode-default-toggle">
+                      <span class="toggle-slider"></span>
+                    </label>
+                  </div>
+                </div>
+              </div>
+            </div>
+
             <!-- Future: Other default settings can be added here -->
           </div>
         </div>
@@ -482,11 +533,22 @@
         >
           Manga
         </button>
+        <button
+          id="fullscreen-continuous-mode-btn"
+          type="button"
+          class="continuous-mode-btn"
+          title="Toggle Continuous Mode"
+        >
+          Continuous
+        </button>
       </div>
 
       <div id="fullscreen-nav-left" class="fullscreen-nav left"></div>
       <div id="fullscreen-nav-right" class="fullscreen-nav right"></div>
       <img id="fullscreen-image" src="" alt="Fullscreen Comic Page" class="fullscreen-image">
+      <div id="fullscreen-pages-continuous" class="hidden overflow-y-auto absolute inset-0">
+        <!-- Pages will be dynamically inserted here in continuous mode -->
+      </div>
     </div>
     
 
@@ -887,6 +949,7 @@
   <script src="js/viewer/navigation.js"></script>
   <script src="js/viewer/ui.js"></script>
   <script src="js/viewer.js"></script>
+  <script src="js/continuous.js"></script>
   <script src="js/settings.js"></script>
   <script src="js/comictagger.js"></script>
   <script src="js/events.js"></script>

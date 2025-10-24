@@ -5,6 +5,11 @@
   const { ICONS, positionContextMenu, attachCloseHandler, closeContextMenu } = global.ContextMenuBuilder;
   const { toggleMangaMode, updateMangaModeInCache, updateLibraryCache, updateMangaModeUI } = global.MangaMode;
 
+  // Get continuous mode functions if available
+  const toggleContinuousMode = global.toggleContinuousMode;
+  const updateContinuousModeInCache = global.updateContinuousModeInCache;
+  const updateContinuousModeUI = global.updateContinuousModeUI;
+
   // ============================================================================
   // CONTEXT MENU ACTIONS
   // ============================================================================
@@ -137,6 +142,57 @@
     });
 
     menu.appendChild(mangaModeItem);
+
+    // 4. Continuous mode toggle menu item
+    if (typeof toggleContinuousMode === 'function') {
+      const continuousMode = comic.continuousMode || false;
+      const continuousIcon = continuousMode ? ICONS.CHECKMARK : ICONS.SCROLL;
+
+      const continuousModeItem = document.createElement('div');
+      continuousModeItem.className = 'comic-context-menu-item' + (continuousMode ? ' continuous-active' : '');
+      continuousModeItem.innerHTML = `${continuousIcon}<span>${continuousMode ? 'Disable' : 'Enable'} Continuous Mode</span>`;
+
+      continuousModeItem.addEventListener('click', async (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        closeContextMenu();
+
+        try {
+          const newMode = await toggleContinuousMode(comic.id, continuousMode);
+
+          // Update the comic object
+          comic.continuousMode = newMode;
+
+          // Update the global library object if it exists
+          if (typeof global.updateComicInLibrary === 'function') {
+            global.updateComicInLibrary(comic.id, { continuousMode: newMode });
+          }
+
+          // Re-render the current view to reflect changes (without refetching library)
+          if (typeof global.applyFilterAndRender === 'function') {
+            global.applyFilterAndRender();
+          }
+
+          // Update IndexedDB cache if function exists
+          if (typeof updateContinuousModeInCache === 'function') {
+            await updateContinuousModeInCache(comic.id, newMode);
+          }
+
+          // If we're in the viewer and this is the current comic, update UI
+          if (global.currentComic && global.currentComic.id === comic.id) {
+            global.currentComic.continuousMode = newMode;
+            if (typeof updateContinuousModeUI === 'function') {
+              updateContinuousModeUI(newMode);
+            }
+          }
+        } catch (error) {
+          console.error('Failed to toggle continuous mode:', error);
+          alert('Failed to toggle continuous mode. Please try again.');
+        }
+      });
+
+      menu.appendChild(continuousModeItem);
+    }
 
     // Position menu and attach close handler
     positionContextMenu(menu, event);
@@ -308,6 +364,55 @@
       menu.appendChild(mangaModeItem);
     }
 
+    // 4. Continuous mode toggle for the entire series
+    if (hasComics && typeof toggleContinuousMode === 'function') {
+      // Check if all comics have continuous mode enabled
+      const allComicsAreContinuous = comicsInSeries.every(comic => comic.continuousMode === true);
+      const continuousIcon = allComicsAreContinuous ? ICONS.CHECKMARK : ICONS.SCROLL;
+
+      const continuousModeItem = document.createElement('div');
+      continuousModeItem.className = 'comic-context-menu-item' + (allComicsAreContinuous ? ' continuous-active' : '');
+      continuousModeItem.innerHTML = `${continuousIcon}<span>${allComicsAreContinuous ? 'Unset' : 'Set to'} Continuous Mode</span>`;
+
+      continuousModeItem.addEventListener('click', async (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        closeContextMenu();
+
+        try {
+          const newMode = !allComicsAreContinuous;
+
+          // Toggle continuous mode for all comics in the series
+          for (const comic of comicsInSeries) {
+            await toggleContinuousMode(comic.id, comic.continuousMode || false);
+            comic.continuousMode = newMode;
+
+            // Update the global library object if it exists
+            if (typeof global.updateComicInLibrary === 'function') {
+              global.updateComicInLibrary(comic.id, { continuousMode: newMode });
+            }
+          }
+
+          // Update IndexedDB cache if function exists
+          if (typeof updateContinuousModeInCache === 'function') {
+            for (const comic of comicsInSeries) {
+              await updateContinuousModeInCache(comic.id, newMode);
+            }
+          }
+
+          // Re-render to update UI
+          if (typeof global.applyFilterAndRender === 'function') {
+            global.applyFilterAndRender();
+          }
+        } catch (error) {
+          console.error('Failed to toggle continuous mode for series:', error);
+          alert('Failed to toggle continuous mode for series. Please try again.');
+        }
+      });
+
+      menu.appendChild(continuousModeItem);
+    }
+
     // Position menu and attach close handler
     positionContextMenu(menu, event);
     attachCloseHandler(menu);
@@ -427,6 +532,54 @@
     }
 
     menu.appendChild(mangaModeItem);
+
+    // 3. Continuous mode toggle for the entire publisher
+    if (allComics.length > 0 && typeof toggleContinuousMode === 'function') {
+      const allComicsAreContinuous = allComics.every(comic => comic.continuousMode === true);
+      const continuousIcon = allComicsAreContinuous ? ICONS.CHECKMARK : ICONS.SCROLL;
+
+      const continuousModeItem = document.createElement('div');
+      continuousModeItem.className = 'comic-context-menu-item' + (allComicsAreContinuous ? ' continuous-active' : '');
+      continuousModeItem.innerHTML = `${continuousIcon}<span>${allComicsAreContinuous ? 'Unset' : 'Set to'} Continuous Mode</span>`;
+
+      continuousModeItem.addEventListener('click', async (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        closeContextMenu();
+
+        try {
+          const newMode = !allComicsAreContinuous;
+
+          // Toggle continuous mode for all comics in all series
+          for (const comic of allComics) {
+            await toggleContinuousMode(comic.id, comic.continuousMode || false);
+            comic.continuousMode = newMode;
+
+            // Update the global library object if it exists
+            if (typeof global.updateComicInLibrary === 'function') {
+              global.updateComicInLibrary(comic.id, { continuousMode: newMode });
+            }
+          }
+
+          // Update IndexedDB cache if function exists
+          if (typeof updateContinuousModeInCache === 'function') {
+            for (const comic of allComics) {
+              await updateContinuousModeInCache(comic.id, newMode);
+            }
+          }
+
+          // Re-render to update UI
+          if (typeof global.applyFilterAndRender === 'function') {
+            global.applyFilterAndRender();
+          }
+        } catch (error) {
+          console.error('Failed to toggle continuous mode for publisher:', error);
+          alert('Failed to toggle continuous mode for publisher. Please try again.');
+        }
+      });
+
+      menu.appendChild(continuousModeItem);
+    }
 
     // Position menu and attach close handler
     positionContextMenu(menu, event);
@@ -552,6 +705,54 @@
     }
 
     menu.appendChild(mangaModeItem);
+
+    // 3. Continuous mode toggle for the entire library
+    if (allComics.length > 0 && typeof toggleContinuousMode === 'function') {
+      const allComicsAreContinuous = allComics.every(comic => comic.continuousMode === true);
+      const continuousIcon = allComicsAreContinuous ? ICONS.CHECKMARK : ICONS.SCROLL;
+
+      const continuousModeItem = document.createElement('div');
+      continuousModeItem.className = 'comic-context-menu-item' + (allComicsAreContinuous ? ' continuous-active' : '');
+      continuousModeItem.innerHTML = `${continuousIcon}<span>${allComicsAreContinuous ? 'Unset' : 'Set to'} Continuous Mode</span>`;
+
+      continuousModeItem.addEventListener('click', async (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        closeContextMenu();
+
+        try {
+          const newMode = !allComicsAreContinuous;
+
+          // Toggle continuous mode for all comics in all series from all publishers
+          for (const comic of allComics) {
+            await toggleContinuousMode(comic.id, comic.continuousMode || false);
+            comic.continuousMode = newMode;
+
+            // Update the global library object if it exists
+            if (typeof global.updateComicInLibrary === 'function') {
+              global.updateComicInLibrary(comic.id, { continuousMode: newMode });
+            }
+          }
+
+          // Update IndexedDB cache if function exists
+          if (typeof updateContinuousModeInCache === 'function') {
+            for (const comic of allComics) {
+              await updateContinuousModeInCache(comic.id, newMode);
+            }
+          }
+
+          // Re-render to update UI
+          if (typeof global.applyFilterAndRender === 'function') {
+            global.applyFilterAndRender();
+          }
+        } catch (error) {
+          console.error('Failed to toggle continuous mode for library:', error);
+          alert('Failed to toggle continuous mode for library. Please try again.');
+        }
+      });
+
+      menu.appendChild(continuousModeItem);
+    }
 
     // Position menu and attach close handler
     positionContextMenu(menu, event);

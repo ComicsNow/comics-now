@@ -255,6 +255,11 @@
             if (libraryComic && libraryComic.mangaMode !== undefined) {
               baseComic.mangaMode = libraryComic.mangaMode;
             }
+
+            // Sync continuous mode from library if found
+            if (libraryComic && libraryComic.continuousMode !== undefined) {
+              baseComic.continuousMode = libraryComic.continuousMode;
+            }
           }
 
           applyDisplayInfoToComic(baseComic);

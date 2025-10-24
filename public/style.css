@@ -193,6 +193,11 @@ body {
     padding-left: env(safe-area-inset-left);
 }
 
+/* Override flex display when continuous mode is active */
+.fullscreen-viewer:has(#fullscreen-pages-continuous:not(.hidden)) {
+    display: block;
+}
+
 .fullscreen-image {
     max-width: calc(100vw - env(safe-area-inset-left) - env(safe-area-inset-right));
     max-height: calc(100vh - env(safe-area-inset-top) - env(safe-area-inset-bottom));
@@ -912,6 +917,134 @@ body {
 
 .manga-mode-btn.active:hover {
     background-color: #9333ea;
+}
+
+/* Continuous Mode Button */
+.continuous-mode-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 0.35rem 0.9rem;
+    border-radius: 9999px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    line-height: 1.1;
+    letter-spacing: 0.01em;
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.25);
+    transition: all 0.15s ease;
+    cursor: pointer;
+    border: none;
+    background-color: #374151;
+    color: #e5e7eb;
+}
+
+.continuous-mode-btn:hover {
+    background-color: #4b5563;
+    transform: translateY(-1px);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
+}
+
+.continuous-mode-btn:active {
+    transform: translateY(1px);
+    box-shadow: 0 3px 12px rgba(0, 0, 0, 0.2);
+}
+
+.continuous-mode-btn.active {
+    background-color: #3b82f6;
+    color: #ffffff;
+}
+
+.continuous-mode-btn.active:hover {
+    background-color: #2563eb;
+}
+
+/* Continuous Viewer Container */
+#viewer-pages-continuous {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    align-items: center;
+    padding: 1rem 0;
+    background-color: #111827;
+}
+
+#viewer-pages-continuous .page-container {
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    min-height: 200px;
+}
+
+#viewer-pages-continuous img {
+    max-width: 100%;
+    height: auto;
+    display: block;
+}
+
+#viewer-pages-continuous .page-placeholder {
+    width: 100%;
+    max-width: 48rem;
+    height: 24rem;
+    background-color: #374151;
+    border-radius: 0.5rem;
+    animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes pulse {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.5;
+    }
+}
+
+/* Fullscreen Continuous Viewer Container */
+#fullscreen-pages-continuous {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 1rem 0;
+    background-color: #000000;
+    z-index: 1;
+}
+
+#fullscreen-pages-continuous .page-container {
+    width: 100%;
+    min-height: 200px;
+    overflow: hidden;
+}
+
+#fullscreen-pages-continuous img {
+    /* Use CSS fill-available and fit-content for proper sizing */
+    width: -webkit-fill-available;
+    width: fill-available;
+    height: fit-content;
+    display: block;
+    margin: 0 auto;
+    position: relative;
+}
+
+/* Context Menu Active States */
+.manga-active {
+    color: #a855f7 !important;
+}
+
+.manga-active svg {
+    color: #a855f7 !important;
+}
+
+.continuous-active {
+    color: #60a5fa !important;
+}
+
+.continuous-active svg {
+    color: #60a5fa !important;
 }
 
 /* iOS-Style Toggle Switch */

@@ -79,6 +79,14 @@
       updateFullscreenPageStatus(global.currentPageIndex + 1, totalPages);
     }
 
+    // Check if continuous mode should be enabled
+    if (global.currentComic?.continuousMode && typeof global.enableContinuousMode === 'function') {
+      // Enable continuous mode after a short delay to ensure fullscreen is ready
+      setTimeout(async () => {
+        await global.enableContinuousMode();
+      }, 100);
+    }
+
     hideFullscreenControls();
     if (typeof global.resetFullscreenZoom === 'function') {
       global.resetFullscreenZoom();
@@ -109,11 +117,16 @@
     }
   }
 
-  function closeFullscreen() {
+  async function closeFullscreen() {
     hideFullscreenControls();
     const viewer = global.fullscreenViewer;
     const image = global.fullscreenImage;
     if (!viewer) return;
+
+    // Disable continuous mode if active
+    if (global.isContinuousMode && typeof global.disableContinuousMode === 'function') {
+      await global.disableContinuousMode();
+    }
 
     viewer.classList.add('hidden');
 
@@ -139,6 +152,11 @@
 
     if (document.fullscreenElement === viewer && document.exitFullscreen) {
       document.exitFullscreen().catch(() => {});
+    }
+
+    // Render current page in normal viewer to show correct position
+    if (typeof global.renderPage === 'function') {
+      await global.renderPage();
     }
   }
 
@@ -542,8 +560,24 @@
     global.currentPageIndex = targetIndex;
     hideFullscreenPageJumpInput();
 
-    if (typeof global.renderPage === 'function') {
-      global.renderPage();
+    // Check if in continuous mode
+    if (global.isContinuousMode) {
+      // Scroll to the page in continuous view
+      const continuousContainer = document.getElementById('fullscreen-pages-continuous');
+      if (continuousContainer) {
+        const targetContainer = continuousContainer.querySelector(
+          `.page-container[data-index="${targetIndex}"]`
+        );
+        if (targetContainer) {
+          targetContainer.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          console.log('[FULLSCREEN] Scrolled to page', targetPage, 'in continuous mode');
+        }
+      }
+    } else {
+      // Single page mode - render the page
+      if (typeof global.renderPage === 'function') {
+        global.renderPage();
+      }
     }
   }
 
