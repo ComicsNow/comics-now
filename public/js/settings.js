@@ -1540,4 +1540,64 @@ async function loadComicsDefaults() {
   }
 }
 
+// --- CONTINUOUS MODE SETTINGS ---
+// Load user's default continuous mode preference
+async function loadContinuousModeDefault() {
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/v1/continuous-mode-preference`);
+    const data = await response.json();
+    const toggle = document.getElementById('continuous-mode-default-toggle');
+    if (toggle) {
+      toggle.checked = data.continuousMode || false;
+    }
+  } catch (error) {
+    console.error('Failed to load continuous mode default:', error);
+  }
+}
+
+// Save user's default continuous mode preference
+async function saveContinuousModeDefault(enabled) {
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/v1/continuous-mode-preference`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ continuousMode: enabled })
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to save preference');
+    }
+
+    showSettingsMessage('Continuous mode default updated', 'success');
+  } catch (error) {
+    console.error('Failed to save continuous mode default:', error);
+    showSettingsMessage('Failed to update continuous mode default', 'error');
+  }
+}
+
+// Setup continuous mode toggle event listener
+function initContinuousModeSettings() {
+  const continuousModeToggle = document.getElementById('continuous-mode-default-toggle');
+  if (continuousModeToggle) {
+    continuousModeToggle.addEventListener('change', (e) => {
+      saveContinuousModeDefault(e.target.checked);
+    });
+
+    // Load current setting
+    loadContinuousModeDefault();
+  }
+}
+
+// Helper function to show settings messages
+function showSettingsMessage(message, type) {
+  const statusDiv = document.getElementById('settings-status');
+  if (statusDiv) {
+    statusDiv.textContent = message;
+    statusDiv.className = type === 'success' ? 'text-green-400' : 'text-red-400';
+    setTimeout(() => {
+      statusDiv.textContent = '';
+    }, 3000);
+  }
+}
+
 

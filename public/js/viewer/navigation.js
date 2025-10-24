@@ -254,6 +254,19 @@
       global.updateMangaModeUI(comic.mangaMode || false);
     }
 
+    // Initialize continuous mode if enabled for this comic
+    if (comic.continuousMode && typeof global.enableContinuousMode === 'function') {
+      await global.enableContinuousMode();
+    } else {
+      // Ensure continuous mode is disabled and UI reflects that
+      if (typeof global.disableContinuousMode === 'function' && global.isContinuousMode) {
+        await global.disableContinuousMode();
+      }
+      if (typeof global.updateContinuousModeUI === 'function') {
+        global.updateContinuousModeUI(false);
+      }
+    }
+
     if (global.viewerPagesDiv) {
       global.viewerPagesDiv.dataset.pages = JSON.stringify([]);
     }
