@@ -995,6 +995,31 @@ body {
     }
 }
 
+/* Fullscreen Continuous Viewer Container */
+#fullscreen-pages-continuous {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    align-items: center;
+    padding: 1rem 0;
+    background-color: #000000;
+    z-index: 1;
+}
+
+#fullscreen-pages-continuous .page-container {
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    min-height: 200px;
+}
+
+#fullscreen-pages-continuous img {
+    max-width: 100%;
+    max-height: 100vh;
+    height: auto;
+    display: block;
+}
+
 /* Context Menu Active States */
 .manga-active {
     color: #a855f7 !important;

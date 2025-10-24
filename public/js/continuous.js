@@ -100,7 +100,7 @@
       return;
     }
 
-    continuousContainer = document.getElementById('viewer-pages-continuous');
+    // Use the container set by enableContinuousMode() (either normal or fullscreen)
     if (!continuousContainer) {
       console.error('[CONTINUOUS] Container not found');
       return;
@@ -151,18 +151,42 @@
     isContinuousMode = true;
     global.isContinuousMode = true;
 
-    // Hide normal viewer
-    const normalViewer = document.getElementById('viewer-pages');
-    if (normalViewer) {
-      normalViewer.classList.add('hidden');
-      console.log('[CONTINUOUS] Hidden normal viewer');
-    }
+    // Detect if in fullscreen mode
+    const fullscreenViewer = document.getElementById('fullscreen-viewer');
+    const isFullscreen = fullscreenViewer && !fullscreenViewer.classList.contains('hidden');
 
-    // Show continuous viewer
-    continuousContainer = document.getElementById('viewer-pages-continuous');
-    if (continuousContainer) {
-      continuousContainer.classList.remove('hidden');
-      console.log('[CONTINUOUS] Showing continuous viewer');
+    if (isFullscreen) {
+      console.log('[CONTINUOUS] Enabling in fullscreen mode');
+
+      // Hide fullscreen single image
+      const fullscreenImage = document.getElementById('fullscreen-image');
+      if (fullscreenImage) {
+        fullscreenImage.classList.add('hidden');
+        console.log('[CONTINUOUS] Hidden fullscreen image');
+      }
+
+      // Show fullscreen continuous container
+      continuousContainer = document.getElementById('fullscreen-pages-continuous');
+      if (continuousContainer) {
+        continuousContainer.classList.remove('hidden');
+        console.log('[CONTINUOUS] Showing fullscreen continuous viewer');
+      }
+    } else {
+      console.log('[CONTINUOUS] Enabling in normal mode');
+
+      // Hide normal viewer
+      const normalViewer = document.getElementById('viewer-pages');
+      if (normalViewer) {
+        normalViewer.classList.add('hidden');
+        console.log('[CONTINUOUS] Hidden normal viewer');
+      }
+
+      // Show continuous viewer
+      continuousContainer = document.getElementById('viewer-pages-continuous');
+      if (continuousContainer) {
+        continuousContainer.classList.remove('hidden');
+        console.log('[CONTINUOUS] Showing continuous viewer');
+      }
     }
 
     // Hide navigation buttons (not needed in continuous mode)
@@ -188,17 +212,40 @@
     isContinuousMode = false;
     global.isContinuousMode = false;
 
-    // Show normal viewer
-    const normalViewer = document.getElementById('viewer-pages');
-    if (normalViewer) {
-      normalViewer.classList.remove('hidden');
-      console.log('[CONTINUOUS] Showing normal viewer');
-    }
+    // Detect if in fullscreen mode
+    const fullscreenViewer = document.getElementById('fullscreen-viewer');
+    const isFullscreen = fullscreenViewer && !fullscreenViewer.classList.contains('hidden');
 
-    // Hide continuous viewer
-    if (continuousContainer) {
-      continuousContainer.classList.add('hidden');
-      console.log('[CONTINUOUS] Hidden continuous viewer');
+    if (isFullscreen) {
+      console.log('[CONTINUOUS] Disabling in fullscreen mode');
+
+      // Show fullscreen single image
+      const fullscreenImage = document.getElementById('fullscreen-image');
+      if (fullscreenImage) {
+        fullscreenImage.classList.remove('hidden');
+        console.log('[CONTINUOUS] Showing fullscreen image');
+      }
+
+      // Hide fullscreen continuous container
+      if (continuousContainer) {
+        continuousContainer.classList.add('hidden');
+        console.log('[CONTINUOUS] Hidden fullscreen continuous viewer');
+      }
+    } else {
+      console.log('[CONTINUOUS] Disabling in normal mode');
+
+      // Show normal viewer
+      const normalViewer = document.getElementById('viewer-pages');
+      if (normalViewer) {
+        normalViewer.classList.remove('hidden');
+        console.log('[CONTINUOUS] Showing normal viewer');
+      }
+
+      // Hide continuous viewer
+      if (continuousContainer) {
+        continuousContainer.classList.add('hidden');
+        console.log('[CONTINUOUS] Hidden continuous viewer');
+      }
     }
 
     // Show navigation buttons
@@ -210,8 +257,8 @@
       console.log('[CONTINUOUS] Disconnected observer');
     }
 
-    // Render current page in normal mode
-    if (typeof global.renderPage === 'function') {
+    // Render current page in normal mode (only for normal viewer, not fullscreen)
+    if (!isFullscreen && typeof global.renderPage === 'function') {
       await global.renderPage();
       console.log('[CONTINUOUS] Rendered current page in normal mode');
     }
