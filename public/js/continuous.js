@@ -414,35 +414,15 @@
   // ============================================================================
 
   /**
-   * Toggle continuous mode via API
+   * Toggle continuous mode (local state only)
    * @param {string} comicId - The comic ID
    * @param {boolean} currentMode - Current continuous mode state
-   * @returns {Promise<boolean>} - New continuous mode state
+   * @returns {boolean} - New continuous mode state
    */
-  async function toggleContinuousMode(comicId, currentMode) {
+  function toggleContinuousMode(comicId, currentMode) {
     const newMode = !currentMode;
-
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/v1/comics/continuous-mode`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          comicId,
-          continuousMode: newMode
-        })
-      });
-
-      const data = await response.json();
-      if (!data.ok) {
-        throw new Error(data.message || 'Failed to toggle continuous mode');
-      }
-
-      console.log('[CONTINUOUS] API toggle successful:', newMode);
-      return data.continuousMode;
-    } catch (error) {
-      console.log('[CONTINUOUS] API call failed, using local toggle:', error.message);
-      return newMode;
-    }
+    console.log('[CONTINUOUS] Toggling continuous mode to:', newMode);
+    return newMode;
   }
 
   /**
@@ -518,7 +498,7 @@
         const currentMode = global.currentComic.continuousMode || false;
         console.log('[CONTINUOUS] Toggling from', currentMode, 'to', !currentMode);
 
-        const newMode = await toggleContinuousMode(
+        const newMode = toggleContinuousMode(
           global.currentComic.id,
           currentMode
         );
