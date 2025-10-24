@@ -193,6 +193,11 @@ body {
     padding-left: env(safe-area-inset-left);
 }
 
+/* Override flex display when continuous mode is active */
+.fullscreen-viewer:has(#fullscreen-pages-continuous:not(.hidden)) {
+    display: block;
+}
+
 .fullscreen-image {
     max-width: calc(100vw - env(safe-area-inset-left) - env(safe-area-inset-right));
     max-height: calc(100vh - env(safe-area-inset-top) - env(safe-area-inset-bottom));
