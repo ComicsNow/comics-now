@@ -76,6 +76,11 @@ document.getElementById('settings-tab-comics-defaults')?.addEventListener('click
 
   // Load user's manga mode preferences when tab is opened
   await loadComicsDefaults();
+
+  // Initialize continuous mode settings
+  if (typeof initContinuousModeSettings === 'function') {
+    initContinuousModeSettings();
+  }
 });
 
 document.getElementById('settings-tab-devices').addEventListener('click', async () => {
