@@ -68,10 +68,43 @@
       const pageUrl = await global.getPageUrl(pageName);
 
       const img = document.createElement('img');
-      img.src = pageUrl;
       img.alt = `Page ${pageName}`;
-      img.className = 'w-full h-auto block';
       img.loading = 'lazy'; // Browser native lazy loading as backup
+
+      // Wait for image to load to get natural dimensions
+      await new Promise((resolve, reject) => {
+        img.onload = () => {
+          // Get viewport width for continuous mode (fullscreen)
+          const viewportWidth = window.innerWidth;
+
+          // Get natural dimensions
+          const naturalWidth = img.naturalWidth;
+          const naturalHeight = img.naturalHeight;
+
+          if (naturalWidth && naturalHeight) {
+            // Calculate dimensions maintaining aspect ratio
+            const calculatedWidth = viewportWidth;
+            const calculatedHeight = Math.round(naturalHeight * (calculatedWidth / naturalWidth));
+
+            // Set explicit width and height attributes (like Komga does)
+            img.width = calculatedWidth;
+            img.height = calculatedHeight;
+
+            console.log('[CONTINUOUS] Image dimensions:', pageName,
+                       'natural:', naturalWidth, 'x', naturalHeight,
+                       'display:', calculatedWidth, 'x', calculatedHeight);
+          }
+
+          resolve();
+        };
+
+        img.onerror = (err) => {
+          reject(new Error(`Failed to load image: ${pageName}`));
+        };
+
+        // Set src to trigger loading
+        img.src = pageUrl;
+      });
 
       // Clear placeholder and add image
       container.innerHTML = '';

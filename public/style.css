@@ -1014,11 +1014,9 @@ body {
 }
 
 #fullscreen-pages-continuous img {
-    width: 100% !important;
-    height: auto !important;
-    max-height: none !important;
-    object-fit: contain;
+    /* Dimensions set via explicit width/height attributes (like Komga) */
     display: block;
+    margin: 0 auto;
 }
 
 /* Context Menu Active States */
