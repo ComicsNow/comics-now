@@ -201,9 +201,6 @@
       console.log('[CONTINUOUS] Added click handler for controls');
     }
 
-    // Hide navigation buttons (not needed in continuous mode)
-    hideNavigationButtons();
-
     // Render continuous mode
     await renderContinuousMode();
 
@@ -217,57 +214,61 @@
   }
 
   /**
-   * Disable continuous mode and return to page-by-page (fullscreen only)
+   * Disable continuous mode and return to page-by-page
    */
   async function disableContinuousMode() {
     console.log('[CONTINUOUS] Disabling continuous mode');
     isContinuousMode = false;
     global.isContinuousMode = false;
 
-    // Continuous mode only works in fullscreen
+    // Check if in fullscreen mode
     const fullscreenViewer = document.getElementById('fullscreen-viewer');
     const isFullscreen = fullscreenViewer && !fullscreenViewer.classList.contains('hidden');
 
-    if (!isFullscreen) {
-      console.warn('[CONTINUOUS] Not in fullscreen - nothing to disable');
-      return;
-    }
+    if (isFullscreen) {
+      console.log('[CONTINUOUS] Disabling in fullscreen mode');
 
-    console.log('[CONTINUOUS] Disabling in fullscreen mode');
-
-    // Show fullscreen single image
-    const fullscreenImage = document.getElementById('fullscreen-image');
-    if (fullscreenImage) {
-      fullscreenImage.classList.remove('hidden');
-      console.log('[CONTINUOUS] Showing fullscreen image');
-    }
-
-    // Hide fullscreen continuous container
-    if (continuousContainer) {
-      // Remove click handler
-      if (continuousClickHandler) {
-        continuousContainer.removeEventListener('click', continuousClickHandler);
-        continuousClickHandler = null;
-        console.log('[CONTINUOUS] Removed click handler');
+      // Show fullscreen single image
+      const fullscreenImage = document.getElementById('fullscreen-image');
+      if (fullscreenImage) {
+        fullscreenImage.classList.remove('hidden');
+        console.log('[CONTINUOUS] Showing fullscreen image');
       }
 
-      continuousContainer.classList.add('hidden');
-      console.log('[CONTINUOUS] Hidden fullscreen continuous viewer');
+      // Hide fullscreen continuous container
+      if (continuousContainer) {
+        // Remove click handler
+        if (continuousClickHandler) {
+          continuousContainer.removeEventListener('click', continuousClickHandler);
+          continuousClickHandler = null;
+          console.log('[CONTINUOUS] Removed click handler');
+        }
+
+        continuousContainer.classList.add('hidden');
+        console.log('[CONTINUOUS] Hidden fullscreen continuous viewer');
+      }
+
+      // Render current page in fullscreen to populate the image
+      if (typeof global.renderPage === 'function') {
+        await global.renderPage();
+        console.log('[CONTINUOUS] Rendered current page in fullscreen mode');
+      }
+    } else {
+      console.log('[CONTINUOUS] Disabling outside fullscreen - cleaning up state');
+
+      // Just clean up state, no UI changes needed
+      if (continuousContainer) {
+        if (continuousClickHandler) {
+          continuousContainer.removeEventListener('click', continuousClickHandler);
+          continuousClickHandler = null;
+        }
+      }
     }
 
-    // Show navigation buttons
-    showNavigationButtons();
-
-    // Cleanup observer
+    // Cleanup observer (always do this)
     if (intersectionObserver) {
       intersectionObserver.disconnect();
       console.log('[CONTINUOUS] Disconnected observer');
-    }
-
-    // Render current page in fullscreen to populate the image
-    if (typeof global.renderPage === 'function') {
-      await global.renderPage();
-      console.log('[CONTINUOUS] Rendered current page in fullscreen mode');
     }
 
     // Update UI

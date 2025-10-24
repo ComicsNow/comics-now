@@ -109,11 +109,16 @@
     }
   }
 
-  function closeFullscreen() {
+  async function closeFullscreen() {
     hideFullscreenControls();
     const viewer = global.fullscreenViewer;
     const image = global.fullscreenImage;
     if (!viewer) return;
+
+    // Disable continuous mode if active
+    if (global.isContinuousMode && typeof global.disableContinuousMode === 'function') {
+      await global.disableContinuousMode();
+    }
 
     viewer.classList.add('hidden');
 
@@ -139,6 +144,11 @@
 
     if (document.fullscreenElement === viewer && document.exitFullscreen) {
       document.exitFullscreen().catch(() => {});
+    }
+
+    // Render current page in normal viewer to show correct position
+    if (typeof global.renderPage === 'function') {
+      await global.renderPage();
     }
   }
 
