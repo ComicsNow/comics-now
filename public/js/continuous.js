@@ -66,55 +66,53 @@
       }
 
       const pageUrl = await global.getPageUrl(pageName);
+      console.log('[CONTINUOUS] Page URL:', pageUrl);
 
       const img = document.createElement('img');
       img.alt = `Page ${pageName}`;
-      img.loading = 'lazy'; // Browser native lazy loading as backup
+      img.style.opacity = '0'; // Hide until dimensions are set
+      img.style.transition = 'opacity 0.2s';
 
-      // Wait for image to load to get natural dimensions
-      await new Promise((resolve, reject) => {
-        img.onload = () => {
-          // Get viewport width for continuous mode (fullscreen)
-          const viewportWidth = window.innerWidth;
+      // Set up load handler to calculate dimensions
+      img.onload = () => {
+        const naturalWidth = img.naturalWidth;
+        const naturalHeight = img.naturalHeight;
 
-          // Get natural dimensions
-          const naturalWidth = img.naturalWidth;
-          const naturalHeight = img.naturalHeight;
+        if (naturalWidth && naturalHeight) {
+          // Calculate dimensions maintaining aspect ratio
+          const calculatedWidth = window.innerWidth;
+          const calculatedHeight = Math.round(naturalHeight * (calculatedWidth / naturalWidth));
 
-          if (naturalWidth && naturalHeight) {
-            // Calculate dimensions maintaining aspect ratio
-            const calculatedWidth = viewportWidth;
-            const calculatedHeight = Math.round(naturalHeight * (calculatedWidth / naturalWidth));
+          // Set explicit width and height attributes
+          img.width = calculatedWidth;
+          img.height = calculatedHeight;
 
-            // Set explicit width and height attributes (like Komga does)
-            img.width = calculatedWidth;
-            img.height = calculatedHeight;
+          console.log('[CONTINUOUS] Loaded:', pageName,
+                     'natural:', naturalWidth, 'x', naturalHeight,
+                     'display:', calculatedWidth, 'x', calculatedHeight);
+        }
 
-            console.log('[CONTINUOUS] Image dimensions:', pageName,
-                       'natural:', naturalWidth, 'x', naturalHeight,
-                       'display:', calculatedWidth, 'x', calculatedHeight);
-          }
+        // Show image
+        img.style.opacity = '1';
+      };
 
-          resolve();
-        };
+      // Set up error handler
+      img.onerror = () => {
+        console.error('[CONTINUOUS] Failed to load image:', pageName, pageUrl);
+        container.innerHTML = `<div class="text-red-400 p-4">Failed to load: ${pageName}</div>`;
+      };
 
-        img.onerror = (err) => {
-          reject(new Error(`Failed to load image: ${pageName}`));
-        };
-
-        // Set src to trigger loading
-        img.src = pageUrl;
-      });
-
-      // Clear placeholder and add image
+      // Clear placeholder and add image to DOM
       container.innerHTML = '';
       container.appendChild(img);
       pageElements.set(pageName, img);
 
-      console.log('[CONTINUOUS] Page loaded:', pageName);
+      // Set src to trigger loading (after image is in DOM)
+      img.src = pageUrl;
+
     } catch (error) {
-      console.error('[CONTINUOUS] Failed to load page:', pageName, error);
-      container.innerHTML = '<div class="text-red-400 p-4">Failed to load page</div>';
+      console.error('[CONTINUOUS] Error loading page:', pageName, error);
+      container.innerHTML = `<div class="text-red-400 p-4">Error: ${error.message}</div>`;
     }
   }
 
