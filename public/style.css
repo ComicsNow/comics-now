@@ -1014,7 +1014,8 @@ body {
 }
 
 #fullscreen-pages-continuous img {
-    width: 100%;
+    max-width: 100%;
+    width: auto;
     height: auto;
     display: block;
 }
