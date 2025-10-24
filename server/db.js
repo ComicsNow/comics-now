@@ -378,6 +378,39 @@ function initializeDatabase() {
         });
       }
     });
+
+    // Migration: Add continuous mode columns
+    db.all('PRAGMA table_info(user_settings)', (err, cols) => {
+      if (err) {
+        log('ERROR', 'DB', `PRAGMA error on user_settings: ${err.message}`);
+        return;
+      }
+      if (!cols.some(c => c.name === 'continuousModeDefault')) {
+        db.run('ALTER TABLE user_settings ADD COLUMN continuousModeDefault INTEGER DEFAULT 0', (alterErr) => {
+          if (alterErr) {
+            log('ERROR', 'DB', `Failed to add continuousModeDefault to user_settings: ${alterErr.message}`);
+          } else {
+            log('INFO', 'DB', 'Added continuousModeDefault column to user_settings table');
+          }
+        });
+      }
+    });
+
+    db.all('PRAGMA table_info(user_comic_status)', (err, cols) => {
+      if (err) {
+        log('ERROR', 'DB', `PRAGMA error on user_comic_status: ${err.message}`);
+        return;
+      }
+      if (!cols.some(c => c.name === 'continuousMode')) {
+        db.run('ALTER TABLE user_comic_status ADD COLUMN continuousMode INTEGER', (alterErr) => {
+          if (alterErr) {
+            log('ERROR', 'DB', `Failed to add continuousMode to user_comic_status: ${alterErr.message}`);
+          } else {
+            log('INFO', 'DB', 'Added continuousMode column to user_comic_status table');
+          }
+        });
+      }
+    });
   });
 }
 

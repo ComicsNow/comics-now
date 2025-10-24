@@ -1278,6 +1278,17 @@ function createApiRouter({
       const { getAllMangaModePreferences } = require('../db');
       const allPrefs = await getAllMangaModePreferences(userId);
 
+      // Load user continuous mode preferences
+      const userProgress = await dbAll(
+        'SELECT comicId, continuousMode FROM user_comic_status WHERE userId = ? AND continuousMode IS NOT NULL',
+        [userId]
+      );
+
+      const continuousModeMap = {};
+      for (const p of userProgress) {
+        continuousModeMap[p.comicId] = p.continuousMode === 1;
+      }
+
       // Create maps for each preference type
       const prefMaps = {
         comic: new Map(),
@@ -1312,6 +1323,8 @@ function createApiRouter({
             mangaMode = prefMaps.publisher.get(r.publisher);
           }
 
+          const continuousMode = continuousModeMap[r.id] !== undefined ? continuousModeMap[r.id] : false;
+
           results.push({
             id: r.id,
             name: r.name,
@@ -1320,7 +1333,8 @@ function createApiRouter({
             progress: { lastReadPage: r.lastReadPage || 0, totalPages: r.totalPages || 0 },
             metadata: meta,
             series: r.series,
-            mangaMode: mangaMode
+            mangaMode: mangaMode,
+            continuousMode: continuousMode
           });
         }
       }
@@ -1635,6 +1649,152 @@ function createApiRouter({
     } catch (e) {
       log('ERROR', 'MANGA_MODE', `Failed to set manga modes: ${e.message}`);
       res.status(500).json({ ok: false, message: formatErrorMessage(e, req, 'Failed to update manga modes') });
+    }
+  });
+
+  // === CONTINUOUS MODE ENDPOINTS ===
+
+  // Get user's default continuous mode preference
+  router.get('/api/v1/continuous-mode-preference', requireAuth, async (req, res) => {
+    try {
+      const userId = req.user?.userId || 'default-user';
+
+      // Check user_settings for continuousModeDefault
+      const setting = await dbGet(
+        `SELECT continuousModeDefault FROM user_settings WHERE userId = ? AND key = 'continuousMode'`,
+        [userId]
+      );
+
+      const continuousMode = setting ? (setting.continuousModeDefault === 1) : false;
+
+      res.json({ ok: true, continuousMode });
+    } catch (e) {
+      log('ERROR', 'CONTINUOUS_MODE', `Failed to get continuous mode preference: ${e.message}`);
+      res.status(500).json({ ok: false, message: formatErrorMessage(e, req, 'Failed to get continuous mode preference') });
+    }
+  });
+
+  // Toggle continuous mode for a specific comic (per-user)
+  router.post('/api/v1/comics/continuous-mode', requireAuth, async (req, res) => {
+    try {
+      const { comicId, continuousMode } = req.body;
+      if (!comicId || typeof continuousMode !== 'boolean') {
+        return res.status(400).json({ ok: false, message: 'Bad request: comicId and continuousMode (boolean) required' });
+      }
+
+      const userId = req.user?.userId || 'default-user';
+
+      // Verify comic exists
+      const comic = await dbGet('SELECT id FROM comics WHERE id = ?', [comicId]);
+      if (!comic) {
+        return res.status(404).json({ ok: false, message: 'Comic not found' });
+      }
+
+      // Update or insert continuous mode for this comic in user_comic_status
+      await dbRun(
+        `INSERT INTO user_comic_status (userId, comicId, continuousMode)
+         VALUES (?, ?, ?)
+         ON CONFLICT(userId, comicId) DO UPDATE SET
+           continuousMode = excluded.continuousMode,
+           updatedAt = (strftime('%s', 'now') * 1000)`,
+        [userId, comicId, continuousMode ? 1 : null]
+      );
+
+      log('INFO', 'CONTINUOUS_MODE', `User ${userId} set comic ${comicId} continuous mode to ${continuousMode}`);
+
+      res.json({
+        ok: true,
+        continuousMode
+      });
+    } catch (e) {
+      log('ERROR', 'CONTINUOUS_MODE', `Failed to update continuous mode: ${e.message}`);
+      res.status(500).json({ ok: false, message: formatErrorMessage(e, req, 'Failed to update continuous mode') });
+    }
+  });
+
+  // Set continuous mode for all comics at hierarchy level
+  router.post('/api/v1/comics/set-all-continuous-mode', requireAuth, async (req, res) => {
+    try {
+      const { level, target, continuousMode } = req.body;
+
+      if (typeof continuousMode !== 'boolean') {
+        return res.status(400).json({ ok: false, message: 'Bad request: continuousMode must be boolean' });
+      }
+
+      const userId = req.user?.userId || 'default-user';
+      let updated = 0;
+
+      if (!level || !target) {
+        // Set as user default
+        await dbRun(
+          `INSERT INTO user_settings (userId, key, continuousModeDefault)
+           VALUES (?, 'continuousMode', ?)
+           ON CONFLICT(userId, key) DO UPDATE SET
+             continuousModeDefault = excluded.continuousModeDefault`,
+          [userId, continuousMode ? 1 : 0]
+        );
+
+        log('INFO', 'CONTINUOUS_MODE', `User ${userId} set default continuous mode to ${continuousMode}`);
+
+        res.json({
+          ok: true,
+          updated: 1,
+          continuousMode
+        });
+        return;
+      }
+
+      // Bulk update based on hierarchy level
+      if (level === 'library' && target.rootFolder) {
+        // Update all comics in this root folder
+        const result = await dbRun(
+          `INSERT OR REPLACE INTO user_comic_status (userId, comicId, continuousMode, lastReadPage, totalPages, updatedAt)
+           SELECT ?, c.id, ?, COALESCE(ucs.lastReadPage, 0), COALESCE(ucs.totalPages, 0), (strftime('%s', 'now') * 1000)
+           FROM comics c
+           LEFT JOIN user_comic_status ucs ON ucs.userId = ? AND ucs.comicId = c.id
+           WHERE c.rootFolder = ?`,
+          [userId, continuousMode ? 1 : null, userId, target.rootFolder]
+        );
+        updated = result.changes || 0;
+
+      } else if (level === 'publisher' && target.rootFolder && target.publisher) {
+        // Update all comics from this publisher
+        const result = await dbRun(
+          `INSERT OR REPLACE INTO user_comic_status (userId, comicId, continuousMode, lastReadPage, totalPages, updatedAt)
+           SELECT ?, c.id, ?, COALESCE(ucs.lastReadPage, 0), COALESCE(ucs.totalPages, 0), (strftime('%s', 'now') * 1000)
+           FROM comics c
+           LEFT JOIN user_comic_status ucs ON ucs.userId = ? AND ucs.comicId = c.id
+           WHERE c.rootFolder = ? AND c.publisher = ?`,
+          [userId, continuousMode ? 1 : null, userId, target.rootFolder, target.publisher]
+        );
+        updated = result.changes || 0;
+
+      } else if (level === 'series' && target.rootFolder && target.publisher && target.series) {
+        // Update all comics in this series
+        const result = await dbRun(
+          `INSERT OR REPLACE INTO user_comic_status (userId, comicId, continuousMode, lastReadPage, totalPages, updatedAt)
+           SELECT ?, c.id, ?, COALESCE(ucs.lastReadPage, 0), COALESCE(ucs.totalPages, 0), (strftime('%s', 'now') * 1000)
+           FROM comics c
+           LEFT JOIN user_comic_status ucs ON ucs.userId = ? AND ucs.comicId = c.id
+           WHERE c.rootFolder = ? AND c.publisher = ? AND c.series = ?`,
+          [userId, continuousMode ? 1 : null, userId, target.rootFolder, target.publisher, target.series]
+        );
+        updated = result.changes || 0;
+
+      } else {
+        return res.status(400).json({ ok: false, message: 'Invalid level or target parameters' });
+      }
+
+      log('INFO', 'CONTINUOUS_MODE', `User ${userId} set continuous mode to ${continuousMode} for ${updated} comics at ${level} level`);
+
+      res.json({
+        ok: true,
+        updated,
+        continuousMode
+      });
+    } catch (e) {
+      log('ERROR', 'CONTINUOUS_MODE', `Failed to set continuous modes: ${e.message}`);
+      res.status(500).json({ ok: false, message: formatErrorMessage(e, req, 'Failed to update continuous modes') });
     }
   });
 
