@@ -149,6 +149,7 @@
   async function enableContinuousMode() {
     console.log('[CONTINUOUS] Enabling continuous mode');
     isContinuousMode = true;
+    global.isContinuousMode = true;
 
     // Hide normal viewer
     const normalViewer = document.getElementById('viewer-pages');
@@ -173,6 +174,9 @@
     // Setup scroll progress tracking
     setupScrollProgressTracking();
 
+    // Update UI
+    updateContinuousModeUI(true);
+
     console.log('[CONTINUOUS] Continuous mode enabled');
   }
 
@@ -182,6 +186,7 @@
   async function disableContinuousMode() {
     console.log('[CONTINUOUS] Disabling continuous mode');
     isContinuousMode = false;
+    global.isContinuousMode = false;
 
     // Show normal viewer
     const normalViewer = document.getElementById('viewer-pages');
@@ -533,7 +538,8 @@
   global.toggleContinuousMode = toggleContinuousMode;
   global.initializeContinuousMode = initializeContinuousMode;
   global.updateContinuousModeUI = updateContinuousModeUI;
-  global.isContinuousMode = isContinuousMode;
+  global.updateContinuousModeInCache = updateContinuousModeInCache;
+  global.isContinuousMode = isContinuousMode; // Will be updated dynamically
 
   // Initialize when DOM is ready
   if (document.readyState === 'loading') {

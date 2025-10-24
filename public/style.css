@@ -995,6 +995,23 @@ body {
     }
 }
 
+/* Context Menu Active States */
+.manga-active {
+    color: #a855f7 !important;
+}
+
+.manga-active svg {
+    color: #a855f7 !important;
+}
+
+.continuous-active {
+    color: #60a5fa !important;
+}
+
+.continuous-active svg {
+    color: #60a5fa !important;
+}
+
 /* iOS-Style Toggle Switch */
 #manga-mode-library {
     position: absolute !important;
