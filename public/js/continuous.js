@@ -70,29 +70,13 @@
 
       const img = document.createElement('img');
       img.alt = `Page ${pageName}`;
-      img.style.opacity = '0'; // Hide until dimensions are set
+      img.style.opacity = '0';
       img.style.transition = 'opacity 0.2s';
 
-      // Set up load handler to calculate dimensions
+      // Set up load handler
       img.onload = () => {
-        const naturalWidth = img.naturalWidth;
-        const naturalHeight = img.naturalHeight;
-
-        if (naturalWidth && naturalHeight) {
-          // Calculate dimensions maintaining aspect ratio
-          const calculatedWidth = window.innerWidth;
-          const calculatedHeight = Math.round(naturalHeight * (calculatedWidth / naturalWidth));
-
-          // Set explicit width and height attributes
-          img.width = calculatedWidth;
-          img.height = calculatedHeight;
-
-          console.log('[CONTINUOUS] Loaded:', pageName,
-                     'natural:', naturalWidth, 'x', naturalHeight,
-                     'display:', calculatedWidth, 'x', calculatedHeight);
-        }
-
-        // Show image
+        console.log('[CONTINUOUS] Loaded:', pageName);
+        // Fade in image (CSS handles sizing with fill-available + fit-content)
         img.style.opacity = '1';
       };
 

@@ -1021,11 +1021,12 @@ body {
 }
 
 #fullscreen-pages-continuous img {
-    /* Dimensions set via explicit width/height attributes (like Komga) */
+    /* Use CSS fill-available and fit-content for proper sizing */
+    width: -webkit-fill-available;
+    width: fill-available;
+    height: fit-content;
     display: block;
     margin: 0 auto;
-    max-width: none !important;
-    max-height: none !important;
 }
 
 /* Context Menu Active States */
