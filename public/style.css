@@ -1015,11 +1015,8 @@ body {
 
 #fullscreen-pages-continuous .page-container {
     width: 100%;
-    display: flex;
-    justify-content: center;
-    align-items: flex-start;
     min-height: 200px;
-    height: auto;
+    overflow: hidden;
 }
 
 #fullscreen-pages-continuous img {
