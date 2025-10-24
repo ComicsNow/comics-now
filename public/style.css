@@ -997,6 +997,13 @@ body {
 
 /* Fullscreen Continuous Viewer Container */
 #fullscreen-pages-continuous {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    overflow-y: auto;
+    overflow-x: hidden;
     display: flex;
     flex-direction: column;
     gap: 0;
@@ -1017,6 +1024,8 @@ body {
     /* Dimensions set via explicit width/height attributes (like Komga) */
     display: block;
     margin: 0 auto;
+    max-width: none !important;
+    max-height: none !important;
 }
 
 /* Context Menu Active States */
