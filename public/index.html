@@ -482,6 +482,14 @@
         >
           Manga
         </button>
+        <button
+          id="fullscreen-continuous-mode-btn"
+          type="button"
+          class="continuous-mode-btn"
+          title="Toggle Continuous Mode"
+        >
+          Continuous
+        </button>
       </div>
 
       <div id="fullscreen-nav-left" class="fullscreen-nav left"></div>
@@ -680,6 +688,7 @@
       <div class="w-full mb-4 flex justify-center gap-2">
         <button id="viewer-tab" class="tab-button pill-button active">Viewer</button>
         <button id="manga-mode-btn" class="manga-mode-btn" title="Toggle Manga Mode">Manga</button>
+        <button id="continuous-mode-btn" class="continuous-mode-btn" title="Toggle Continuous Mode">Continuous</button>
         <button id="metadata-tab" class="tab-button pill-button">Metadata</button>
       </div>
       <div class="w-full flex justify-center items-center mb-2 space-x-2 flex-wrap gap-2">
@@ -750,6 +759,9 @@
               <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
             </svg>
           </div>
+        </div>
+        <div id="viewer-pages-continuous" class="hidden overflow-y-auto max-h-screen">
+          <!-- Pages will be dynamically inserted here in continuous mode -->
         </div>
         <div class="flex justify-between items-center mt-4">
           <button id="prev-page-btn-bottom" type="button" class="pill-button bg-gray-700 hover:bg-gray-600 text-white transition-colors" aria-label="Previous page">←</button>
@@ -887,6 +899,7 @@
   <script src="js/viewer/navigation.js"></script>
   <script src="js/viewer/ui.js"></script>
   <script src="js/viewer.js"></script>
+  <script src="js/continuous.js"></script>
   <script src="js/settings.js"></script>
   <script src="js/comictagger.js"></script>
   <script src="js/events.js"></script>
