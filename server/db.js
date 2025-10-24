@@ -165,6 +165,19 @@ function initializeDatabase() {
       FOREIGN KEY (userId) REFERENCES users(userId) ON DELETE CASCADE
     )`);
 
+    // Per-user reading preferences (manga mode, continuous mode, etc.)
+    // Supports hierarchical preferences: comic -> series -> publisher -> library
+    db.run(`CREATE TABLE IF NOT EXISTS user_reading_preferences (
+      userId TEXT NOT NULL,
+      preferenceType TEXT NOT NULL,
+      targetId TEXT NOT NULL,
+      mangaMode INTEGER DEFAULT 0,
+      createdAt INTEGER DEFAULT (strftime('%s', 'now') * 1000),
+      updatedAt INTEGER DEFAULT (strftime('%s', 'now') * 1000),
+      PRIMARY KEY (userId, preferenceType, targetId),
+      FOREIGN KEY (userId) REFERENCES users(userId) ON DELETE CASCADE
+    )`);
+
     // User library access control
     // Supports hierarchical access: root_folder -> publisher -> series
     // Series is the lowest level - having series access grants access to all comics in that series
