@@ -79,6 +79,14 @@
       updateFullscreenPageStatus(global.currentPageIndex + 1, totalPages);
     }
 
+    // Check if continuous mode should be enabled
+    if (global.currentComic?.continuousMode && typeof global.enableContinuousMode === 'function') {
+      // Enable continuous mode after a short delay to ensure fullscreen is ready
+      setTimeout(async () => {
+        await global.enableContinuousMode();
+      }, 100);
+    }
+
     hideFullscreenControls();
     if (typeof global.resetFullscreenZoom === 'function') {
       global.resetFullscreenZoom();
@@ -561,7 +569,7 @@
           `.page-container[data-index="${targetIndex}"]`
         );
         if (targetContainer) {
-          targetContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          targetContainer.scrollIntoView({ behavior: 'smooth', block: 'center' });
           console.log('[FULLSCREEN] Scrolled to page', targetPage, 'in continuous mode');
         }
       }

@@ -152,6 +152,17 @@
     // Update UI to show continuous mode is active
     updateContinuousModeUI(true);
 
+    // Scroll to current page position
+    const currentIndex = global.currentPageIndex || 0;
+    const targetContainer = continuousContainer.querySelector(
+      `.page-container[data-index="${currentIndex}"]`
+    );
+    if (targetContainer) {
+      // Use instant scroll (no animation) for initial position
+      targetContainer.scrollIntoView({ behavior: 'instant', block: 'center' });
+      console.log('[CONTINUOUS] Scrolled to current page index:', currentIndex);
+    }
+
     console.log('[CONTINUOUS] Continuous mode rendering complete');
   }
 
