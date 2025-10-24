@@ -1024,11 +1024,6 @@ body {
     overflow: hidden;
 }
 
-/* Override flex display to prevent container collapse */
-#fullscreen-pages-continuous .flex {
-    display: contents !important;
-}
-
 #fullscreen-pages-continuous img {
     /* Use CSS fill-available and fit-content for proper sizing */
     width: -webkit-fill-available;

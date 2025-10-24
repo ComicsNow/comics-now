@@ -132,7 +132,7 @@
     // Create container for each page
     pages.forEach((pageName, index) => {
       const pageContainer = document.createElement('div');
-      pageContainer.className = 'page-container w-full flex justify-center';
+      pageContainer.className = 'page-container w-full';
       pageContainer.dataset.page = pageName;
       pageContainer.dataset.index = index;
 
