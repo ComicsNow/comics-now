@@ -191,6 +191,7 @@
     global.currentMetadata = null;
     global.preloadedImages?.clear?.();
     global.pageUrlCache?.clear?.();
+    global.clearDownloadedZipCache?.(); // Clear cached ZIP when switching comics
     global.hidePageJumpInput?.({ focusButton: false });
     global.updateViewerPageCounter?.([]);
 
