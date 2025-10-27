@@ -1,104 +1,24 @@
 (function (global) {
   'use strict';
 
-  // ============================================================================
-  // OFFLINE COMIC ZIP CACHING
-  // ============================================================================
-
-  // Cache the loaded JSZip instance to avoid re-reading the entire ZIP
-  // from IndexedDB for every page (critical for continuous mode performance)
-  let currentDownloadedZip = null;
-  let currentDownloadedComicId = null;
-  let zipLoadingPromise = null;
-
-  /**
-   * Get or load the downloaded comic ZIP file
-   * Returns cached JSZip instance if already loaded for this comic
-   * @param {string} comicId - Comic ID
-   * @returns {Promise<JSZip|null>} JSZip instance or null if not found
-   */
-  async function getDownloadedZip(comicId) {
-    // Return cached if same comic
-    if (currentDownloadedComicId === comicId && currentDownloadedZip) {
-      console.log('[ZIP CACHE] Using cached ZIP for comic:', comicId);
-      return currentDownloadedZip;
-    }
-
-    // Return existing promise if already loading (prevents race conditions)
-    if (zipLoadingPromise) {
-      console.log('[ZIP CACHE] Waiting for existing ZIP load');
-      return zipLoadingPromise;
-    }
-
-    // Load ZIP file from IndexedDB
-    console.log('[ZIP CACHE] Loading ZIP for comic:', comicId);
-    zipLoadingPromise = (async () => {
-      try {
-        const comic = await global.getComicFromDB?.(comicId);
-        if (!comic || !comic.fileBlob) {
-          console.warn('[ZIP CACHE] Comic not found in IndexedDB:', comicId);
-          return null;
-        }
-
-        const jszip = new JSZip();
-        const zip = await jszip.loadAsync(comic.fileBlob);
-
-        currentDownloadedZip = zip;
-        currentDownloadedComicId = comicId;
-
-        console.log('[ZIP CACHE] ZIP loaded successfully for comic:', comicId);
-        return zip;
-      } catch (error) {
-        console.error('[ZIP CACHE] Error loading ZIP:', error);
-        return null;
-      }
-    })();
-
-    const result = await zipLoadingPromise;
-    zipLoadingPromise = null;
-    return result;
-  }
-
-  /**
-   * Clear the cached ZIP instance
-   * Should be called when switching comics or cleaning up
-   */
-  function clearDownloadedZipCache() {
-    console.log('[ZIP CACHE] Clearing cached ZIP');
-    currentDownloadedZip = null;
-    currentDownloadedComicId = null;
-    zipLoadingPromise = null;
-  }
-
-  // ============================================================================
-  // PAGE URL GENERATION
-  // ============================================================================
-
   async function getPageUrl(pageName) {
     if (global.pageUrlCache?.has(pageName)) {
       return global.pageUrlCache.get(pageName);
     }
 
-    // Check if this is a downloaded comic
-    const isDownloaded = global.downloadedComicIds?.has(global.currentComic?.id);
-    if (isDownloaded) {
-      // Use cached ZIP instance to avoid re-loading entire file for each page
-      const zip = await getDownloadedZip(global.currentComic.id);
-      if (zip) {
-        const pageFile = zip.file(pageName);
-        if (pageFile) {
-          const blob = await pageFile.async('blob');
-          const url = URL.createObjectURL(blob);
-          global.pageUrlCache?.set(pageName, url);
-          console.log('[PAGE URL] Created blob URL for offline page:', pageName);
-          return url;
-        } else {
-          console.warn('[PAGE URL] Page not found in ZIP:', pageName);
-        }
+    const downloadedComic = await global.getComicFromDB?.(global.currentComic?.id);
+    if (downloadedComic) {
+      const jszip = new JSZip();
+      const zip = await jszip.loadAsync(downloadedComic.fileBlob);
+      const pageFile = zip.file(pageName);
+      if (pageFile) {
+        const blob = await pageFile.async('blob');
+        const url = URL.createObjectURL(blob);
+        global.pageUrlCache?.set(pageName, url);
+        return url;
       }
     }
 
-    // Fallback to online/server URL
     const url = `${API_BASE_URL}/api/v1/comics/pages/image?path=${encodeURIComponent(encodePath(global.currentComic.path))}&page=${encodeURIComponent(pageName)}`;
     global.pageUrlCache?.set(pageName, url);
     return url;
@@ -694,7 +614,6 @@
 
   const ViewerOrchestrator = {
     getPageUrl,
-    clearDownloadedZipCache,
     preloadPages,
     prunePreloadedImages,
     renderPage,
