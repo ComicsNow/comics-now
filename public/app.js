@@ -98,6 +98,17 @@ async function initializeApp() {
 
     // 4) App init - prioritize offline data
     await openOfflineDB();
+
+    // Initialize download queue and resume any pending downloads
+    if (typeof initializeDownloadQueue === 'function') {
+      try {
+        await initializeDownloadQueue();
+        console.log('[APP] Download queue initialized');
+      } catch (error) {
+        console.error('[APP] Failed to initialize download queue:', error);
+      }
+    }
+
     initializeLibraryUIControls();
     initializeViewerUIControls();
     initializeProgressTracking();
@@ -272,7 +283,7 @@ async function fetchLibraryFromServer() {
       try {
         await saveLibraryCacheToDB(library);
       } catch (error) {
-        
+        console.error('Failed to save library cache to DB:', error);
       }
     }
 
