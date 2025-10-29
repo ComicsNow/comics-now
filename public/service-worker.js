@@ -183,3 +183,379 @@ self.addEventListener('fetch', event => {
     }
   })());
 });
+
+// ==============================================================================
+// BACKGROUND SYNC - DOWNLOAD QUEUE
+// ==============================================================================
+
+/**
+ * Open IndexedDB from Service Worker context
+ */
+async function openDownloadDB() {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open('comics-now-offline', 11);
+
+    request.onsuccess = () => {
+      console.log('[SW] IndexedDB opened successfully');
+      resolve(request.result);
+    };
+
+    request.onerror = () => {
+      console.error('[SW] IndexedDB open error:', request.error);
+      reject(request.error);
+    };
+
+    request.onupgradeneeded = (event) => {
+      console.log('[SW] IndexedDB upgrade not expected in Service Worker');
+    };
+  });
+}
+
+/**
+ * Get all queue items from IndexedDB
+ */
+async function getQueueItems(db) {
+  return new Promise((resolve, reject) => {
+    try {
+      const tx = db.transaction(['downloadQueue'], 'readonly');
+      const store = tx.objectStore('downloadQueue');
+      const index = store.index('priority');
+      const request = index.getAll();
+
+      request.onsuccess = () => {
+        const items = request.result || [];
+        console.log('[SW] Loaded', items.length, 'queue items');
+        resolve(items);
+      };
+
+      request.onerror = () => {
+        console.error('[SW] Error loading queue:', request.error);
+        reject(request.error);
+      };
+    } catch (error) {
+      console.error('[SW] Exception in getQueueItems:', error);
+      reject(error);
+    }
+  });
+}
+
+/**
+ * Update a queue item in IndexedDB
+ */
+async function updateQueueItem(db, id, updates) {
+  return new Promise((resolve, reject) => {
+    try {
+      const tx = db.transaction(['downloadQueue'], 'readwrite');
+      const store = tx.objectStore('downloadQueue');
+      const getRequest = store.get(id);
+
+      getRequest.onsuccess = () => {
+        const item = getRequest.result;
+        if (!item) {
+          console.warn('[SW] Queue item not found:', id);
+          return resolve();
+        }
+
+        Object.assign(item, updates);
+        const putRequest = store.put(item);
+
+        putRequest.onsuccess = () => {
+          console.log('[SW] Updated queue item:', id);
+          resolve();
+        };
+
+        putRequest.onerror = () => {
+          console.error('[SW] Error updating queue item:', putRequest.error);
+          reject(putRequest.error);
+        };
+      };
+
+      getRequest.onerror = () => {
+        console.error('[SW] Error getting queue item:', getRequest.error);
+        reject(getRequest.error);
+      };
+    } catch (error) {
+      console.error('[SW] Exception in updateQueueItem:', error);
+      reject(error);
+    }
+  });
+}
+
+/**
+ * Remove a queue item from IndexedDB
+ */
+async function removeQueueItem(db, id) {
+  return new Promise((resolve, reject) => {
+    try {
+      const tx = db.transaction(['downloadQueue'], 'readwrite');
+      const store = tx.objectStore('downloadQueue');
+      const request = store.delete(id);
+
+      request.onsuccess = () => {
+        console.log('[SW] Removed queue item:', id);
+        resolve();
+      };
+
+      request.onerror = () => {
+        console.error('[SW] Error removing queue item:', request.error);
+        reject(request.error);
+      };
+    } catch (error) {
+      console.error('[SW] Exception in removeQueueItem:', error);
+      reject(error);
+    }
+  });
+}
+
+/**
+ * Save downloaded comic to IndexedDB
+ */
+async function saveComicBlob(db, comic, blob) {
+  return new Promise((resolve, reject) => {
+    try {
+      const tx = db.transaction(['comics'], 'readwrite');
+      const store = tx.objectStore('comics');
+
+      // Get userId from comic or use default
+      const userId = comic.userId || 'default-user';
+
+      const comicData = {
+        id: comic.id,
+        userId: userId,
+        comicInfo: comic,
+        fileBlob: blob,
+        downloadedAt: Date.now()
+      };
+
+      const request = store.put(comicData);
+
+      request.onsuccess = () => {
+        console.log('[SW] Saved comic to IndexedDB:', comic.id);
+        resolve();
+      };
+
+      request.onerror = () => {
+        console.error('[SW] Error saving comic:', request.error);
+        reject(request.error);
+      };
+    } catch (error) {
+      console.error('[SW] Exception in saveComicBlob:', error);
+      reject(error);
+    }
+  });
+}
+
+/**
+ * Download with progress tracking
+ */
+async function downloadWithProgress(response, onProgress) {
+  const total = parseInt(response.headers.get('Content-Length') || '0');
+  const reader = response.body.getReader();
+  let received = 0;
+  const chunks = [];
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    chunks.push(value);
+    received += value.length;
+
+    if (total && onProgress) {
+      onProgress(received / total);
+    }
+  }
+
+  return new Blob(chunks);
+}
+
+/**
+ * Send message to all clients
+ */
+async function notifyClients(message) {
+  try {
+    const clients = await self.clients.matchAll({ includeUncontrolled: true });
+    console.log('[SW] Notifying', clients.length, 'clients:', message.type);
+
+    clients.forEach(client => {
+      try {
+        client.postMessage(message);
+      } catch (error) {
+        console.error('[SW] Error sending message to client:', error);
+      }
+    });
+  } catch (error) {
+    console.error('[SW] Error notifying clients:', error);
+  }
+}
+
+/**
+ * Show notification when downloads complete
+ */
+async function showCompletionNotification(completedCount) {
+  if (!self.registration.showNotification) {
+    console.log('[SW] Notifications not supported');
+    return;
+  }
+
+  try {
+    await self.registration.showNotification('Comics Downloaded', {
+      body: `${completedCount} comic${completedCount > 1 ? 's' : ''} downloaded successfully`,
+      icon: `${BASE_PATH}icons/icon-192x192.png`,
+      badge: `${BASE_PATH}icons/icon-192x192.png`,
+      tag: 'download-complete',
+      requireInteraction: false,
+      data: { action: 'open-app' }
+    });
+
+    console.log('[SW] Showed completion notification');
+  } catch (error) {
+    console.error('[SW] Error showing notification:', error);
+  }
+}
+
+/**
+ * Process download queue (Background Sync handler)
+ */
+async function processDownloadQueue() {
+  console.log('[SW] Processing download queue');
+
+  let db;
+  try {
+    db = await openDownloadDB();
+  } catch (error) {
+    console.error('[SW] Failed to open IndexedDB:', error);
+    return;
+  }
+
+  let queue;
+  try {
+    queue = await getQueueItems(db);
+  } catch (error) {
+    console.error('[SW] Failed to load queue:', error);
+    return;
+  }
+
+  // Filter only pending items
+  const pendingItems = queue.filter(item => item.status === 'pending');
+  console.log('[SW] Found', pendingItems.length, 'pending downloads');
+
+  if (pendingItems.length === 0) {
+    console.log('[SW] No pending downloads');
+    return;
+  }
+
+  let completedCount = 0;
+
+  for (const item of pendingItems) {
+    try {
+      console.log('[SW] Downloading:', item.comicName);
+
+      // Update status to downloading
+      await updateQueueItem(db, item.id, { status: 'downloading', progress: 0 });
+
+      // Notify clients of status change
+      await notifyClients({
+        type: 'download-status',
+        comicId: item.id,
+        status: 'downloading'
+      });
+
+      // Construct download URL
+      const downloadUrl = `${self.location.origin}${BASE_PATH}api/v1/comics/download?path=${encodeURIComponent(item.comicPath)}`;
+
+      // Download comic
+      const response = await fetch(downloadUrl, {
+        credentials: 'include'
+      });
+
+      if (!response.ok) {
+        throw new Error(`Download failed: ${response.status} ${response.statusText}`);
+      }
+
+      // Download with progress tracking
+      const blob = await downloadWithProgress(response, async (progress) => {
+        await updateQueueItem(db, item.id, { progress });
+        await notifyClients({
+          type: 'download-progress',
+          comicId: item.id,
+          progress: progress
+        });
+      });
+
+      console.log('[SW] Downloaded blob, size:', blob.size);
+
+      // Save to IndexedDB
+      await saveComicBlob(db, item.comic, blob);
+
+      // Mark complete and remove from queue after 3 seconds
+      await updateQueueItem(db, item.id, {
+        status: 'completed',
+        progress: 1
+      });
+
+      await notifyClients({
+        type: 'download-complete',
+        comicId: item.id
+      });
+
+      completedCount++;
+      console.log('[SW] Completed:', item.comicName);
+
+      // Remove from queue
+      setTimeout(async () => {
+        try {
+          const db2 = await openDownloadDB();
+          await removeQueueItem(db2, item.id);
+        } catch (error) {
+          console.error('[SW] Error removing completed item:', error);
+        }
+      }, 3000);
+
+    } catch (error) {
+      console.error('[SW] Download failed:', item.comicName, error);
+
+      try {
+        await updateQueueItem(db, item.id, {
+          status: 'error',
+          error: error.message || 'Download failed'
+        });
+
+        await notifyClients({
+          type: 'download-error',
+          comicId: item.id,
+          error: error.message
+        });
+      } catch (updateError) {
+        console.error('[SW] Error updating failed item:', updateError);
+      }
+    }
+  }
+
+  // Show notification if any completed
+  if (completedCount > 0) {
+    await showCompletionNotification(completedCount);
+  }
+
+  console.log('[SW] Queue processing complete, completed:', completedCount);
+}
+
+// SYNC EVENT: Handle background sync for downloads
+self.addEventListener('sync', (event) => {
+  console.log('[SW] Sync event received:', event.tag);
+
+  if (event.tag === 'download-comics') {
+    event.waitUntil(processDownloadQueue());
+  }
+});
+
+// NOTIFICATION CLICK: Handle notification interactions
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+
+  if (event.notification.data?.action === 'open-app') {
+    event.waitUntil(
+      clients.openWindow(BASE_PATH || '/')
+    );
+  }
+});

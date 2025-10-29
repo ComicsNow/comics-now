@@ -24,6 +24,16 @@
       this.currentDownload = null;
       this.abortController = null;
       this.persistentQueue = []; // Mirrors IndexedDB queue
+      this.useServiceWorker = BackgroundDownloadManager.isBackgroundSyncSupported();
+      this.syncRegistered = false;
+    }
+
+    /**
+     * Check if Background Sync API is supported
+     */
+    static isBackgroundSyncSupported() {
+      return 'serviceWorker' in navigator &&
+             'sync' in ServiceWorkerRegistration.prototype;
     }
 
     /**
@@ -64,12 +74,40 @@
       // Update UI
       this.updateQueueUI();
 
-      // Start processing if not already running
-      if (!this.isProcessing) {
-        this.processQueue();
+      // Register background sync if supported (Service Worker will handle downloads)
+      if (this.useServiceWorker) {
+        await this.registerBackgroundSync();
+      } else {
+        // Fallback to in-page processing
+        if (!this.isProcessing) {
+          this.processQueue();
+        }
       }
 
       return queueItem;
+    }
+
+    /**
+     * Register background sync with Service Worker
+     */
+    async registerBackgroundSync() {
+      if (!this.useServiceWorker) return false;
+
+      try {
+        const registration = await navigator.serviceWorker.ready;
+        await registration.sync.register('download-comics');
+        this.syncRegistered = true;
+        console.log('[DOWNLOAD MANAGER] Background sync registered');
+        return true;
+      } catch (error) {
+        console.warn('[DOWNLOAD MANAGER] Background sync registration failed, falling back to in-page:', error);
+        this.useServiceWorker = false;
+        // Start in-page processing as fallback
+        if (!this.isProcessing) {
+          this.processQueue();
+        }
+        return false;
+      }
     }
 
     /**
@@ -279,6 +317,22 @@
       if (!downloadQueueDiv) return;
 
       downloadQueueDiv.innerHTML = '';
+
+      // Add background sync indicator
+      if (this.persistentQueue.length > 0) {
+        const syncIndicator = document.createElement('div');
+        syncIndicator.className = 'p-2 mb-2 rounded text-xs text-center';
+
+        if (this.useServiceWorker) {
+          syncIndicator.className += ' bg-green-900 text-green-300';
+          syncIndicator.innerHTML = '✓ Background sync enabled - downloads continue even if you close this tab';
+        } else {
+          syncIndicator.className += ' bg-yellow-900 text-yellow-300';
+          syncIndicator.innerHTML = '⚠ Keep this tab open - background sync not supported in your browser';
+        }
+
+        downloadQueueDiv.appendChild(syncIndicator);
+      }
 
       this.persistentQueue.forEach(item => {
         const wrapper = document.createElement('div');
@@ -573,9 +627,108 @@
     clearCompletedDownloads: () => downloadManager.clearCompleted(),
   };
 
+  // ============================================================================
+  // SERVICE WORKER MESSAGE LISTENER
+  // ============================================================================
+
+  /**
+   * Listen for Service Worker messages (progress updates, status changes)
+   */
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.addEventListener('message', async (event) => {
+      const { type, comicId, progress, status, error } = event.data;
+
+      console.log('[DOWNLOAD] Service Worker message:', type, comicId);
+
+      // Reload queue from IndexedDB to get latest state
+      await downloadManager.loadQueue();
+
+      // Find the item in queue
+      const item = downloadManager.persistentQueue.find(i => i.id === comicId);
+
+      if (item) {
+        // Update item based on message type
+        if (type === 'download-progress' && typeof progress !== 'undefined') {
+          item.progress = progress;
+        } else if (type === 'download-status' && status) {
+          item.status = status;
+        } else if (type === 'download-complete') {
+          item.status = 'completed';
+          item.progress = 1;
+
+          // Refresh library to show checkmark
+          if (typeof fetchLibrary === 'function') {
+            await fetchLibrary();
+          }
+
+          // Refresh downloads info
+          if (typeof refreshDownloadsInfo === 'function') {
+            await refreshDownloadsInfo();
+          }
+        } else if (type === 'download-error' && error) {
+          item.status = 'error';
+          item.error = error;
+        }
+
+        // Update UI
+        downloadManager.updateQueueUI();
+      }
+    });
+
+    console.log('[DOWNLOAD] Service Worker message listener registered');
+  }
+
+  // ============================================================================
+  // NOTIFICATION PERMISSION
+  // ============================================================================
+
+  /**
+   * Request notification permission for download completion alerts
+   */
+  async function requestNotificationPermission() {
+    if (!('Notification' in window)) {
+      console.log('[DOWNLOAD] Notifications not supported');
+      return false;
+    }
+
+    if (Notification.permission === 'granted') {
+      console.log('[DOWNLOAD] Notification permission already granted');
+      return true;
+    }
+
+    if (Notification.permission === 'denied') {
+      console.log('[DOWNLOAD] Notification permission denied');
+      return false;
+    }
+
+    try {
+      const permission = await Notification.requestPermission();
+      console.log('[DOWNLOAD] Notification permission:', permission);
+      return permission === 'granted';
+    } catch (error) {
+      console.error('[DOWNLOAD] Error requesting notification permission:', error);
+      return false;
+    }
+  }
+
+  // Request notification permission on first download if background sync is supported
+  let notificationPermissionRequested = false;
+
+  const originalAddToQueue = downloadManager.addToQueue.bind(downloadManager);
+  downloadManager.addToQueue = async function (comic) {
+    // Request notification permission on first download
+    if (!notificationPermissionRequested && BackgroundDownloadManager.isBackgroundSyncSupported()) {
+      notificationPermissionRequested = true;
+      await requestNotificationPermission();
+    }
+
+    return originalAddToQueue(comic);
+  };
+
   global.OfflineDownloads = OfflineDownloads;
   Object.assign(global, OfflineDownloads);
 
   // Expose download manager globally
   global.downloadManager = downloadManager;
+  global.requestNotificationPermission = requestNotificationPermission;
 })(typeof window !== 'undefined' ? window : globalThis);
