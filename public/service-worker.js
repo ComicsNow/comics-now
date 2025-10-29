@@ -3,7 +3,7 @@
 
 const SCOPE_URL = new URL(self.registration.scope);
 const BASE_PATH = SCOPE_URL.pathname;
-const CACHE_VERSION = 'v2.1';
+const CACHE_VERSION = 'v2.2';
 const CACHE_NAME = `comics-now-${CACHE_VERSION}-${BASE_PATH}`;
 
 // Assets relative to the scope. DO NOT start with "/" (root) here.
@@ -18,6 +18,7 @@ const ASSET_PATHS = [
   'icons/icon-512x512.png',
   'js/globals.js',
   'js/offline/db.js',
+  'js/jwt-capture.js',
   'js/offline/status.js',
   'js/offline/downloads.js',
   'js/offline.js',
@@ -206,7 +207,7 @@ function encodePath(str) {
  */
 async function openDownloadDB() {
   return new Promise((resolve, reject) => {
-    const request = indexedDB.open('comics-now-offline', 11);
+    const request = indexedDB.open('comics-now-offline', 12);
 
     request.onsuccess = () => {
       console.log('[SW] IndexedDB opened successfully');
@@ -221,6 +222,40 @@ async function openDownloadDB() {
     request.onupgradeneeded = (event) => {
       console.log('[SW] IndexedDB upgrade not expected in Service Worker');
     };
+  });
+}
+
+/**
+ * Get stored JWT token from IndexedDB
+ * @param {IDBDatabase} db - Database instance
+ * @returns {Promise<string|null>} JWT token or null
+ */
+async function getStoredJWT(db) {
+  return new Promise((resolve, reject) => {
+    try {
+      const tx = db.transaction(['settings'], 'readonly');
+      const store = tx.objectStore('settings');
+      const request = store.get('cf-jwt-token');
+
+      request.onsuccess = () => {
+        const result = request.result;
+        if (result && result.value) {
+          console.log('[SW] JWT token retrieved from IndexedDB');
+          resolve(result.value);
+        } else {
+          console.log('[SW] No JWT token found in IndexedDB');
+          resolve(null);
+        }
+      };
+
+      request.onerror = () => {
+        console.error('[SW] Error getting JWT token:', request.error);
+        resolve(null);
+      };
+    } catch (error) {
+      console.error('[SW] Exception in getStoredJWT:', error);
+      resolve(null);
+    }
   });
 }
 
@@ -477,12 +512,27 @@ async function processDownloadQueue() {
       // Construct download URL (path must be base64 encoded, then URI encoded)
       const downloadUrl = `${self.location.origin}${BASE_PATH}api/v1/comics/download?path=${encodeURIComponent(encodePath(item.comicPath))}`;
 
-      // Download comic
+      // Get stored JWT token for Cloudflare Access authentication
+      const jwt = await getStoredJWT(db);
+
+      // Prepare request headers
+      const headers = {};
+      if (jwt) {
+        headers['CF-Access-JWT-Assertion'] = jwt;
+        console.log('[SW] Added JWT header to download request');
+      }
+
+      // Download comic with authentication headers
       const response = await fetch(downloadUrl, {
-        credentials: 'include'
+        credentials: 'include',
+        headers: headers
       });
 
       if (!response.ok) {
+        // Handle authentication errors specially
+        if (response.status === 401 || response.status === 403) {
+          throw new Error('Authentication expired - please reopen app and restart download');
+        }
         throw new Error(`Download failed: ${response.status} ${response.statusText}`);
       }
 

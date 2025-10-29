@@ -41,7 +41,7 @@
 
     return new Promise((resolve, reject) => {
       debugLog('PROGRESS', 'Opening IndexedDB connection...');
-      const request = indexedDB.open('comics-now-offline', 11);
+      const request = indexedDB.open('comics-now-offline', 12);
 
       request.onerror = (event) => {
         
@@ -114,6 +114,12 @@
           const queueStore = database.createObjectStore('downloadQueue', { keyPath: 'id' });
           queueStore.createIndex('priority', 'priority', { unique: false });
           queueStore.createIndex('status', 'status', { unique: false });
+        }
+
+        // Create settings object store for JWT tokens and app settings
+        if (!database.objectStoreNames.contains('settings')) {
+          debugLog('PROGRESS', "Creating 'settings' object store");
+          database.createObjectStore('settings', { keyPath: 'key' });
         }
 
         debugLog('PROGRESS', 'IndexedDB upgrade completed');
@@ -1007,6 +1013,83 @@
     });
   }
 
+  // ============================================================================
+  // JWT TOKEN STORAGE (for Service Worker authentication)
+  // ============================================================================
+
+  /**
+   * Save JWT token to IndexedDB for Service Worker access
+   * @param {string} token - JWT token
+   * @returns {Promise<boolean>}
+   */
+  async function saveJWTToken(token) {
+    if (!token) return false;
+    if (!db) await openOfflineDB();
+
+    return new Promise((resolve, reject) => {
+      try {
+        const tx = db.transaction(['settings'], 'readwrite');
+        const store = tx.objectStore('settings');
+
+        const data = {
+          key: 'cf-jwt-token',
+          value: token,
+          timestamp: Date.now()
+        };
+
+        const request = store.put(data);
+
+        request.onsuccess = () => {
+          console.log('[JWT] Token saved to IndexedDB');
+          resolve(true);
+        };
+
+        request.onerror = (event) => {
+          console.error('[JWT] Error saving token:', event.target.error);
+          reject(event.target.error);
+        };
+      } catch (error) {
+        console.error('[JWT] Exception in saveJWTToken:', error);
+        reject(error);
+      }
+    });
+  }
+
+  /**
+   * Get JWT token from IndexedDB
+   * @returns {Promise<string|null>}
+   */
+  async function getJWTToken() {
+    if (!db) await openOfflineDB();
+
+    return new Promise((resolve, reject) => {
+      try {
+        const tx = db.transaction(['settings'], 'readonly');
+        const store = tx.objectStore('settings');
+        const request = store.get('cf-jwt-token');
+
+        request.onsuccess = () => {
+          const result = request.result;
+          if (result && result.value) {
+            console.log('[JWT] Token retrieved from IndexedDB');
+            resolve(result.value);
+          } else {
+            console.log('[JWT] No token found in IndexedDB');
+            resolve(null);
+          }
+        };
+
+        request.onerror = (event) => {
+          console.error('[JWT] Error getting token:', event.target.error);
+          resolve(null);
+        };
+      } catch (error) {
+        console.error('[JWT] Exception in getJWTToken:', error);
+        resolve(null);
+      }
+    });
+  }
+
   const OfflineDB = {
     LIBRARY_CACHE_STORE,
     LIBRARY_CACHE_KEY,
@@ -1032,6 +1115,9 @@
     removeQueueItemFromDB,
     updateQueuePriorities,
     clearCompletedQueueItems,
+    // JWT token functions
+    saveJWTToken,
+    getJWTToken,
   };
 
   global.OfflineDB = OfflineDB;

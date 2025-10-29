@@ -109,6 +109,17 @@ async function initializeApp() {
       }
     }
 
+    // Initialize JWT token capture for Cloudflare Access authentication
+    // This enables background downloads to work with authentication enabled
+    if (typeof initializeJWTCapture === 'function') {
+      try {
+        await initializeJWTCapture(30 * 60 * 1000); // Refresh every 30 minutes
+        console.log('[APP] JWT capture initialized');
+      } catch (error) {
+        console.error('[APP] Failed to initialize JWT capture:', error);
+      }
+    }
+
     initializeLibraryUIControls();
     initializeViewerUIControls();
     initializeProgressTracking();
