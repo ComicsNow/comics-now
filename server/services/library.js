@@ -133,20 +133,43 @@ async function convertCbrToCbz(cbrPath) {
 
       log('INFO', 'CONVERT', `Unrar → ${path.basename(cbrPath)} …`);
       await new Promise((ok, bad) => {
-        const unrar = spawn('unrar', ['x', '-o+', cbrPath, `${tempDir}${path.sep}`]);
+        // Add maxBuffer (100MB) and timeout (30 min) for large files
+        const unrar = spawn('unrar', ['x', '-o+', cbrPath, `${tempDir}${path.sep}`], {
+          maxBuffer: 1024 * 1024 * 100, // 100MB buffer (default is 1MB)
+          timeout: 30 * 60 * 1000 // 30 minute timeout for huge files (1.9GB-3.7GB)
+        });
+
+        // Use sliding window for stderr to prevent memory overflow on large files
         let stderr = '';
-        unrar.stderr.on('data', d => { stderr += d.toString(); });
+        let lastLog = Date.now();
+
+        unrar.stderr.on('data', d => {
+          // Only keep last 5KB of stderr for error reporting
+          stderr += d.toString();
+          if (stderr.length > 5000) {
+            stderr = stderr.slice(-5000);
+          }
+
+          // Log progress every 5 seconds for long-running conversions
+          if (Date.now() - lastLog > 5000) {
+            log('INFO', 'CONVERT', `Extracting... ${path.basename(cbrPath)}`);
+            lastLog = Date.now();
+          }
+        });
+
         unrar.on('error', (err) => {
           if (err.code === 'ENOENT') {
             return bad(new Error("'unrar' command not found. Install it to enable CBR conversion."));
           }
           return bad(err);
         });
+
         unrar.on('close', (code) => {
           if (code !== 0) {
             const msg = stderr.trim() || `unrar exited with code ${code}`;
             return bad(new Error(msg));
           }
+          log('INFO', 'CONVERT', `Extraction complete: ${path.basename(cbrPath)}`);
           ok();
         });
       });
@@ -154,13 +177,33 @@ async function convertCbrToCbz(cbrPath) {
       log('INFO', 'CONVERT', `Zip → ${path.basename(cbzPath)} …`);
       const output = fs.createWriteStream(cbzPath);
       const archive = archiver('zip', { store: true });
+
+      let archiverLastLog = Date.now();
+      let archivedCount = 0;
+
+      // Track progress for large archives
+      archive.on('entry', (entry) => {
+        archivedCount++;
+        if (Date.now() - archiverLastLog > 5000) {
+          log('INFO', 'CONVERT', `Archiving... ${archivedCount} files → ${path.basename(cbzPath)}`);
+          archiverLastLog = Date.now();
+        }
+      });
+
       archive.on('error', (err) => { throw err; });
       archive.pipe(output);
-      archive.directory(tempDir, false);
+
+      // Use glob pattern instead of directory() for better memory efficiency
+      // This streams files instead of loading all into memory
+      archive.glob('**/*', {
+        cwd: tempDir,
+        dot: true // Include hidden files
+      });
+
       await archive.finalize();
 
       output.on('close', async () => {
-        log('INFO', 'CONVERT', `✅ Created: ${path.basename(cbzPath)} in ${ms(start)} ms`);
+        log('INFO', 'CONVERT', `✅ Created: ${path.basename(cbzPath)} (${archivedCount} files) in ${ms(start)} ms`);
         await fs.promises.unlink(cbrPath).catch(() => {});
         await fs.promises.rm(tempDir, { recursive: true, force: true }).catch(() => {});
         resolve(cbzPath);
