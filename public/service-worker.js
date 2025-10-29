@@ -3,7 +3,7 @@
 
 const SCOPE_URL = new URL(self.registration.scope);
 const BASE_PATH = SCOPE_URL.pathname;
-const CACHE_VERSION = 'v2.0';
+const CACHE_VERSION = 'v2.1';
 const CACHE_NAME = `comics-now-${CACHE_VERSION}-${BASE_PATH}`;
 
 // Assets relative to the scope. DO NOT start with "/" (root) here.
@@ -187,6 +187,19 @@ self.addEventListener('fetch', event => {
 // ==============================================================================
 // BACKGROUND SYNC - DOWNLOAD QUEUE
 // ==============================================================================
+
+/**
+ * Encode path to base64 (same as encodePath in globals.js)
+ * Server expects paths to be base64 encoded
+ */
+function encodePath(str) {
+  const utf8 = new TextEncoder().encode(str);
+  let binary = '';
+  for (const byte of utf8) {
+    binary += String.fromCharCode(byte);
+  }
+  return btoa(binary);
+}
 
 /**
  * Open IndexedDB from Service Worker context
@@ -461,8 +474,8 @@ async function processDownloadQueue() {
         status: 'downloading'
       });
 
-      // Construct download URL
-      const downloadUrl = `${self.location.origin}${BASE_PATH}api/v1/comics/download?path=${encodeURIComponent(item.comicPath)}`;
+      // Construct download URL (path must be base64 encoded, then URI encoded)
+      const downloadUrl = `${self.location.origin}${BASE_PATH}api/v1/comics/download?path=${encodeURIComponent(encodePath(item.comicPath))}`;
 
       // Download comic
       const response = await fetch(downloadUrl, {
