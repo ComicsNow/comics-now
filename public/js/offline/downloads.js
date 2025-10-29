@@ -165,6 +165,84 @@
     }
 
     /**
+     * Restart a failed download
+     */
+    async restartDownload(comicId) {
+      const item = this.persistentQueue.find(i => i.id === comicId);
+      if (!item) return false;
+
+      // Reset to pending status
+      item.status = 'pending';
+      item.progress = 0;
+      item.error = null;
+
+      await saveQueueItemToDB(item);
+      console.log('[DOWNLOAD MANAGER] Restarting download:', item.displayName);
+
+      this.updateQueueUI();
+
+      // Trigger processing
+      if (this.useServiceWorker) {
+        await this.registerBackgroundSync();
+      } else {
+        if (!this.isProcessing) {
+          this.processQueue();
+        }
+      }
+
+      return true;
+    }
+
+    /**
+     * Pause an active download (in-page downloads only)
+     */
+    async pauseDownload(comicId) {
+      const item = this.persistentQueue.find(i => i.id === comicId);
+      if (!item || item.status !== 'downloading') return false;
+
+      // If using Service Worker background sync, can't pause
+      if (this.useServiceWorker && this.currentDownload?.id !== comicId) {
+        console.warn('[DOWNLOAD MANAGER] Cannot pause Service Worker downloads');
+        return false;
+      }
+
+      // For in-page downloads, abort the current download
+      if (this.currentDownload && this.currentDownload.id === comicId) {
+        if (this.abortController) {
+          this.abortController.abort();
+        }
+      }
+
+      item.status = 'paused';
+      await saveQueueItemToDB(item);
+      console.log('[DOWNLOAD MANAGER] Paused download:', item.displayName);
+
+      this.updateQueueUI();
+      return true;
+    }
+
+    /**
+     * Resume a paused download
+     */
+    async resumeDownload(comicId) {
+      const item = this.persistentQueue.find(i => i.id === comicId);
+      if (!item || item.status !== 'paused') return false;
+
+      item.status = 'pending';
+      await saveQueueItemToDB(item);
+      console.log('[DOWNLOAD MANAGER] Resuming download:', item.displayName);
+
+      this.updateQueueUI();
+
+      // Restart processing
+      if (!this.isProcessing) {
+        this.processQueue();
+      }
+
+      return true;
+    }
+
+    /**
      * Change priority of a queue item (reorder)
      */
     async changePriority(comicId, newPriority) {
@@ -344,6 +422,21 @@
     }
 
     /**
+     * Helper function to create action buttons
+     */
+    createButton(icon, title, colorClass, onClick) {
+      const btn = document.createElement('button');
+      btn.className = `${colorClass} hover:opacity-80 text-lg px-1`;
+      btn.innerHTML = icon;
+      btn.title = title;
+      btn.onclick = async (e) => {
+        e.stopPropagation();
+        await onClick();
+      };
+      return btn;
+    }
+
+    /**
      * Update queue UI
      */
     updateQueueUI() {
@@ -423,22 +516,63 @@
         wrapper.dataset.comicId = item.id;
 
         const title = document.createElement('div');
-        title.className = 'text-sm pr-6';
+        title.className = 'text-sm pr-16';
         title.textContent = item.displayName || item.comicName;
         wrapper.appendChild(title);
 
-        // Cancel button
-        if (item.status === 'pending' || item.status === 'downloading') {
-          const cancelBtn = document.createElement('button');
-          cancelBtn.className = 'absolute top-2 right-2 text-red-400 hover:text-red-600';
-          cancelBtn.innerHTML = '×';
-          cancelBtn.title = 'Cancel download';
-          cancelBtn.onclick = async (e) => {
-            e.stopPropagation();
-            await this.cancelDownload(item.id);
-          };
-          wrapper.appendChild(cancelBtn);
+        // Action buttons based on status
+        const btnContainer = document.createElement('div');
+        btnContainer.className = 'absolute top-2 right-2 flex space-x-1';
+
+        if (item.status === 'downloading') {
+          // Pause button (only for in-page downloads)
+          if (!this.useServiceWorker || this.currentDownload?.id === item.id) {
+            const pauseBtn = this.createButton('⏸', 'Pause', 'text-blue-400',
+              () => this.pauseDownload(item.id));
+            btnContainer.appendChild(pauseBtn);
+          }
+
+          // Cancel button
+          const cancelBtn = this.createButton('×', 'Cancel', 'text-red-400',
+            () => this.cancelDownload(item.id));
+          btnContainer.appendChild(cancelBtn);
+
+        } else if (item.status === 'paused') {
+          // Resume button
+          const resumeBtn = this.createButton('▶', 'Resume', 'text-green-400',
+            () => this.resumeDownload(item.id));
+          btnContainer.appendChild(resumeBtn);
+
+          // Cancel button
+          const cancelBtn = this.createButton('×', 'Cancel', 'text-red-400',
+            () => this.cancelDownload(item.id));
+          btnContainer.appendChild(cancelBtn);
+
+        } else if (item.status === 'error') {
+          // Restart button
+          const restartBtn = this.createButton('↻', 'Restart', 'text-green-400',
+            () => this.restartDownload(item.id));
+          btnContainer.appendChild(restartBtn);
+
+          // Remove button
+          const removeBtn = this.createButton('×', 'Remove', 'text-red-400',
+            () => this.cancelDownload(item.id));
+          btnContainer.appendChild(removeBtn);
+
+        } else if (item.status === 'pending') {
+          // Cancel button only
+          const cancelBtn = this.createButton('×', 'Cancel', 'text-red-400',
+            () => this.cancelDownload(item.id));
+          btnContainer.appendChild(cancelBtn);
+
+        } else if (item.status === 'completed') {
+          // Remove button (optional)
+          const removeBtn = this.createButton('×', 'Remove', 'text-gray-400',
+            () => this.cancelDownload(item.id));
+          btnContainer.appendChild(removeBtn);
         }
+
+        wrapper.appendChild(btnContainer);
 
         // Progress bar
         const bar = document.createElement('div');
@@ -449,6 +583,8 @@
           inner.className = 'bg-red-500 h-2 rounded';
         } else if (item.status === 'completed') {
           inner.className = 'bg-green-500 h-2 rounded';
+        } else if (item.status === 'paused') {
+          inner.className = 'bg-yellow-500 h-2 rounded';
         } else {
           inner.className = 'bg-blue-500 h-2 rounded';
         }
@@ -464,6 +600,8 @@
           status.textContent = 'Waiting...';
         } else if (item.status === 'downloading') {
           status.textContent = `Downloading... ${Math.round(item.progress * 100)}%`;
+        } else if (item.status === 'paused') {
+          status.textContent = `Paused at ${Math.round(item.progress * 100)}%`;
         } else if (item.status === 'completed') {
           status.textContent = 'Completed';
         } else if (item.status === 'error') {
@@ -708,6 +846,9 @@
       downloadManager.processQueue(); // Resume processing if items in queue
     },
     cancelDownload: (comicId) => downloadManager.cancelDownload(comicId),
+    restartDownload: (comicId) => downloadManager.restartDownload(comicId),
+    pauseDownload: (comicId) => downloadManager.pauseDownload(comicId),
+    resumeDownload: (comicId) => downloadManager.resumeDownload(comicId),
     clearCompletedDownloads: () => downloadManager.clearCompleted(),
   };
 
