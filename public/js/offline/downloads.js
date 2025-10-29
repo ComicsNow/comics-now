@@ -26,6 +26,39 @@
       this.persistentQueue = []; // Mirrors IndexedDB queue
       this.useServiceWorker = BackgroundDownloadManager.isBackgroundSyncSupported();
       this.syncRegistered = false;
+      this.isCollapsed = this.loadCollapsedState();
+    }
+
+    /**
+     * Load collapsed state from localStorage
+     */
+    loadCollapsedState() {
+      try {
+        const saved = localStorage.getItem('download-queue-collapsed');
+        return saved === 'true';
+      } catch (error) {
+        return false;
+      }
+    }
+
+    /**
+     * Save collapsed state to localStorage
+     */
+    saveCollapsedState(collapsed) {
+      try {
+        localStorage.setItem('download-queue-collapsed', collapsed.toString());
+      } catch (error) {
+        console.error('[DOWNLOAD MANAGER] Error saving collapsed state:', error);
+      }
+    }
+
+    /**
+     * Toggle collapsed state
+     */
+    toggleCollapsed() {
+      this.isCollapsed = !this.isCollapsed;
+      this.saveCollapsedState(this.isCollapsed);
+      this.updateQueueUI();
     }
 
     /**
@@ -318,25 +351,75 @@
 
       downloadQueueDiv.innerHTML = '';
 
-      // Add background sync indicator
-      if (this.persistentQueue.length > 0) {
-        const syncIndicator = document.createElement('div');
-        syncIndicator.className = 'p-2 mb-2 rounded text-xs text-center';
-
-        if (this.useServiceWorker) {
-          syncIndicator.className += ' bg-green-900 text-green-300';
-          syncIndicator.innerHTML = '✓ Background sync enabled - downloads continue even if you close this tab';
-        } else {
-          syncIndicator.className += ' bg-yellow-900 text-yellow-300';
-          syncIndicator.innerHTML = '⚠ Keep this tab open - background sync not supported in your browser';
-        }
-
-        downloadQueueDiv.appendChild(syncIndicator);
+      // Don't show anything if queue is empty
+      if (this.persistentQueue.length === 0) {
+        downloadQueueDiv.classList.add('hidden');
+        return;
       }
 
+      downloadQueueDiv.classList.remove('hidden');
+
+      // Create header bar
+      const header = document.createElement('div');
+      header.className = 'bg-gray-900 text-white p-3 rounded-t shadow flex items-center justify-between cursor-pointer';
+      header.onclick = () => this.toggleCollapsed();
+
+      // Header content
+      const headerContent = document.createElement('div');
+      headerContent.className = 'flex items-center space-x-2';
+
+      // Download icon
+      const icon = document.createElement('span');
+      icon.textContent = '⬇';
+      icon.className = 'text-lg';
+      headerContent.appendChild(icon);
+
+      // Title and count
+      const title = document.createElement('span');
+      title.className = 'font-semibold text-sm';
+      const activeCount = this.persistentQueue.filter(i => i.status === 'pending' || i.status === 'downloading').length;
+      const totalCount = this.persistentQueue.length;
+      title.textContent = `Downloads (${activeCount}/${totalCount})`;
+      headerContent.appendChild(title);
+
+      header.appendChild(headerContent);
+
+      // Collapse/expand button
+      const collapseBtn = document.createElement('button');
+      collapseBtn.className = 'text-gray-400 hover:text-white text-xl';
+      collapseBtn.innerHTML = this.isCollapsed ? '▼' : '▲';
+      collapseBtn.title = this.isCollapsed ? 'Expand' : 'Collapse';
+      header.appendChild(collapseBtn);
+
+      downloadQueueDiv.appendChild(header);
+
+      // If collapsed, only show header
+      if (this.isCollapsed) {
+        return;
+      }
+
+      // Queue content container
+      const queueContent = document.createElement('div');
+      queueContent.className = 'bg-gray-800 rounded-b shadow max-h-96 overflow-y-auto';
+
+      // Add background sync indicator
+      const syncIndicator = document.createElement('div');
+      syncIndicator.className = 'p-2 text-xs text-center';
+
+      if (this.useServiceWorker) {
+        syncIndicator.className += ' bg-green-900 text-green-300';
+        syncIndicator.innerHTML = '✓ Background sync enabled - downloads continue even if you close this tab';
+      } else {
+        syncIndicator.className += ' bg-yellow-900 text-yellow-300';
+        syncIndicator.innerHTML = '⚠ Keep this tab open - background sync not supported in your browser';
+      }
+
+      queueContent.appendChild(syncIndicator);
+
+      // Add all queue items
       this.persistentQueue.forEach(item => {
         const wrapper = document.createElement('div');
-        wrapper.className = 'bg-gray-800 text-white p-2 rounded shadow mb-2 relative';
+        wrapper.className = 'bg-gray-700 text-white p-3 border-b border-gray-600 last:border-b-0 relative';
         wrapper.dataset.comicId = item.id;
 
         const title = document.createElement('div');
@@ -388,10 +471,11 @@
         }
         wrapper.appendChild(status);
 
-        downloadQueueDiv.appendChild(wrapper);
+        queueContent.appendChild(wrapper);
       });
 
-      downloadQueueDiv.classList.toggle('hidden', this.persistentQueue.length === 0);
+      // Append queue content container
+      downloadQueueDiv.appendChild(queueContent);
     }
   }
 
