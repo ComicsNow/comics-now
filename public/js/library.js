@@ -55,13 +55,6 @@ function initializeLibraryUIControls() {
     latestAddedButton.addEventListener('click', latestAddedButton._smartListListener);
   }
 
-  if (latestConvertedButton && !latestConvertedButton._smartListListener) {
-    latestConvertedButton._smartListListener = (event) => {
-      event.preventDefault();
-      showLatestConvertedSmartList();
-    };
-    latestConvertedButton.addEventListener('click', latestConvertedButton._smartListListener);
-  }
 
   if (downloadedButton && !downloadedButton._smartListListener) {
     downloadedButton._smartListListener = async (event) => {

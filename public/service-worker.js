@@ -3,7 +3,7 @@
 
 const SCOPE_URL = new URL(self.registration.scope);
 const BASE_PATH = SCOPE_URL.pathname;
-const CACHE_VERSION = 'v2.2';
+const CACHE_VERSION = 'v3.1';
 const CACHE_NAME = `comics-now-${CACHE_VERSION}-${BASE_PATH}`;
 
 // Assets relative to the scope. DO NOT start with "/" (root) here.
@@ -17,6 +17,7 @@ const ASSET_PATHS = [
   'icons/icon-192x192.png',
   'icons/icon-512x512.png',
   'js/globals.js',
+  'js/utils/device-detection.js',
   'js/offline/db.js',
   'js/jwt-capture.js',
   'js/offline/status.js',
@@ -512,21 +513,26 @@ async function processDownloadQueue() {
       // Construct download URL (path must be base64 encoded, then URI encoded)
       const downloadUrl = `${self.location.origin}${BASE_PATH}api/v1/comics/download?path=${encodeURIComponent(encodePath(item.comicPath))}`;
 
-      // Get stored JWT token for Cloudflare Access authentication
-      const jwt = await getStoredJWT(db);
+      // Download comic with authentication
+      // Note: Cloudflare Access cookies should be sent automatically with credentials: 'include'
+      // Service Workers can't access or set cookies directly, so we rely on browser cookie handling
+      console.log('[SW] Fetching:', downloadUrl);
+      console.log('[SW] Using credentials: include (cookies sent automatically)');
 
-      // Prepare request headers
-      const headers = {};
-      if (jwt) {
-        headers['CF-Access-JWT-Assertion'] = jwt;
-        console.log('[SW] Added JWT header to download request');
+      let response;
+      try {
+        response = await fetch(downloadUrl, {
+          credentials: 'include',
+          mode: 'cors',
+          cache: 'no-cache'
+        });
+      } catch (fetchError) {
+        console.error('[SW] Fetch error:', fetchError);
+        console.error('[SW] This might be a CORS issue or network connectivity problem');
+        throw new Error(`Network error: ${fetchError.message}. Try downloading from library instead.`);
       }
 
-      // Download comic with authentication headers
-      const response = await fetch(downloadUrl, {
-        credentials: 'include',
-        headers: headers
-      });
+      console.log('[SW] Response status:', response.status, response.statusText);
 
       if (!response.ok) {
         // Handle authentication errors specially

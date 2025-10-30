@@ -15,6 +15,49 @@ let currentProcess = null;
 let pendingUserChoice = null;
 let pendingMatchState = null; // Stores info about pending match for later response
 
+/**
+ * Parse a ComicTagger match line
+ * Example: "1. Mugshots (2024) #2 [Mad Cave Studios] (7/2024) - Chapter Two: An Eye For An Eye"
+ * Returns: { choice, title, year, issue, publisher, subtitle }
+ */
+function parseMatchLine(line) {
+  try {
+    // Pattern: number. Title (YEAR) #issue [Publisher] (date) - Subtitle
+    const match = line.match(/^(\d+)\.\s*(.+?)\s*\((\d{4})\)\s*#(\d+)\s*\[([^\]]+)\](?:\s*\(([^)]+)\))?(?:\s*-\s*(.+))?$/);
+
+    if (match) {
+      return {
+        choice: match[1],
+        title: match[2].trim(),
+        year: match[3],
+        issue: match[4],
+        publisher: match[5].trim(),
+        date: match[6] ? match[6].trim() : null,
+        subtitle: match[7] ? match[7].trim() : null
+      };
+    }
+
+    // Fallback: simpler pattern without date/subtitle
+    const simpleMatch = line.match(/^(\d+)\.\s*(.+?)\s*\((\d{4})\)\s*#(\d+)\s*\[([^\]]+)\]/);
+    if (simpleMatch) {
+      return {
+        choice: simpleMatch[1],
+        title: simpleMatch[2].trim(),
+        year: simpleMatch[3],
+        issue: simpleMatch[4],
+        publisher: simpleMatch[5].trim(),
+        date: null,
+        subtitle: null
+      };
+    }
+
+    return null;
+  } catch (error) {
+    ctLog(`Warning: Failed to parse match line: ${line}`);
+    return null;
+  }
+}
+
 async function runComicTagger() {
   if (ctRunning) {
     ctLog('ComicTagger already running.');
@@ -50,6 +93,8 @@ async function runComicTagger() {
         let awaitingUserInput = false;
         let userChoiceResolver = null;
         let processExited = false;
+        let collectingMatches = false;
+        let collectedMatches = [];
 
         const handleLine = (l) => {
           // Skip empty lines
@@ -57,6 +102,22 @@ async function runComicTagger() {
           if (!trimmed) return;
 
           ctLog(trimmed);
+
+          // Start collecting matches when we see the header
+          if (/low-confidence match:/i.test(l) || /Multiple matches found/i.test(l)) {
+            collectingMatches = true;
+            collectedMatches = [];
+            return;
+          }
+
+          // Collect match lines (format: "1. Title (Year) #issue...")
+          if (collectingMatches && /^\d+\./.test(trimmed)) {
+            const parsed = parseMatchLine(trimmed);
+            if (parsed) {
+              collectedMatches.push(parsed);
+            }
+            return;
+          }
 
           // Detect when ComicTagger is asking for user selection
           // Pattern: "Choose a match #, or 's' to skip:"
@@ -68,9 +129,14 @@ async function runComicTagger() {
               // Store pending match state for later retrieval
               pendingMatchState = {
                 fileName: entry.name,
+                filePath: filePath,
+                matches: collectedMatches,
                 timestamp: new Date().toISOString(),
                 waitingForResponse: true
               };
+
+              // Stop collecting matches
+              collectingMatches = false;
 
               // Create a promise that will be resolved when user makes a choice
               pendingUserChoice = new Promise((resolveChoice) => {
@@ -88,9 +154,9 @@ async function runComicTagger() {
                 }
                 // Clear pending state once choice is made
                 pendingMatchState = null;
-                // If process hasn't exited yet, we successfully handled the choice
-                if (!processExited) {
-                  decision = 'yes'; // Assume success if user made a choice
+                // If process hasn't exited yet and user selected a match (not skip/timeout), mark as success
+                if (!processExited && choice !== 'skip' && choice !== 's' && choice !== 'timeout') {
+                  decision = 'yes';
                 }
               }).catch((err) => {
                 ctLog(`✗ Error handling user choice: ${err.message}`);

@@ -426,7 +426,7 @@
      */
     createButton(icon, title, colorClass, onClick) {
       const btn = document.createElement('button');
-      btn.className = `${colorClass} hover:opacity-80 text-lg px-1`;
+      btn.className = `${colorClass} hover:opacity-80 text-2xl p-2 min-w-[44px] min-h-[44px] flex items-center justify-center`;
       btn.innerHTML = icon;
       btn.title = title;
       btn.onclick = async (e) => {
@@ -444,6 +444,12 @@
 
       downloadQueueDiv.innerHTML = '';
 
+      // Hide download queue on desktop devices
+      if (typeof isDesktopDevice === 'function' && isDesktopDevice()) {
+        downloadQueueDiv.classList.add('hidden');
+        return;
+      }
+
       // Don't show anything if queue is empty
       if (this.persistentQueue.length === 0) {
         downloadQueueDiv.classList.add('hidden');
@@ -451,6 +457,31 @@
       }
 
       downloadQueueDiv.classList.remove('hidden');
+
+      // Calculate counts
+      const activeCount = this.persistentQueue.filter(i => i.status === 'pending' || i.status === 'downloading').length;
+      const totalCount = this.persistentQueue.length;
+
+      // If collapsed, show minimized icon button
+      if (this.isCollapsed) {
+        const iconButton = document.createElement('button');
+        iconButton.className = 'bg-gray-900 hover:bg-gray-800 text-white px-3 py-2 rounded-full shadow-lg flex items-center space-x-2 transition-colors';
+        iconButton.onclick = () => this.toggleCollapsed();
+        iconButton.title = 'Show download queue';
+
+        const icon = document.createElement('span');
+        icon.textContent = '⬇';
+        icon.className = 'text-lg';
+        iconButton.appendChild(icon);
+
+        const count = document.createElement('span');
+        count.textContent = `(${activeCount}/${totalCount})`;
+        count.className = 'text-sm font-medium';
+        iconButton.appendChild(count);
+
+        downloadQueueDiv.appendChild(iconButton);
+        return;
+      }
 
       // Create header bar
       const header = document.createElement('div');
@@ -470,8 +501,6 @@
       // Title and count
       const title = document.createElement('span');
       title.className = 'font-semibold text-sm';
-      const activeCount = this.persistentQueue.filter(i => i.status === 'pending' || i.status === 'downloading').length;
-      const totalCount = this.persistentQueue.length;
       title.textContent = `Downloads (${activeCount}/${totalCount})`;
       headerContent.appendChild(title);
 
@@ -480,16 +509,11 @@
       // Collapse/expand button
       const collapseBtn = document.createElement('button');
       collapseBtn.className = 'text-gray-400 hover:text-white text-xl';
-      collapseBtn.innerHTML = this.isCollapsed ? '▼' : '▲';
-      collapseBtn.title = this.isCollapsed ? 'Expand' : 'Collapse';
+      collapseBtn.innerHTML = '▲';
+      collapseBtn.title = 'Collapse';
       header.appendChild(collapseBtn);
 
       downloadQueueDiv.appendChild(header);
-
-      // If collapsed, only show header
-      if (this.isCollapsed) {
-        return;
-      }
 
       // Queue content container
       const queueContent = document.createElement('div');
@@ -516,13 +540,13 @@
         wrapper.dataset.comicId = item.id;
 
         const title = document.createElement('div');
-        title.className = 'text-sm pr-16';
+        title.className = 'text-sm pr-20';
         title.textContent = item.displayName || item.comicName;
         wrapper.appendChild(title);
 
         // Action buttons based on status
         const btnContainer = document.createElement('div');
-        btnContainer.className = 'absolute top-2 right-2 flex space-x-1';
+        btnContainer.className = 'absolute top-2 right-2 flex space-x-2';
 
         if (item.status === 'downloading') {
           // Pause button (only for in-page downloads)
@@ -727,6 +751,13 @@
    */
   async function downloadComic(comic, btn) {
     try {
+      // Block downloads on desktop devices
+      if (typeof isDesktopDevice === 'function' && isDesktopDevice()) {
+        console.log('[DOWNLOAD] Downloads are disabled on desktop devices');
+        alert('Comic downloads are only available on mobile devices.\n\nUse a mobile device or tablet to download comics for offline reading.');
+        return false;
+      }
+
       // Skip if already downloaded
       if (global.downloadedComicIds?.has(comic.id)) {
         console.log('[DOWNLOAD] Comic already downloaded:', comic.id);
@@ -772,6 +803,13 @@
    */
   async function downloadSeries(comics, btn) {
     if (!btn) return;
+
+    // Block downloads on desktop devices
+    if (typeof isDesktopDevice === 'function' && isDesktopDevice()) {
+      console.log('[DOWNLOAD] Downloads are disabled on desktop devices');
+      alert('Comic downloads are only available on mobile devices.\n\nUse a mobile device or tablet to download comics for offline reading.');
+      return false;
+    }
 
     btn._origHtml = btn.innerHTML;
     btn.disabled = true;

@@ -110,7 +110,12 @@ app.use((req, res, next) => {
 
   // Check if origin is allowed
   let isAllowed = false;
-  if (origin) {
+
+  // Allow same-origin requests (no origin header)
+  // This is needed for Service Worker requests from the same origin
+  if (!origin) {
+    isAllowed = true;
+  } else {
     isAllowed = allowedOrigins.some(allowed => {
       // Exact match
       if (allowed === origin) return true;
@@ -124,10 +129,14 @@ app.use((req, res, next) => {
 
   // If origin is allowed, set CORS headers
   if (isAllowed) {
-    res.setHeader('Access-Control-Allow-Origin', origin);
-    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Cf-Access-Jwt-Assertion');
-    res.setHeader('Access-Control-Allow-Credentials', 'true');
+    // For same-origin requests without origin header, don't set CORS headers
+    // (they're not needed and could cause issues)
+    if (origin) {
+      res.setHeader('Access-Control-Allow-Origin', origin);
+      res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+      res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Cf-Access-Jwt-Assertion');
+      res.setHeader('Access-Control-Allow-Credentials', 'true');
+    }
   }
 
   // Handle preflight OPTIONS requests

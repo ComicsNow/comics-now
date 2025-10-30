@@ -15,6 +15,7 @@
   let loadedPages = new Set();
   let scrollTimeout = null;
   let continuousClickHandler = null;
+  let isInitializingScroll = false;
 
   // Store original navigation state for restoration
   let originalNavigationState = {
@@ -169,8 +170,24 @@
     );
     if (targetContainer) {
       // Use instant scroll (no animation) for initial position
+      isInitializingScroll = true;
       targetContainer.scrollIntoView({ behavior: 'instant', block: 'center' });
       console.log('[CONTINUOUS] Scrolled to current page index:', currentIndex);
+
+      // Clear initialization flag after scroll settles
+      setTimeout(() => {
+        isInitializingScroll = false;
+        console.log('[CONTINUOUS] Initial scroll positioning complete');
+      }, 300);
+
+      // Setup scroll tracking after initialization is complete
+      setTimeout(() => {
+        setupScrollProgressTracking();
+        console.log('[CONTINUOUS] Scroll tracking enabled');
+      }, 350);
+    } else {
+      // No scroll needed, setup tracking immediately
+      setupScrollProgressTracking();
     }
 
     console.log('[CONTINUOUS] Continuous mode rendering complete');
@@ -225,8 +242,8 @@
     // Render continuous mode
     await renderContinuousMode();
 
-    // Setup scroll progress tracking
-    setupScrollProgressTracking();
+    // Note: Scroll progress tracking is now set up in renderContinuousMode()
+    // with a delay to avoid race conditions during initial positioning
 
     // Replace left/right arrows with up/down arrows
     const prevBtn = document.getElementById('fullscreen-prev-page-btn');
@@ -446,6 +463,12 @@
   async function updateCurrentPageFromScroll() {
     if (!continuousContainer) return;
 
+    // Skip scroll tracking during initial positioning to prevent page jumps
+    if (isInitializingScroll) {
+      console.log('[CONTINUOUS] Skipping scroll tracking - still initializing');
+      return;
+    }
+
     const pageContainers = continuousContainer.querySelectorAll('.page-container');
     if (!pageContainers.length) return;
 
@@ -477,8 +500,47 @@
       }
 
       // Save progress to persist reading position
-      if (typeof global.saveProgress === 'function') {
-        await global.saveProgress(closestPage);
+      try {
+        const comicFromDB = await global.getComicFromDB?.(global.currentComic.id);
+        const isDownloaded = global.downloadedComicIds?.has(global.currentComic.id) || !!comicFromDB;
+
+        if (isDownloaded) {
+          // Save to IndexedDB for offline access
+          try {
+            await saveProgressToDB(
+              global.currentComic.id,
+              closestPage,
+              global.currentComic.progress?.totalPages,
+              global.currentComic.path,
+            );
+          } catch (error) {
+            console.error('[CONTINUOUS] Failed to save to IndexedDB:', error);
+          }
+
+          // Update local progress
+          if (!global.currentComic.progress) {
+            global.currentComic.progress = { totalPages: 0, lastReadPage: 0 };
+          }
+          global.currentComic.progress.lastReadPage = closestPage;
+          global.downloadedComicIds?.add(global.currentComic.id);
+          global.updateLibraryProgress?.(global.currentComic.id, closestPage, global.currentComic.progress.totalPages);
+
+          // ALSO sync to server with per-device progress
+          if (navigator.onLine && typeof global.saveProgress === 'function') {
+            await global.saveProgress(closestPage);
+          }
+        } else {
+          // Online comics - save to server directly
+          if (typeof global.saveProgress === 'function') {
+            await global.saveProgress(closestPage);
+          }
+          // Also update the library data
+          if (global.updateLibraryProgress) {
+            global.updateLibraryProgress(global.currentComic.id, closestPage, global.currentComic.progress?.totalPages);
+          }
+        }
+      } catch (error) {
+        console.error('[CONTINUOUS] Error saving progress:', error);
       }
 
       console.log('[CONTINUOUS] Current page updated to:', closestPage);

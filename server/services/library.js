@@ -3,7 +3,6 @@ const path = require('path');
 const yauzl = require('yauzl');
 const sharp = require('sharp');
 const { spawn } = require('child_process');
-const archiver = require('archiver');
 
 const { dbGet, dbRun, dbAll, getUserAccessibleResources, checkComicAccess } = require('../db');
 const { log, t0, ms } = require('../logger');
@@ -67,152 +66,143 @@ async function generateThumbnail(comicPath) {
     return filename;
   }
 
-  return new Promise((resolve) => {
+  return new Promise(async (resolve) => {
     const start = t0();
-    yauzl.open(comicPath, { lazyEntries: true }, (err, zipfile) => {
-      if (err) {
-        log('ERROR', 'THUMBNAIL', `Open ${path.basename(comicPath)} failed: ${err.message}`);
+    try {
+      // Get sorted page list to ensure thumbnail uses the same "first page" as reader
+      const pages = await getComicPages(comicPath);
+      if (!pages || pages.length === 0) {
+        log('ERROR', 'THUMBNAIL', `No images found in ${path.basename(comicPath)}`);
         return resolve(null);
       }
-      let done = false;
-      zipfile.readEntry();
-      zipfile.on('entry', (entry) => {
-        if (done) return;
-        if (/\.(jpg|jpeg|png|gif|webp)$/i.test(entry.fileName) && !entry.fileName.startsWith('__MACOSX')) {
-          done = true;
-          zipfile.openReadStream(entry, (e, rs) => {
-            if (e) {
-              zipfile.close();
-              log('ERROR', 'THUMBNAIL', `Stream error: ${e.message}`);
-              return resolve(null);
-            }
-            const chunks = [];
-            rs.on('data', c => chunks.push(c));
-            rs.on('end', async () => {
-              zipfile.close();
-              try {
-                log('INFO', 'THUMBNAIL', `Create → ${filename} (first image: ${entry.fileName})`);
-                await sharp(Buffer.concat(chunks))
-                  .resize({ height: 300, withoutEnlargement: true })
-                  .jpeg({ quality: 80, progressive: true })
-                  .toFile(full);
-                log('INFO', 'THUMBNAIL', `✅ Generated: ${filename} in ${ms(start)} ms`);
-                resolve(filename);
-              } catch (se) {
-                log('ERROR', 'THUMBNAIL', `❌ Sharp fail (${path.basename(comicPath)}): ${se.message} after ${ms(start)} ms`);
-                resolve(null);
+
+      const firstPage = pages[0]; // Use sorted first page
+
+      // Extract the specific first page from the CBZ
+      yauzl.open(comicPath, { lazyEntries: true }, (err, zipfile) => {
+        if (err) {
+          log('ERROR', 'THUMBNAIL', `Open ${path.basename(comicPath)} failed: ${err.message}`);
+          return resolve(null);
+        }
+
+        let done = false;
+        zipfile.readEntry();
+
+        zipfile.on('entry', (entry) => {
+          if (done) return;
+
+          // Find the sorted first page specifically
+          if (entry.fileName === firstPage) {
+            done = true;
+            zipfile.openReadStream(entry, (e, rs) => {
+              if (e) {
+                zipfile.close();
+                log('ERROR', 'THUMBNAIL', `Stream error: ${e.message}`);
+                return resolve(null);
               }
+
+              const chunks = [];
+              rs.on('data', c => chunks.push(c));
+              rs.on('end', async () => {
+                zipfile.close();
+                try {
+                  log('INFO', 'THUMBNAIL', `Create → ${filename} (first page: ${firstPage})`);
+                  await sharp(Buffer.concat(chunks))
+                    .resize({ height: 300, withoutEnlargement: true })
+                    .jpeg({ quality: 80, progressive: true })
+                    .toFile(full);
+                  log('INFO', 'THUMBNAIL', `✅ Generated: ${filename} in ${ms(start)} ms`);
+                  resolve(filename);
+                } catch (se) {
+                  log('ERROR', 'THUMBNAIL', `❌ Sharp fail (${path.basename(comicPath)}): ${se.message} after ${ms(start)} ms`);
+                  resolve(null);
+                }
+              });
             });
-          });
-        } else zipfile.readEntry();
+          } else {
+            zipfile.readEntry();
+          }
+        });
+
+        zipfile.on('end', () => {
+          if (!done) {
+            log('ERROR', 'THUMBNAIL', `First page ${firstPage} not found in ${path.basename(comicPath)}`);
+            resolve(null);
+          }
+        });
+
+        zipfile.on('error', () => {
+          if (!done) {
+            resolve(null);
+          }
+        });
       });
-      zipfile.on('end', () => {
-        if (!done) {
-          log('ERROR', 'THUMBNAIL', `No images found in ${path.basename(comicPath)}`);
-          resolve(null);
-        }
-      });
-      zipfile.on('error', () => {
-        if (!done) {
-          resolve(null);
-        }
-      });
-    });
+    } catch (error) {
+      log('ERROR', 'THUMBNAIL', `Failed to generate thumbnail for ${path.basename(comicPath)}: ${error.message}`);
+      resolve(null);
+    }
   });
 }
 
 async function convertCbrToCbz(cbrPath) {
-  return new Promise(async (resolve) => {
+  return new Promise((resolve) => {
     const start = t0();
     log('INFO', 'CONVERT', `Converting: ${path.basename(cbrPath)}`);
     const cbzPath = cbrPath.replace(/\.cbr$/i, '.cbz');
-    const tempDir = path.join(path.dirname(cbrPath), `.tmp-${createId(cbrPath)}`);
-    try {
-      await fs.promises.rm(tempDir, { recursive: true, force: true });
-      await fs.promises.mkdir(tempDir, { recursive: true });
+    const scriptPath = path.join(__dirname, '..', '..', 'scripts', 'convert_cbr_to_cbz.sh');
+    const cbrDir = path.dirname(cbrPath);
 
-      log('INFO', 'CONVERT', `Unrar → ${path.basename(cbrPath)} …`);
-      await new Promise((ok, bad) => {
-        // Add maxBuffer (100MB) and timeout (30 min) for large files
-        const unrar = spawn('unrar', ['x', '-o+', cbrPath, `${tempDir}${path.sep}`], {
-          maxBuffer: 1024 * 1024 * 100, // 100MB buffer (default is 1MB)
-          timeout: 30 * 60 * 1000 // 30 minute timeout for huge files (1.9GB-3.7GB)
-        });
+    // Run the bash script from the directory containing the CBR file
+    const conversionProcess = spawn(scriptPath, [cbrPath], {
+      cwd: cbrDir,
+      maxBuffer: 1024 * 1024 * 100, // 100MB buffer
+      timeout: 30 * 60 * 1000 // 30 minute timeout
+    });
 
-        // Use sliding window for stderr to prevent memory overflow on large files
-        let stderr = '';
-        let lastLog = Date.now();
+    let stdout = '';
+    let stderr = '';
+    let lastLog = Date.now();
 
-        unrar.stderr.on('data', d => {
-          // Only keep last 5KB of stderr for error reporting
-          stderr += d.toString();
-          if (stderr.length > 5000) {
-            stderr = stderr.slice(-5000);
-          }
+    conversionProcess.stdout.on('data', (data) => {
+      const output = data.toString();
+      stdout += output;
 
-          // Log progress every 5 seconds for long-running conversions
-          if (Date.now() - lastLog > 5000) {
-            log('INFO', 'CONVERT', `Extracting... ${path.basename(cbrPath)}`);
-            lastLog = Date.now();
-          }
-        });
+      // Log progress every 5 seconds
+      if (Date.now() - lastLog > 5000) {
+        log('INFO', 'CONVERT', `Progress: ${path.basename(cbrPath)}`);
+        lastLog = Date.now();
+      }
+    });
 
-        unrar.on('error', (err) => {
-          if (err.code === 'ENOENT') {
-            return bad(new Error("'unrar' command not found. Install it to enable CBR conversion."));
-          }
-          return bad(err);
-        });
+    conversionProcess.stderr.on('data', (data) => {
+      stderr += data.toString();
+    });
 
-        unrar.on('close', (code) => {
-          if (code !== 0) {
-            const msg = stderr.trim() || `unrar exited with code ${code}`;
-            return bad(new Error(msg));
-          }
-          log('INFO', 'CONVERT', `Extraction complete: ${path.basename(cbrPath)}`);
-          ok();
-        });
-      });
-
-      log('INFO', 'CONVERT', `Zip → ${path.basename(cbzPath)} …`);
-      const output = fs.createWriteStream(cbzPath);
-      const archive = archiver('zip', { store: true });
-
-      let archiverLastLog = Date.now();
-      let archivedCount = 0;
-
-      // Track progress for large archives
-      archive.on('entry', (entry) => {
-        archivedCount++;
-        if (Date.now() - archiverLastLog > 5000) {
-          log('INFO', 'CONVERT', `Archiving... ${archivedCount} files → ${path.basename(cbzPath)}`);
-          archiverLastLog = Date.now();
-        }
-      });
-
-      archive.on('error', (err) => { throw err; });
-      archive.pipe(output);
-
-      // Use glob pattern instead of directory() for better memory efficiency
-      // This streams files instead of loading all into memory
-      archive.glob('**/*', {
-        cwd: tempDir,
-        dot: true // Include hidden files
-      });
-
-      await archive.finalize();
-
-      output.on('close', async () => {
-        log('INFO', 'CONVERT', `✅ Created: ${path.basename(cbzPath)} (${archivedCount} files) in ${ms(start)} ms`);
-        await fs.promises.unlink(cbrPath).catch(() => {});
-        await fs.promises.rm(tempDir, { recursive: true, force: true }).catch(() => {});
-        resolve(cbzPath);
-      });
-    } catch (e) {
-      log('ERROR', 'CONVERT', `❌ Failed ${path.basename(cbrPath)}: ${e.message} after ${ms(start)} ms`);
-      await fs.promises.rm(tempDir, { recursive: true, force: true }).catch(() => {});
+    conversionProcess.on('error', (err) => {
+      if (err.code === 'ENOENT') {
+        log('ERROR', 'CONVERT', `Conversion script not found: ${scriptPath}`);
+        return resolve(null);
+      }
+      log('ERROR', 'CONVERT', `❌ Failed ${path.basename(cbrPath)}: ${err.message} after ${ms(start)} ms`);
       resolve(null);
-    }
+    });
+
+    conversionProcess.on('close', (code) => {
+      if (code === 0) {
+        // Check if CBZ file was created
+        if (fs.existsSync(cbzPath)) {
+          log('INFO', 'CONVERT', `✅ Created: ${path.basename(cbzPath)} in ${ms(start)} ms`);
+          resolve(cbzPath);
+        } else {
+          log('ERROR', 'CONVERT', `❌ Failed ${path.basename(cbrPath)}: CBZ file not created after ${ms(start)} ms`);
+          resolve(null);
+        }
+      } else {
+        const errorMsg = stderr.trim() || stdout.trim() || `Script exited with code ${code}`;
+        log('ERROR', 'CONVERT', `❌ Failed ${path.basename(cbrPath)}: ${errorMsg} after ${ms(start)} ms`);
+        resolve(null);
+      }
+    });
   });
 }
 

@@ -348,13 +348,13 @@ function showUserBadge() {
 
   // Position at bottom left of page for both mobile and desktop
   if (window.matchMedia('(min-width: 640px)').matches) {
-    // Desktop: Position at bottom left
+    // Desktop: Position at bottom left (moved 25px right)
     badge.style.bottom = '0.01rem';
-    badge.style.left = '2rem';
+    badge.style.left = 'calc(2rem + 25px)';
   } else {
-    // Mobile: Position at bottom left
+    // Mobile: Position at bottom left (moved 25px right)
     badge.style.bottom = '0.01rem';
-    badge.style.left = '1rem';
+    badge.style.left = 'calc(1rem + 25px)';
   }
 
   // Add role indicator color

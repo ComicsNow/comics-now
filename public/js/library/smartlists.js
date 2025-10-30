@@ -2,22 +2,14 @@
   'use strict';
 
   const LATEST_ADDED_DAYS = 14;
-  const LATEST_CONVERTED_DAYS = 30;
 
   let latestComics = [];
-  let latestConvertedComics = [];
   let downloadedSmartListComics = [];
   let downloadedSmartListError = null;
 
   function updateLatestButtonCount() {
     if (latestAddedCountSpan) {
       latestAddedCountSpan.textContent = latestComics.length.toString();
-    }
-  }
-
-  function updateConvertedButtonCount() {
-    if (latestConvertedCountSpan) {
-      latestConvertedCountSpan.textContent = latestConvertedComics.length.toString();
     }
   }
 
@@ -63,39 +55,6 @@
     updateLatestButtonCount();
   }
 
-  function rebuildLatestConvertedComics() {
-    const cutoff = Date.now() - (LATEST_CONVERTED_DAYS * 24 * 60 * 60 * 1000);
-    const convertedComics = [];
-
-    if (library && typeof library === 'object') {
-      for (const rootFolder of Object.keys(library)) {
-        const publishers = library[rootFolder]?.publishers || {};
-        for (const publisherName of Object.keys(publishers)) {
-          const seriesEntries = publishers[publisherName]?.series || {};
-          for (const seriesName of Object.keys(seriesEntries)) {
-            const comics = seriesEntries[seriesName];
-            if (!Array.isArray(comics)) continue;
-            for (const comic of comics) {
-              const convertedValue = Number(comic.convertedAt ?? 0);
-              if (!Number.isFinite(convertedValue) || convertedValue <= 0) continue;
-              if (convertedValue >= cutoff) {
-                convertedComics.push(comic);
-              }
-            }
-          }
-        }
-      }
-    }
-
-    convertedComics.sort((a, b) => {
-      const bTime = Number(b.convertedAt ?? 0);
-      const aTime = Number(a.convertedAt ?? 0);
-      return bTime - aTime;
-    });
-
-    latestConvertedComics = convertedComics;
-    updateConvertedButtonCount();
-  }
 
   function parseDownloadedTimestamp(value) {
     if (value == null) return NaN;
@@ -318,9 +277,6 @@
     return latestComics;
   }
 
-  function getLatestConvertedComics() {
-    return latestConvertedComics;
-  }
 
   function getDownloadedSmartListComics() {
     return downloadedSmartListComics;
@@ -342,18 +298,14 @@
 
   const LibrarySmartLists = {
     LATEST_ADDED_DAYS,
-    LATEST_CONVERTED_DAYS,
     updateLatestButtonCount,
-    updateConvertedButtonCount,
     updateDownloadedButtonCount,
     rebuildLatestComics,
-    rebuildLatestConvertedComics,
     updateDownloadedComicProgressData,
     resolveTotalPagesForComic,
     syncDownloadedComicStatusFromLibrary,
     rebuildDownloadedComics,
     getLatestComics,
-    getLatestConvertedComics,
     getDownloadedSmartListComics,
     getDownloadedSmartListError,
     updateDownloadedSmartListComic,
@@ -362,12 +314,9 @@
   global.LibrarySmartLists = LibrarySmartLists;
   Object.assign(global, {
     LATEST_ADDED_DAYS,
-    LATEST_CONVERTED_DAYS,
     updateLatestButtonCount,
-    updateConvertedButtonCount,
     updateDownloadedButtonCount,
     rebuildLatestComics,
-    rebuildLatestConvertedComics,
     updateDownloadedComicProgressData,
     syncDownloadedComicStatusFromLibrary,
     rebuildDownloadedComics,

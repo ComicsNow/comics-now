@@ -44,13 +44,13 @@
     </button>
   </div>
 
-  <!-- Download Queue -->
-  <div id="download-queue" class="hidden fixed bottom-20 right-4 sm:bottom-24 sm:right-8 z-40 w-80 max-w-[calc(100vw-2rem)]"></div>
-
-  <!-- Ko-fi Support Button -->
-  <a href="https://ko-fi.com/comicsnow" target="_blank" rel="noopener noreferrer" aria-label="Support on Ko-fi" class="fixed bottom-4 right-4 bg-red-600 hover:bg-red-500 text-white font-bold p-3 rounded-full transition-colors shadow-lg z-50 text-lg">
+  <!-- Ko-fi Support Button (left side) -->
+  <a href="https://ko-fi.com/comicsnow" target="_blank" rel="noopener noreferrer" aria-label="Support on Ko-fi" class="fixed bottom-4 left-4 bg-red-600 hover:bg-red-500 text-white font-bold p-3 rounded-full transition-colors shadow-lg z-50 text-lg">
     ☕
   </a>
+
+  <!-- Download Queue (bottom right) -->
+  <div id="download-queue" class="hidden fixed bottom-4 right-4 z-40 w-80 max-w-[calc(100vw-2rem)]"></div>
 
   <!-- Directory Selection Modal -->
   <div id="directory-selection-modal" class="hidden fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center" style="z-index: 9999;">
@@ -383,13 +383,16 @@
         </div>
         <div class="mb-4">
           <h4 class="font-semibold mb-2">Possible Matches</h4>
-          <div id="ct-match-container" class="min-h-[100px] bg-gray-900 p-3 rounded-lg">
-            <div id="ct-no-matches" class="text-gray-500 text-sm text-center">
+          <div id="ct-match-container" class="min-h-[200px] max-h-[600px] overflow-y-auto bg-gray-900 p-3 rounded-lg">
+            <div id="ct-no-matches" class="text-gray-500 text-sm text-center py-8">
               No matches to select. Matches will appear here when ComicTagger finds multiple options.
             </div>
             <table class="w-full text-sm hidden" id="ct-match-table">
               <tbody id="ct-match-body"></tbody>
             </table>
+          </div>
+          <div class="mt-2 text-xs text-gray-400">
+            Select a match by clicking on it, then click Apply to tag the comic.
           </div>
         </div>
         <div class="flex space-x-2">
@@ -601,15 +604,6 @@
         >
           <span class="pill-label">Latest</span>
           <span class="count-badge" id="latest-added-count">0</span>
-        </button>
-        <button
-          id="latest-converted-btn"
-          class="pill-button bg-gray-700 hover:bg-gray-600 text-white transition-colors"
-          type="button"
-          aria-pressed="false"
-        >
-          <span class="pill-label">Converted <span class="pill-subtext">(30 Days)</span></span>
-          <span class="count-badge" id="latest-converted-count">0</span>
         </button>
         <button
           id="downloaded-btn"
@@ -933,6 +927,19 @@
 </div>
 
   <script src="js/globals.js"></script>
+  <script src="js/utils/device-detection.js"></script>
+  <script>
+    // Hide download buttons and Downloaded filter on desktop devices
+    if (typeof isDesktopDevice === 'function' && isDesktopDevice()) {
+      const style = document.createElement('style');
+      style.textContent = `
+        .download-btn { display: none !important; }
+        [data-filter="downloaded"] { display: none !important; }
+      `;
+      document.head.appendChild(style);
+      console.log('[DEVICE] Download UI hidden on desktop');
+    }
+  </script>
   <script src="js/offline/db.js"></script>
   <script src="js/jwt-capture.js"></script>
   <script src="js/offline/status.js"></script>
@@ -945,13 +952,13 @@
   <!-- Context menu and manga mode modules -->
   <script src="js/context-menu/menu-builder.js"></script>
   <script src="js/manga.js"></script>
+  <script src="js/continuous.js"></script>
   <script src="js/context-menu/menu-actions.js"></script>
   <script src="js/metadata.js"></script>
   <script src="js/viewer/fullscreen.js"></script>
   <script src="js/viewer/navigation.js"></script>
   <script src="js/viewer/ui.js"></script>
   <script src="js/viewer.js"></script>
-  <script src="js/continuous.js"></script>
   <script src="js/settings.js"></script>
   <script src="js/comictagger.js"></script>
   <script src="js/events.js"></script>

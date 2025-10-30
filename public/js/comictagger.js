@@ -142,6 +142,10 @@ function openCTModal() {
   // Check for pending matches
   checkPendingMatch();
 
+  // Fetch and display pending match details if available
+  // This ensures matches appear even if user opens modal hours after detection
+  fetchPendingMatchDetails();
+
   ctEventSource = new EventSource(`${API_BASE_URL}/api/v1/comictagger/stream`);
   ctEventSource.onmessage = (e) => {
     try {
@@ -156,19 +160,24 @@ function openCTModal() {
       if (/Single low-confidence match:/i.test(msg) || /Multiple matches found/i.test(msg)) {
         ctAwaitingMatches = true;
         clearCtMatches();
+        tempMatches = []; // Reset temp matches
       } else if (ctAwaitingMatches) {
         if (/^Choose a match/i.test(msg) || /^\s*Enter selection/i.test(msg)) {
           ctAwaitingMatches = false;
-          // Don't clear matches here - user needs to see them to make a choice
+          // Fetch and render matches with images
+          fetchPendingMatchDetails();
         } else {
           const parsed = parseCtSuggestion(msg);
-          if (parsed) renderCtMatch(parsed);
+          if (parsed) {
+            tempMatches.push(parsed);
+          }
         }
       } else if (/^Choose a match/i.test(msg)) {
         // If we see "Choose a match" prompt when not awaiting, it's a new file
         // This happens after user skipped/applied the previous file
         ctAwaitingMatches = false;
         clearCtMatches();
+        tempMatches = [];
       }
     } catch {}
   };
@@ -222,31 +231,117 @@ function parseCtSuggestion(line) {
   };
 }
 
-function renderCtMatch(match) {
+// Store temporarily collected matches
+let tempMatches = [];
+
+/**
+ * Fetch pending match details including images and render UI
+ */
+async function fetchPendingMatchDetails() {
+  try {
+    // Get pending match details including first page URL
+    const detailsRes = await fetch(`${API_BASE_URL}/api/v1/comictagger/pending-details`);
+    const details = await detailsRes.json();
+
+    if (!details.waitingForResponse) {
+      console.log('[CT] No pending matches to fetch');
+      return;
+    }
+
+    const firstPageUrl = details.firstPageUrl;
+
+    // Use matches from backend if available, otherwise use temp collected matches
+    const matchesToEnrich = details.matches && details.matches.length > 0
+      ? details.matches
+      : tempMatches;
+
+    if (matchesToEnrich.length === 0) {
+      console.log('[CT] No matches to enrich');
+      return;
+    }
+
+    // Enrich matches with ComicVine cover images
+    const coversRes = await fetch(`${API_BASE_URL}/api/v1/comictagger/match-covers`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ matches: matchesToEnrich })
+    });
+    const { matches: enrichedMatches } = await coversRes.json();
+
+    // Clear and render each match with images
+    clearCtMatches();
+    enrichedMatches.forEach(match => {
+      renderCtMatch(match, firstPageUrl);
+    });
+
+    // Clear temp matches
+    tempMatches = [];
+
+    console.log('[CT] Rendered', enrichedMatches.length, 'matches with images');
+  } catch (error) {
+    console.error('[CT] Failed to fetch match details:', error);
+    // Fallback: render without images if fetch fails
+    tempMatches.forEach(match => renderCtMatch(match, null));
+    tempMatches = [];
+  }
+}
+
+function renderCtMatch(match, comicFirstPageUrl) {
   // Show the table and hide the "no matches" message
   const noMatchesDiv = document.getElementById('ct-no-matches');
   const matchTable = document.getElementById('ct-match-table');
   if (noMatchesDiv) noMatchesDiv.classList.add('hidden');
   if (matchTable) matchTable.classList.remove('hidden');
 
+  // Build image comparison section
+  const imageComparisonHtml = `
+    <div class="flex items-center space-x-4 mb-3">
+      <div class="flex-1 text-center">
+        <div class="text-xs text-gray-400 mb-1">Your Comic</div>
+        ${comicFirstPageUrl
+          ? `<img src="${comicFirstPageUrl}"
+                 alt="Comic page"
+                 class="w-full max-w-[150px] h-auto mx-auto rounded border-2 border-gray-600 object-cover"
+                 loading="lazy">`
+          : `<div class="w-full max-w-[150px] h-48 mx-auto rounded border-2 border-gray-600 bg-gray-800 flex items-center justify-center text-xs text-gray-500">No preview</div>`
+        }
+      </div>
+      <div class="text-2xl text-gray-500">⟷</div>
+      <div class="flex-1 text-center">
+        <div class="text-xs text-gray-400 mb-1">ComicVine Match</div>
+        ${match.coverUrl
+          ? `<img src="${match.coverUrl}"
+                 alt="ComicVine cover"
+                 class="w-full max-w-[150px] h-auto mx-auto rounded border-2 border-purple-500 object-cover"
+                 loading="lazy">`
+          : `<div class="w-full max-w-[150px] h-48 mx-auto rounded border-2 border-gray-600 bg-gray-800 flex items-center justify-center text-xs text-gray-500">No cover</div>`
+        }
+      </div>
+    </div>
+  `;
+
   const tr = document.createElement('tr');
   tr.className = 'border-b border-gray-700 hover:bg-gray-800';
   tr.innerHTML = `
       <td class="pr-3 py-2 align-top">
-        <input type="checkbox" class="ct-match-select w-4 h-4 cursor-pointer" data-choice="${match.choice}">
+        <input type="radio"
+               name="ct-match-choice"
+               class="ct-match-select w-5 h-5 cursor-pointer"
+               data-choice="${match.choice}"
+               id="match-${match.choice}">
       </td>
       <td class="py-2">
-        <details open>
-          <summary class="cursor-pointer font-semibold text-white hover:text-purple-400">
-            ${match.choice}. ${match.title}
-          </summary>
-          <div class="pl-4 text-sm text-gray-300 space-y-1 mt-2">
-            <div><span class="text-gray-400">Number:</span> ${match.number}</div>
-            <div><span class="text-gray-400">Publisher:</span> ${match.publisher}</div>
-            <div><span class="text-gray-400">Year:</span> ${match.year}</div>
-            <div><span class="text-gray-400">Confidence:</span> ${match.confidence}</div>
+        <label for="match-${match.choice}" class="cursor-pointer block">
+          <div class="font-semibold text-white text-lg mb-2">
+            ${match.choice}. ${match.title} ${match.year ? `(${match.year})` : ''}
           </div>
-        </details>
+          ${imageComparisonHtml}
+          <div class="text-sm text-gray-300 space-y-1">
+            <div><span class="text-gray-400">Issue:</span> #${match.issue || match.number}</div>
+            <div><span class="text-gray-400">Publisher:</span> ${match.publisher}</div>
+            ${match.subtitle ? `<div><span class="text-gray-400">Subtitle:</span> ${match.subtitle}</div>` : ''}
+          </div>
+        </label>
       </td>`;
   ctMatchBody.appendChild(tr);
 }
@@ -269,12 +364,29 @@ function showCtConfirm(action) {
 
 async function handleCtConfirmYes() {
   const action = ctConfirmBar.dataset.action;
-  const selected = Array.from(ctMatchBody.querySelectorAll('.ct-match-select:checked')).map(cb => cb.dataset.choice);
-  await fetch(`${API_BASE_URL}/api/v1/comictagger/${action}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ selections: selected })
-  });
+
+  if (action === 'apply') {
+    // Get selected radio button
+    const selected = document.querySelector('.ct-match-select:checked');
+    const choice = selected ? selected.dataset.choice : null;
+
+    if (!choice) {
+      alert('Please select a match to apply');
+      return;
+    }
+
+    await fetch(`${API_BASE_URL}/api/v1/comictagger/apply`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ selections: [choice] })
+    });
+  } else {
+    // Skip action
+    await fetch(`${API_BASE_URL}/api/v1/comictagger/skip`, {
+      method: 'POST'
+    });
+  }
+
   ctConfirmBar.classList.add('hidden');
 
   // Clear matches after action - will be populated again for next file

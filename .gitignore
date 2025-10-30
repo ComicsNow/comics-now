@@ -10,3 +10,12 @@ thumbnails/
 *.db-shm
 *.db-wal
 *.db.bak
+
+# Ignore markdown files
+# Ignore all markdown files...
+*.md
+# ...except README.md
+!README.md
+
+# Ignore docs folder
+docs/

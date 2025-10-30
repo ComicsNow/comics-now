@@ -25,41 +25,44 @@
     const menu = document.createElement('div');
     menu.className = 'comic-context-menu';
 
-    // 1. Download/Downloaded status menu item
-    const isDownloaded = global.downloadedComicIds && global.downloadedComicIds.has(comic.id);
-    const downloadIcon = isDownloaded ? ICONS.SUCCESS : ICONS.DOWNLOAD;
+    // 1. Download/Downloaded status menu item (only on mobile devices)
+    const isDesktop = typeof isDesktopDevice === 'function' && isDesktopDevice();
+    if (!isDesktop) {
+      const isDownloaded = global.downloadedComicIds && global.downloadedComicIds.has(comic.id);
+      const downloadIcon = isDownloaded ? ICONS.SUCCESS : ICONS.DOWNLOAD;
 
-    const downloadItem = document.createElement('div');
-    downloadItem.className = 'comic-context-menu-item' + (isDownloaded ? ' text-green-400' : '');
-    downloadItem.innerHTML = `${downloadIcon}<span>${isDownloaded ? 'Downloaded' : 'Download for Offline'}</span>`;
+      const downloadItem = document.createElement('div');
+      downloadItem.className = 'comic-context-menu-item' + (isDownloaded ? ' text-green-400' : '');
+      downloadItem.innerHTML = `${downloadIcon}<span>${isDownloaded ? 'Downloaded' : 'Download for Offline'}</span>`;
 
-    if (!isDownloaded) {
-      downloadItem.addEventListener('click', async (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        closeContextMenu();
+      if (!isDownloaded) {
+        downloadItem.addEventListener('click', async (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          closeContextMenu();
 
-        if (typeof global.downloadComic === 'function') {
-          try {
-            // Create a temporary button element for the download function
-            const tempBtn = document.createElement('button');
-            await global.downloadComic(comic, tempBtn);
+          if (typeof global.downloadComic === 'function') {
+            try {
+              // Create a temporary button element for the download function
+              const tempBtn = document.createElement('button');
+              await global.downloadComic(comic, tempBtn);
 
-            // Re-render to update UI
-            if (typeof global.applyFilterAndRender === 'function') {
-              global.applyFilterAndRender();
+              // Re-render to update UI
+              if (typeof global.applyFilterAndRender === 'function') {
+                global.applyFilterAndRender();
+              }
+            } catch (error) {
+
             }
-          } catch (error) {
-
           }
-        }
-      });
-    } else {
-      downloadItem.style.cursor = 'default';
-      downloadItem.style.opacity = '0.7';
-    }
+        });
+      } else {
+        downloadItem.style.cursor = 'default';
+        downloadItem.style.opacity = '0.7';
+      }
 
-    menu.appendChild(downloadItem);
+      menu.appendChild(downloadItem);
+    }
 
     // 2. Read/Unread toggle menu item
     const comicStatus = typeof global.getComicStatus === 'function'
@@ -263,53 +266,56 @@
 
     menu.appendChild(readStatusItem);
 
-    // 2. Download series menu item
-    let isSeriesDownloaded = false;
+    // 2. Download series menu item (only on mobile devices)
+    const isDesktop = typeof isDesktopDevice === 'function' && isDesktopDevice();
+    if (!isDesktop) {
+      let isSeriesDownloaded = false;
 
-    if (Array.isArray(comicsInSeries)) {
-      // Full data - can check if all comics are downloaded
-      isSeriesDownloaded = comicsInSeries.length > 0 &&
-        comicsInSeries.every(comic => global.downloadedComicIds && global.downloadedComicIds.has(comic.id));
-    }
-    // For lazy loading, we can't determine download status without full data
+      if (Array.isArray(comicsInSeries)) {
+        // Full data - can check if all comics are downloaded
+        isSeriesDownloaded = comicsInSeries.length > 0 &&
+          comicsInSeries.every(comic => global.downloadedComicIds && global.downloadedComicIds.has(comic.id));
+      }
+      // For lazy loading, we can't determine download status without full data
 
-    const downloadIcon = isSeriesDownloaded ? ICONS.SUCCESS : ICONS.DOWNLOAD;
+      const downloadIcon = isSeriesDownloaded ? ICONS.SUCCESS : ICONS.DOWNLOAD;
 
-    const downloadItem = document.createElement('div');
-    downloadItem.className = 'comic-context-menu-item' + (isSeriesDownloaded ? ' text-green-400' : '');
-    downloadItem.innerHTML = `${downloadIcon}<span>${isSeriesDownloaded ? 'Series Downloaded' : 'Download Series'}</span>`;
+      const downloadItem = document.createElement('div');
+      downloadItem.className = 'comic-context-menu-item' + (isSeriesDownloaded ? ' text-green-400' : '');
+      downloadItem.innerHTML = `${downloadIcon}<span>${isSeriesDownloaded ? 'Series Downloaded' : 'Download Series'}</span>`;
 
-    if (!isSeriesDownloaded) {
-      downloadItem.addEventListener('click', async (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        closeContextMenu();
+      if (!isSeriesDownloaded) {
+        downloadItem.addEventListener('click', async (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          closeContextMenu();
 
-        if (typeof global.downloadSeries === 'function') {
-          try {
-            // Create a temporary button element for the download function
-            const tempBtn = document.createElement('button');
-            tempBtn.dataset.rootFolder = rootFolder;
-            tempBtn.dataset.publisher = publisher;
-            tempBtn.dataset.seriesName = seriesName;
+          if (typeof global.downloadSeries === 'function') {
+            try {
+              // Create a temporary button element for the download function
+              const tempBtn = document.createElement('button');
+              tempBtn.dataset.rootFolder = rootFolder;
+              tempBtn.dataset.publisher = publisher;
+              tempBtn.dataset.seriesName = seriesName;
 
-            await global.downloadSeries(comicsInSeries, tempBtn);
+              await global.downloadSeries(comicsInSeries, tempBtn);
 
-            // Re-render to update UI
-            if (typeof global.applyFilterAndRender === 'function') {
-              global.applyFilterAndRender();
+              // Re-render to update UI
+              if (typeof global.applyFilterAndRender === 'function') {
+                global.applyFilterAndRender();
+              }
+            } catch (error) {
+
             }
-          } catch (error) {
-
           }
-        }
-      });
-    } else {
-      downloadItem.style.cursor = 'default';
-      downloadItem.style.opacity = '0.7';
-    }
+        });
+      } else {
+        downloadItem.style.cursor = 'default';
+        downloadItem.style.opacity = '0.7';
+      }
 
-    menu.appendChild(downloadItem);
+      menu.appendChild(downloadItem);
+    }
 
     // 3. Manga mode toggle for the entire series
     let allComicsAreManga = false;
@@ -442,45 +448,48 @@
       }
     }
 
-    // 1. Download publisher menu item
-    let isPublisherDownloaded = false;
-    if (allComics.length > 0) {
-      isPublisherDownloaded = allComics.every(comic => global.downloadedComicIds && global.downloadedComicIds.has(comic.id));
-    }
+    // 1. Download publisher menu item (only on mobile devices)
+    const isDesktop = typeof isDesktopDevice === 'function' && isDesktopDevice();
+    if (!isDesktop) {
+      let isPublisherDownloaded = false;
+      if (allComics.length > 0) {
+        isPublisherDownloaded = allComics.every(comic => global.downloadedComicIds && global.downloadedComicIds.has(comic.id));
+      }
 
-    const downloadIcon = isPublisherDownloaded ? ICONS.SUCCESS : ICONS.DOWNLOAD;
+      const downloadIcon = isPublisherDownloaded ? ICONS.SUCCESS : ICONS.DOWNLOAD;
 
-    const downloadItem = document.createElement('div');
-    downloadItem.className = 'comic-context-menu-item' + (isPublisherDownloaded ? ' text-green-400' : '');
-    downloadItem.innerHTML = `${downloadIcon}<span>${isPublisherDownloaded ? 'Publisher Downloaded' : 'Download Publisher'}</span>`;
+      const downloadItem = document.createElement('div');
+      downloadItem.className = 'comic-context-menu-item' + (isPublisherDownloaded ? ' text-green-400' : '');
+      downloadItem.innerHTML = `${downloadIcon}<span>${isPublisherDownloaded ? 'Publisher Downloaded' : 'Download Publisher'}</span>`;
 
-    if (!isPublisherDownloaded && allComics.length > 0) {
-      downloadItem.addEventListener('click', async (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        closeContextMenu();
+      if (!isPublisherDownloaded && allComics.length > 0) {
+        downloadItem.addEventListener('click', async (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          closeContextMenu();
 
-        if (typeof global.downloadSeries === 'function') {
-          try {
-            // Download all comics from all series
-            const tempBtn = document.createElement('button');
-            await global.downloadSeries(allComics, tempBtn);
+          if (typeof global.downloadSeries === 'function') {
+            try {
+              // Download all comics from all series
+              const tempBtn = document.createElement('button');
+              await global.downloadSeries(allComics, tempBtn);
 
-            // Re-render to update UI
-            if (typeof global.applyFilterAndRender === 'function') {
-              global.applyFilterAndRender();
+              // Re-render to update UI
+              if (typeof global.applyFilterAndRender === 'function') {
+                global.applyFilterAndRender();
+              }
+            } catch (error) {
+
             }
-          } catch (error) {
-
           }
-        }
-      });
-    } else {
-      downloadItem.style.cursor = 'default';
-      downloadItem.style.opacity = '0.7';
-    }
+        });
+      } else {
+        downloadItem.style.cursor = 'default';
+        downloadItem.style.opacity = '0.7';
+      }
 
-    menu.appendChild(downloadItem);
+      menu.appendChild(downloadItem);
+    }
 
     // 2. Manga mode toggle for the entire publisher
     let allComicsAreManga = false;
@@ -615,45 +624,48 @@
       }
     }
 
-    // 1. Download library menu item
-    let isLibraryDownloaded = false;
-    if (allComics.length > 0) {
-      isLibraryDownloaded = allComics.every(comic => global.downloadedComicIds && global.downloadedComicIds.has(comic.id));
-    }
+    // 1. Download library menu item (only on mobile devices)
+    const isDesktop = typeof isDesktopDevice === 'function' && isDesktopDevice();
+    if (!isDesktop) {
+      let isLibraryDownloaded = false;
+      if (allComics.length > 0) {
+        isLibraryDownloaded = allComics.every(comic => global.downloadedComicIds && global.downloadedComicIds.has(comic.id));
+      }
 
-    const downloadIcon = isLibraryDownloaded ? ICONS.SUCCESS : ICONS.DOWNLOAD;
+      const downloadIcon = isLibraryDownloaded ? ICONS.SUCCESS : ICONS.DOWNLOAD;
 
-    const downloadItem = document.createElement('div');
-    downloadItem.className = 'comic-context-menu-item' + (isLibraryDownloaded ? ' text-green-400' : '');
-    downloadItem.innerHTML = `${downloadIcon}<span>${isLibraryDownloaded ? 'Library Downloaded' : 'Download Library'}</span>`;
+      const downloadItem = document.createElement('div');
+      downloadItem.className = 'comic-context-menu-item' + (isLibraryDownloaded ? ' text-green-400' : '');
+      downloadItem.innerHTML = `${downloadIcon}<span>${isLibraryDownloaded ? 'Library Downloaded' : 'Download Library'}</span>`;
 
-    if (!isLibraryDownloaded && allComics.length > 0) {
-      downloadItem.addEventListener('click', async (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        closeContextMenu();
+      if (!isLibraryDownloaded && allComics.length > 0) {
+        downloadItem.addEventListener('click', async (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          closeContextMenu();
 
-        if (typeof global.downloadSeries === 'function') {
-          try {
-            // Download all comics from all series from all publishers
-            const tempBtn = document.createElement('button');
-            await global.downloadSeries(allComics, tempBtn);
+          if (typeof global.downloadSeries === 'function') {
+            try {
+              // Download all comics from all series from all publishers
+              const tempBtn = document.createElement('button');
+              await global.downloadSeries(allComics, tempBtn);
 
-            // Re-render to update UI
-            if (typeof global.applyFilterAndRender === 'function') {
-              global.applyFilterAndRender();
+              // Re-render to update UI
+              if (typeof global.applyFilterAndRender === 'function') {
+                global.applyFilterAndRender();
+              }
+            } catch (error) {
+
             }
-          } catch (error) {
-
           }
-        }
-      });
-    } else {
-      downloadItem.style.cursor = 'default';
-      downloadItem.style.opacity = '0.7';
-    }
+        });
+      } else {
+        downloadItem.style.cursor = 'default';
+        downloadItem.style.opacity = '0.7';
+      }
 
-    menu.appendChild(downloadItem);
+      menu.appendChild(downloadItem);
+    }
 
     // 2. Manga mode toggle for the entire library
     let allComicsAreManga = false;

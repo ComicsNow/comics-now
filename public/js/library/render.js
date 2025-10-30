@@ -13,14 +13,6 @@ function setLatestButtonActive(isActive) {
   latestAddedButton.setAttribute('aria-pressed', String(Boolean(isActive)));
 }
 
-function setConvertedButtonActive(isActive) {
-  if (!latestConvertedButton) return;
-  latestConvertedButton.classList.toggle('bg-purple-600', Boolean(isActive));
-  latestConvertedButton.classList.toggle('hover:bg-purple-500', Boolean(isActive));
-  latestConvertedButton.classList.toggle('bg-gray-700', !isActive);
-  latestConvertedButton.classList.toggle('hover:bg-gray-600', !isActive);
-  latestConvertedButton.setAttribute('aria-pressed', String(Boolean(isActive)));
-}
 
 function setDownloadedButtonActive(isActive) {
   if (!downloadedButton) return;
@@ -47,20 +39,6 @@ function showLatestAddedSmartList() {
   renderLatestSmartList();
 }
 
-function showLatestConvertedSmartList() {
-  currentView = 'converted';
-  currentRootFolder = null;
-  currentPublisher = null;
-  currentSeries = null;
-  if (typeof window !== 'undefined') {
-    window.currentView = currentView;
-    window.currentRootFolder = currentRootFolder;
-    window.currentPublisher = currentPublisher;
-    window.currentSeries = currentSeries;
-  }
-  SmartLists.rebuildLatestConvertedComics();
-  renderConvertedSmartList();
-}
 
 async function showDownloadedSmartList() {
   currentView = 'downloaded';
@@ -75,7 +53,6 @@ async function showDownloadedSmartList() {
   }
 
   setLatestButtonActive(false);
-  setConvertedButtonActive(false);
   setDownloadedButtonActive(true);
 
   showView(smartListView);
@@ -98,7 +75,6 @@ function renderLatestSmartList() {
   const latestComics = SmartLists.getLatestComics() || [];
 
   setLatestButtonActive(true);
-  setConvertedButtonActive(false);
   setDownloadedButtonActive(false);
   showView(smartListView);
 
@@ -136,49 +112,6 @@ function renderLatestSmartList() {
   renderComicCards(comicsToRender, 'smart-list');
 }
 
-function renderConvertedSmartList() {
-  if (!smartListContainer) return;
-
-  const latestConvertedComics = SmartLists.getLatestConvertedComics() || [];
-
-  setLatestButtonActive(false);
-  setConvertedButtonActive(true);
-  setDownloadedButtonActive(false);
-  showView(smartListView);
-
-  if (smartListTitle) {
-    smartListTitle.textContent = `Converted (Last ${SmartLists.LATEST_CONVERTED_DAYS} Days)`;
-  }
-
-  if (!Array.isArray(latestConvertedComics) || latestConvertedComics.length === 0) {
-    smartListContainer.innerHTML = `<div class="bg-gray-800 rounded-lg p-6 text-center text-gray-500 col-span-full">No comics converted in the last ${SmartLists.LATEST_CONVERTED_DAYS} days.</div>`;
-    return;
-  }
-
-  let comicsToRender = latestConvertedComics;
-  if (activeFilter === 'in-progress') {
-    comicsToRender = latestConvertedComics.filter(comic => getComicStatus(comic) === 'in-progress');
-  } else if (activeFilter === 'read') {
-    comicsToRender = latestConvertedComics.filter(comic => getComicStatus(comic) === 'read');
-  } else if (activeFilter === 'unread') {
-    comicsToRender = latestConvertedComics.filter(comic => getComicStatus(comic) === 'unread');
-  }
-
-  if (comicsToRender.length === 0) {
-    let message = `No comics converted in the last ${SmartLists.LATEST_CONVERTED_DAYS} days.`;
-    if (activeFilter === 'in-progress') {
-      message = `No comics in progress converted in the last ${SmartLists.LATEST_CONVERTED_DAYS} days.`;
-    } else if (activeFilter === 'read') {
-      message = `No comics read converted in the last ${SmartLists.LATEST_CONVERTED_DAYS} days.`;
-    } else if (activeFilter === 'unread') {
-      message = `No unread comics converted in the last ${SmartLists.LATEST_CONVERTED_DAYS} days.`;
-    }
-    smartListContainer.innerHTML = `<div class="bg-gray-800 rounded-lg p-6 text-center text-gray-500 col-span-full">${message}</div>`;
-    return;
-  }
-
-  renderComicCards(comicsToRender, 'smart-list');
-}
 
 function renderDownloadedSmartList() {
   if (!smartListContainer) return;
@@ -187,7 +120,6 @@ function renderDownloadedSmartList() {
   const downloadedSmartListComics = SmartLists.getDownloadedSmartListComics() || [];
 
   setLatestButtonActive(false);
-  setConvertedButtonActive(false);
   setDownloadedButtonActive(true);
   showView(smartListView);
 
@@ -251,9 +183,6 @@ function applyFilterAndRender() {
       break;
     case 'latest':
       renderLatestSmartList();
-      break;
-    case 'converted':
-      renderConvertedSmartList();
       break;
     case 'downloaded':
       renderDownloadedSmartList();
@@ -606,7 +535,6 @@ function showRootFolderList(options = {}) {
     window.currentSeries = currentSeries;
   }
   setLatestButtonActive(false);
-  setConvertedButtonActive(false);
   setDownloadedButtonActive(false);
 
   const rootFoldersFromLibrary = library ? Object.keys(library) : [];
@@ -820,7 +748,6 @@ function showPublisherList(rootFolder, options = {}) {
     window.currentSeries = currentSeries;
   }
   setLatestButtonActive(false);
-  setConvertedButtonActive(false);
   setDownloadedButtonActive(false);
 
   const rootData = library[currentRootFolder];
@@ -1007,7 +934,6 @@ function renderPublisherCards(publishersToShow) {
 function showSeriesList(publisherName, options = {}) {
   const force = Boolean(options.force);
   setLatestButtonActive(false);
-  setConvertedButtonActive(false);
   setDownloadedButtonActive(false);
   const publisherData = library[currentRootFolder]?.publishers[publisherName];
   if (!publisherData) {
@@ -1298,7 +1224,6 @@ async function showComicList(seriesName) {
     window.currentSeries = currentSeries;
   }
   setLatestButtonActive(false);
-  setConvertedButtonActive(false);
   setDownloadedButtonActive(false);
 
   showView(comicListDiv);
@@ -1563,7 +1488,6 @@ if (downloadedComicIds.has(comic.id)) {
 async function showSearchView(query, field) {
   currentView = 'search';
   setLatestButtonActive(false);
-  setConvertedButtonActive(false);
   setDownloadedButtonActive(false);
   rootFolderListDiv.classList.add('hidden');
   publisherListDiv.classList.add('hidden');
@@ -1592,13 +1516,10 @@ async function showSearchView(query, field) {
 
   const LibraryRender = {
     setLatestButtonActive,
-    setConvertedButtonActive,
     setDownloadedButtonActive,
     showLatestAddedSmartList,
-    showLatestConvertedSmartList,
     showDownloadedSmartList,
     renderLatestSmartList,
-    renderConvertedSmartList,
     renderDownloadedSmartList,
     applyFilterAndRender,
     renderAlphaFilter,

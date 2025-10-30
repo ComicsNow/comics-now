@@ -262,6 +262,127 @@ function createApiRouter({
     res.json(pending || { waitingForResponse: false });
   });
 
+  // Get detailed pending match info including first page as base64 data URI
+  router.get('/api/v1/comictagger/pending-details', requireAdmin, async (req, res) => {
+    try {
+      const pending = getPendingMatch();
+      if (!pending || !pending.waitingForResponse) {
+        return res.json({ waitingForResponse: false });
+      }
+
+      // Get first page of the comic being tagged as base64 data URI
+      let firstPageUrl = null;
+      if (pending.filePath) {
+        try {
+          const pages = await getComicPages(pending.filePath);
+          if (pages && pages.length > 0) {
+            const firstPage = pages[0];
+
+            // Read the first page image from the CBZ and convert to base64
+            const imageBuffer = await new Promise((resolve, reject) => {
+              yauzl.open(pending.filePath, { lazyEntries: true }, (err, zipfile) => {
+                if (err) return reject(err);
+
+                let found = false;
+                zipfile.readEntry();
+
+                zipfile.on('entry', (entry) => {
+                  if (entry.fileName === firstPage) {
+                    found = true;
+                    zipfile.openReadStream(entry, (e, readStream) => {
+                      if (e) {
+                        zipfile.close();
+                        return reject(e);
+                      }
+
+                      const chunks = [];
+                      readStream.on('data', (chunk) => chunks.push(chunk));
+                      readStream.on('end', () => {
+                        zipfile.close();
+                        resolve(Buffer.concat(chunks));
+                      });
+                      readStream.on('error', (err) => {
+                        zipfile.close();
+                        reject(err);
+                      });
+                    });
+                  } else {
+                    zipfile.readEntry();
+                  }
+                });
+
+                zipfile.on('end', () => {
+                  if (!found) reject(new Error('First page not found in CBZ'));
+                });
+
+                zipfile.on('error', reject);
+              });
+            });
+
+            // Determine mime type from file extension
+            const mimeType = getMimeFromExt(firstPage);
+            const base64Image = imageBuffer.toString('base64');
+            firstPageUrl = `data:${mimeType};base64,${base64Image}`;
+
+            log('INFO', 'CT', `Generated base64 data URI for first page (${Math.round(base64Image.length / 1024)}KB)`);
+          }
+        } catch (error) {
+          log('ERROR', 'CT', `Failed to get first page: ${error.message}`);
+        }
+      }
+
+      res.json({
+        ...pending,
+        firstPageUrl,
+        matches: pending.matches || []
+      });
+    } catch (error) {
+      log('ERROR', 'CT', `Failed to get pending details: ${error.message}`);
+      res.status(500).json({ error: 'Failed to get pending details' });
+    }
+  });
+
+  // Enrich matches with ComicVine cover images
+  router.post('/api/v1/comictagger/match-covers', requireAdmin, async (req, res) => {
+    try {
+      const { matches } = req.body;
+      if (!Array.isArray(matches)) {
+        return res.status(400).json({ error: 'matches must be an array' });
+      }
+
+      const apiKey = getComicVineApiKey();
+      if (!apiKey) {
+        // No API key, return matches without covers
+        return res.json({ matches: matches.map(m => ({ ...m, coverUrl: null })) });
+      }
+
+      // For each match, search ComicVine and get cover URL
+      const enrichedMatches = await Promise.all(matches.map(async (match) => {
+        try {
+          // Build search query: "Title Issue#"
+          const query = `${match.title} ${match.issue}`;
+          const searchUrl = `${COMICVINE_API_URL}/search/?api_key=${apiKey}&format=json&query=${encodeURIComponent(query)}&resources=issue&limit=1`;
+
+          const result = await cvFetchJson(searchUrl);
+          const coverUrl = result?.results?.[0]?.image?.thumb_url || null;
+
+          return {
+            ...match,
+            coverUrl
+          };
+        } catch (error) {
+          log('WARN', 'CT', `Failed to fetch cover for ${match.title}: ${error.message}`);
+          return { ...match, coverUrl: null };
+        }
+      }));
+
+      res.json({ matches: enrichedMatches });
+    } catch (error) {
+      log('ERROR', 'CT', `Failed to enrich matches: ${error.message}`);
+      res.status(500).json({ error: 'Failed to enrich matches' });
+    }
+  });
+
   router.post('/api/v1/rename-cbz', requireAdmin, async (req, res) => {
     try {
       const yesDir = path.join(getConfig().comicsLocation, 'yes');
