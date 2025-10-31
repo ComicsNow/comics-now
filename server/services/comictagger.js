@@ -111,17 +111,25 @@ async function runComicTagger() {
           }
 
           // Collect match lines (format: "❯ 1. Title (Year) #issue..." or "1. Title...")
-          // Remove leading arrow/bullet if present
-          const cleanedLine = trimmed.replace(/^[❯⊘✓✗►▶•]\s*/, '');
-          if (collectingMatches && /^\d+\./.test(cleanedLine)) {
-            const parsed = parseMatchLine(cleanedLine);
-            if (parsed) {
-              collectedMatches.push(parsed);
-              ctLog(`✓ Collected match #${parsed.choice}: ${parsed.title} #${parsed.issue}`);
-            } else {
-              ctLog(`⚠ Failed to parse match line: ${cleanedLine}`);
+          if (collectingMatches) {
+            // Debug: log what we're trying to match
+            ctLog(`[DEBUG] collectingMatches=true, checking line: "${trimmed}"`);
+
+            // Remove leading arrow/bullet if present
+            const cleanedLine = trimmed.replace(/^[❯⊘✓✗►▶•]\s*/, '');
+            ctLog(`[DEBUG] After cleaning: "${cleanedLine}"`);
+            ctLog(`[DEBUG] Regex test /^\\d+\\./.test(cleanedLine) = ${/^\d+\./.test(cleanedLine)}`);
+
+            if (/^\d+\./.test(cleanedLine)) {
+              const parsed = parseMatchLine(cleanedLine);
+              if (parsed) {
+                collectedMatches.push(parsed);
+                ctLog(`✓ Collected match #${parsed.choice}: ${parsed.title} #${parsed.issue}`);
+              } else {
+                ctLog(`⚠ Failed to parse match line: ${cleanedLine}`);
+              }
+              return;
             }
-            return;
           }
 
           // Detect when ComicTagger is asking for user selection
