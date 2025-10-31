@@ -104,7 +104,9 @@ async function runComicTagger() {
           ctLog(trimmed);
 
           // Start collecting matches when we see the header
-          if (/low-confidence match:/i.test(l) || /Multiple matches found/i.test(l)) {
+          // Patterns: "low-confidence match:", "Archives with low-confidence matches:", "Multiple bad cover matches", etc.
+          if (/low-confidence match/i.test(l) || /Multiple.*matches/i.test(l) || /Archives with low-confidence/i.test(l)) {
+            ctLog(`[DEBUG] Match collection triggered by: "${trimmed}"`);
             collectingMatches = true;
             collectedMatches = [];
             return;
