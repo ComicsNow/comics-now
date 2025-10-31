@@ -106,32 +106,20 @@ async function runComicTagger() {
           // Start collecting matches when we see the header
           // Patterns: "low-confidence match:", "Archives with low-confidence matches:", "Multiple bad cover matches", etc.
           if (/low-confidence match/i.test(l) || /Multiple.*matches/i.test(l) || /Archives with low-confidence/i.test(l)) {
-            ctLog(`[DEBUG] Match collection triggered by: "${trimmed}"`);
             collectingMatches = true;
             collectedMatches = [];
             return;
           }
 
           // Collect match lines (format: "❯ 1. Title (Year) #issue..." or "1. Title...")
-          if (collectingMatches) {
-            // Debug: log what we're trying to match
-            ctLog(`[DEBUG] collectingMatches=true, checking line: "${trimmed}"`);
-
-            // Remove leading arrow/bullet if present
-            const cleanedLine = trimmed.replace(/^[❯⊘✓✗►▶•]\s*/, '');
-            ctLog(`[DEBUG] After cleaning: "${cleanedLine}"`);
-            ctLog(`[DEBUG] Regex test /^\\d+\\./.test(cleanedLine) = ${/^\d+\./.test(cleanedLine)}`);
-
-            if (/^\d+\./.test(cleanedLine)) {
-              const parsed = parseMatchLine(cleanedLine);
-              if (parsed) {
-                collectedMatches.push(parsed);
-                ctLog(`✓ Collected match #${parsed.choice}: ${parsed.title} #${parsed.issue}`);
-              } else {
-                ctLog(`⚠ Failed to parse match line: ${cleanedLine}`);
-              }
-              return;
+          // Remove leading arrow/bullet if present
+          const cleanedLine = trimmed.replace(/^[❯⊘✓✗►▶•]\s*/, '');
+          if (collectingMatches && /^\d+\./.test(cleanedLine)) {
+            const parsed = parseMatchLine(cleanedLine);
+            if (parsed) {
+              collectedMatches.push(parsed);
             }
+            return;
           }
 
           // Detect when ComicTagger is asking for user selection
@@ -140,7 +128,6 @@ async function runComicTagger() {
             if (!awaitingUserInput) {
               awaitingUserInput = true;
               ctLog('>>> WAITING FOR USER SELECTION <<<');
-              ctLog(`✓ Stored ${collectedMatches.length} match(es) in pendingMatchState`);
 
               // Store pending match state for later retrieval
               pendingMatchState = {
