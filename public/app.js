@@ -195,7 +195,6 @@ async function loadLibraryOfflineFirst() {
           applyFilterAndRender();
           requestAnimationFrame(() => {
             rebuildLatestComics();
-            rebuildLatestConvertedComics();
             requestAnimationFrame(() => {
               if (typeof updateFilterButtonCounts === 'function') {
                 updateFilterButtonCounts();
@@ -204,7 +203,6 @@ async function loadLibraryOfflineFirst() {
           });
         } else {
           rebuildLatestComics();
-          rebuildLatestConvertedComics();
           applyFilterAndRender();
         }
 
@@ -305,7 +303,6 @@ async function fetchLibraryFromServer() {
       applyFilterAndRender();
       requestAnimationFrame(() => {
         rebuildLatestComics();
-        rebuildLatestConvertedComics();
         requestAnimationFrame(() => {
           if (typeof updateFilterButtonCounts === 'function') {
             updateFilterButtonCounts();
@@ -315,7 +312,6 @@ async function fetchLibraryFromServer() {
     } else {
       // For smaller libraries, rebuild immediately
       rebuildLatestComics();
-      rebuildLatestConvertedComics();
       applyFilterAndRender();
     }
 
