@@ -331,11 +331,14 @@ function createApiRouter({
         }
       }
 
-      res.json({
+      const response = {
         ...pending,
         firstPageUrl,
         matches: pending.matches || []
-      });
+      };
+
+      log('INFO', 'CT', `Returning pending details: ${response.matches.length} match(es), waitingForResponse: ${response.waitingForResponse}`);
+      res.json(response);
     } catch (error) {
       log('ERROR', 'CT', `Failed to get pending details: ${error.message}`);
       res.status(500).json({ error: 'Failed to get pending details' });
