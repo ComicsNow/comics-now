@@ -239,8 +239,13 @@ let tempMatches = [];
  */
 async function fetchPendingMatchDetails() {
   try {
+    console.log('[CT] Fetching pending match details...');
+
     // Get pending match details including first page URL
     const detailsRes = await fetch(`${API_BASE_URL}/api/v1/comictagger/pending-details`);
+    if (!detailsRes.ok) {
+      throw new Error(`Failed to fetch pending details: ${detailsRes.status}`);
+    }
     const details = await detailsRes.json();
 
     if (!details.waitingForResponse) {
@@ -255,34 +260,65 @@ async function fetchPendingMatchDetails() {
       ? details.matches
       : tempMatches;
 
+    console.log('[CT] Found', matchesToEnrich.length, 'matches to enrich');
+
     if (matchesToEnrich.length === 0) {
-      console.log('[CT] No matches to enrich');
+      console.warn('[CT] No matches to render!');
       return;
     }
 
-    // Enrich matches with ComicVine cover images
-    const coversRes = await fetch(`${API_BASE_URL}/api/v1/comictagger/match-covers`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ matches: matchesToEnrich })
-    });
-    const { matches: enrichedMatches } = await coversRes.json();
+    try {
+      // Enrich matches with ComicVine cover images
+      console.log('[CT] Fetching cover images from ComicVine...');
+      const coversRes = await fetch(`${API_BASE_URL}/api/v1/comictagger/match-covers`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ matches: matchesToEnrich })
+      });
 
-    // Clear and render each match with images
-    clearCtMatches();
-    enrichedMatches.forEach(match => {
-      renderCtMatch(match, firstPageUrl);
-    });
+      if (!coversRes.ok) {
+        throw new Error(`Cover fetch failed: ${coversRes.status}`);
+      }
+
+      const { matches: enrichedMatches } = await coversRes.json();
+
+      if (!Array.isArray(enrichedMatches) || enrichedMatches.length === 0) {
+        throw new Error('No enriched matches returned');
+      }
+
+      // Clear and render each match with images
+      clearCtMatches();
+      enrichedMatches.forEach(match => {
+        renderCtMatch(match, firstPageUrl);
+      });
+
+      console.log('[CT] ✓ Rendered', enrichedMatches.length, 'matches with cover images');
+    } catch (coverError) {
+      // Fallback: render matches without cover images if enrichment fails
+      console.warn('[CT] Cover enrichment failed, rendering without covers:', coverError.message);
+      clearCtMatches();
+      matchesToEnrich.forEach(match => {
+        renderCtMatch({ ...match, coverUrl: null }, firstPageUrl);
+      });
+      console.log('[CT] ✓ Rendered', matchesToEnrich.length, 'matches without covers');
+    }
 
     // Clear temp matches
     tempMatches = [];
 
-    console.log('[CT] Rendered', enrichedMatches.length, 'matches with images');
   } catch (error) {
-    console.error('[CT] Failed to fetch match details:', error);
-    // Fallback: render without images if fetch fails
-    tempMatches.forEach(match => renderCtMatch(match, null));
-    tempMatches = [];
+    console.error('[CT] Fatal error fetching match details:', error);
+
+    // Last resort fallback: try to render tempMatches if we have them
+    if (tempMatches.length > 0) {
+      console.warn('[CT] Using tempMatches as last resort fallback');
+      clearCtMatches();
+      tempMatches.forEach(match => renderCtMatch(match, null));
+      console.log('[CT] ✓ Rendered', tempMatches.length, 'matches from temp cache');
+      tempMatches = [];
+    } else {
+      console.error('[CT] No matches available to render!');
+    }
   }
 }
 

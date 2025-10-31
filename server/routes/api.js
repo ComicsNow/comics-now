@@ -350,36 +350,69 @@ function createApiRouter({
         return res.status(400).json({ error: 'matches must be an array' });
       }
 
+      log('INFO', 'CT', `Enriching ${matches.length} match(es) with cover images`);
+
       const apiKey = getComicVineApiKey();
       if (!apiKey) {
         // No API key, return matches without covers
+        log('WARN', 'CT', 'No ComicVine API key, returning matches without covers');
         return res.json({ matches: matches.map(m => ({ ...m, coverUrl: null })) });
       }
 
-      // For each match, search ComicVine and get cover URL
-      const enrichedMatches = await Promise.all(matches.map(async (match) => {
+      // Helper to fetch cover with timeout
+      const fetchCoverWithTimeout = async (match, timeoutMs = 5000) => {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), timeoutMs);
+
         try {
           // Build search query: "Title Issue#"
           const query = `${match.title} ${match.issue}`;
           const searchUrl = `${COMICVINE_API_URL}/search/?api_key=${apiKey}&format=json&query=${encodeURIComponent(query)}&resources=issue&limit=1`;
 
           const result = await cvFetchJson(searchUrl);
+          clearTimeout(timeout);
+
           const coverUrl = result?.results?.[0]?.image?.thumb_url || null;
+          log('INFO', 'CT', `✓ Found cover for ${match.title} #${match.issue}`);
 
           return {
             ...match,
             coverUrl
           };
         } catch (error) {
-          log('WARN', 'CT', `Failed to fetch cover for ${match.title}: ${error.message}`);
+          clearTimeout(timeout);
+          if (error.name === 'AbortError') {
+            log('WARN', 'CT', `Timeout fetching cover for ${match.title}`);
+          } else {
+            log('WARN', 'CT', `Failed to fetch cover for ${match.title}: ${error.message}`);
+          }
           return { ...match, coverUrl: null };
         }
-      }));
+      };
 
+      // Use Promise.allSettled to ensure one failure doesn't break all matches
+      const results = await Promise.allSettled(
+        matches.map(match => fetchCoverWithTimeout(match))
+      );
+
+      // Extract values from settled promises (all should be fulfilled since we catch errors)
+      const enrichedMatches = results.map((result, index) => {
+        if (result.status === 'fulfilled') {
+          return result.value;
+        } else {
+          // This should rarely happen since we catch errors in fetchCoverWithTimeout
+          log('ERROR', 'CT', `Unexpected rejection for match ${index}: ${result.reason}`);
+          return { ...matches[index], coverUrl: null };
+        }
+      });
+
+      log('INFO', 'CT', `Successfully enriched ${enrichedMatches.length} match(es)`);
       res.json({ matches: enrichedMatches });
     } catch (error) {
       log('ERROR', 'CT', `Failed to enrich matches: ${error.message}`);
-      res.status(500).json({ error: 'Failed to enrich matches' });
+      // Even on error, try to return matches without covers rather than failing completely
+      const fallbackMatches = req.body.matches?.map(m => ({ ...m, coverUrl: null })) || [];
+      res.json({ matches: fallbackMatches });
     }
   });
 
