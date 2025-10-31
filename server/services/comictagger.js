@@ -110,11 +110,16 @@ async function runComicTagger() {
             return;
           }
 
-          // Collect match lines (format: "1. Title (Year) #issue...")
-          if (collectingMatches && /^\d+\./.test(trimmed)) {
-            const parsed = parseMatchLine(trimmed);
+          // Collect match lines (format: "❯ 1. Title (Year) #issue..." or "1. Title...")
+          // Remove leading arrow/bullet if present
+          const cleanedLine = trimmed.replace(/^[❯⊘✓✗►▶•]\s*/, '');
+          if (collectingMatches && /^\d+\./.test(cleanedLine)) {
+            const parsed = parseMatchLine(cleanedLine);
             if (parsed) {
               collectedMatches.push(parsed);
+              ctLog(`✓ Collected match #${parsed.choice}: ${parsed.title} #${parsed.issue}`);
+            } else {
+              ctLog(`⚠ Failed to parse match line: ${cleanedLine}`);
             }
             return;
           }
@@ -125,6 +130,7 @@ async function runComicTagger() {
             if (!awaitingUserInput) {
               awaitingUserInput = true;
               ctLog('>>> WAITING FOR USER SELECTION <<<');
+              ctLog(`✓ Stored ${collectedMatches.length} match(es) in pendingMatchState`);
 
               // Store pending match state for later retrieval
               pendingMatchState = {
