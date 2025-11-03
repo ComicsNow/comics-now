@@ -832,12 +832,48 @@ async function showReadingListDetail(listId, listName) {
             </div>
           ` : '<p class="text-xs text-gray-400">No progress data</p>'}
         </div>
+        <button class="delete-comic-btn flex-shrink-0 text-red-400 hover:text-red-300 transition-colors p-2 text-xl" title="Remove from list" data-comic-id="${item.comicId}">
+          🗑
+        </button>
       `;
 
       // Click to open comic
       comicDiv.addEventListener('click', () => {
         if (typeof window.openComicViewer === 'function') {
           window.openComicViewer(comic);
+          closeReadingListModal();
+        }
+      });
+
+      // Delete button handler
+      const deleteBtn = comicDiv.querySelector('.delete-comic-btn');
+      deleteBtn.addEventListener('click', async (e) => {
+        e.stopPropagation(); // Prevent opening comic
+
+        const confirmDelete = confirm(`Remove "${title}" from this reading list?`);
+        if (!confirmDelete) return;
+
+        try {
+          const result = await window.ReadingLists.removeComicsFromList(listId, [item.comicId]);
+          if (result.ok) {
+            // Refresh detail view
+            const comicsContainer = document.getElementById('list-detail-comics-container');
+            comicsContainer.innerHTML = '<p class="text-sm text-gray-400 text-center py-4">Loading comics...</p>';
+
+            const details = await window.ReadingLists.getReadingListDetails(listId);
+            if (!details.items || details.items.length === 0) {
+              comicsContainer.innerHTML = '<p class="text-sm text-gray-400 text-center py-4">No comics in this list.</p>';
+            } else {
+              // Reload the entire detail view to refresh all comics
+              hideReadingListDetail();
+              showReadingListDetail(listId, listName);
+            }
+          } else {
+            alert('Failed to remove comic from list. Please try again.');
+          }
+        } catch (error) {
+          console.error('Failed to delete comic from list:', error);
+          alert('Failed to remove comic from list. Please try again.');
         }
       });
 

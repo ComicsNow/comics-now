@@ -141,6 +141,28 @@
     }
   }
 
+  /**
+   * Remove comics from a reading list
+   * @param {string} listId - Reading list ID
+   * @param {Array<string>} comicIds - Array of comic IDs to remove
+   * @returns {Promise<Object>} Result object with ok status
+   */
+  async function removeComicsFromList(listId, comicIds) {
+    try {
+      const baseUrl = getBaseUrl();
+      const response = await fetch(`${baseUrl}/api/v1/reading-lists/${listId}/comics`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ comicIds })
+      });
+      const data = await response.json();
+      return data;
+    } catch (error) {
+      console.error('[Reading Lists] Error removing comics:', error);
+      throw error;
+    }
+  }
+
   // ============================================================================
   // MODAL MANAGEMENT
   // ============================================================================
@@ -336,6 +358,7 @@
     addComicsToList,
     getReadingListDetails,
     markListAsRead,
+    removeComicsFromList,
     openAddToListModal,
     closeAddToListModal
   };
