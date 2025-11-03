@@ -163,13 +163,8 @@
     setLibraryControlsVisibility(false);
     global.updateOrientationButtons?.();
 
-    global.comicListDiv?.classList.add('hidden');
-    if (global.smartListView) global.smartListView.classList.add('hidden');
-    global.searchResultsView?.classList.add('hidden');
-    if (global.comicViewerDiv) {
-      global.comicViewerDiv.classList.remove('hidden');
-      global.comicViewerDiv.style.display = '';
-    }
+    // Use centralized showView to properly hide all library views
+    global.showView?.(global.comicViewerDiv);
 
     const displayInfo = global.applyDisplayInfoToComic?.(comic) || {};
     if (global.comicTitleH2) {

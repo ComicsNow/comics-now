@@ -199,6 +199,31 @@ function initializeDatabase() {
     db.run(`CREATE INDEX IF NOT EXISTS idx_user_library_access_lookup
       ON user_library_access(userId, accessType)`);
 
+    // Reading lists table
+    db.run(`CREATE TABLE IF NOT EXISTS reading_lists (
+      id TEXT PRIMARY KEY,
+      userId TEXT NOT NULL,
+      name TEXT NOT NULL,
+      description TEXT,
+      created INTEGER DEFAULT (strftime('%s', 'now') * 1000),
+      updated INTEGER DEFAULT (strftime('%s', 'now') * 1000),
+      FOREIGN KEY (userId) REFERENCES users(userId) ON DELETE CASCADE
+    )`);
+
+    // Reading list items (comics in lists) with sort order
+    db.run(`CREATE TABLE IF NOT EXISTS reading_list_items (
+      listId TEXT NOT NULL,
+      comicId TEXT NOT NULL,
+      addedAt INTEGER DEFAULT (strftime('%s', 'now') * 1000),
+      sortOrder INTEGER DEFAULT 0,
+      PRIMARY KEY (listId, comicId),
+      FOREIGN KEY (listId) REFERENCES reading_lists(id) ON DELETE CASCADE
+    )`);
+
+    // Create index for faster comic lookups in reading lists
+    db.run(`CREATE INDEX IF NOT EXISTS idx_reading_list_items_comic
+      ON reading_list_items(comicId)`);
+
 
     db.all('PRAGMA table_info(comics)', (err, cols) => {
       if (err) {

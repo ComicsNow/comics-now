@@ -12,7 +12,7 @@
   <link rel="icon" type="image/png" href="icons/icon-192x192.png">
   <link rel="stylesheet" href="tailwind.css">
   <script src="jszip.min.js"></script>
-  <link rel="stylesheet" href="style.css?v=1.0">
+  <link rel="stylesheet" href="style.css?v=1.5">
 </head>
 <body class="p-4 sm:p-8">
  
@@ -24,30 +24,6 @@
     Offline
   </div>
 
-  <!-- Logout Button (left side) -->
-  <div class="absolute top-4 left-4 sm:top-8 sm:left-8 z-30">
-    <button id="logout-button" aria-label="Logout" class="hidden bg-red-600 hover:bg-red-500 text-white font-bold p-2 rounded-full transition-colors" onclick="handleLogout()">
-      <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-        <path stroke-linecap="round" stroke-linejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-      </svg>
-    </button>
-  </div>
-
-  <!-- Settings and CT Buttons (right side) -->
-  <div class="absolute top-4 right-4 sm:top-8 sm:right-8 z-30 flex flex-wrap justify-end gap-2">
-    <button id="ct-button" aria-label="ComicTagger" class="bg-blue-600 hover:bg-blue-500 text-white font-bold p-2 rounded-full transition-colors">CT</button>
-    <button onclick="openSettingsModal()" aria-label="Settings" class="bg-gray-700 hover:bg-gray-600 text-white font-bold p-2 rounded-full transition-colors">
-      <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-        <path stroke-linecap="round" stroke-linejoin="round" d="M11.049 2.927c.3-1.14 1.902-1.14 2.201 0a1.724 1.724 0 002.591 1.114l.043-.03a1.724 1.724 0 012.448 2.448l-.03.043a1.724 1.724 0 001.114 2.591c1.14.3 1.14 1.902 0 2.201a1.724 1.724 0 00-1.114 2.591l.03.043a1.724 1.724 0 01-2.448 2.448l-.043-.03a1.724 1.724 0 00-2.591 1.114c-.3 1.14-1.902 1.14-2.201 0a1.724 1.724 0 00-2.591-1.114l-.043.03a1.724 1.724 0 01-2.448-2.448l.03-.043a1.724 1.724 0 00-1.114-2.591c-1.14-.3-1.14-1.902 0-2.201a1.724 1.724 0 001.114-2.591l-.03-.043a1.724 1.724 0 012.448-2.448l.043.03a1.724 1.724 0 002.591-1.114z" />
-        <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-      </svg>
-    </button>
-  </div>
-
-  <!-- Ko-fi Support Button (left side) -->
-  <a href="https://ko-fi.com/comicsnow" target="_blank" rel="noopener noreferrer" aria-label="Support on Ko-fi" class="fixed bottom-4 left-4 bg-red-600 hover:bg-red-500 text-white font-bold p-3 rounded-full transition-colors shadow-lg z-50 text-lg">
-    ☕
-  </a>
 
   <!-- Download Queue (bottom right) -->
   <div id="download-queue" class="hidden fixed bottom-4 right-4 z-40 w-80 max-w-[calc(100vw-2rem)]"></div>
@@ -382,6 +358,9 @@
           <input type="number" id="ct-schedule-input" class="w-full bg-gray-700 text-white p-2 rounded-lg" min="1" value="60">
         </div>
         <div class="mb-4">
+          <button id="ct-save-btn" class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-full transition-colors">Save</button>
+        </div>
+        <div class="mb-4">
           <h4 class="font-semibold mb-2">Possible Matches</h4>
           <div id="ct-match-container" class="min-h-[200px] max-h-[600px] overflow-y-auto bg-gray-900 p-3 rounded-lg">
             <div id="ct-no-matches" class="text-gray-500 text-sm text-center py-8">
@@ -398,7 +377,6 @@
         <div class="flex space-x-2">
           <button id="ct-apply-btn" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-full transition-colors">Apply</button>
           <button id="ct-skip-btn" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-full transition-colors">Skip</button>
-          <button id="ct-save-btn" class="ml-auto bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-full transition-colors">Save</button>
         </div>
         <div id="ct-confirm-bar" class="hidden mt-4 flex items-center space-x-4">
           <span id="ct-confirm-message" class="text-white"></span>
@@ -415,6 +393,69 @@
             <button id="ct-clear-output" class="bg-gray-600 hover:bg-gray-500 text-white font-bold py-2 px-4 rounded-full transition-colors">Clear Output</button>
           </div>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Reading List Modal -->
+  <div id="reading-list-modal" class="hidden fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-40 p-4">
+    <div class="bg-gray-800 rounded-lg w-full h-full sm:h-auto sm:max-h-[90vh] max-w-3xl shadow-lg flex flex-col overflow-hidden">
+      <div class="flex justify-between items-center p-4 sm:p-6 border-b border-gray-700">
+        <div class="flex items-center gap-3">
+          <h3 class="text-2xl font-bold">Reading Lists</h3>
+          <span id="library-status-badge" class="text-xs px-2 py-1 rounded-full bg-yellow-600">Loading...</span>
+        </div>
+        <button id="reading-list-close-btn" class="text-2xl font-bold hover:text-gray-300 transition-colors">&times;</button>
+      </div>
+
+      <div class="flex-1 overflow-y-auto p-4 sm:p-6">
+        <!-- Create New Reading List Button -->
+        <div class="mb-6">
+          <button id="create-reading-list-btn" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-lg transition-colors flex items-center justify-center gap-2">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
+            </svg>
+            <span>Create New Reading List</span>
+          </button>
+        </div>
+
+        <!-- Your Reading Lists Section -->
+        <div>
+          <h4 class="text-lg font-semibold mb-3">Your Reading Lists</h4>
+          <div id="reading-lists-container" class="space-y-2">
+            <p class="text-sm text-gray-400 text-center py-4">No reading lists yet. Create one to get started!</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Add to Reading List Selection Modal -->
+  <div id="add-to-list-modal" class="hidden fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center p-4" style="z-index: 9999;">
+    <div class="bg-gray-800 rounded-lg w-full max-w-md shadow-lg flex flex-col overflow-hidden">
+      <div class="flex justify-between items-center p-4 border-b border-gray-700">
+        <h3 class="text-xl font-bold">Add to Reading List</h3>
+        <button id="add-to-list-close-btn" class="text-2xl font-bold hover:text-gray-300 transition-colors">&times;</button>
+      </div>
+
+      <div class="flex-1 overflow-y-auto p-4 max-h-96">
+        <!-- Create New List Button -->
+        <button id="add-to-list-create-new-btn" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg transition-colors mb-4 flex items-center justify-center gap-2">
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
+          </svg>
+          <span>Create New List</span>
+        </button>
+
+        <!-- Reading Lists Checkboxes -->
+        <div id="add-to-list-container" class="space-y-2">
+          <p class="text-sm text-gray-400 text-center py-4">No reading lists yet. Create one to get started!</p>
+        </div>
+      </div>
+
+      <div class="flex justify-end gap-2 p-4 border-t border-gray-700">
+        <button id="add-to-list-cancel-btn" class="bg-gray-600 hover:bg-gray-500 text-white font-bold py-2 px-4 rounded-lg transition-colors">Cancel</button>
+        <button id="add-to-list-save-btn" class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-lg transition-colors">Save</button>
       </div>
     </div>
   </div>
@@ -556,8 +597,35 @@
     
 
   <div id="app" class="container mx-auto">
-    <h1 class="text-4xl font-bold mb-6 text-center text-white">Comics Now!</h1>
+    <!-- Heading -->
+    <h1 class="text-4xl font-bold mb-4 text-center text-white">Comics Now!</h1>
 
+    <!-- Button Container with Split Layout -->
+    <div class="flex justify-between items-center mb-6 px-2">
+      <!-- Left Group: Ko-fi and Logout -->
+      <div class="flex gap-2">
+        <a href="https://ko-fi.com/comicsnow" target="_blank" rel="noopener noreferrer" aria-label="Support on Ko-fi" class="bg-red-600 hover:bg-red-500 text-white font-bold p-3 rounded-full transition-colors shadow-lg text-lg">
+          ☕
+        </a>
+        <button id="logout-button" aria-label="Logout" class="hidden bg-red-600 hover:bg-red-500 text-white font-bold p-2 rounded-full transition-colors" onclick="handleLogout()">
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+          </svg>
+        </button>
+      </div>
+
+      <!-- Right Group: Reading List, ComicTagger, and Settings -->
+      <div class="flex gap-2">
+        <button id="reading-list-button" aria-label="Reading Lists" class="bg-green-600 hover:bg-green-500 text-white font-bold p-3 rounded-full transition-colors shadow-lg text-lg" onclick="openReadingListModal()">📚</button>
+        <button id="ct-button" aria-label="ComicTagger" class="bg-blue-600 hover:bg-blue-500 text-white font-bold p-2 rounded-full transition-colors">CT</button>
+        <button onclick="openSettingsModal()" aria-label="Settings" class="bg-gray-700 hover:bg-gray-600 text-white font-bold p-2 rounded-full transition-colors">
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M11.049 2.927c.3-1.14 1.902-1.14 2.201 0a1.724 1.724 0 002.591 1.114l.043-.03a1.724 1.724 0 012.448 2.448l-.03.043a1.724 1.724 0 001.114 2.591c1.14.3 1.14 1.902 0 2.201a1.724 1.724 0 00-1.114 2.591l.03.043a1.724 1.724 0 01-2.448 2.448l-.043-.03a1.724 1.724 0 00-2.591 1.114c-.3 1.14-1.902 1.14-2.201 0a1.724 1.724 0 00-2.591-1.114l-.043.03a1.724 1.724 0 01-2.448-2.448l.03-.043a1.724 1.724 0 00-1.114-2.591c-1.14-.3-1.14-1.902 0-2.201a1.724 1.724 0 001.114-2.591l-.03-.043a1.724 1.724 0 012.448-2.448l.043.03a1.724 1.724 0 002.591-1.114z" />
+            <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+          </svg>
+        </button>
+      </div>
+    </div>
 
     <!-- Search Bar -->
     <div id="search-container" class="mb-6">
@@ -960,12 +1028,13 @@
   <script src="js/viewer/ui.js"></script>
   <script src="js/viewer.js"></script>
   <script src="js/settings.js"></script>
-  <script src="js/comictagger.js"></script>
+  <script src="js/comictagger.js" data-cfasync="false"></script>
   <script src="js/events.js"></script>
   <script src="js/comicvine.js"></script>
   <script src="js/progress.js"></script>
   <script src="js/sync.js"></script>
   <script src="js/auth.js"></script>
+  <script src="js/reading-lists.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

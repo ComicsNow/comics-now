@@ -56,6 +56,26 @@ function showOfflineLibraryUnavailableMessage() {
   }
 }
 
+// --- LIBRARY STATUS TRACKING ---
+window.libraryReady = false;
+window.libraryLoadedAt = null;
+
+function updateLibraryStatusBadge() {
+  const badge = document.getElementById('library-status-badge');
+  if (!badge) return;
+
+  if (window.libraryReady) {
+    const comicCount = Object.keys(window.library || {}).length;
+    badge.textContent = comicCount > 0 ? 'Ready' : 'Empty';
+    badge.className = comicCount > 0
+      ? 'text-xs px-2 py-1 rounded-full bg-green-600'
+      : 'text-xs px-2 py-1 rounded-full bg-gray-600';
+  } else {
+    badge.textContent = 'Loading...';
+    badge.className = 'text-xs px-2 py-1 rounded-full bg-yellow-600';
+  }
+}
+
 // --- INITIAL LOAD ---
 async function initializeApp() {
   try {
@@ -263,8 +283,17 @@ async function loadLibraryOfflineFirst() {
       }, 50);
     }
 
+    // Mark library as ready
+    window.libraryReady = true;
+    window.libraryLoadedAt = Date.now();
+    console.log('[LIBRARY] Library loaded successfully. Comics available:', Object.keys(library).length);
+
+    // Update library status badge
+    updateLibraryStatusBadge();
+
   } catch (error) {
-    
+    window.libraryReady = false;
+    console.error('[LIBRARY] Failed to load library:', error);
     rootFolderListContainer.innerHTML = '<div class="bg-gray-800 rounded-lg p-6 text-center text-red-400 col-span-full">Error loading library. Check network connection.</div>';
   }
 }
@@ -340,17 +369,17 @@ function showUserBadge() {
   const badge = document.createElement('div');
   badge.id = 'user-badge';
   badge.className = 'z-30 bg-gray-700 text-white text-xs sm:text-sm font-medium shadow-lg';
-  badge.style.cssText = 'position: relative; padding: 0.25rem 0.75rem; border-radius: 9999px; display: inline-flex; align-items: center; gap: 0.5rem; white-space: nowrap; width: fit-content; max-width: 250px;';
+  badge.style.cssText = 'position: fixed; padding: 0.25rem 0.75rem; border-radius: 9999px; display: inline-flex; align-items: center; gap: 0.5rem; white-space: nowrap; width: fit-content; max-width: 250px;';
 
   // Position at bottom left of page for both mobile and desktop
   if (window.matchMedia('(min-width: 640px)').matches) {
-    // Desktop: Position at bottom left (moved 25px right)
-    badge.style.bottom = '0.01rem';
-    badge.style.left = 'calc(2rem + 25px)';
+    // Desktop: Position at bottom left
+    badge.style.bottom = '1rem';
+    badge.style.left = '2rem';
   } else {
-    // Mobile: Position at bottom left (moved 25px right)
-    badge.style.bottom = '0.01rem';
-    badge.style.left = 'calc(1rem + 25px)';
+    // Mobile: Position at bottom left
+    badge.style.bottom = '1rem';
+    badge.style.left = '1rem';
   }
 
   // Add role indicator color
@@ -432,5 +461,432 @@ if (typeof window !== 'undefined') {
   window.loadLibraryOfflineFirst = loadLibraryOfflineFirst;
   window.fetchLibraryFromServer = fetchLibraryFromServer;
 }
+
+// --- READING LIST MODAL ---
+
+/**
+ * Open the reading list modal and refresh its contents
+ */
+function openReadingListModal() {
+  const modal = document.getElementById('reading-list-modal');
+  if (modal) {
+    modal.classList.remove('hidden');
+    updateLibraryStatusBadge(); // Update status badge
+    refreshReadingListModal();
+  }
+}
+
+/**
+ * Close the reading list modal
+ */
+function closeReadingListModal() {
+  const modal = document.getElementById('reading-list-modal');
+  if (modal) {
+    modal.classList.add('hidden');
+  }
+}
+
+/**
+ * Get comic object by ID from the library
+ * @param {string} comicId - The comic ID
+ * @returns {object|null} The comic object or null
+ */
+function getComicById(comicId) {
+  if (!window.library || typeof window.library !== 'object') {
+    console.error('[Reading List] Library not loaded yet');
+    return null;
+  }
+
+  const libraryKeys = Object.keys(window.library);
+  if (libraryKeys.length === 0) {
+    console.error('[Reading List] Library is empty - no comics available');
+    return null;
+  }
+
+  // Iterate through root folders (object keys)
+  for (const rootFolderKey of libraryKeys) {
+    const rootFolder = window.library[rootFolderKey];
+    const publishers = rootFolder?.publishers || {};
+
+    // Iterate through publishers (object keys)
+    for (const publisherName of Object.keys(publishers)) {
+      const publisher = publishers[publisherName];
+      const seriesEntries = publisher?.series || {};
+
+      // Iterate through series (object keys)
+      for (const seriesName of Object.keys(seriesEntries)) {
+        const comics = seriesEntries[seriesName];
+
+        // Comics is an array
+        if (Array.isArray(comics)) {
+          const comic = comics.find(c => c.id === comicId);
+          if (comic) return comic;
+        }
+      }
+    }
+  }
+
+  console.error(`[Reading List] Comic not found: ${comicId}`);
+  return null;
+}
+
+// Expose to window scope
+window.getComicById = getComicById;
+
+/**
+ * Refresh the reading list modal display
+ */
+async function refreshReadingListModal() {
+  const listsContainer = document.getElementById('reading-lists-container');
+  if (!listsContainer) return;
+
+  // Show loading state
+  listsContainer.innerHTML = '<p class="text-sm text-gray-400 text-center py-4">Loading...</p>';
+
+  // Fetch lists from API
+  if (typeof window.ReadingLists !== 'undefined' && typeof window.ReadingLists.fetchReadingLists === 'function') {
+    const lists = await window.ReadingLists.fetchReadingLists();
+
+    if (lists.length === 0) {
+      listsContainer.innerHTML = '<p class="text-sm text-gray-400 text-center py-4">No reading lists yet. Create one to get started!</p>';
+    } else {
+      listsContainer.innerHTML = '';
+
+      lists.forEach((list) => {
+        const listDiv = document.createElement('div');
+        listDiv.className = 'bg-gray-700 p-4 rounded-lg relative cursor-pointer hover:bg-gray-600 transition-colors';
+        listDiv.dataset.listId = list.id;
+
+        const itemCount = list.totalComics || 0;
+        const readCount = list.readComics || 0;
+        const createdDate = list.created ? new Date(list.created).toLocaleDateString() : '';
+        const progressPercent = list.progressPercent || 0;
+
+        // Determine read status
+        const allRead = readCount === itemCount && itemCount > 0;
+        const hasProgress = readCount > 0;
+
+        listDiv.innerHTML = `
+          <div class="flex justify-between items-start mb-2">
+            <div class="flex-1">
+              <h5 class="font-bold text-lg">📚 ${list.name}</h5>
+              <p class="text-xs text-gray-400">Created: ${createdDate}</p>
+              <p class="text-sm text-gray-300 mt-1">${readCount} of ${itemCount} comics read</p>
+            </div>
+            <button class="text-red-400 hover:text-red-300 text-sm delete-list-btn" data-list-id="${list.id}">Delete</button>
+          </div>
+
+          <!-- Progress Bar -->
+          <div class="relative h-1.5 bg-gray-600 rounded-full mb-3">
+            <div class="bg-purple-600 h-full rounded-full transition-all" style="width: ${progressPercent}%;"></div>
+          </div>
+
+          <!-- Action Icons -->
+          <div class="flex gap-2 items-center">
+            <button class="text-white hover:text-gray-300 transition-colors p-2 rounded-full hover:bg-gray-600 read-toggle-btn"
+                    data-list-id="${list.id}"
+                    data-current-status="${allRead}"
+                    title="${allRead ? 'Mark as unread' : 'Mark as read'}"
+                    aria-label="${allRead ? 'Mark as unread' : 'Mark as read'}">
+              ${allRead ? '✓' : '👁'}
+            </button>
+
+            <button class="hidden sm:block text-white hover:text-gray-300 transition-colors p-2 rounded-full hover:bg-gray-600 download-list-btn"
+                    data-list-id="${list.id}"
+                    title="Download all comics"
+                    aria-label="Download all comics">
+              ⬇
+            </button>
+
+            <button class="text-white hover:text-gray-300 transition-colors p-2 rounded-full hover:bg-gray-600 play-list-btn"
+                    data-list-id="${list.id}"
+                    title="${allRead ? 'Restart' : hasProgress ? 'Continue' : 'Play'}"
+                    aria-label="${allRead ? 'Restart' : hasProgress ? 'Continue' : 'Play'}">
+              ${allRead ? '🔄' : '▶'}
+            </button>
+          </div>
+        `;
+
+        // Click handler for card (opens detail view)
+        listDiv.addEventListener('click', (e) => {
+          // Ignore if clicking on buttons
+          if (e.target.closest('button')) return;
+          showReadingListDetail(list.id, list.name);
+        });
+
+        // Delete button handler
+        const deleteBtn = listDiv.querySelector('.delete-list-btn');
+        deleteBtn.addEventListener('click', async (e) => {
+          e.stopPropagation();
+          if (confirm(`Are you sure you want to delete "${list.name}"?`)) {
+            await deleteReadingList(list.id);
+          }
+        });
+
+        // Read/Unread toggle handler
+        const readToggleBtn = listDiv.querySelector('.read-toggle-btn');
+        readToggleBtn.addEventListener('click', async (e) => {
+          e.stopPropagation();
+          const isCurrentlyRead = readToggleBtn.dataset.currentStatus === 'true';
+          const newStatus = !isCurrentlyRead;
+
+          try {
+            await window.ReadingLists.markListAsRead(list.id, newStatus);
+            await refreshReadingListModal();
+          } catch (error) {
+            alert('Failed to update reading status. Please try again.');
+          }
+        });
+
+        // Download handler
+        const downloadBtn = listDiv.querySelector('.download-list-btn');
+        downloadBtn.addEventListener('click', async (e) => {
+          e.stopPropagation();
+          // TODO: Implement download all comics functionality
+          alert('Download functionality coming soon!');
+        });
+
+        // Play/Continue handler
+        const playBtn = listDiv.querySelector('.play-list-btn');
+        playBtn.addEventListener('click', async (e) => {
+          e.stopPropagation();
+
+          // Check if library is loaded
+          if (!window.library || Object.keys(window.library).length === 0) {
+            alert('Library is still loading. Check the status badge at the top - it will show "Ready" when comics are available. Try again in a moment.');
+            return;
+          }
+
+          try {
+            const details = await window.ReadingLists.getReadingListDetails(list.id);
+
+            // Find first unread or in-progress comic
+            let firstComic = details.items.find(item => {
+              const total = item.totalPages || 0;
+              const last = item.lastReadPage || 0;
+              return total === 0 || last < total - 1; // Not finished
+            });
+
+            // If all read, start from beginning
+            if (!firstComic && details.items.length > 0) {
+              firstComic = details.items[0];
+            }
+
+            if (firstComic) {
+              // Find the comic in the library
+              const comic = getComicById(firstComic.comicId);
+              if (comic && typeof window.openComicViewer === 'function') {
+                window.openComicViewer(comic);
+              } else {
+                alert('Could not find comic in library. The comic may have been moved or deleted.');
+              }
+            }
+          } catch (error) {
+            console.error('Failed to play reading list:', error);
+            alert('Failed to open comic. Please try again.');
+          }
+        });
+
+        listsContainer.appendChild(listDiv);
+      });
+    }
+  }
+}
+
+/**
+ * Create a new reading list
+ */
+async function createReadingList() {
+  const name = prompt('Enter a name for your reading list:');
+
+  if (!name || name.trim() === '') {
+    return;
+  }
+
+  // Use API to create list
+  if (typeof window.ReadingLists !== 'undefined' && typeof window.ReadingLists.createReadingList === 'function') {
+    try {
+      await window.ReadingLists.createReadingList(name.trim(), '', []);
+      console.log(`[Reading List] Created list "${name}"`);
+
+      // Refresh the modal display
+      await refreshReadingListModal();
+    } catch (error) {
+      console.error('[Reading List] Failed to create list:', error);
+      alert('Failed to create reading list. Please try again.');
+    }
+  }
+}
+
+/**
+ * Delete a reading list by ID
+ * @param {string} listId - The ID of the list to delete
+ */
+async function deleteReadingList(listId) {
+  if (!listId) return;
+
+  try {
+    // Get base URL
+    const baseTag = document.querySelector('base');
+    const baseUrl = baseTag && baseTag.href ? new URL(baseTag.href).pathname.replace(/\/$/, '') : '';
+
+    // Call delete API
+    const response = await fetch(`${baseUrl}/api/v1/reading-lists/${listId}`, {
+      method: 'DELETE'
+    });
+
+    const data = await response.json();
+    if (data.ok) {
+      console.log(`[Reading List] Deleted list ${listId}`);
+      await refreshReadingListModal();
+    } else {
+      throw new Error(data.message || 'Failed to delete list');
+    }
+  } catch (error) {
+    console.error('[Reading List] Failed to delete list:', error);
+    alert('Failed to delete reading list. Please try again.');
+  }
+}
+
+/**
+ * Show reading list detail view
+ * @param {string} listId - The reading list ID
+ * @param {string} listName - The reading list name
+ */
+async function showReadingListDetail(listId, listName) {
+  const modalContent = document.getElementById('reading-lists-container').parentElement;
+  if (!modalContent) return;
+
+  // Hide main list view
+  document.getElementById('reading-lists-container').parentElement.classList.add('hidden');
+
+  // Create detail view
+  const detailView = document.createElement('div');
+  detailView.id = 'reading-list-detail-view';
+  detailView.className = 'flex-1 overflow-y-auto p-4 sm:p-6';
+
+  detailView.innerHTML = `
+    <div class="mb-4 flex items-center gap-4">
+      <button id="back-to-lists-btn" class="text-gray-400 hover:text-white transition-colors text-2xl" title="Back to lists">
+        ←
+      </button>
+      <h2 class="text-2xl font-bold">${listName}</h2>
+    </div>
+    <div id="list-detail-comics-container" class="space-y-2">
+      <p class="text-sm text-gray-400 text-center py-4">Loading comics...</p>
+    </div>
+  `;
+
+  // Insert detail view
+  modalContent.appendChild(detailView);
+
+  // Add back button handler
+  document.getElementById('back-to-lists-btn').addEventListener('click', hideReadingListDetail);
+
+  // Load comics for this list
+  try {
+    const details = await window.ReadingLists.getReadingListDetails(listId);
+    const comicsContainer = document.getElementById('list-detail-comics-container');
+
+    if (!details.items || details.items.length === 0) {
+      comicsContainer.innerHTML = '<p class="text-sm text-gray-400 text-center py-4">No comics in this list.</p>';
+      return;
+    }
+
+    comicsContainer.innerHTML = '';
+
+    details.items.forEach((item) => {
+      const comic = getComicById(item.comicId);
+      if (!comic) return; // Skip if comic not found in library
+
+      const comicDiv = document.createElement('div');
+      comicDiv.className = 'bg-gray-700 p-3 rounded flex items-center gap-3 hover:bg-gray-600 cursor-pointer transition-colors';
+
+      const title = comic.title || comic.name || 'Unknown';
+      const total = item.totalPages || 0;
+      const last = item.lastReadPage || 0;
+      const progressPercent = total > 0 ? Math.round((last / total) * 100) : 0;
+
+      // Determine status
+      let status = 'unread';
+      if (total > 0) {
+        if (last >= total - 1) status = 'read';
+        else if (last > 0) status = 'in-progress';
+      } else if (last > 0) {
+        status = 'in-progress';
+      }
+
+      comicDiv.innerHTML = `
+        <div class="flex-shrink-0 text-2xl">
+          ${status === 'read' ? '✓' : status === 'in-progress' ? '👁' : '○'}
+        </div>
+        <div class="flex-1 min-w-0">
+          <p class="font-semibold truncate">${title}</p>
+          ${total > 0 ? `
+            <div class="flex items-center gap-2 mt-1">
+              <div class="flex-1 h-1 bg-gray-600 rounded-full">
+                <div class="bg-purple-600 h-full rounded-full" style="width: ${progressPercent}%;"></div>
+              </div>
+              <span class="text-xs text-gray-400">${progressPercent}%</span>
+            </div>
+          ` : '<p class="text-xs text-gray-400">No progress data</p>'}
+        </div>
+      `;
+
+      // Click to open comic
+      comicDiv.addEventListener('click', () => {
+        if (typeof window.openComicViewer === 'function') {
+          window.openComicViewer(comic);
+        }
+      });
+
+      comicsContainer.appendChild(comicDiv);
+    });
+  } catch (error) {
+    console.error('Failed to load reading list details:', error);
+    document.getElementById('list-detail-comics-container').innerHTML = '<p class="text-sm text-red-400 text-center py-4">Failed to load comics.</p>';
+  }
+}
+
+/**
+ * Hide reading list detail view and return to main list
+ */
+function hideReadingListDetail() {
+  const detailView = document.getElementById('reading-list-detail-view');
+  if (detailView) {
+    detailView.remove();
+  }
+
+  // Show main list view
+  const mainView = document.getElementById('reading-lists-container').parentElement;
+  if (mainView) {
+    mainView.classList.remove('hidden');
+  }
+}
+
+// Add event listeners for reading list modal (after DOM loads)
+document.addEventListener('DOMContentLoaded', () => {
+  // Close button
+  const closeBtn = document.getElementById('reading-list-close-btn');
+  if (closeBtn) {
+    closeBtn.addEventListener('click', closeReadingListModal);
+  }
+
+  // Create reading list button
+  const createBtn = document.getElementById('create-reading-list-btn');
+  if (createBtn) {
+    createBtn.addEventListener('click', createReadingList);
+  }
+
+  // Close modal when clicking outside
+  const modal = document.getElementById('reading-list-modal');
+  if (modal) {
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) {
+        closeReadingListModal();
+      }
+    });
+  }
+});
 
 initializeApp();

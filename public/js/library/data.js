@@ -34,10 +34,10 @@
         return false;
       }
 
-      library = await response.json();
-      applyDisplayInfoToLibrary(library);
+      global.library = await response.json();
+      applyDisplayInfoToLibrary(global.library);
 
-      library._isLazyLoaded = true;
+      global.library._isLazyLoaded = true;
 
       debugLog('LAZY', 'Progressive loading successful');
       return true;
@@ -55,18 +55,18 @@
       throw new Error(`Failed to fetch library: ${response.status} ${response.statusText}`);
     }
 
-    library = await response.json();
-    applyDisplayInfoToLibrary(library);
+    global.library = await response.json();
+    applyDisplayInfoToLibrary(global.library);
 
     if (typeof saveLibraryCacheToDB === 'function') {
       try {
-        await saveLibraryCacheToDB(library);
+        await saveLibraryCacheToDB(global.library);
       } catch (error) {
-        
+
       }
     }
 
-    const librarySize = estimateLibrarySize(library);
+    const librarySize = estimateLibrarySize(global.library);
     if (librarySize > 1000) {
       global.LibraryRender?.applyFilterAndRender?.();
       requestAnimationFrame(() => {
@@ -96,12 +96,12 @@
   }
 
   async function ensureSeriesLoaded(rootFolder, publisher, series) {
-    if (!library._isLazyLoaded) {
+    if (!global.library._isLazyLoaded) {
       return true;
     }
 
     try {
-      const seriesData = library[rootFolder]?.publishers?.[publisher]?.series?.[series];
+      const seriesData = global.library[rootFolder]?.publishers?.[publisher]?.series?.[series];
 
       if (!seriesData || seriesData._hasDetails) {
         return true;
@@ -114,18 +114,18 @@
       );
 
       if (!response.ok) {
-        
+
         return false;
       }
 
       const comics = await response.json();
 
-      library[rootFolder].publishers[publisher].series[series] = comics;
+      global.library[rootFolder].publishers[publisher].series[series] = comics;
 
       debugLog('LAZY', `Successfully loaded ${comics.length} comics for series ${series}`);
       return true;
     } catch (error) {
-      
+
       return false;
     }
   }
@@ -133,12 +133,12 @@
   async function getSeriesComics(rootFolder, publisher, series) {
     await ensureSeriesLoaded(rootFolder, publisher, series);
 
-    const seriesData = library[rootFolder]?.publishers?.[publisher]?.series?.[series];
+    const seriesData = global.library[rootFolder]?.publishers?.[publisher]?.series?.[series];
 
     if (Array.isArray(seriesData)) {
       return seriesData;
     } else if (seriesData && seriesData._hasDetails === false) {
-      
+
       return [];
     }
 
@@ -146,11 +146,11 @@
   }
 
   function updateComicInLibrary(comicId, updates) {
-    if (!library || typeof library !== 'object' || !comicId || !updates) return false;
+    if (!global.library || typeof global.library !== 'object' || !comicId || !updates) return false;
 
     try {
-      for (const rootFolder of Object.keys(library)) {
-        const publishers = library[rootFolder]?.publishers || {};
+      for (const rootFolder of Object.keys(global.library)) {
+        const publishers = global.library[rootFolder]?.publishers || {};
         for (const publisherName of Object.keys(publishers)) {
           const seriesEntries = publishers[publisherName]?.series || {};
           for (const seriesName of Object.keys(seriesEntries)) {
@@ -167,7 +167,7 @@
       }
       return false;
     } catch (error) {
-      
+
       return false;
     }
   }

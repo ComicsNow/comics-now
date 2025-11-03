@@ -197,6 +197,28 @@
       menu.appendChild(continuousModeItem);
     }
 
+    // 5. Reading List menu item
+    const readingListItem = document.createElement('div');
+    readingListItem.className = 'comic-context-menu-item';
+    readingListItem.innerHTML = `${ICONS.READING_LIST}<span>Add to Reading List</span>`;
+
+    readingListItem.addEventListener('click', async (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      closeContextMenu();
+
+      // Open selection modal with this comic
+      if (typeof global.ReadingLists !== 'undefined' && typeof global.ReadingLists.openAddToListModal === 'function') {
+        try {
+          global.ReadingLists.openAddToListModal([comic.id]);
+        } catch (error) {
+          console.error('Failed to open reading list modal:', error);
+        }
+      }
+    });
+
+    menu.appendChild(readingListItem);
+
     // Position menu and attach close handler
     positionContextMenu(menu, event);
     attachCloseHandler(menu);
@@ -419,6 +441,31 @@
       menu.appendChild(continuousModeItem);
     }
 
+    // 5. Reading List for the entire series
+    if (hasComics) {
+      const readingListItem = document.createElement('div');
+      readingListItem.className = 'comic-context-menu-item';
+      readingListItem.innerHTML = `${ICONS.READING_LIST}<span>Add to Reading List</span>`;
+
+      readingListItem.addEventListener('click', async (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        closeContextMenu();
+
+        // Open selection modal with all comics in series
+        if (typeof global.ReadingLists !== 'undefined' && typeof global.ReadingLists.openAddToListModal === 'function') {
+          try {
+            const comicIds = comicsInSeries.map(comic => comic.id);
+            global.ReadingLists.openAddToListModal(comicIds);
+          } catch (error) {
+            console.error('Failed to open reading list modal:', error);
+          }
+        }
+      });
+
+      menu.appendChild(readingListItem);
+    }
+
     // Position menu and attach close handler
     positionContextMenu(menu, event);
     attachCloseHandler(menu);
@@ -588,6 +635,31 @@
       });
 
       menu.appendChild(continuousModeItem);
+    }
+
+    // 4. Reading List for the entire publisher
+    if (allComics.length > 0) {
+      const readingListItem = document.createElement('div');
+      readingListItem.className = 'comic-context-menu-item';
+      readingListItem.innerHTML = `${ICONS.READING_LIST}<span>Add to Reading List</span>`;
+
+      readingListItem.addEventListener('click', async (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        closeContextMenu();
+
+        // Open selection modal with all comics in publisher
+        if (typeof global.ReadingLists !== 'undefined' && typeof global.ReadingLists.openAddToListModal === 'function') {
+          try {
+            const comicIds = allComics.map(comic => comic.id);
+            global.ReadingLists.openAddToListModal(comicIds);
+          } catch (error) {
+            console.error('Failed to open reading list modal:', error);
+          }
+        }
+      });
+
+      menu.appendChild(readingListItem);
     }
 
     // Position menu and attach close handler
@@ -764,6 +836,31 @@
       });
 
       menu.appendChild(continuousModeItem);
+    }
+
+    // 4. Reading List for the entire library
+    if (allComics.length > 0) {
+      const readingListItem = document.createElement('div');
+      readingListItem.className = 'comic-context-menu-item';
+      readingListItem.innerHTML = `${ICONS.READING_LIST}<span>Add to Reading List</span>`;
+
+      readingListItem.addEventListener('click', async (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        closeContextMenu();
+
+        // Open selection modal with all comics in library
+        if (typeof global.ReadingLists !== 'undefined' && typeof global.ReadingLists.openAddToListModal === 'function') {
+          try {
+            const comicIds = allComics.map(comic => comic.id);
+            global.ReadingLists.openAddToListModal(comicIds);
+          } catch (error) {
+            console.error('Failed to open reading list modal:', error);
+          }
+        }
+      });
+
+      menu.appendChild(readingListItem);
     }
 
     // Position menu and attach close handler

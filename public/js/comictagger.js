@@ -181,6 +181,17 @@ function openCTModal() {
       }
     } catch {}
   };
+
+  // Auto-refresh pending matches every 2 seconds while modal is open
+  // This ensures matches appear immediately even if modal was opened before detection
+  ctPollInterval = setInterval(async () => {
+    if (ctModal.classList.contains('hidden')) {
+      clearInterval(ctPollInterval);
+      ctPollInterval = null;
+      return;
+    }
+    await fetchPendingMatchDetails();
+  }, 2000);
 }
 
 function clearCtMatches() {
@@ -198,6 +209,12 @@ function closeCTModal() {
     ctEventSource.close();
     ctEventSource = null;
   }
+  if (ctPollInterval) {
+    clearInterval(ctPollInterval);
+    ctPollInterval = null;
+  }
+  // Reset hash so fresh matches render on next modal open
+  lastRenderedMatchesHash = null;
 }
 
 async function fetchCtSettings() {
@@ -233,6 +250,7 @@ function parseCtSuggestion(line) {
 
 // Store temporarily collected matches
 let tempMatches = [];
+let lastRenderedMatchesHash = null;
 
 /**
  * Fetch pending match details including images and render UI
@@ -242,7 +260,8 @@ async function fetchPendingMatchDetails() {
     console.log('[CT] Fetching pending match details...');
 
     // Get pending match details including first page URL
-    const detailsRes = await fetch(`${API_BASE_URL}/api/v1/comictagger/pending-details`);
+    // Add cache-busting query parameter to prevent Cloudflare caching
+    const detailsRes = await fetch(`${API_BASE_URL}/api/v1/comictagger/pending-details?_t=${Date.now()}`);
     if (!detailsRes.ok) {
       throw new Error(`Failed to fetch pending details: ${detailsRes.status}`);
     }
@@ -267,10 +286,20 @@ async function fetchPendingMatchDetails() {
       return;
     }
 
+    // Create hash of current matches to detect changes
+    const currentHash = JSON.stringify(matchesToEnrich.map(m => `${m.choice}|${m.title}|${m.issue}`));
+
+    // If matches haven't changed, don't re-render (preserves radio selection)
+    if (currentHash === lastRenderedMatchesHash) {
+      console.log('[CT] Matches unchanged, skipping re-render to preserve selection');
+      return;
+    }
+
     try {
       // Enrich matches with ComicVine cover images
       console.log('[CT] Fetching cover images from ComicVine...');
-      const coversRes = await fetch(`${API_BASE_URL}/api/v1/comictagger/match-covers`, {
+      // Add cache-busting query parameter to prevent Cloudflare caching
+      const coversRes = await fetch(`${API_BASE_URL}/api/v1/comictagger/match-covers?_t=${Date.now()}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ matches: matchesToEnrich })
@@ -292,6 +321,9 @@ async function fetchPendingMatchDetails() {
         renderCtMatch(match, firstPageUrl);
       });
 
+      // Update hash after successful render
+      lastRenderedMatchesHash = currentHash;
+
       console.log('[CT] ✓ Rendered', enrichedMatches.length, 'matches with cover images');
     } catch (coverError) {
       // Fallback: render matches without cover images if enrichment fails
@@ -300,6 +332,10 @@ async function fetchPendingMatchDetails() {
       matchesToEnrich.forEach(match => {
         renderCtMatch({ ...match, coverUrl: null }, firstPageUrl);
       });
+
+      // Update hash after fallback render
+      lastRenderedMatchesHash = currentHash;
+
       console.log('[CT] ✓ Rendered', matchesToEnrich.length, 'matches without covers');
     }
 

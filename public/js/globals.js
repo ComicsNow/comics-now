@@ -388,6 +388,7 @@ const ctContentOutput = document.getElementById('ct-content-output');
 let logInterval = null;
 let ctEventSource = null;
 let ctAwaitingMatches = false;
+let ctPollInterval = null;
 
 // --- STATE MANAGEMENT ---
 let library = {};

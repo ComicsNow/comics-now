@@ -29,7 +29,7 @@ async function loadSettings() {
           setComicVineApiKey(row.value);
         }
       }
-      if (row.key === 'ctSchedule') {
+      if (row.key === 'ctScheduleMinutes') {
         let rawMinutes;
         try {
           rawMinutes = JSON.parse(row.value);
