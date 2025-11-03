@@ -775,6 +775,9 @@ async function showReadingListDetail(listId, listName) {
         <h2 class="text-2xl font-bold">${listName}</h2>
       </div>
       <div class="flex items-center gap-2">
+        <button id="export-list-btn" class="bg-orange-600 hover:bg-orange-700 text-white font-bold py-2 px-4 rounded transition-colors">
+          Export
+        </button>
         <button id="edit-list-btn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded transition-colors">
           Edit
         </button>
@@ -955,6 +958,16 @@ async function showReadingListDetail(listId, listName) {
     }, { offset: Number.NEGATIVE_INFINITY }).element;
   }
 
+  // Export button handler
+  document.getElementById('export-list-btn').addEventListener('click', async () => {
+    try {
+      await window.ReadingLists.exportSingleList(listId, listName);
+    } catch (error) {
+      console.error('Export error:', error);
+      alert('Failed to export list. Please try again.');
+    }
+  });
+
   // Edit button handler
   document.getElementById('edit-list-btn').addEventListener('click', () => {
     isEditMode = true;
@@ -1028,6 +1041,82 @@ document.addEventListener('DOMContentLoaded', () => {
   const createBtn = document.getElementById('create-reading-list-btn');
   if (createBtn) {
     createBtn.addEventListener('click', createReadingList);
+  }
+
+  // Export All Lists button
+  const exportAllBtn = document.getElementById('export-all-lists-btn');
+  if (exportAllBtn) {
+    exportAllBtn.addEventListener('click', async () => {
+      try {
+        await window.ReadingLists.exportAllLists();
+      } catch (error) {
+        alert('Failed to export lists. Please try again.');
+      }
+    });
+  }
+
+  // Import Lists button
+  const importBtn = document.getElementById('import-lists-btn');
+  const fileInput = document.getElementById('import-file-input');
+  if (importBtn && fileInput) {
+    importBtn.addEventListener('click', () => {
+      fileInput.click();
+    });
+
+    fileInput.addEventListener('change', async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      try {
+        const text = await file.text();
+        const data = JSON.parse(text);
+
+        // Check for duplicate names
+        const existingLists = await window.ReadingLists.fetchReadingLists();
+        const existingNames = new Set(existingLists.map(list => list.name.toLowerCase()));
+
+        const listsToImport = Array.isArray(data) ? data : [data];
+        const processedLists = [];
+
+        for (const list of listsToImport) {
+          if (existingNames.has(list.name.toLowerCase())) {
+            const choice = confirm(
+              `A reading list named "${list.name}" already exists.\n\n` +
+              `Click OK to rename the imported list (will add " (imported)")\n` +
+              `Click Cancel to skip this list`
+            );
+
+            if (choice) {
+              // Rename
+              list.name = `${list.name} (imported)`;
+              processedLists.push(list);
+            }
+            // else skip
+          } else {
+            processedLists.push(list);
+          }
+        }
+
+        if (processedLists.length === 0) {
+          alert('No lists were imported.');
+          fileInput.value = '';
+          return;
+        }
+
+        const result = await window.ReadingLists.importLists(processedLists);
+        if (result.ok) {
+          alert(`Successfully imported ${processedLists.length} list(s)!`);
+          await refreshReadingListModal();
+        } else {
+          alert('Failed to import lists. Please try again.');
+        }
+      } catch (error) {
+        console.error('Import error:', error);
+        alert('Failed to import lists. Please check the file format and try again.');
+      }
+
+      fileInput.value = '';
+    });
   }
 
   // Close modal when clicking outside
