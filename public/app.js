@@ -677,6 +677,7 @@ async function refreshReadingListModal() {
               const comic = getComicById(firstComic.comicId);
               if (comic && typeof window.openComicViewer === 'function') {
                 window.openComicViewer(comic);
+                closeReadingListModal(); // Close modal after opening comic
               } else {
                 alert('Could not find comic in library. The comic may have been moved or deleted.');
               }
