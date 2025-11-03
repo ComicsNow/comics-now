@@ -759,7 +759,7 @@ async function showReadingListDetail(listId, listName) {
   if (!modalContent) return;
 
   // Hide main list view
-  document.getElementById('reading-lists-container').parentElement.classList.add('hidden');
+  document.getElementById('reading-lists-container').classList.add('hidden');
 
   // Create detail view
   const detailView = document.createElement('div');
@@ -895,7 +895,7 @@ function hideReadingListDetail() {
   }
 
   // Show main list view
-  const mainView = document.getElementById('reading-lists-container').parentElement;
+  const mainView = document.getElementById('reading-lists-container');
   if (mainView) {
     mainView.classList.remove('hidden');
   }
