@@ -163,6 +163,28 @@
     }
   }
 
+  /**
+   * Reorder comics in a reading list
+   * @param {string} listId - Reading list ID
+   * @param {Array<string>} comicOrder - Array of comic IDs in new order
+   * @returns {Promise<Object>} Result object with ok status
+   */
+  async function reorderComics(listId, comicOrder) {
+    try {
+      const baseUrl = getBaseUrl();
+      const response = await fetch(`${baseUrl}/api/v1/reading-lists/${listId}/reorder`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ comicOrder })
+      });
+      const data = await response.json();
+      return data;
+    } catch (error) {
+      console.error('[Reading Lists] Error reordering comics:', error);
+      throw error;
+    }
+  }
+
   // ============================================================================
   // MODAL MANAGEMENT
   // ============================================================================
@@ -359,6 +381,7 @@
     getReadingListDetails,
     markListAsRead,
     removeComicsFromList,
+    reorderComics,
     openAddToListModal,
     closeAddToListModal
   };

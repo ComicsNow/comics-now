@@ -767,11 +767,24 @@ async function showReadingListDetail(listId, listName) {
   detailView.className = 'flex-1 overflow-y-auto p-4 sm:p-6';
 
   detailView.innerHTML = `
-    <div class="mb-4 flex items-center gap-4">
-      <button id="back-to-lists-btn" class="text-gray-400 hover:text-white transition-colors text-2xl" title="Back to lists">
-        ←
-      </button>
-      <h2 class="text-2xl font-bold">${listName}</h2>
+    <div class="mb-4 flex items-center justify-between gap-4">
+      <div class="flex items-center gap-4">
+        <button id="back-to-lists-btn" class="text-gray-400 hover:text-white transition-colors text-2xl" title="Back to lists">
+          ←
+        </button>
+        <h2 class="text-2xl font-bold">${listName}</h2>
+      </div>
+      <div class="flex items-center gap-2">
+        <button id="edit-list-btn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded transition-colors">
+          Edit
+        </button>
+        <button id="save-order-btn" class="hidden bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded transition-colors">
+          Save
+        </button>
+        <button id="cancel-edit-btn" class="hidden bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded transition-colors">
+          Cancel
+        </button>
+      </div>
     </div>
     <div id="list-detail-comics-container" class="space-y-2">
       <p class="text-sm text-gray-400 text-center py-4">Loading comics...</p>
@@ -784,24 +797,34 @@ async function showReadingListDetail(listId, listName) {
   // Add back button handler
   document.getElementById('back-to-lists-btn').addEventListener('click', hideReadingListDetail);
 
+  // Edit mode state
+  let isEditMode = false;
+  let originalOrder = [];
+  let currentDetails = null;
+
   // Load comics for this list
-  try {
-    const details = await window.ReadingLists.getReadingListDetails(listId);
-    const comicsContainer = document.getElementById('list-detail-comics-container');
+  async function renderComics() {
+    try {
+      const details = await window.ReadingLists.getReadingListDetails(listId);
+      currentDetails = details;
+      const comicsContainer = document.getElementById('list-detail-comics-container');
 
-    if (!details.items || details.items.length === 0) {
-      comicsContainer.innerHTML = '<p class="text-sm text-gray-400 text-center py-4">No comics in this list.</p>';
-      return;
-    }
+      if (!details.items || details.items.length === 0) {
+        comicsContainer.innerHTML = '<p class="text-sm text-gray-400 text-center py-4">No comics in this list.</p>';
+        return;
+      }
 
-    comicsContainer.innerHTML = '';
+      originalOrder = details.items.map(item => item.comicId);
+      comicsContainer.innerHTML = '';
 
-    details.items.forEach((item) => {
+      details.items.forEach((item, index) => {
       const comic = getComicById(item.comicId);
       if (!comic) return; // Skip if comic not found in library
 
       const comicDiv = document.createElement('div');
-      comicDiv.className = 'bg-gray-700 p-3 rounded flex items-center gap-3 hover:bg-gray-600 cursor-pointer transition-colors';
+      comicDiv.className = 'bg-gray-700 p-3 rounded flex items-center gap-3 hover:bg-gray-600 transition-colors';
+      comicDiv.dataset.comicId = item.comicId;
+      comicDiv.draggable = isEditMode;
 
       const title = comic.title || comic.name || 'Unknown';
       const total = item.totalPages || 0;
@@ -818,6 +841,7 @@ async function showReadingListDetail(listId, listName) {
       }
 
       comicDiv.innerHTML = `
+        ${isEditMode ? '<div class="drag-handle flex-shrink-0 text-gray-400 text-2xl cursor-move" style="cursor: grab;">☰</div>' : ''}
         <div class="flex-shrink-0 text-2xl">
           ${status === 'read' ? '✓' : status === 'in-progress' ? '👁' : '○'}
         </div>
@@ -832,18 +856,48 @@ async function showReadingListDetail(listId, listName) {
             </div>
           ` : '<p class="text-xs text-gray-400">No progress data</p>'}
         </div>
-        <button class="delete-comic-btn flex-shrink-0 text-red-400 hover:text-red-300 transition-colors p-2 text-xl" title="Remove from list" data-comic-id="${item.comicId}">
+        <button class="delete-comic-btn ${isEditMode ? 'hidden' : ''} flex-shrink-0 text-red-400 hover:text-red-300 transition-colors p-2 text-xl" title="Remove from list" data-comic-id="${item.comicId}">
           🗑
         </button>
       `;
 
-      // Click to open comic
-      comicDiv.addEventListener('click', () => {
-        if (typeof window.openComicViewer === 'function') {
-          window.openComicViewer(comic);
-          closeReadingListModal();
-        }
-      });
+      // Click to open comic (only when not in edit mode)
+      if (!isEditMode) {
+        comicDiv.style.cursor = 'pointer';
+        comicDiv.addEventListener('click', () => {
+          if (typeof window.openComicViewer === 'function') {
+            window.openComicViewer(comic);
+            closeReadingListModal();
+          }
+        });
+      }
+
+      // Drag-and-drop handlers (only in edit mode)
+      if (isEditMode) {
+        comicDiv.addEventListener('dragstart', (e) => {
+          e.dataTransfer.effectAllowed = 'move';
+          e.dataTransfer.setData('text/plain', item.comicId);
+          comicDiv.classList.add('opacity-50');
+        });
+
+        comicDiv.addEventListener('dragend', (e) => {
+          comicDiv.classList.remove('opacity-50');
+        });
+
+        comicDiv.addEventListener('dragover', (e) => {
+          e.preventDefault();
+          e.dataTransfer.dropEffect = 'move';
+
+          const afterElement = getDragAfterElement(comicsContainer, e.clientY);
+          const draggable = document.querySelector('.opacity-50');
+
+          if (afterElement == null) {
+            comicsContainer.appendChild(draggable);
+          } else {
+            comicsContainer.insertBefore(draggable, afterElement);
+          }
+        });
+      }
 
       // Delete button handler
       const deleteBtn = comicDiv.querySelector('.delete-comic-btn');
@@ -879,10 +933,71 @@ async function showReadingListDetail(listId, listName) {
 
       comicsContainer.appendChild(comicDiv);
     });
-  } catch (error) {
-    console.error('Failed to load reading list details:', error);
-    document.getElementById('list-detail-comics-container').innerHTML = '<p class="text-sm text-red-400 text-center py-4">Failed to load comics.</p>';
+    } catch (error) {
+      console.error('Failed to load reading list details:', error);
+      document.getElementById('list-detail-comics-container').innerHTML = '<p class="text-sm text-red-400 text-center py-4">Failed to load comics.</p>';
+    }
   }
+
+  // Helper function for drag-and-drop
+  function getDragAfterElement(container, y) {
+    const draggableElements = [...container.querySelectorAll('[draggable="true"]:not(.opacity-50)')];
+
+    return draggableElements.reduce((closest, child) => {
+      const box = child.getBoundingClientRect();
+      const offset = y - box.top - box.height / 2;
+
+      if (offset < 0 && offset > closest.offset) {
+        return { offset: offset, element: child };
+      } else {
+        return closest;
+      }
+    }, { offset: Number.NEGATIVE_INFINITY }).element;
+  }
+
+  // Edit button handler
+  document.getElementById('edit-list-btn').addEventListener('click', () => {
+    isEditMode = true;
+    document.getElementById('edit-list-btn').classList.add('hidden');
+    document.getElementById('save-order-btn').classList.remove('hidden');
+    document.getElementById('cancel-edit-btn').classList.remove('hidden');
+    renderComics();
+  });
+
+  // Save button handler
+  document.getElementById('save-order-btn').addEventListener('click', async () => {
+    try {
+      const comicsContainer = document.getElementById('list-detail-comics-container');
+      const comicDivs = comicsContainer.querySelectorAll('[data-comic-id]');
+      const newOrder = Array.from(comicDivs).map(div => div.dataset.comicId);
+
+      const result = await window.ReadingLists.reorderComics(listId, newOrder);
+      if (result.ok) {
+        isEditMode = false;
+        document.getElementById('edit-list-btn').classList.remove('hidden');
+        document.getElementById('save-order-btn').classList.add('hidden');
+        document.getElementById('cancel-edit-btn').classList.add('hidden');
+        renderComics();
+      } else {
+        alert('Failed to save new order. Please try again.');
+      }
+    } catch (error) {
+      console.error('Failed to save order:', error);
+      alert('Failed to save new order. Please try again.');
+    }
+  });
+
+  // Cancel button handler
+  document.getElementById('cancel-edit-btn').addEventListener('click', () => {
+    isEditMode = false;
+    document.getElementById('edit-list-btn').classList.remove('hidden');
+    document.getElementById('save-order-btn').classList.add('hidden');
+    document.getElementById('cancel-edit-btn').classList.add('hidden');
+    renderComics();
+  });
+
+  // Initial render
+  renderComics();
 }
 
 /**
