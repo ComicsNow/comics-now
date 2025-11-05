@@ -2773,7 +2773,7 @@ function createApiRouter({
         }))
       };
 
-      res.json({ ok: true, data: exportData });
+      res.json({ ok: true, ...exportData });
     } catch (error) {
       res.status(500).json({
         message: formatErrorMessage(error, req, 'Failed to export reading lists')
