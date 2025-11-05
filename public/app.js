@@ -865,6 +865,13 @@ async function showReadingListDetail(listId, listName) {
       originalOrder = details.items.map(item => item.comicId);
       comicsContainer.innerHTML = '';
 
+      // Set container layout based on view mode
+      if (viewMode === 'compact') {
+        comicsContainer.className = 'space-y-2';
+      } else {
+        comicsContainer.className = 'grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4';
+      }
+
       details.items.forEach((item, index) => {
       const comic = getComicById(item.comicId);
       if (!comic) return; // Skip if comic not found in library
@@ -913,33 +920,43 @@ async function showReadingListDetail(listId, listName) {
           </button>
         `;
       } else {
-        // Detailed view: full height with progress bar
-        comicDiv.className = 'bg-gray-700 p-3 rounded flex items-center gap-3 hover:bg-gray-600 transition-colors';
+        // Grid view: comic cards with covers
+        comicDiv.className = 'bg-gray-800 rounded-lg overflow-hidden shadow-lg hover:shadow-xl transition-all hover:scale-105 flex flex-col';
+
+        const coverUrl = comic.thumbnailPath
+          ? `${API_BASE_URL}/thumbnails/${comic.thumbnailPath}`
+          : 'https://placehold.co/400x600/1e1e1e/e0e0e0?text=No+Cover';
+
+        const statusBanner = status === 'read'
+          ? '<div class="absolute top-0 left-0 bg-green-600 text-white text-xs px-2 py-1 font-bold">Read</div>'
+          : '';
+
         comicDiv.innerHTML = `
-          ${isEditMode ? '<div class="drag-handle flex-shrink-0 text-gray-400 text-2xl cursor-move" style="cursor: grab;">☰</div>' : ''}
-          <div class="flex-shrink-0 text-2xl">
-            ${status === 'read' ? '✓' : status === 'in-progress' ? '👁' : '○'}
-          </div>
-          <div class="flex-1 min-w-0">
-            <p class="font-semibold truncate">${title}</p>
-            ${total > 0 ? `
-              <div class="flex items-center gap-2 mt-1">
-                <div class="flex-1 h-1 bg-gray-600 rounded-full">
-                  <div class="bg-purple-600 h-full rounded-full" style="width: ${progressPercent}%;"></div>
-                </div>
-                <span class="text-xs text-gray-400">${progressPercent}%</span>
+          <div class="relative">
+            ${isEditMode ? '<div class="absolute top-2 left-2 z-10 drag-handle bg-gray-900 bg-opacity-75 p-2 rounded cursor-move text-gray-400 text-2xl" style="cursor: grab;">☰</div>' : ''}
+            ${statusBanner}
+            <img src="${coverUrl}" alt="${title}" class="w-full h-auto object-cover" style="aspect-ratio: 2/3;">
+            <div class="absolute bottom-0 left-0 right-0 h-1.5 bg-gray-600">
+              <div class="bg-purple-600 h-full" style="width: ${progressPercent}%;"></div>
+            </div>
+            ${!isEditMode ? `
+              <div class="absolute top-2 right-2 flex gap-1">
+                <button class="mark-read-btn bg-gray-900 bg-opacity-75 p-2 rounded text-gray-400 hover:text-green-400 transition-colors text-sm" title="${status === 'read' ? 'Mark as unread' : 'Mark as read'}" data-comic-id="${item.comicId}" data-status="${status}">
+                  ${status === 'read' ? '↩' : '✓'}
+                </button>
+                <button class="download-comic-btn block sm:hidden bg-gray-900 bg-opacity-75 p-2 rounded text-gray-400 hover:text-blue-400 transition-colors text-sm" title="Download comic" data-comic-id="${item.comicId}">
+                  ⬇
+                </button>
+                <button class="delete-comic-btn bg-gray-900 bg-opacity-75 p-2 rounded text-red-400 hover:text-red-300 transition-colors text-sm" title="Remove from list" data-comic-id="${item.comicId}">
+                  🗑
+                </button>
               </div>
-            ` : '<p class="text-xs text-gray-400">No progress data</p>'}
+            ` : ''}
           </div>
-          <button class="mark-read-btn ${isEditMode ? 'hidden' : ''} flex-shrink-0 text-gray-400 hover:text-green-400 transition-colors p-2 text-xl" title="${status === 'read' ? 'Mark as unread' : 'Mark as read'}" data-comic-id="${item.comicId}" data-status="${status}">
-            ${status === 'read' ? '↩' : '✓'}
-          </button>
-          <button class="download-comic-btn ${isEditMode ? 'hidden' : ''} block sm:hidden flex-shrink-0 text-gray-400 hover:text-blue-400 transition-colors p-2 text-xl" title="Download comic" data-comic-id="${item.comicId}">
-            ⬇
-          </button>
-          <button class="delete-comic-btn ${isEditMode ? 'hidden' : ''} flex-shrink-0 text-red-400 hover:text-red-300 transition-colors p-2 text-xl" title="Remove from list" data-comic-id="${item.comicId}">
-            🗑
-          </button>
+          <div class="p-2 flex-grow">
+            <p class="text-sm font-semibold text-white truncate">${title}</p>
+            <p class="text-xs text-gray-400">${progressPercent}% complete</p>
+          </div>
         `;
       }
 
