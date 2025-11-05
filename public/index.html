@@ -627,9 +627,10 @@
         </button>
       </div>
 
-      <!-- Right Group: Reading List, ComicTagger, and Settings -->
+      <!-- Right Group: Reading List, Downloads, ComicTagger, and Settings -->
       <div class="flex gap-2">
         <button id="reading-list-button" aria-label="Reading Lists" class="bg-green-600 hover:bg-green-500 text-white font-bold p-3 rounded-full transition-colors shadow-lg text-lg" onclick="openReadingListModal()">📚</button>
+        <button id="downloads-button" aria-label="Downloads" class="bg-purple-600 hover:bg-purple-500 text-white font-bold p-3 rounded-full transition-colors shadow-lg text-lg" onclick="openDownloadsPanel()">⬇</button>
         <button id="ct-button" aria-label="ComicTagger" class="bg-blue-600 hover:bg-blue-500 text-white font-bold p-2 rounded-full transition-colors">CT</button>
         <button onclick="openSettingsModal()" aria-label="Settings" class="bg-gray-700 hover:bg-gray-600 text-white font-bold p-2 rounded-full transition-colors">
           <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -923,6 +924,29 @@
           </div>
           <button id="next-page-btn-bottom" type="button" class="pill-button bg-gray-700 hover:bg-gray-600 text-white transition-colors" aria-label="Next page">→</button>
         </div>
+
+        <!-- End of Comic Navigation -->
+        <div id="end-of-comic-navigation" class="hidden mt-6 p-4 bg-gray-800/50 rounded-lg border border-gray-700">
+          <div class="text-center text-gray-400 text-sm mb-3">
+            End of Comic
+          </div>
+          <div id="end-nav-buttons" class="flex gap-3">
+            <!-- Next in Series Button -->
+            <button id="next-in-series-btn" type="button" class="hidden pill-button bg-blue-600 hover:bg-blue-500 text-white transition-colors flex items-center gap-2" aria-label="Next comic in series">
+              <span>Next in Series</span>
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"></path>
+              </svg>
+            </button>
+            <!-- Next in Reading List Button -->
+            <button id="next-in-reading-list-btn" type="button" class="hidden pill-button bg-purple-600 hover:bg-purple-500 text-white transition-colors flex items-center gap-2" aria-label="Next comic in reading list">
+              <span>Next in Reading List</span>
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"></path>
+              </svg>
+            </button>
+          </div>
+        </div>
       </div>
 <!-- Metadata tab content -->
 <div id="metadata-content" class="hidden">
@@ -1020,6 +1044,21 @@
       document.head.appendChild(style);
       console.log('[DEVICE] Download UI hidden on desktop');
     }
+
+    // Open downloads panel (settings modal with downloads tab)
+    function openDownloadsPanel() {
+      // Open settings modal first
+      if (typeof openSettingsModal === 'function') {
+        openSettingsModal();
+      }
+      // Switch to downloads tab
+      setTimeout(() => {
+        const downloadsTab = document.getElementById('settings-tab-downloads');
+        if (downloadsTab) {
+          downloadsTab.click();
+        }
+      }, 100);
+    }
   </script>
   <script src="js/offline/db.js"></script>
   <script src="js/jwt-capture.js"></script>
@@ -1039,6 +1078,7 @@
   <script src="js/viewer/fullscreen.js"></script>
   <script src="js/viewer/navigation.js"></script>
   <script src="js/viewer/ui.js"></script>
+  <script src="js/viewer/end-navigation.js"></script>
   <script src="js/viewer.js"></script>
   <script src="js/settings.js"></script>
   <script src="js/comictagger.js" data-cfasync="false"></script>
