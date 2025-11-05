@@ -7,7 +7,8 @@
     "start": "node server.js",
     "build:css": "tailwindcss -i ./styles/tailwind.css -o ./public/tailwind.css --minify",
     "test": "jest",
-    "test:watch": "jest --watch"
+    "test:watch": "jest --watch",
+    "postinstall": "node scripts/check-dependencies.js"
   },
   "license": "CC-BY-NC-SA-4.0",
   "dependencies": {

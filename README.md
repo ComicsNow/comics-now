@@ -49,19 +49,28 @@ git clone <repository-url>
 cd comics-now
 ```
 
-2. Install dependencies:
+2. Install system dependencies:
+```bash
+sudo apt install poppler-utils zip unrar
+```
+These packages are required for:
+- `poppler-utils` - PDF to CBZ conversion (pdftoppm)
+- `zip` - Creating CBZ archives
+- `unrar` - CBR to CBZ conversion
+
+3. Install Node.js dependencies:
 ```bash
 npm install
 ```
 
-3. Copy the example configuration:
+4. Copy the example configuration:
 ```bash
 cp config.example.json config.json
 ```
 
-4. Edit `config.json` with your settings (see Configuration below)
+5. Edit `config.json` with your settings (see Configuration below)
 
-5. Start the server:
+6. Start the server:
 ```bash
 npm start
 ```
