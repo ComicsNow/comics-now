@@ -183,6 +183,53 @@
     global.currentPageIndex = clampedPage - 1;
 
     try {
+      // Save progress before rendering
+      if (global.currentComic) {
+        const comicFromDB = await global.getComicFromDB?.(global.currentComic.id);
+        const isDownloaded = global.downloadedComicIds?.has(global.currentComic.id) || !!comicFromDB;
+
+        if (isDownloaded) {
+          // Save to IndexedDB for offline access
+          try {
+            if (typeof saveProgressToDB === 'function') {
+              await saveProgressToDB(
+                global.currentComic.id,
+                global.currentPageIndex,
+                global.currentComic.progress?.totalPages,
+                global.currentComic.path,
+              );
+            }
+          } catch (error) {
+
+          }
+
+          // Update local progress
+          if (!global.currentComic.progress) {
+            global.currentComic.progress = { totalPages: 0, lastReadPage: 0 };
+          }
+          global.currentComic.progress.lastReadPage = global.currentPageIndex;
+          global.downloadedComicIds?.add(global.currentComic.id);
+          global.updateLibraryProgress?.(global.currentComic.id, global.currentPageIndex, global.currentComic.progress.totalPages);
+
+          // ALSO sync to server with per-device progress (same as online comics)
+          if (navigator.onLine && typeof saveProgress === 'function') {
+            await saveProgress(global.currentPageIndex);
+          }
+        } else {
+          try {
+            if (typeof saveProgress === 'function') {
+              await saveProgress(global.currentPageIndex);
+            }
+            // Also update the library data so it has the latest progress
+            if (global.updateLibraryProgress) {
+              global.updateLibraryProgress(global.currentComic.id, global.currentPageIndex, global.currentComic.progress?.totalPages);
+            }
+          } catch (error) {
+
+          }
+        }
+      }
+
       const rendered = await global.renderPage?.();
       if (rendered === false) {
         global.currentPageIndex = previousIndex;
@@ -283,6 +330,53 @@
     global.currentPageIndex = clampedPage - 1;
 
     try {
+      // Save progress before rendering
+      if (global.currentComic) {
+        const comicFromDB = await global.getComicFromDB?.(global.currentComic.id);
+        const isDownloaded = global.downloadedComicIds?.has(global.currentComic.id) || !!comicFromDB;
+
+        if (isDownloaded) {
+          // Save to IndexedDB for offline access
+          try {
+            if (typeof saveProgressToDB === 'function') {
+              await saveProgressToDB(
+                global.currentComic.id,
+                global.currentPageIndex,
+                global.currentComic.progress?.totalPages,
+                global.currentComic.path,
+              );
+            }
+          } catch (error) {
+
+          }
+
+          // Update local progress
+          if (!global.currentComic.progress) {
+            global.currentComic.progress = { totalPages: 0, lastReadPage: 0 };
+          }
+          global.currentComic.progress.lastReadPage = global.currentPageIndex;
+          global.downloadedComicIds?.add(global.currentComic.id);
+          global.updateLibraryProgress?.(global.currentComic.id, global.currentPageIndex, global.currentComic.progress.totalPages);
+
+          // ALSO sync to server with per-device progress (same as online comics)
+          if (navigator.onLine && typeof saveProgress === 'function') {
+            await saveProgress(global.currentPageIndex);
+          }
+        } else {
+          try {
+            if (typeof saveProgress === 'function') {
+              await saveProgress(global.currentPageIndex);
+            }
+            // Also update the library data so it has the latest progress
+            if (global.updateLibraryProgress) {
+              global.updateLibraryProgress(global.currentComic.id, global.currentPageIndex, global.currentComic.progress?.totalPages);
+            }
+          } catch (error) {
+
+          }
+        }
+      }
+
       const rendered = await global.renderPage?.();
       if (rendered === false) {
         global.currentPageIndex = previousIndex;
