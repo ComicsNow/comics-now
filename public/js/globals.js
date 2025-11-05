@@ -534,5 +534,9 @@ if (typeof window !== 'undefined') {
   window.showLatestAddedSmartList = null; // Will be set by render.js
   window.showLatestConvertedSmartList = null; // Will be set by render.js
   window.showDownloadedSmartList = null; // Will be set by render.js
+
+  // Expose display formatting functions
+  window.applyDisplayInfoToComic = applyDisplayInfoToComic;
+  window.buildComicDisplayInfo = buildComicDisplayInfo;
 }
 

@@ -873,7 +873,9 @@ async function showReadingListDetail(listId, listName) {
       comicDiv.dataset.comicId = item.comicId;
       comicDiv.draggable = isEditMode;
 
-      const title = comic.title || comic.name || 'Unknown';
+      // Use display info to get properly formatted comic name (not filename)
+      const displayInfo = window.applyDisplayInfoToComic?.(comic) || {};
+      const title = displayInfo.displayTitle || comic.name || 'Unknown';
       const total = item.totalPages || 0;
       const last = item.lastReadPage || 0;
       const progressPercent = total > 0 ? Math.round((last / total) * 100) : 0;
