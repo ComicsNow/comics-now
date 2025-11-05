@@ -147,12 +147,13 @@
     global.showRootFolderList?.({ force: true });
   }
 
-  async function openComicViewer(comic) {
+  async function openComicViewer(comic, options = {}) {
     global.viewerReturnContext = {
       view: global.currentView,
       rootFolder: global.currentRootFolder,
       publisher: global.currentPublisher,
       series: global.currentSeries,
+      readingListId: options.readingListId || null,
     };
     global.currentView = 'comic';
     // Also update the global currentView variable (not just window.currentView)
@@ -165,6 +166,11 @@
 
     // Use centralized showView to properly hide all library views
     global.showView?.(global.comicViewerDiv);
+
+    // Remove inline display:none style that may have been set by navigateBackFromViewer
+    if (global.comicViewerDiv) {
+      global.comicViewerDiv.style.display = '';
+    }
 
     const displayInfo = global.applyDisplayInfoToComic?.(comic) || {};
     if (global.comicTitleH2) {
