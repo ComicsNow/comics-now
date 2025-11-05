@@ -1045,19 +1045,15 @@
       console.log('[DEVICE] Download UI hidden on desktop');
     }
 
-    // Open downloads panel (settings modal with downloads tab)
+    // Open downloads panel (shows download queue)
     function openDownloadsPanel() {
-      // Open settings modal first
-      if (typeof openSettingsModal === 'function') {
-        openSettingsModal();
+      // Wait for download manager to be initialized
+      if (typeof window.OfflineDownloads !== 'undefined' &&
+          window.OfflineDownloads.downloadManager) {
+        window.OfflineDownloads.downloadManager.showQueue();
+      } else {
+        console.warn('[Downloads] Download manager not yet initialized');
       }
-      // Switch to downloads tab
-      setTimeout(() => {
-        const downloadsTab = document.getElementById('settings-tab-downloads');
-        if (downloadsTab) {
-          downloadsTab.click();
-        }
-      }, 100);
     }
   </script>
   <script src="js/offline/db.js"></script>
