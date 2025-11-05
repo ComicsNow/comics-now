@@ -591,10 +591,11 @@ async function refreshReadingListModal() {
               ${allRead ? '✓' : '👁'}
             </button>
 
-            <button class="hidden sm:block text-white hover:text-gray-300 transition-colors p-2 rounded-full hover:bg-gray-600 download-list-btn"
+            <button class="text-white hover:text-gray-300 transition-colors p-2 rounded-full hover:bg-gray-600 download-list-btn"
                     data-list-id="${list.id}"
-                    title="Download all comics"
-                    aria-label="Download all comics">
+                    data-list-name="${list.name}"
+                    title="Download all comics in this list"
+                    aria-label="Download all comics in this list">
               ⬇
             </button>
 
@@ -640,11 +641,20 @@ async function refreshReadingListModal() {
 
         // Download handler
         const downloadBtn = listDiv.querySelector('.download-list-btn');
-        downloadBtn.addEventListener('click', async (e) => {
-          e.stopPropagation();
-          // TODO: Implement download all comics functionality
-          alert('Download functionality coming soon!');
-        });
+        if (downloadBtn) {
+          downloadBtn.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            const listId = downloadBtn.dataset.listId;
+            const listName = downloadBtn.dataset.listName || 'Unknown List';
+
+            if (typeof window.downloadReadingList === 'function') {
+              await window.downloadReadingList(listId, listName, downloadBtn);
+            } else {
+              console.error('downloadReadingList function not available');
+              alert('Download functionality is not available. Please refresh the page.');
+            }
+          });
+        }
 
         // Play/Continue handler
         const playBtn = listDiv.querySelector('.play-list-btn');
@@ -676,7 +686,7 @@ async function refreshReadingListModal() {
               // Find the comic in the library
               const comic = getComicById(firstComic.comicId);
               if (comic && typeof window.openComicViewer === 'function') {
-                window.openComicViewer(comic);
+                window.openComicViewer(comic, { readingListId: list.id });
                 closeReadingListModal(); // Close modal after opening comic
               } else {
                 alert('Could not find comic in library. The comic may have been moved or deleted.');
@@ -773,8 +783,14 @@ async function showReadingListDetail(listId, listName) {
           ←
         </button>
         <h2 class="text-2xl font-bold">${listName}</h2>
+        <button id="view-toggle-btn" class="text-gray-400 hover:text-white transition-colors text-xl p-2 rounded hover:bg-gray-700" title="Toggle view">
+          <span id="view-toggle-icon">☰</span>
+        </button>
       </div>
       <div class="flex items-center gap-2">
+        <button id="download-all-list-btn" class="block sm:hidden bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded transition-colors">
+          ⬇ Download All
+        </button>
         <button id="export-list-btn" class="bg-orange-600 hover:bg-orange-700 text-white font-bold py-2 px-4 rounded transition-colors">
           Export
         </button>
@@ -799,6 +815,35 @@ async function showReadingListDetail(listId, listName) {
 
   // Add back button handler
   document.getElementById('back-to-lists-btn').addEventListener('click', hideReadingListDetail);
+
+  // View mode state (detailed or compact)
+  let viewMode = localStorage.getItem('readingListViewMode') || 'detailed';
+
+  // Update toggle icon based on current view
+  const updateViewToggleIcon = () => {
+    const icon = document.getElementById('view-toggle-icon');
+    const btn = document.getElementById('view-toggle-btn');
+    if (icon && btn) {
+      if (viewMode === 'detailed') {
+        icon.textContent = '☰';
+        btn.title = 'Switch to compact view';
+      } else {
+        icon.textContent = '▤';
+        btn.title = 'Switch to detailed view';
+      }
+    }
+  };
+
+  // Initialize icon
+  updateViewToggleIcon();
+
+  // View toggle handler
+  document.getElementById('view-toggle-btn').addEventListener('click', () => {
+    viewMode = viewMode === 'detailed' ? 'compact' : 'detailed';
+    localStorage.setItem('readingListViewMode', viewMode);
+    updateViewToggleIcon();
+    renderComics();
+  });
 
   // Edit mode state
   let isEditMode = false;
@@ -825,7 +870,6 @@ async function showReadingListDetail(listId, listName) {
       if (!comic) return; // Skip if comic not found in library
 
       const comicDiv = document.createElement('div');
-      comicDiv.className = 'bg-gray-700 p-3 rounded flex items-center gap-3 hover:bg-gray-600 transition-colors';
       comicDiv.dataset.comicId = item.comicId;
       comicDiv.draggable = isEditMode;
 
@@ -843,33 +887,66 @@ async function showReadingListDetail(listId, listName) {
         status = 'in-progress';
       }
 
-      comicDiv.innerHTML = `
-        ${isEditMode ? '<div class="drag-handle flex-shrink-0 text-gray-400 text-2xl cursor-move" style="cursor: grab;">☰</div>' : ''}
-        <div class="flex-shrink-0 text-2xl">
-          ${status === 'read' ? '✓' : status === 'in-progress' ? '👁' : '○'}
-        </div>
-        <div class="flex-1 min-w-0">
-          <p class="font-semibold truncate">${title}</p>
-          ${total > 0 ? `
-            <div class="flex items-center gap-2 mt-1">
-              <div class="flex-1 h-1 bg-gray-600 rounded-full">
-                <div class="bg-purple-600 h-full rounded-full" style="width: ${progressPercent}%;"></div>
+      // Render based on view mode
+      if (viewMode === 'compact') {
+        // Compact view: minimal height, no progress bar
+        comicDiv.className = 'bg-gray-700 p-2 rounded flex items-center gap-2 hover:bg-gray-600 transition-colors';
+        comicDiv.innerHTML = `
+          ${isEditMode ? '<div class="drag-handle flex-shrink-0 text-gray-400 text-xl cursor-move" style="cursor: grab;">☰</div>' : ''}
+          <div class="flex-shrink-0 text-lg">
+            ${status === 'read' ? '✓' : status === 'in-progress' ? '👁' : '○'}
+          </div>
+          <div class="flex-1 min-w-0">
+            <p class="text-sm truncate">${title}</p>
+          </div>
+          <span class="flex-shrink-0 text-xs text-gray-400">${progressPercent}%</span>
+          <button class="mark-read-btn ${isEditMode ? 'hidden' : ''} flex-shrink-0 text-gray-400 hover:text-green-400 transition-colors p-1 text-lg" title="${status === 'read' ? 'Mark as unread' : 'Mark as read'}" data-comic-id="${item.comicId}" data-status="${status}">
+            ${status === 'read' ? '↩' : '✓'}
+          </button>
+          <button class="download-comic-btn ${isEditMode ? 'hidden' : ''} block sm:hidden flex-shrink-0 text-gray-400 hover:text-blue-400 transition-colors p-1 text-lg" title="Download comic" data-comic-id="${item.comicId}">
+            ⬇
+          </button>
+          <button class="delete-comic-btn ${isEditMode ? 'hidden' : ''} flex-shrink-0 text-red-400 hover:text-red-300 transition-colors p-1 text-lg" title="Remove from list" data-comic-id="${item.comicId}">
+            🗑
+          </button>
+        `;
+      } else {
+        // Detailed view: full height with progress bar
+        comicDiv.className = 'bg-gray-700 p-3 rounded flex items-center gap-3 hover:bg-gray-600 transition-colors';
+        comicDiv.innerHTML = `
+          ${isEditMode ? '<div class="drag-handle flex-shrink-0 text-gray-400 text-2xl cursor-move" style="cursor: grab;">☰</div>' : ''}
+          <div class="flex-shrink-0 text-2xl">
+            ${status === 'read' ? '✓' : status === 'in-progress' ? '👁' : '○'}
+          </div>
+          <div class="flex-1 min-w-0">
+            <p class="font-semibold truncate">${title}</p>
+            ${total > 0 ? `
+              <div class="flex items-center gap-2 mt-1">
+                <div class="flex-1 h-1 bg-gray-600 rounded-full">
+                  <div class="bg-purple-600 h-full rounded-full" style="width: ${progressPercent}%;"></div>
+                </div>
+                <span class="text-xs text-gray-400">${progressPercent}%</span>
               </div>
-              <span class="text-xs text-gray-400">${progressPercent}%</span>
-            </div>
-          ` : '<p class="text-xs text-gray-400">No progress data</p>'}
-        </div>
-        <button class="delete-comic-btn ${isEditMode ? 'hidden' : ''} flex-shrink-0 text-red-400 hover:text-red-300 transition-colors p-2 text-xl" title="Remove from list" data-comic-id="${item.comicId}">
-          🗑
-        </button>
-      `;
+            ` : '<p class="text-xs text-gray-400">No progress data</p>'}
+          </div>
+          <button class="mark-read-btn ${isEditMode ? 'hidden' : ''} flex-shrink-0 text-gray-400 hover:text-green-400 transition-colors p-2 text-xl" title="${status === 'read' ? 'Mark as unread' : 'Mark as read'}" data-comic-id="${item.comicId}" data-status="${status}">
+            ${status === 'read' ? '↩' : '✓'}
+          </button>
+          <button class="download-comic-btn ${isEditMode ? 'hidden' : ''} block sm:hidden flex-shrink-0 text-gray-400 hover:text-blue-400 transition-colors p-2 text-xl" title="Download comic" data-comic-id="${item.comicId}">
+            ⬇
+          </button>
+          <button class="delete-comic-btn ${isEditMode ? 'hidden' : ''} flex-shrink-0 text-red-400 hover:text-red-300 transition-colors p-2 text-xl" title="Remove from list" data-comic-id="${item.comicId}">
+            🗑
+          </button>
+        `;
+      }
 
       // Click to open comic (only when not in edit mode)
       if (!isEditMode) {
         comicDiv.style.cursor = 'pointer';
         comicDiv.addEventListener('click', () => {
           if (typeof window.openComicViewer === 'function') {
-            window.openComicViewer(comic);
+            window.openComicViewer(comic, { readingListId: listId });
             closeReadingListModal();
           }
         });
@@ -902,9 +979,53 @@ async function showReadingListDetail(listId, listName) {
         });
       }
 
+      // Mark as read/unread button handler
+      const markReadBtn = comicDiv.querySelector('.mark-read-btn');
+      if (markReadBtn) {
+        markReadBtn.addEventListener('click', async (e) => {
+          e.stopPropagation(); // Prevent opening comic
+
+          const currentStatus = markReadBtn.dataset.status;
+          const newStatus = currentStatus === 'read' ? 'unread' : 'read';
+
+          try {
+            // Call the API to update status
+            const response = await fetch(`${API_BASE_URL}/api/v1/comics/status`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ comicId: item.comicId, status: newStatus })
+            });
+
+            if (!response.ok) throw new Error('Failed to update status');
+
+            // Refresh the view to show updated status
+            await renderComics();
+          } catch (error) {
+            console.error('Failed to update comic status:', error);
+            alert('Failed to update comic status. Please try again.');
+          }
+        });
+      }
+
+      // Download button handler
+      const downloadBtn = comicDiv.querySelector('.download-comic-btn');
+      if (downloadBtn) {
+        downloadBtn.addEventListener('click', async (e) => {
+          e.stopPropagation(); // Prevent opening comic
+
+          if (typeof window.downloadComic === 'function') {
+            await window.downloadComic(comic, downloadBtn);
+          } else {
+            console.error('downloadComic function not available');
+            alert('Download functionality is not available. Please refresh the page.');
+          }
+        });
+      }
+
       // Delete button handler
       const deleteBtn = comicDiv.querySelector('.delete-comic-btn');
-      deleteBtn.addEventListener('click', async (e) => {
+      if (deleteBtn) {
+        deleteBtn.addEventListener('click', async (e) => {
         e.stopPropagation(); // Prevent opening comic
 
         const confirmDelete = confirm(`Remove "${title}" from this reading list?`);
@@ -933,6 +1054,7 @@ async function showReadingListDetail(listId, listName) {
           alert('Failed to remove comic from list. Please try again.');
         }
       });
+      }
 
       comicsContainer.appendChild(comicDiv);
     });
@@ -956,6 +1078,19 @@ async function showReadingListDetail(listId, listName) {
         return closest;
       }
     }, { offset: Number.NEGATIVE_INFINITY }).element;
+  }
+
+  // Download All button handler
+  const downloadAllBtn = document.getElementById('download-all-list-btn');
+  if (downloadAllBtn) {
+    downloadAllBtn.addEventListener('click', async () => {
+      if (typeof window.downloadReadingList === 'function') {
+        await window.downloadReadingList(listId, listName, downloadAllBtn);
+      } else {
+        console.error('downloadReadingList function not available');
+        alert('Download functionality is not available. Please refresh the page.');
+      }
+    });
   }
 
   // Export button handler
