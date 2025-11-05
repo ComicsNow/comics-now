@@ -2784,9 +2784,9 @@ function createApiRouter({
   // Import reading lists from JSON
   router.post('/api/v1/reading-lists/import', requireAuth, async (req, res) => {
     try {
-      const { data } = req.body;
+      const { lists } = req.body;
 
-      if (!data || !data.lists || !Array.isArray(data.lists)) {
+      if (!lists || !Array.isArray(lists)) {
         return res.status(400).json({ message: 'Invalid import data format' });
       }
 
@@ -2794,7 +2794,7 @@ function createApiRouter({
       const imported = [];
       const skipped = [];
 
-      for (const listData of data.lists) {
+      for (const listData of lists) {
         try {
           const listId = createId(`${req.user.userId}:${listData.name}:${now}:${Math.random()}`);
 
