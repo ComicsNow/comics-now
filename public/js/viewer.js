@@ -109,19 +109,22 @@
 
     console.log('[End Nav] Is at end?', isAtEnd);
 
+    // Regular viewer elements
     const container = document.getElementById('end-of-comic-navigation');
     const buttonsContainer = document.getElementById('end-nav-buttons');
     const seriesBtn = document.getElementById('next-in-series-btn');
     const readingListBtn = document.getElementById('next-in-reading-list-btn');
 
-    if (!container || !buttonsContainer) {
-      console.log('[End Nav] Container not found!');
-      return;
-    }
+    // Fullscreen viewer elements
+    const fullscreenContainer = document.getElementById('fullscreen-end-of-comic-navigation');
+    const fullscreenButtonsContainer = document.getElementById('fullscreen-end-nav-buttons');
+    const fullscreenSeriesBtn = document.getElementById('fullscreen-next-in-series-btn');
+    const fullscreenReadingListBtn = document.getElementById('fullscreen-next-in-reading-list-btn');
 
-    // Hide container if not at end
+    // Hide containers if not at end
     if (!isAtEnd) {
-      container.classList.add('hidden');
+      if (container) container.classList.add('hidden');
+      if (fullscreenContainer) fullscreenContainer.classList.add('hidden');
       return;
     }
 
@@ -131,45 +134,57 @@
     let hasVisibleButtons = false;
 
     // Check for next comic in series
-    if (seriesBtn && typeof global.getNextComicInSeries === 'function') {
-      const nextInSeries = await global.getNextComicInSeries();
+    let nextInSeries = null;
+    if (typeof global.getNextComicInSeries === 'function') {
+      nextInSeries = await global.getNextComicInSeries();
       console.log('[End Nav] Next in series:', nextInSeries?.name || 'none');
+
       if (nextInSeries) {
-        seriesBtn.classList.remove('hidden');
+        if (seriesBtn) seriesBtn.classList.remove('hidden');
+        if (fullscreenSeriesBtn) fullscreenSeriesBtn.classList.remove('hidden');
         hasVisibleButtons = true;
       } else {
-        seriesBtn.classList.add('hidden');
+        if (seriesBtn) seriesBtn.classList.add('hidden');
+        if (fullscreenSeriesBtn) fullscreenSeriesBtn.classList.add('hidden');
       }
     }
 
     // Check for next comic in reading list
-    if (readingListBtn && typeof global.getNextComicInReadingList === 'function') {
-      const nextInList = await global.getNextComicInReadingList();
+    let nextInList = null;
+    if (typeof global.getNextComicInReadingList === 'function') {
+      nextInList = await global.getNextComicInReadingList();
       console.log('[End Nav] Next in reading list:', nextInList?.name || 'none');
+
       if (nextInList) {
-        readingListBtn.classList.remove('hidden');
+        if (readingListBtn) readingListBtn.classList.remove('hidden');
+        if (fullscreenReadingListBtn) fullscreenReadingListBtn.classList.remove('hidden');
         hasVisibleButtons = true;
       } else {
-        readingListBtn.classList.add('hidden');
+        if (readingListBtn) readingListBtn.classList.add('hidden');
+        if (fullscreenReadingListBtn) fullscreenReadingListBtn.classList.add('hidden');
       }
     }
 
-    // Update container positioning based on manga mode
-    console.log('[End Nav] Updating position for manga mode:', isMangaMode);
-    if (isMangaMode) {
-      buttonsContainer.classList.remove('justify-end');
-      buttonsContainer.classList.add('justify-start');
-    } else {
-      buttonsContainer.classList.remove('justify-start');
-      buttonsContainer.classList.add('justify-end');
+    // Update regular viewer container positioning based on manga mode
+    if (buttonsContainer) {
+      console.log('[End Nav] Updating position for manga mode:', isMangaMode);
+      if (isMangaMode) {
+        buttonsContainer.classList.remove('justify-end');
+        buttonsContainer.classList.add('justify-start');
+      } else {
+        buttonsContainer.classList.remove('justify-start');
+        buttonsContainer.classList.add('justify-end');
+      }
     }
 
-    // Show container only if there are visible buttons
+    // Show containers only if there are visible buttons
     console.log('[End Nav] Has visible buttons?', hasVisibleButtons);
     if (hasVisibleButtons) {
-      container.classList.remove('hidden');
+      if (container) container.classList.remove('hidden');
+      if (fullscreenContainer) fullscreenContainer.classList.remove('hidden');
     } else {
-      container.classList.add('hidden');
+      if (container) container.classList.add('hidden');
+      if (fullscreenContainer) fullscreenContainer.classList.add('hidden');
     }
   }
 
@@ -713,6 +728,39 @@
         }
       };
       nextInReadingListBtn.addEventListener('click', nextInReadingListBtn._clickListener);
+    }
+
+    // Fullscreen end-of-comic navigation buttons
+    const fullscreenNextInSeriesBtn = document.getElementById('fullscreen-next-in-series-btn');
+    const fullscreenNextInReadingListBtn = document.getElementById('fullscreen-next-in-reading-list-btn');
+
+    if (fullscreenNextInSeriesBtn && !fullscreenNextInSeriesBtn._clickListener) {
+      fullscreenNextInSeriesBtn._clickListener = async () => {
+        if (typeof global.getNextComicInSeries === 'function' &&
+            typeof global.navigateToNextComic === 'function') {
+          const nextComic = await global.getNextComicInSeries();
+          if (nextComic) {
+            // Don't pass reading list context for series navigation
+            await global.navigateToNextComic(nextComic, {});
+          }
+        }
+      };
+      fullscreenNextInSeriesBtn.addEventListener('click', fullscreenNextInSeriesBtn._clickListener);
+    }
+
+    if (fullscreenNextInReadingListBtn && !fullscreenNextInReadingListBtn._clickListener) {
+      fullscreenNextInReadingListBtn._clickListener = async () => {
+        if (typeof global.getNextComicInReadingList === 'function' &&
+            typeof global.navigateToNextComic === 'function') {
+          const nextComic = await global.getNextComicInReadingList();
+          const readingListId = global.viewerReturnContext?.readingListId;
+          if (nextComic && readingListId) {
+            // Pass reading list context to maintain context chain
+            await global.navigateToNextComic(nextComic, { readingListId });
+          }
+        }
+      };
+      fullscreenNextInReadingListBtn.addEventListener('click', fullscreenNextInReadingListBtn._clickListener);
     }
 
     global.document.addEventListener('keyup', (event) => {

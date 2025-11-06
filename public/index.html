@@ -600,6 +600,29 @@
         </button>
       </div>
 
+      <!-- End of Comic Navigation for Fullscreen -->
+      <div id="fullscreen-end-of-comic-navigation" class="hidden absolute bottom-24 left-1/2 transform -translate-x-1/2 z-20 bg-gray-900/95 p-4 rounded-lg border border-gray-700 shadow-2xl">
+        <div class="text-center text-gray-300 text-sm mb-3">
+          End of Comic
+        </div>
+        <div id="fullscreen-end-nav-buttons" class="flex gap-3 flex-wrap justify-center">
+          <!-- Next in Series Button -->
+          <button id="fullscreen-next-in-series-btn" type="button" class="hidden pill-button bg-blue-600 hover:bg-blue-500 text-white transition-colors flex items-center gap-2" aria-label="Next comic in series">
+            <span>Next in Series</span>
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"></path>
+            </svg>
+          </button>
+          <!-- Next in Reading List Button -->
+          <button id="fullscreen-next-in-reading-list-btn" type="button" class="hidden pill-button bg-purple-600 hover:bg-purple-500 text-white transition-colors flex items-center gap-2" aria-label="Next comic in reading list">
+            <span>Next in Reading List</span>
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"></path>
+            </svg>
+          </button>
+        </div>
+      </div>
+
       <div id="fullscreen-nav-left" class="fullscreen-nav left"></div>
       <div id="fullscreen-nav-right" class="fullscreen-nav right"></div>
       <img id="fullscreen-image" src="" alt="Fullscreen Comic Page" class="fullscreen-image">
