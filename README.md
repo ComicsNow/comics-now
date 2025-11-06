@@ -18,8 +18,10 @@ A modern, self-hosted Progressive Web App (PWA) for managing and reading your di
   - [ComicTagger Integration](#comictagger-integration)
   - [Manga Mode](#manga-mode)
   - [Continuous Mode](#continuous-mode)
+  - [Reading Lists](#reading-lists)
   - [Context Menus](#context-menus)
-  - [Offline Reading](#offline-reading)
+  - [Offline Reading & Download Queue](#offline-reading--download-queue)
+  - [End-of-Comic Navigation](#end-of-comic-navigation)
   - [Multi-Device Sync](#multi-device-sync)
   - [Library Access Control](#library-access-control-admin-only)
 - [API Endpoints](#api-endpoints)
@@ -31,15 +33,20 @@ A modern, self-hosted Progressive Web App (PWA) for managing and reading your di
 - 📖 Built-in comic reader with page navigation
 - 📜 Continuous mode with vertical scrolling (webtoon-style reading)
 - 📕 Hierarchical manga mode with right-to-left reading support (per-user)
+- 📋 Reading Lists - Create custom collections and reading orders with drag-and-drop
 - 🔒 Granular library access control with hierarchical permissions (admin)
 - 🖱️ Context menus for quick actions (right-click or long-press)
 - 🔄 Cross-device sync with progress tracking
 - 📱 Offline support - download comics for offline reading
+- 📥 Enhanced download queue - Persistent queue with pause/resume/cancel
 - 🏷️ ComicVine integration for metadata
 - 🤖 ComicTagger integration for automated metadata tagging with visual comparison
+- 📄 Automatic PDF and CBR to CBZ conversion during library scan
+- ➡️ End-of-comic navigation to next issue or reading list item
 - 🔐 Optional Cloudflare Zero Trust authentication
 - 👥 Multi-user support with user roles and access control
 - 📊 Reading progress tracking across devices
+- ✅ Automatic system dependency checking during installation
 
 ## Installation
 
@@ -409,6 +416,46 @@ Read comics with vertical scrolling like webtoons and manga readers. **Continuou
 - **Scroll freely**: Use mouse wheel, trackpad, or touch gestures
 - **Click sides**: Click left/right sides of screen to navigate up/down
 
+### Reading Lists
+
+Create custom collections of comics and organize your reading order. Reading lists are perfect for storyline arcs, crossovers, or any custom grouping you want to create.
+
+#### Creating and Managing Reading Lists
+
+1. **Access Reading Lists**: Click the 📚 Reading Lists button in the toolbar
+2. **Create New List**: Click "Create New Reading List" and give it a name and optional description
+3. **Add Comics**: Use the context menu (right-click or long-press) on any comic and select "Add to Reading List"
+4. **View List Details**: Click on any reading list to see all comics in that list
+
+#### Features
+
+- **Drag-and-Drop Reordering**: Rearrange comics within a list by dragging them to your desired order (enable Edit Mode first)
+- **Two View Modes**:
+  - **Compact View** (☰): Minimal list with titles and progress
+  - **Grid View** (▤): Card-based layout with cover images and full details
+- **Import/Export**:
+  - Export single lists or all lists as JSON files
+  - Import reading lists from JSON to share across devices or with others
+- **Download Entire Lists**: Download all comics in a reading list for offline reading
+- **Play Through Lists**: Click the ▶ play button to start reading comics in sequence
+- **Progress Tracking**: See reading progress for each comic in the list
+- **Mark as Read/Unread**: Quickly update comic status from the list view
+- **End-of-Comic Navigation**: When you finish a comic, get automatic navigation to the next comic in the list
+
+#### Edit Mode
+
+Enable Edit Mode to:
+- Drag and drop comics to reorder them
+- Delete comics from the list
+- Reorder your reading sequence
+
+#### Works Offline
+
+Reading lists work with both online and offline comics. You can:
+- View your lists when offline
+- Play through downloaded comics in sequence
+- Sync your lists and progress when you come back online
+
 ### Context Menus
 
 Quick access to common actions via right-click or long-press menus:
@@ -436,12 +483,97 @@ Quick access to common actions via right-click or long-press menus:
 - Download entire library
 - Toggle manga mode for all comics
 
-### Offline Reading
+### Offline Reading & Download Queue
 
+Download comics for offline reading with a powerful, persistent download queue system.
+
+#### Accessing the Download Queue
+
+Click the **⬇ Downloads** button in the toolbar (between Reading Lists and ComicTagger) to open the download queue panel.
+
+#### Downloading Comics
+
+**Individual Comics:**
 1. Open a comic in the reader
-2. Click the download button to save for offline
-3. Access downloaded comics from the "Downloaded" filter
+2. Click the download button to add to queue
+3. Comic downloads in the background
+
+**Bulk Downloads:**
+- **Download Series**: Use context menu on any series card
+- **Download Reading List**: Click "Download All" button in reading list detail view
+- **Download from Smart Lists**: Download button available on Downloaded smart list
+
+#### Download Queue Features
+
+- **Always-Visible Button**: Downloads button in toolbar shows queue at any time
+- **Persistent Queue**: Downloads continue across page reloads and sessions
+- **Background Processing**: Queue continues while you browse the library
+- **Queue Management**:
+  - **Pause/Resume**: Pause individual downloads and resume later
+  - **Cancel**: Remove downloads from the queue
+  - **Restart**: Retry failed downloads
+  - **Reorder**: Change download priority (drag-and-drop in edit mode)
+- **Collapsible Panel**: Minimize queue to small icon showing active downloads count
+- **Real-time Status**: See download progress, speed, and status for each comic
+- **Service Worker Support**: Uses Background Sync API when available for reliable downloads
+
+#### Download Queue States
+
+- **Pending**: Waiting in queue
+- **Downloading**: Currently downloading with progress bar
+- **Completed**: Successfully downloaded
+- **Error**: Failed (can be restarted)
+- **Paused**: Temporarily stopped (can be resumed)
+
+#### Accessing Downloaded Comics
+
+1. Use the "Downloaded" filter in the library view
+2. Downloaded comics work completely offline
+3. Reading progress syncs when you come back online
 4. Comics are stored in browser IndexedDB
+
+#### Storage Notes
+
+- Downloads are stored locally in your browser's IndexedDB
+- Each browser maintains its own download cache
+- Downloads persist across sessions until manually deleted
+- Use "Clear All Downloaded Comics" in Settings → Downloads tab to free up space
+
+### End-of-Comic Navigation
+
+When you reach the last page of a comic, smart navigation options appear automatically to help you continue reading.
+
+#### How It Works
+
+1. Read to the last page of any comic
+2. Navigation UI appears at the bottom showing available options
+3. Click a button to instantly jump to the next comic
+
+#### Available Navigation Options
+
+**Next in Series** (if available):
+- Appears when there's a next issue in the same series
+- Takes you directly to the next sequential comic
+- Perfect for reading through a series in order
+
+**Next in Reading List** (if applicable):
+- Appears when the comic is part of a reading list
+- Takes you to the next comic in your custom reading order
+- Maintains your position in the reading list
+
+#### Benefits
+
+- **Seamless Reading**: No need to navigate back to library between comics
+- **Context-Aware**: Only shows relevant options based on your current comic
+- **Works Offline**: Navigation works with downloaded comics too
+- **Preserves Progress**: Reading progress saves before navigating to next comic
+
+#### Notes
+
+- Both buttons can appear simultaneously if the comic is in a series AND a reading list
+- Buttons only appear on the last page
+- Navigation respects manga mode (right-to-left reading)
+- Compatible with all reading modes (standard, manga, continuous)
 
 ### Multi-Device Sync
 
