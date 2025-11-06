@@ -94,6 +94,85 @@
     })();
   }
 
+  /**
+   * Update end-of-comic navigation visibility and button states
+   */
+  async function updateEndOfComicNavigation() {
+    const pages = global.getViewerPages?.() || [];
+    const currentIndex = global.currentPageIndex;
+    const isMangaMode = global.currentComic?.mangaMode || false;
+
+    console.log('[End Nav] Update called - Index:', currentIndex, 'Pages:', pages.length, 'Manga:', isMangaMode);
+
+    // Check if at last page (same for both standard and manga mode - only navigation direction changes)
+    const isAtEnd = currentIndex === pages.length - 1;
+
+    console.log('[End Nav] Is at end?', isAtEnd);
+
+    const container = document.getElementById('end-of-comic-navigation');
+    const buttonsContainer = document.getElementById('end-nav-buttons');
+    const seriesBtn = document.getElementById('next-in-series-btn');
+    const readingListBtn = document.getElementById('next-in-reading-list-btn');
+
+    if (!container || !buttonsContainer) {
+      console.log('[End Nav] Container not found!');
+      return;
+    }
+
+    // Hide container if not at end
+    if (!isAtEnd) {
+      container.classList.add('hidden');
+      return;
+    }
+
+    console.log('[End Nav] At end! Checking for next comics...');
+
+    // At end - show container and update buttons
+    let hasVisibleButtons = false;
+
+    // Check for next comic in series
+    if (seriesBtn && typeof global.getNextComicInSeries === 'function') {
+      const nextInSeries = await global.getNextComicInSeries();
+      console.log('[End Nav] Next in series:', nextInSeries?.name || 'none');
+      if (nextInSeries) {
+        seriesBtn.classList.remove('hidden');
+        hasVisibleButtons = true;
+      } else {
+        seriesBtn.classList.add('hidden');
+      }
+    }
+
+    // Check for next comic in reading list
+    if (readingListBtn && typeof global.getNextComicInReadingList === 'function') {
+      const nextInList = await global.getNextComicInReadingList();
+      console.log('[End Nav] Next in reading list:', nextInList?.name || 'none');
+      if (nextInList) {
+        readingListBtn.classList.remove('hidden');
+        hasVisibleButtons = true;
+      } else {
+        readingListBtn.classList.add('hidden');
+      }
+    }
+
+    // Update container positioning based on manga mode
+    console.log('[End Nav] Updating position for manga mode:', isMangaMode);
+    if (isMangaMode) {
+      buttonsContainer.classList.remove('justify-end');
+      buttonsContainer.classList.add('justify-start');
+    } else {
+      buttonsContainer.classList.remove('justify-start');
+      buttonsContainer.classList.add('justify-end');
+    }
+
+    // Show container only if there are visible buttons
+    console.log('[End Nav] Has visible buttons?', hasVisibleButtons);
+    if (hasVisibleButtons) {
+      container.classList.remove('hidden');
+    } else {
+      container.classList.add('hidden');
+    }
+  }
+
   async function renderPage() {
     console.log('[renderPage] START - currentPageIndex:', global.currentPageIndex);
     const pages = global.getViewerPages?.() || [];
@@ -252,6 +331,10 @@
         fullscreenPageLoader.classList.add('hidden');
         fullscreenPageLoader.classList.remove('flex');
       }
+
+      // Update end-of-comic navigation
+      await updateEndOfComicNavigation();
+
       console.log('[renderPage] END');
     }
   }
@@ -597,6 +680,39 @@
         }
       };
       global.metadataTabBtn.addEventListener('click', global.metadataTabBtn._loadListener);
+    }
+
+    // End-of-comic navigation buttons
+    const nextInSeriesBtn = document.getElementById('next-in-series-btn');
+    const nextInReadingListBtn = document.getElementById('next-in-reading-list-btn');
+
+    if (nextInSeriesBtn && !nextInSeriesBtn._clickListener) {
+      nextInSeriesBtn._clickListener = async () => {
+        if (typeof global.getNextComicInSeries === 'function' &&
+            typeof global.navigateToNextComic === 'function') {
+          const nextComic = await global.getNextComicInSeries();
+          if (nextComic) {
+            // Don't pass reading list context for series navigation
+            await global.navigateToNextComic(nextComic, {});
+          }
+        }
+      };
+      nextInSeriesBtn.addEventListener('click', nextInSeriesBtn._clickListener);
+    }
+
+    if (nextInReadingListBtn && !nextInReadingListBtn._clickListener) {
+      nextInReadingListBtn._clickListener = async () => {
+        if (typeof global.getNextComicInReadingList === 'function' &&
+            typeof global.navigateToNextComic === 'function') {
+          const nextComic = await global.getNextComicInReadingList();
+          const readingListId = global.viewerReturnContext?.readingListId;
+          if (nextComic && readingListId) {
+            // Pass reading list context to maintain context chain
+            await global.navigateToNextComic(nextComic, { readingListId });
+          }
+        }
+      };
+      nextInReadingListBtn.addEventListener('click', nextInReadingListBtn._clickListener);
     }
 
     global.document.addEventListener('keyup', (event) => {
