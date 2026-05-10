@@ -1,5 +1,10 @@
 // --- SETTINGS & LOGS ---
 function openSettingsModal() {
+  // Always ensure admin UI is hidden for non-admins when opening settings
+  if (typeof window.hideAdminUI === 'function') {
+    window.hideAdminUI();
+  }
+
   if (!window._isNavigatingFromRouter && window.router) {
     if (!getRelativePath().startsWith('/settings')) {
       window.router.navigate('/settings', true);
