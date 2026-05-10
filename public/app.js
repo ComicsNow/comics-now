@@ -464,6 +464,19 @@ function hideAdminUI() {
     }
   });
 
+  // Hide admin-only sections in the Comics Defaults tab
+  const adminDefaultSections = [
+    'settings-defaults-formats',
+    'settings-defaults-metadata'
+  ];
+
+  adminDefaultSections.forEach(sectionId => {
+    const section = document.getElementById(sectionId);
+    if (section) {
+      section.remove();
+    }
+  });
+
   // Auto-select Devices or Downloads tab for non-admin users when settings opens
   setTimeout(() => {
     const devicesTab = document.getElementById('settings-tab-devices');
