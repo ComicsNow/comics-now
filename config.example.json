@@ -1,0 +1,43 @@
+{
+  "port": 3000,
+  "baseUrl": "/comics",
+  "comictaggerPath": "/path/to/comictagger",
+
+  /* 
+     comicsLocation: The "workspace" directory where ComicTagger looks for 
+     new, untagged CBZ files to process.
+  */
+  "comicsLocation": "/path/to/comics/processing-inbox",
+
+  /*
+     libraries: The organized collections you want to browse in the UI.
+     Each library can have a different 'hierarchyMode':
+     - "metadata": Groups by Publisher/Series using internal ComicInfo.xml.
+     - "folder": Mirrors the physical folder structure on disk.
+  */
+  "libraries": [
+    { "path": "/path/to/comics/organized-collection", "hierarchyMode": "metadata" },
+    { "path": "/path/to/comics/raw-unsorted-scans", "hierarchyMode": "folder" }
+  ],
+  "cors": {
+    "enabled": true,
+    "allowedOrigins": [
+      "https://your-domain.com",
+      "http://localhost:3000",
+      "http://127.0.0.1:3000"
+    ]
+  },
+  "authentication": {
+    "enabled": false,
+    "adminEmail": "admin@example.com",
+    "cloudflare": {
+      "teamDomain": "yourteam.cloudflareaccess.com",
+      "audience": "your-application-audience-tag-from-cloudflare"
+    },
+    "trustedIPs": [
+      "127.0.0.1",
+      "::1",
+      "192.168.1.*"
+    ]
+  }
+}
