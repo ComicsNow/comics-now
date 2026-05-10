@@ -1,17 +1,17 @@
 // --- EVENT LISTENERS ---
-document.getElementById('settings-tab-general').addEventListener('click', () => {
+document.getElementById('settings-tab-general')?.addEventListener('click', () => {
   if (!window._isNavigatingFromRouter && window.router) {
     window.router.navigate('/settings', true);
   }
-  document.getElementById('settings-tab-general').classList.add('active');
-  document.getElementById('settings-tab-logs').classList.remove('active');
+  document.getElementById('settings-tab-general')?.classList.add('active');
+  document.getElementById('settings-tab-logs')?.classList.remove('active');
   document.getElementById('settings-tab-downloads').classList.remove('active');
   document.getElementById('settings-tab-comics-defaults')?.classList.remove('active');
   document.getElementById('settings-tab-devices').classList.remove('active');
   document.getElementById('settings-tab-users')?.classList.remove('active');
   document.getElementById('settings-tab-guided-reader')?.classList.remove('active');
-  document.getElementById('settings-content-general').classList.remove('hidden');
-  document.getElementById('settings-content-logs').classList.add('hidden');
+  document.getElementById('settings-content-general')?.classList.remove('hidden');
+  document.getElementById('settings-content-logs')?.classList.add('hidden');
   document.getElementById('settings-content-downloads').classList.add('hidden');
   document.getElementById('settings-content-comics-defaults')?.classList.add('hidden');
   document.getElementById('settings-content-devices').classList.add('hidden');
@@ -22,19 +22,19 @@ document.getElementById('settings-tab-general').addEventListener('click', () => 
   if (typeof refreshLibraryFolders === 'function') refreshLibraryFolders();
 });
 
-document.getElementById('settings-tab-logs').addEventListener('click', () => {
+document.getElementById('settings-tab-logs')?.addEventListener('click', () => {
   if (!window._isNavigatingFromRouter && window.router) {
     window.router.navigate('/settings/logs', true);
   }
-  document.getElementById('settings-tab-logs').classList.add('active');
-  document.getElementById('settings-tab-general').classList.remove('active');
+  document.getElementById('settings-tab-logs')?.classList.add('active');
+  document.getElementById('settings-tab-general')?.classList.remove('active');
   document.getElementById('settings-tab-downloads').classList.remove('active');
   document.getElementById('settings-tab-comics-defaults')?.classList.remove('active');
   document.getElementById('settings-tab-devices').classList.remove('active');
   document.getElementById('settings-tab-users')?.classList.remove('active');
   document.getElementById('settings-tab-guided-reader')?.classList.remove('active');
-  document.getElementById('settings-content-logs').classList.remove('hidden');
-  document.getElementById('settings-content-general').classList.add('hidden');
+  document.getElementById('settings-content-logs')?.classList.remove('hidden');
+  document.getElementById('settings-content-general')?.classList.add('hidden');
   document.getElementById('settings-content-downloads').classList.add('hidden');
   document.getElementById('settings-content-comics-defaults')?.classList.add('hidden');
   document.getElementById('settings-content-devices').classList.add('hidden');
@@ -50,15 +50,15 @@ document.getElementById('settings-tab-downloads').addEventListener('click', asyn
     window.router.navigate('/settings/downloads', true);
   }
   document.getElementById('settings-tab-downloads').classList.add('active');
-  document.getElementById('settings-tab-general').classList.remove('active');
-  document.getElementById('settings-tab-logs').classList.remove('active');
+  document.getElementById('settings-tab-general')?.classList.remove('active');
+  document.getElementById('settings-tab-logs')?.classList.remove('active');
   document.getElementById('settings-tab-comics-defaults')?.classList.remove('active');
   document.getElementById('settings-tab-devices').classList.remove('active');
   document.getElementById('settings-tab-users')?.classList.remove('active');
   document.getElementById('settings-tab-guided-reader')?.classList.remove('active');
   document.getElementById('settings-content-downloads').classList.remove('hidden');
-  document.getElementById('settings-content-general').classList.add('hidden');
-  document.getElementById('settings-content-logs').classList.add('hidden');
+  document.getElementById('settings-content-general')?.classList.add('hidden');
+  document.getElementById('settings-content-logs')?.classList.add('hidden');
   document.getElementById('settings-content-comics-defaults')?.classList.add('hidden');
   document.getElementById('settings-content-devices').classList.add('hidden');
   document.getElementById('settings-content-users')?.classList.add('hidden');
@@ -72,16 +72,16 @@ document.getElementById('settings-tab-comics-defaults')?.addEventListener('click
   if (!window._isNavigatingFromRouter && window.router) {
     window.router.navigate('/settings/defaults', true);
   }
-  document.getElementById('settings-tab-comics-defaults').classList.add('active');
-  document.getElementById('settings-tab-general').classList.remove('active');
-  document.getElementById('settings-tab-logs').classList.remove('active');
+  document.getElementById('settings-tab-comics-defaults')?.classList.add('active');
+  document.getElementById('settings-tab-general')?.classList.remove('active');
+  document.getElementById('settings-tab-logs')?.classList.remove('active');
   document.getElementById('settings-tab-downloads').classList.remove('active');
   document.getElementById('settings-tab-devices').classList.remove('active');
   document.getElementById('settings-tab-users')?.classList.remove('active');
   document.getElementById('settings-tab-guided-reader')?.classList.remove('active');
-  document.getElementById('settings-content-comics-defaults').classList.remove('hidden');
-  document.getElementById('settings-content-general').classList.add('hidden');
-  document.getElementById('settings-content-logs').classList.add('hidden');
+  document.getElementById('settings-content-comics-defaults')?.classList.remove('hidden');
+  document.getElementById('settings-content-general')?.classList.add('hidden');
+  document.getElementById('settings-content-logs')?.classList.add('hidden');
   document.getElementById('settings-content-downloads').classList.add('hidden');
   document.getElementById('settings-content-devices').classList.add('hidden');
   document.getElementById('settings-content-users')?.classList.add('hidden');
@@ -102,15 +102,15 @@ document.getElementById('settings-tab-devices').addEventListener('click', async 
     window.router.navigate('/settings/devices', true);
   }
   document.getElementById('settings-tab-devices').classList.add('active');
-  document.getElementById('settings-tab-general').classList.remove('active');
-  document.getElementById('settings-tab-logs').classList.remove('active');
+  document.getElementById('settings-tab-general')?.classList.remove('active');
+  document.getElementById('settings-tab-logs')?.classList.remove('active');
   document.getElementById('settings-tab-downloads').classList.remove('active');
   document.getElementById('settings-tab-comics-defaults')?.classList.remove('active');
   document.getElementById('settings-tab-users')?.classList.remove('active');
   document.getElementById('settings-tab-guided-reader')?.classList.remove('active');
   document.getElementById('settings-content-devices').classList.remove('hidden');
-  document.getElementById('settings-content-general').classList.add('hidden');
-  document.getElementById('settings-content-logs').classList.add('hidden');
+  document.getElementById('settings-content-general')?.classList.add('hidden');
+  document.getElementById('settings-content-logs')?.classList.add('hidden');
   document.getElementById('settings-content-downloads').classList.add('hidden');
   document.getElementById('settings-content-comics-defaults')?.classList.add('hidden');
   document.getElementById('settings-content-users')?.classList.add('hidden');
@@ -129,16 +129,16 @@ if (settingsTabUsersEl) {
     if (!window._isNavigatingFromRouter && window.router) {
       window.router.navigate('/settings/users', true);
     }
-    document.getElementById('settings-tab-users').classList.add('active');
-    document.getElementById('settings-tab-general').classList.remove('active');
-    document.getElementById('settings-tab-logs').classList.remove('active');
+    document.getElementById('settings-tab-users')?.classList.add('active');
+    document.getElementById('settings-tab-general')?.classList.remove('active');
+    document.getElementById('settings-tab-logs')?.classList.remove('active');
     document.getElementById('settings-tab-downloads').classList.remove('active');
     document.getElementById('settings-tab-comics-defaults')?.classList.remove('active');
     document.getElementById('settings-tab-devices').classList.remove('active');
     document.getElementById('settings-tab-guided-reader')?.classList.remove('active');
-    document.getElementById('settings-content-users').classList.remove('hidden');
-    document.getElementById('settings-content-general').classList.add('hidden');
-    document.getElementById('settings-content-logs').classList.add('hidden');
+    document.getElementById('settings-content-users')?.classList.remove('hidden');
+    document.getElementById('settings-content-general')?.classList.add('hidden');
+    document.getElementById('settings-content-logs')?.classList.add('hidden');
     document.getElementById('settings-content-downloads').classList.add('hidden');
     document.getElementById('settings-content-comics-defaults')?.classList.add('hidden');
     document.getElementById('settings-content-devices').classList.add('hidden');
@@ -173,16 +173,16 @@ document.getElementById('settings-tab-guided-reader')?.addEventListener('click',
   if (!window._isNavigatingFromRouter && window.router) {
     window.router.navigate('/settings/guided-reader', true);
   }
-  document.getElementById('settings-tab-guided-reader').classList.add('active');
-  document.getElementById('settings-tab-general').classList.remove('active');
-  document.getElementById('settings-tab-logs').classList.remove('active');
+  document.getElementById('settings-tab-guided-reader')?.classList.add('active');
+  document.getElementById('settings-tab-general')?.classList.remove('active');
+  document.getElementById('settings-tab-logs')?.classList.remove('active');
   document.getElementById('settings-tab-downloads').classList.remove('active');
   document.getElementById('settings-tab-comics-defaults')?.classList.remove('active');
   document.getElementById('settings-tab-devices').classList.remove('active');
   document.getElementById('settings-tab-users')?.classList.remove('active');
-  document.getElementById('settings-content-guided-reader').classList.remove('hidden');
-  document.getElementById('settings-content-general').classList.add('hidden');
-  document.getElementById('settings-content-logs').classList.add('hidden');
+  document.getElementById('settings-content-guided-reader')?.classList.remove('hidden');
+  document.getElementById('settings-content-general')?.classList.add('hidden');
+  document.getElementById('settings-content-logs')?.classList.add('hidden');
   document.getElementById('settings-content-downloads').classList.add('hidden');
   document.getElementById('settings-content-comics-defaults')?.classList.add('hidden');
   document.getElementById('settings-content-devices').classList.add('hidden');
