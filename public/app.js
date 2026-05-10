@@ -445,7 +445,7 @@ function hideAdminUI() {
   adminTabs.forEach(tabId => {
     const tab = document.getElementById(tabId);
     if (tab) {
-      tab.style.display = 'none';
+      tab.remove();
     }
   });
 
@@ -460,7 +460,7 @@ function hideAdminUI() {
   adminTabContent.forEach(contentId => {
     const content = document.getElementById(contentId);
     if (content) {
-      content.style.display = 'none';
+      content.remove();
     }
   });
 
