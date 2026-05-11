@@ -1,0 +1,11 @@
+node_modules
+temp
+thumbnails
+metadata
+logs
+.git
+.env
+config.json
+*.log
+*.db
+metadata
