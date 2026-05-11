@@ -246,7 +246,8 @@ function encodePath(str) {
  */
 async function openDownloadDB() {
   return new Promise((resolve, reject) => {
-    const request = indexedDB.open('comics-now-offline', 12);
+    // MUST match version in db.js (currently 13)
+    const request = indexedDB.open('comics-now-offline', 13);
 
     request.onsuccess = () => {
       resolve(request.result);
@@ -258,6 +259,19 @@ async function openDownloadDB() {
     };
 
     request.onupgradeneeded = (event) => {
+      const database = event.target.result;
+      // Ensure basic stores exist if SW is the one upgrading
+      if (!database.objectStoreNames.contains('downloadQueue')) {
+        const queueStore = database.createObjectStore('downloadQueue', { keyPath: 'id' });
+        queueStore.createIndex('priority', 'priority', { unique: false });
+      }
+      if (!database.objectStoreNames.contains('settings')) {
+        database.createObjectStore('settings', { keyPath: 'key' });
+      }
+      if (!database.objectStoreNames.contains('comics')) {
+        const comicsStore = database.createObjectStore('comics', { keyPath: 'id' });
+        comicsStore.createIndex('userId', 'userId', { unique: false });
+      }
     };
   });
 }
@@ -270,6 +284,9 @@ async function openDownloadDB() {
 async function getStoredJWT(db) {
   return new Promise((resolve, reject) => {
     try {
+      if (!db.objectStoreNames.contains('settings')) {
+        return resolve(null);
+      }
       const tx = db.transaction(['settings'], 'readonly');
       const store = tx.objectStore('settings');
       const request = store.get('cf-jwt-token');
@@ -489,146 +506,172 @@ async function showCompletionNotification(completedCount) {
   }
 }
 
+let isProcessingQueue = false;
+
 /**
  * Process download queue (Background Sync handler)
  */
 async function processDownloadQueue() {
+  if (isProcessingQueue) return;
+  isProcessingQueue = true;
 
-  let db;
   try {
-    db = await openDownloadDB();
-  } catch (error) {
-    console.error('[SW] Failed to open IndexedDB:', error);
-    return;
-  }
-
-  let queue;
-  try {
-    queue = await getQueueItems(db);
-  } catch (error) {
-    console.error('[SW] Failed to load queue:', error);
-    return;
-  }
-
-  // Filter only pending items
-  const pendingItems = queue.filter(item => item.status === 'pending');
-
-  if (pendingItems.length === 0) {
-    return;
-  }
-
-  let completedCount = 0;
-
-  for (const item of pendingItems) {
+    let db;
     try {
-
-      // Update status to downloading
-      await updateQueueItem(db, item.id, { status: 'downloading', progress: 0 });
-
-      // Notify clients of status change
-      await notifyClients({
-        type: 'download-status',
-        comicId: item.id,
-        status: 'downloading'
-      });
-
-      // Construct download URL (path must be base64 encoded, then URI encoded)
-      const downloadUrl = `${self.location.origin}${BASE_PATH}api/v1/comics/download?path=${encodeURIComponent(encodePath(item.comicPath))}`;
-
-      // Download comic with authentication
-      // Note: Cloudflare Access cookies should be sent automatically with credentials: 'include'
-      // Service Workers can't access or set cookies directly, so we rely on browser cookie handling
-
-      let response;
-      try {
-        response = await fetch(downloadUrl, {
-          credentials: 'include',
-          mode: 'cors',
-          cache: 'no-cache'
-        });
-      } catch (fetchError) {
-        console.error('[SW] Fetch error:', fetchError);
-        console.error('[SW] This might be a CORS issue or network connectivity problem');
-        throw new Error(`Network error: ${fetchError.message}. Try downloading from library instead.`);
-      }
-
-
-      if (!response.ok) {
-        // Handle authentication errors specially
-        if (response.status === 401 || response.status === 403) {
-          throw new Error('Authentication expired - please reopen app and restart download');
-        }
-        throw new Error(`Download failed: ${response.status} ${response.statusText}`);
-      }
-
-      // Download with progress tracking
-      const blob = await downloadWithProgress(response, async (progress) => {
-        await updateQueueItem(db, item.id, { progress });
-        await notifyClients({
-          type: 'download-progress',
-          comicId: item.id,
-          progress: progress
-        });
-      });
-
-
-      // Save to IndexedDB
-      await saveComicBlob(db, item.comic, blob);
-
-      // Mark complete and remove from queue after 3 seconds
-      await updateQueueItem(db, item.id, {
-        status: 'completed',
-        progress: 1
-      });
-
-      await notifyClients({
-        type: 'download-complete',
-        comicId: item.id
-      });
-
-      completedCount++;
-
-      // Remove from queue
-      setTimeout(async () => {
-        try {
-          const db2 = await openDownloadDB();
-          await removeQueueItem(db2, item.id);
-        } catch (error) {
-          console.error('[SW] Error removing completed item:', error);
-        }
-      }, 3000);
-
+      db = await openDownloadDB();
     } catch (error) {
-      console.error('[SW] Download failed:', item.comicName, error);
+      console.error('[SW] Failed to open IndexedDB:', error);
+      return;
+    }
 
+    let queue;
+    try {
+      queue = await getQueueItems(db);
+    } catch (error) {
+      console.error('[SW] Failed to load queue:', error);
+      return;
+    }
+
+    // Filter only pending items
+    const pendingItems = queue.filter(item => item.status === 'pending');
+
+    if (pendingItems.length === 0) {
+      return;
+    }
+
+    // Get Cloudflare Access JWT token
+    const jwtToken = await getStoredJWT(db);
+
+    let completedCount = 0;
+
+    for (const item of pendingItems) {
       try {
+        // Re-verify item is still in queue and pending (to handle external cancellations)
+        const currentQueue = await getQueueItems(db);
+        const stillExists = currentQueue.find(i => i.id === item.id && i.status === 'pending');
+        if (!stillExists) continue;
+
+        // Update status to downloading
+        await updateQueueItem(db, item.id, { status: 'downloading', progress: 0 });
+
+        // Notify clients of status change
+        await notifyClients({
+          type: 'download-status',
+          comicId: item.id,
+          status: 'downloading'
+        });
+
+        // Construct download URL (path must be base64 encoded, then URI encoded)
+        const downloadUrl = `${self.location.origin}${BASE_PATH}api/v1/comics/download?path=${encodeURIComponent(encodePath(item.comicPath))}`;
+
+        // Download comic with authentication
+        const headers = {
+          'Cache-Control': 'no-cache'
+        };
+
+        // Add Cloudflare Access token if available
+        if (jwtToken) {
+          headers['cf-access-jwt-assertion'] = jwtToken;
+        }
+
+        let response;
+        try {
+          response = await fetch(downloadUrl, {
+            headers: headers,
+            credentials: 'include',
+            mode: 'cors',
+            cache: 'no-cache'
+          });
+        } catch (fetchError) {
+          console.error('[SW] Fetch error:', fetchError);
+          throw new Error(`Network error: ${fetchError.message}. Try downloading from library instead.`);
+        }
+
+
+        if (!response.ok) {
+          // Handle authentication errors specially
+          if (response.status === 401 || response.status === 403) {
+            throw new Error('Authentication expired - please reopen app and restart download');
+          }
+          throw new Error(`Download failed: ${response.status} ${response.statusText}`);
+        }
+
+        // Download with progress tracking
+        const blob = await downloadWithProgress(response, async (progress) => {
+          await updateQueueItem(db, item.id, { progress });
+          await notifyClients({
+            type: 'download-progress',
+            comicId: item.id,
+            progress: progress
+          });
+        });
+
+
+        // Save to IndexedDB
+        await saveComicBlob(db, item.comic, blob);
+
+        // Mark complete and remove from queue after 3 seconds
         await updateQueueItem(db, item.id, {
-          status: 'error',
-          error: error.message || 'Download failed'
+          status: 'completed',
+          progress: 1
         });
 
         await notifyClients({
-          type: 'download-error',
-          comicId: item.id,
-          error: error.message
+          type: 'download-complete',
+          comicId: item.id
         });
-      } catch (updateError) {
-        console.error('[SW] Error updating failed item:', updateError);
+
+        completedCount++;
+
+        // Remove from queue
+        setTimeout(async () => {
+          try {
+            const db2 = await openDownloadDB();
+            await removeQueueItem(db2, item.id);
+          } catch (error) {
+            console.error('[SW] Error removing completed item:', error);
+          }
+        }, 3000);
+
+      } catch (error) {
+        console.error('[SW] Download failed:', item.comicName, error);
+
+        try {
+          await updateQueueItem(db, item.id, {
+            status: 'error',
+            error: error.message || 'Download failed'
+          });
+
+          await notifyClients({
+            type: 'download-error',
+            comicId: item.id,
+            error: error.message
+          });
+        } catch (updateError) {
+          console.error('[SW] Error updating failed item:', updateError);
+        }
       }
     }
-  }
 
-  // Show notification if any completed
-  if (completedCount > 0) {
-    await showCompletionNotification(completedCount);
+    // Show notification if any completed
+    if (completedCount > 0) {
+      await showCompletionNotification(completedCount);
+    }
+  } finally {
+    isProcessingQueue = false;
   }
-
 }
 
 // SYNC EVENT: Handle background sync for downloads
 self.addEventListener('sync', (event) => {
-
   if (event.tag === 'download-comics') {
+    event.waitUntil(processDownloadQueue());
+  }
+});
+
+// MESSAGE EVENT: Handle explicit download start commands
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'start-downloads') {
     event.waitUntil(processDownloadQueue());
   }
 });

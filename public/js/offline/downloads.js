@@ -113,6 +113,10 @@
       // Register background sync if supported (Service Worker will handle downloads)
       if (this.useServiceWorker) {
         await this.registerBackgroundSync();
+        // Explicitly trigger SW to start downloading immediately just in case sync is delayed
+        if (navigator.serviceWorker && navigator.serviceWorker.controller) {
+          navigator.serviceWorker.controller.postMessage({ type: 'start-downloads' });
+        }
       } else {
         // Fallback to in-page processing
         if (!this.isProcessing) {
@@ -208,6 +212,10 @@
       // Trigger processing
       if (this.useServiceWorker) {
         await this.registerBackgroundSync();
+        // Explicitly trigger SW to start downloading immediately
+        if (navigator.serviceWorker && navigator.serviceWorker.controller) {
+          navigator.serviceWorker.controller.postMessage({ type: 'start-downloads' });
+        }
       } else {
         if (!this.isProcessing) {
           this.processQueue();
@@ -1148,7 +1156,18 @@
     downloadManager, // Expose the download manager
     initializeDownloadQueue: async () => {
       await downloadManager.loadQueue();
-      downloadManager.processQueue(); // Resume processing if items in queue
+      // If items exist in queue, resume processing
+      if (downloadManager.persistentQueue.length > 0) {
+        if (downloadManager.useServiceWorker) {
+          await downloadManager.registerBackgroundSync();
+          // Explicitly trigger SW to resume
+          if (navigator.serviceWorker && navigator.serviceWorker.controller) {
+            navigator.serviceWorker.controller.postMessage({ type: 'start-downloads' });
+          }
+        } else {
+          downloadManager.processQueue();
+        }
+      }
     },
     cancelDownload: (comicId) => downloadManager.cancelDownload(comicId),
     restartDownload: (comicId) => downloadManager.restartDownload(comicId),

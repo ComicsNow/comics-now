@@ -7,6 +7,7 @@
   let lastSearchQuery = '';
   let lastSearchField = 'all';
   let lastSearchResults = null;
+  let activeAlphaFilter = 'All';
 
 function setLatestButtonActive(isActive) {
   if (!latestAddedButton) return;
@@ -504,9 +505,13 @@ function renderAlphaFilter(targetDiv, data, renderFn, type) {
   characters.forEach(char => {
     const button = document.createElement('button');
     button.className = 'alpha-filter-btn';
-    if (char === 'All') { button.classList.add('active'); button.style.width = '2.5rem'; }
+    if (char === activeAlphaFilter) {
+      button.classList.add('active');
+      if (char === 'All') button.style.width = '2.5rem';
+    }
     button.textContent = char;
     button.addEventListener('click', (e) => {
+      activeAlphaFilter = char;
       targetDiv.querySelectorAll('.alpha-filter-btn').forEach(btn => btn.classList.remove('active'));
       e.target.classList.add('active');
 
@@ -536,6 +541,30 @@ function renderAlphaFilter(targetDiv, data, renderFn, type) {
     });
     targetDiv.appendChild(button);
   });
+
+  // If a filter is already active (other than 'All'), apply it immediately
+  if (activeAlphaFilter !== 'All') {
+    if (type === 'comics') {
+      const filteredData = data.filter(item => {
+        const info = applyDisplayInfoToComic(item);
+        const label = info.displayTitle || item.name || '';
+        const firstChar = label.charAt(0).toUpperCase();
+        return (activeAlphaFilter === '#' && !isNaN(parseInt(firstChar))) || (activeAlphaFilter === firstChar);
+      });
+      renderFn(filteredData);
+    } else {
+      const filteredData = {};
+      for (const key in data) {
+        const firstChar = key.charAt(0).toUpperCase();
+        if ((activeAlphaFilter === '#' && !isNaN(parseInt(firstChar))) || (activeAlphaFilter === firstChar)) {
+          filteredData[key] = data[key];
+        }
+      }
+      renderFn(filteredData);
+    }
+  } else {
+    renderFn(data);
+  }
 }
 
 function getComicStatus(comic) {
@@ -1188,6 +1217,9 @@ function showPublisherList(rootFolder, options = {}) {
     return;
   }
 
+  if (currentView !== 'publishers') {
+    activeAlphaFilter = 'All';
+  }
   currentView = 'publishers';
   currentRootFolder = actualKey;
   currentPublisher = null;
@@ -1225,7 +1257,6 @@ function showPublisherList(rootFolder, options = {}) {
   ]);
 
   renderAlphaFilter(publisherAlphaFilter, publishersToRender, renderPublisherCards, 'publishers');
-  renderPublisherCards(publishersToRender);
 }
 
 function renderPublisherCards(publishersToShow) {
@@ -1435,6 +1466,9 @@ function showSeriesList(publisherName, options = {}) {
   const force = Boolean(options.force);
   if (!publisherName) return;
 
+  if (currentView !== 'series' || currentPublisher !== publisherName) {
+    activeAlphaFilter = 'All';
+  }
   currentView = 'series';
   currentPublisher = publisherName;
   currentSeries = null;
@@ -1480,7 +1514,6 @@ function showSeriesList(publisherName, options = {}) {
   ]);
 
   renderAlphaFilter(seriesAlphaFilter, filteredSeries, renderSeriesCards, 'series');
-  renderSeriesCards(filteredSeries);
 }
 function renderSeriesCards(seriesToRender) {
   const container = document.getElementById('series-list-container');
@@ -1746,6 +1779,9 @@ function getSeriesStatusBanner(comicsInSeries) {
 }
 
 async function showComicList(seriesName) {
+  if (currentView !== 'comics' || currentSeries !== seriesName) {
+    activeAlphaFilter = 'All';
+  }
   currentView = 'comics';
   currentSeries = seriesName;
   if (typeof window !== 'undefined') {
@@ -1792,7 +1828,6 @@ async function showComicList(seriesName) {
     }
 
     renderAlphaFilter(comicAlphaFilter, comicsToRender, renderComicCards, 'comics');
-    renderComicCards(comicsToRender);
 
   } catch (error) {
     
