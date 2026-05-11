@@ -14,6 +14,8 @@ WORKDIR /app
 
 # Install Node.js dependencies
 COPY package*.json ./
+# Create dummy script to satisfy postinstall if it runs
+RUN mkdir -p scripts && touch scripts/check-dependencies.js
 RUN npm ci --omit=dev
 
 # Install ComicTagger in a virtual environment

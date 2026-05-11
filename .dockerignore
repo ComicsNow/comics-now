@@ -9,3 +9,4 @@ config.json
 *.log
 *.db
 metadata
+data

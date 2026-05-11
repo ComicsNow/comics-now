@@ -7,8 +7,9 @@ services:
     volumes:
       - ./data:/app/data
       # Mount your comic libraries here. 
+      # Example: - /path/to/your/comics:/comics:ro
       # The internal path should match what you put in config.json
-      - /path/to/your/comics:/comics:ro
     environment:
       - NODE_ENV=production
+      - DATA_DIR=/app/data
     restart: unless-stopped
