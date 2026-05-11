@@ -471,13 +471,17 @@ async function scanLibrary() {
         let guidedViewStatus = existing?.guidedViewStatus || 'pending';
         let guidedViewPath = existing?.guidedViewPath || null;
         const guidedViewError = existing?.guidedViewError || null;
-        if (guidedViewStatus !== 'completed') {
-          const sidecarPath = path.join(GUIDED_VIEW_DIR, `${id}.json`);
-          if (fs.existsSync(sidecarPath)) {
-            guidedViewStatus = 'completed';
-            guidedViewPath = sidecarPath;
-            log('INFO', 'SCAN', `Reconnected guided-view sidecar: ${path.basename(filePath)}`);
+        const sidecarPath = path.join(GUIDED_VIEW_DIR, `${id}.json`);
+
+        if (guidedViewStatus === 'completed') {
+          if (!fs.existsSync(sidecarPath)) {
+            guidedViewStatus = 'pending';
+            guidedViewPath = null;
           }
+        } else if (fs.existsSync(sidecarPath)) {
+          guidedViewStatus = 'completed';
+          guidedViewPath = sidecarPath;
+          log('INFO', 'SCAN', `Reconnected guided-view sidecar: ${path.basename(filePath)}`);
         }
 
         let thumbnailPath;

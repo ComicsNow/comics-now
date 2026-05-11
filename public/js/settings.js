@@ -40,7 +40,9 @@ async function fetchSettings() {
   try {
     const response = await fetch(`${API_BASE_URL}/api/v1/settings`);
     const data = await response.json();
-    scanIntervalInput.value = data.scanInterval || 5;
+    if (scanIntervalInput) {
+      scanIntervalInput.value = data.scanInterval || 5;
+    }
 
     // Handle allowed formats
     const allowedFormatsSelect = document.getElementById('allowed-formats-select');
@@ -56,23 +58,27 @@ async function fetchSettings() {
     }
 
     // Handle API key display
-    if (data.comicVineApiKey !== undefined) {
-      // Admin user - show actual key
-      apiKeyInput.value = data.comicVineApiKey || '';
-      apiKeyInput.placeholder = 'Enter your ComicVine API key';
-    } else if (data.hasApiKey) {
-      // Non-admin user with key configured - show masked
-      apiKeyInput.value = '';
-      apiKeyInput.placeholder = '••••••••••••••••';
-      apiKeyInput.disabled = true;
-    } else {
-      // No key configured
-      apiKeyInput.value = '';
-      apiKeyInput.placeholder = 'Not configured';
-      apiKeyInput.disabled = true;
+    if (apiKeyInput) {
+      if (data.comicVineApiKey !== undefined) {
+        // Admin user - show actual key
+        apiKeyInput.value = data.comicVineApiKey || '';
+        apiKeyInput.placeholder = 'Enter your ComicVine API key';
+      } else if (data.hasApiKey) {
+        // Non-admin user with key configured - show masked
+        apiKeyInput.value = '';
+        apiKeyInput.placeholder = '••••••••••••••••';
+        apiKeyInput.disabled = true;
+      } else {
+        // No key configured
+        apiKeyInput.value = '';
+        apiKeyInput.placeholder = 'Not configured';
+        apiKeyInput.disabled = true;
+      }
     }
   } catch (error) {
-    settingsStatusDiv.textContent = 'Failed to load settings.';
+    if (settingsStatusDiv) {
+      settingsStatusDiv.textContent = 'Failed to load settings.';
+    }
   }
 }
 
@@ -173,77 +179,87 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 });
-settingsForm.addEventListener('submit', async (e) => {
-  e.preventDefault();
-  settingsStatusDiv.textContent = 'Saving...';
+if (settingsForm) {
+  settingsForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    if (settingsStatusDiv) settingsStatusDiv.textContent = 'Saving...';
 
-  const interval = scanIntervalInput.value;
-  const apiKey = apiKeyInput.value;
-  const allowedFormats = document.getElementById('allowed-formats-select')?.value || 'cbz';
-  const metadataStorage = document.getElementById('metadata-storage-select')?.value || 'archive';
+    const interval = scanIntervalInput ? scanIntervalInput.value : null;
+    const apiKey = apiKeyInput ? apiKeyInput.value : null;
+    const allowedFormats = document.getElementById('allowed-formats-select')?.value || 'cbz';
+    const metadataStorage = document.getElementById('metadata-storage-select')?.value || 'archive';
 
-  try {
-    const res = await fetch(`${API_BASE_URL}/api/v1/settings`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ interval, apiKey, allowedFormats, metadataStorage })
-    });
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/v1/settings`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ interval, apiKey, allowedFormats, metadataStorage })
+      });
 
-    if (!res.ok) {
-      const errorData = await res.json().catch(() => ({ message: 'An unknown error occurred.' }));
-      throw new Error(errorData.message);
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({ message: 'An unknown error occurred.' }));
+        throw new Error(errorData.message);
+      }
+
+      if (settingsStatusDiv) settingsStatusDiv.textContent = 'Settings saved!';
+      setTimeout(() => {
+        if (settingsStatusDiv) settingsStatusDiv.textContent = '';
+        closeSettingsModal();
+        fetchLibrary(); // Refresh library after saving settings
+      }, 1500);
+    } catch (error) {
+      if (settingsStatusDiv) settingsStatusDiv.textContent = `Error: ${error.message}`;
     }
+  });
+}
 
-    settingsStatusDiv.textContent = 'Settings saved!';
-    setTimeout(() => {
-      settingsStatusDiv.textContent = '';
-      closeSettingsModal();
-      fetchLibrary(); // Refresh library after saving settings
-    }, 1500);
-  } catch (error) {
-    settingsStatusDiv.textContent = `Error: ${error.message}`;
-  }
-});
+if (scanButton) {
+  scanButton.addEventListener('click', async () => {
+    scanButton.textContent = 'Scanning...';
+    scanButton.disabled = true;
+    try {
+      await triggerScan();
+      if (settingsStatusDiv) settingsStatusDiv.textContent = 'Scan initiated successfully.';
+    } catch (e) {
+      if (settingsStatusDiv) settingsStatusDiv.textContent = 'Failed to start scan.';
+    } finally {
+      setTimeout(async () => {
+        scanButton.textContent = 'Scan Now';
+        scanButton.disabled = false;
+        if (settingsStatusDiv) settingsStatusDiv.textContent = '';
+        await fetchLibrary();
+      }, 3000);
+    }
+  });
+}
 
-scanButton.addEventListener('click', async () => {
-  scanButton.textContent = 'Scanning...';
-  scanButton.disabled = true;
-  try {
-    await triggerScan();
-    settingsStatusDiv.textContent = 'Scan initiated successfully.';
-  } catch (e) {
-    settingsStatusDiv.textContent = 'Failed to start scan.';
-  } finally {
-    setTimeout(async () => {
-      scanButton.textContent = 'Scan Now';
-      scanButton.disabled = false;
-      settingsStatusDiv.textContent = '';
-      await fetchLibrary();
-    }, 3000);
-  }
-});
-
-fullScanButton.addEventListener('click', async () => {
-  fullScanButton.textContent = 'Scanning...';
-  fullScanButton.disabled = true;
-  try {
-    await triggerScan(null, true);
-    settingsStatusDiv.textContent = 'Full scan initiated successfully.';
-  } catch (e) {
-    settingsStatusDiv.textContent = 'Failed to start full scan.';
-  } finally {
-    setTimeout(async () => {
-      fullScanButton.textContent = 'Full Scan';
-      fullScanButton.disabled = false;
-      settingsStatusDiv.textContent = '';
-      await fetchLibrary();
-    }, 3000);
-  }
-});
+if (fullScanButton) {
+  fullScanButton.addEventListener('click', async () => {
+    fullScanButton.textContent = 'Scanning...';
+    fullScanButton.disabled = true;
+    try {
+      await triggerScan(null, true);
+      if (settingsStatusDiv) settingsStatusDiv.textContent = 'Full scan initiated successfully.';
+    } catch (e) {
+      if (settingsStatusDiv) settingsStatusDiv.textContent = 'Failed to start full scan.';
+    } finally {
+      setTimeout(async () => {
+        fullScanButton.textContent = 'Full Scan';
+        fullScanButton.disabled = false;
+        if (settingsStatusDiv) settingsStatusDiv.textContent = '';
+        await fetchLibrary();
+      }, 3000);
+    }
+  });
+}
 
 async function fetchLogs() {
-  const level = document.getElementById('log-level-filter').value;
-  const category = document.getElementById('log-category-filter').value;
+  const levelFilter = document.getElementById('log-level-filter');
+  const categoryFilter = document.getElementById('log-category-filter');
+  if (!levelFilter || !categoryFilter || !logsContainer) return;
+
+  const level = levelFilter.value;
+  const category = categoryFilter.value;
   try {
     const res = await fetch(`${API_BASE_URL}/api/v1/logs?level=${level}&category=${category}`);
     if (!res.ok) throw new Error('Server returned an error');
@@ -1607,7 +1623,7 @@ async function loadComicsDefaults() {
   let initialMetadataStorage = null;
 
   // Handle Metadata Storage Change
-  if (metadataStorageSelect) {
+  if (metadataStorageSelect && migrationOptions) {
     // We need the initial value, which is loaded in fetchSettings
     // But since fetchSettings is async, we'll wait a bit or just assume it's what's currently in the select
     setTimeout(() => {
@@ -1618,8 +1634,8 @@ async function loadComicsDefaults() {
       const newValue = metadataStorageSelect.value;
       if (newValue !== initialMetadataStorage) {
         migrationOptions.classList.remove('hidden');
-        migrationStatus.textContent = '';
-        applyCheckbox.checked = false;
+        if (migrationStatus) migrationStatus.textContent = '';
+        if (applyCheckbox) applyCheckbox.checked = false;
       } else {
         migrationOptions.classList.add('hidden');
       }
@@ -1627,19 +1643,23 @@ async function loadComicsDefaults() {
   }
 
   // Handle Migration Button
-  if (migrateBtn) {
+  if (migrateBtn && metadataStorageSelect) {
     migrateBtn.addEventListener('click', async () => {
-      if (!applyCheckbox.checked) {
-        migrationStatus.textContent = 'Please confirm by checking the box above.';
-        migrationStatus.className = 'text-xs mt-3 text-center text-yellow-400';
+      if (applyCheckbox && !applyCheckbox.checked) {
+        if (migrationStatus) {
+          migrationStatus.textContent = 'Please confirm by checking the box above.';
+          migrationStatus.className = 'text-xs mt-3 text-center text-yellow-400';
+        }
         return;
       }
 
       const mode = metadataStorageSelect.value;
       migrateBtn.disabled = true;
       migrateBtn.textContent = 'Migrating...';
-      migrationStatus.textContent = 'Starting migration process...';
-      migrationStatus.className = 'text-xs mt-3 text-center text-blue-400';
+      if (migrationStatus) {
+        migrationStatus.textContent = 'Starting migration process...';
+        migrationStatus.className = 'text-xs mt-3 text-center text-blue-400';
+      }
 
       try {
         const response = await fetch(`${API_BASE_URL}/api/v1/admin/metadata/migrate`, {
@@ -1654,19 +1674,23 @@ async function loadComicsDefaults() {
           throw new Error(data.message || 'Migration failed');
         }
 
-        migrationStatus.textContent = `✓ Migration complete! ${data.processed || 0} comics processed.`;
-        migrationStatus.className = 'text-xs mt-3 text-center text-green-400';
+        if (migrationStatus) {
+          migrationStatus.textContent = `✓ Migration complete! ${data.processed || 0} comics processed.`;
+          migrationStatus.className = 'text-xs mt-3 text-center text-green-400';
+        }
         initialMetadataStorage = mode; // Update initial value
 
         // Hide migration options after success
         setTimeout(() => {
-          migrationOptions.classList.add('hidden');
+          if (migrationOptions) migrationOptions.classList.add('hidden');
         }, 3000);
 
       } catch (error) {
         console.error('Migration error:', error);
-        migrationStatus.textContent = `✗ Error: ${error.message}`;
-        migrationStatus.className = 'text-xs mt-3 text-center text-red-400';
+        if (migrationStatus) {
+          migrationStatus.textContent = `✗ Error: ${error.message}`;
+          migrationStatus.className = 'text-xs mt-3 text-center text-red-400';
+        }
       } finally {
         migrateBtn.disabled = false;
         migrateBtn.textContent = 'Migrate Existing Comics Now';
@@ -1678,8 +1702,8 @@ async function loadComicsDefaults() {
   if (allowedFormatsSelect) {
     allowedFormatsSelect.addEventListener('change', async () => {
       const allowedFormats = allowedFormatsSelect.value;
-      const interval = scanIntervalInput.value;
-      const apiKey = apiKeyInput.value;
+      const interval = scanIntervalInput ? scanIntervalInput.value : null;
+      const apiKey = apiKeyInput ? apiKeyInput.value : null;
 
       try {
         const res = await fetch(`${API_BASE_URL}/api/v1/settings`, {

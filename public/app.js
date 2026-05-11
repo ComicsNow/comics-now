@@ -477,14 +477,6 @@ function hideAdminUI() {
     }
   });
 
-  // Auto-select Devices or Downloads tab for non-admin users when settings opens
-  setTimeout(() => {
-    const devicesTab = document.getElementById('settings-tab-devices');
-    if (devicesTab && !devicesTab.classList.contains('active')) {
-      devicesTab.click();
-    }
-  }, 100);
-
   // Note: We don't throw errors if elements don't exist - they might not be loaded yet
   // The UI will gracefully handle missing elements
 }
@@ -1357,7 +1349,18 @@ document.addEventListener('DOMContentLoaded', () => {
     window.router.addRoute('/settings', () => {
       window.openSettingsModal();
       const generalTab = document.getElementById('settings-tab-general');
-      if (generalTab) generalTab.click();
+      if (generalTab) {
+        generalTab.click();
+      } else {
+        // Fallback for non-admins - try to click the first available user tab
+        const downloadsTab = document.getElementById('settings-tab-downloads');
+        if (downloadsTab) {
+          downloadsTab.click();
+        } else {
+          const devicesTab = document.getElementById('settings-tab-devices');
+          if (devicesTab) devicesTab.click();
+        }
+      }
     });
     
     // 2. Specific Settings Tabs
