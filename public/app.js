@@ -439,7 +439,8 @@ function hideAdminUI() {
     'settings-tab-general',
     'settings-tab-logs',
     'settings-tab-users',
-    'settings-tab-guided-reader'
+    'settings-tab-guided-reader',
+    'metadata-tab'
   ];
 
   adminTabs.forEach(tabId => {
@@ -454,7 +455,8 @@ function hideAdminUI() {
     'settings-content-general',
     'settings-content-logs',
     'settings-content-users',
-    'settings-content-guided-reader'
+    'settings-content-guided-reader',
+    'metadata-content'
   ];
 
   adminTabContent.forEach(contentId => {

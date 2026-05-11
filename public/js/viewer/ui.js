@@ -656,6 +656,14 @@
     if (global.metadataTabBtn && !global.metadataTabBtn._tabListener) {
       global.metadataTabBtn._tabListener = (e) => {
         if (e) e.preventDefault();
+
+        // Security check: Only admins can access metadata
+        const isAdmin = window.syncManager && window.syncManager.userRole === 'admin';
+        if (!isAdmin) {
+          console.warn('[Viewer] Non-admin user tried to access metadata view');
+          return;
+        }
+
         global.metadataTabBtn.classList.add('active');
         global.viewerTabBtn?.classList.remove('active');
         global.metadataContent?.classList.remove('hidden');

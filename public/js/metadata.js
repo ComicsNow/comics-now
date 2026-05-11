@@ -1,6 +1,9 @@
 // --- METADATA ---
 
 async function loadMetadata() {
+  // Security check: only admins can view metadata
+  const isAdmin = window.syncManager && window.syncManager.userRole === 'admin';
+  if (!isAdmin) return;
   try {
     if (!window.currentComic) {
       throw new Error('No comic loaded');
