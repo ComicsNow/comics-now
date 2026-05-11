@@ -10,3 +10,4 @@ config.json
 *.db
 metadata
 data
+docs/plans/

@@ -12,3 +12,4 @@ build/
 *.log
 models/western/
 data/
+docs/plans/
