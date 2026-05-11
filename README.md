@@ -38,7 +38,8 @@ A modern, simple web app for managing and reading your digital comic book collec
    `cd comics-now`
 
 2. **Install system requirements:**
-   Ubuntu/Debian: `sudo apt install poppler-utils zip unrar`
+   - **Utilities (Ubuntu/Debian):** `sudo apt install poppler-utils zip unrar`
+   - **Metadata Engine (Python):** `pip3 install "comictagger[all]"`
 
 3. **Install app dependencies:**
    `npm install`
