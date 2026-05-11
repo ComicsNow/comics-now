@@ -35,8 +35,30 @@ A modern, simple web app for managing and reading your digital comic book collec
 
 ### Docker (Recommended)
 
-The easiest way to run Comics Now! is with Docker. This ensures all dependencies (like Python, ComicTagger, and system libraries) are correctly configured.
+The easiest way to run Comics Now! is with Docker. You can either use our pre-built image from the GitHub Container Registry (fastest) or build it locally.
 
+#### Using Pre-built Image (Fastest)
+
+1. **Download the configuration:**
+   ```bash
+   curl -O https://raw.githubusercontent.com/ComicsNow/comics-now/main/docker-compose.yml
+   ```
+
+2. **Configure:**
+   Edit `docker-compose.yml` and replace `build: .` with `image: ghcr.io/comicsnow/comics-now:latest`. Then mount your comic libraries.
+   ```yaml
+   services:
+     server:
+       image: ghcr.io/comicsnow/comics-now:latest
+       volumes:
+         - ./data:/app/data
+         - /path/to/your/comics:/comics:ro
+   ```
+
+3. **Start the service:**
+   `docker compose up -d`
+
+#### Building Locally
 1. **Clone the repository:**
    `git clone <repository-url>`
    `cd comics-now`
