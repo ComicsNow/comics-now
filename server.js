@@ -10,8 +10,6 @@ const {
   LOGOS_DIRECTORY,
   ICONS_DIRECTORY,
   THUMBNAILS_DIRECTORY,
-  TEMP_DIRECTORY,
-  SCREENSHOTS_DIRECTORY,
   SCRIPTS_DIRECTORY
 } = require('./server/constants');
 
@@ -260,9 +258,7 @@ app.use(baseUrl, staticRouter);
   [
     LOGOS_DIRECTORY,
     ICONS_DIRECTORY,
-    THUMBNAILS_DIRECTORY,
-    TEMP_DIRECTORY,
-    SCREENSHOTS_DIRECTORY
+    THUMBNAILS_DIRECTORY
   ].forEach((dir) => {
     try {
       if (dir && !fs.existsSync(dir)) {

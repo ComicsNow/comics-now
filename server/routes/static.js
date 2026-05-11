@@ -5,8 +5,7 @@ const {
   PUBLIC_DIR,
   ICONS_DIRECTORY,
   THUMBNAILS_DIRECTORY,
-  LOGOS_DIRECTORY,
-  SCREENSHOTS_DIRECTORY
+  LOGOS_DIRECTORY
 } = require('../constants');
 const { log } = require('../logger');
 
@@ -56,7 +55,6 @@ function createStaticRouter({ getConfig, getComicsDirectories, getPublicLibrarie
   router.use('/thumbnails', express.static(THUMBNAILS_DIRECTORY, { maxAge: '1y', immutable: true }));
   router.use('/icons', express.static(ICONS_DIRECTORY, { maxAge: '1y', immutable: true }));
   router.use('/logos', express.static(LOGOS_DIRECTORY, { maxAge: '1y', immutable: true }));
-  router.use('/screenshots', express.static(SCREENSHOTS_DIRECTORY, { maxAge: '1y', immutable: true }));
 
   router.get('*', sendAppShell);
 

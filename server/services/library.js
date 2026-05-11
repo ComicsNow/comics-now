@@ -11,7 +11,6 @@ const { getComicInfoFromArchive } = require('./metadata');
 const { createId, safeDirName, isImage, t0, ms } = require('../utils');
 const {
   THUMBNAILS_DIRECTORY,
-  TEMP_DIRECTORY,
   LOGOS_DIRECTORY,
   METADATA_MARKER_FILE,
   GUIDED_VIEW_DIR
@@ -334,18 +333,7 @@ async function scanLibrary() {
   isScanning = true;
 
   try {
-    if (fs.existsSync(TEMP_DIRECTORY)) {
-      const now = Date.now();
-      const entries = await fs.promises.readdir(TEMP_DIRECTORY);
-      for (const entry of entries) {
-        const tmpPath = path.join(TEMP_DIRECTORY, entry);
-        let stats;
-        try { stats = await fs.promises.stat(tmpPath); } catch { continue; }
-        if (now - stats.mtimeMs > 86400000) {
-          await fs.promises.rm(tmpPath, { recursive: true, force: true }).catch(() => {});
-        }
-      }
-    }
+    // ... no temp cleanup needed
   } catch (err) {
     log('ERROR', 'SCAN', `Temp cleanup failed: ${err.message}`);
   }
