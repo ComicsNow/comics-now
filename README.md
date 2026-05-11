@@ -33,6 +33,29 @@ A modern, simple web app for managing and reading your digital comic book collec
 
 ## Installation & Setup
 
+### Docker (Recommended)
+
+The easiest way to run Comics Now! is with Docker. This ensures all dependencies (like Python, ComicTagger, and system libraries) are correctly configured.
+
+1. **Clone the repository:**
+   `git clone <repository-url>`
+   `cd comics-now`
+
+2. **Configure:**
+   Edit `docker-compose.yml` to mount your comic libraries.
+   ```yaml
+   volumes:
+     - ./data:/app/data
+     - /path/to/your/comics:/comics:ro  # Change this to your library path
+   ```
+
+3. **Start the service:**
+   `docker compose up -d --build`
+
+The app will be available at `http://localhost:3000`. Persistent data (database, config, and thumbnails) will be stored in the `./data` directory on your host.
+
+### Manual Install (NPM)
+
 1. **Clone the repository:**
    `git clone <repository-url>`
    `cd comics-now`
