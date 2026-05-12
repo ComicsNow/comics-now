@@ -104,7 +104,7 @@ Access the app in your browser at `http://localhost:3000`.
 
 ### Demos
 ![Feature Demo 1](docs/assets/f9404841b6094ed7b9f0bc1036d14360.gif)
-![Feature Demo 2](docs/assets/gt45fgbcf36fhfd356gg.gif)
+![Feature Demo 2](docs/assets/guided-view-demo.gif)
 
 ### Screenshots
 | | | |
