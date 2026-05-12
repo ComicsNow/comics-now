@@ -99,3 +99,17 @@ The app will be available at `http://localhost:3000`. Persistent data (database,
 Access the app in your browser at `http://localhost:3000`.
 
 *See the `server/routes/api.js` file for full API documentation.*
+
+## Gallery
+
+### Demos
+![Feature Demo 1](docs/assets/f9404841b6094ed7b9f0bc1036d14360.gif)
+![Feature Demo 2](docs/assets/gt45fgbcf36fhfd356gg.gif)
+
+### Screenshots
+| | | |
+|:---:|:---:|:---:|
+| ![Screenshot 1](docs/assets/59563.jpg) | ![Screenshot 2](docs/assets/59564.jpg) | ![Screenshot 3](docs/assets/59565.jpg) |
+| ![Screenshot 4](docs/assets/59566.jpg) | ![Screenshot 5](docs/assets/59567.jpg) | ![Screenshot 6](docs/assets/59568.jpg) |
+| ![Screenshot 7](docs/assets/59569.jpg) | ![Screenshot 8](docs/assets/59570.jpg) | ![Screenshot 9](docs/assets/59571.jpg) |
+
