@@ -10,7 +10,7 @@
     "test:watch": "jest --watch",
     "postinstall": "node scripts/check-dependencies.js"
   },
-  "license": "CC-BY-NC-SA-4.0",
+  "license": "AGPL-3.0",
   "dependencies": {
     "@eslint/js": "^9.38.0",
     "archiver": "^5.3.1",
