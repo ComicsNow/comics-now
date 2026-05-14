@@ -228,7 +228,7 @@
     btn.setAttribute('aria-pressed', active ? 'true' : 'false');
     
     const isDesktop = typeof global.isDesktopDevice === 'function' && global.isDesktopDevice();
-    btn.innerHTML = (isDesktop ? 'Gem ' : '') + GUIDE_ICON_HTML;
+    btn.innerHTML = (isDesktop ? 'Gen ' : '') + GUIDE_ICON_HTML;
   }
 
   function updateBubbleToggleUI(active) {
@@ -239,9 +239,9 @@
 
     const isDesktop = typeof global.isDesktopDevice === 'function' && global.isDesktopDevice();
     if (isDesktop) {
-      btn.innerHTML = 'Bubble ' + ZOOM_ICON_HTML;
+      btn.innerHTML = 'Bubble ' + GUIDE_ICON_HTML;
     } else {
-      btn.innerHTML = ZOOM_ICON_HTML;
+      btn.innerHTML = GUIDE_ICON_HTML;
     }
   }
 
