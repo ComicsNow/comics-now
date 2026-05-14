@@ -274,7 +274,7 @@ window.getComicById = function(id, includeContext = false) {
       for (const seriesName of Object.keys(pub.series)) {
         const seriesComics = pub.series[seriesName];
         if (!Array.isArray(seriesComics)) continue;
-        const found = seriesComics.find(c => c.id === id);
+        const found = seriesComics.find(c => c.id == id);
         if (found) {
           if (includeContext) {
             return {

@@ -522,52 +522,7 @@ function closeReadingListModal() {
   }
 }
 
-/**
- * Get comic object by ID from the library
- * @param {string} comicId - The comic ID
- * @returns {object|null} The comic object or null
- */
-function getComicById(comicId) {
-  if (!window.library || typeof window.library !== 'object') {
-    console.error('[Reading List] Library not loaded yet');
-    return null;
-  }
 
-  const libraryKeys = Object.keys(window.library);
-  if (libraryKeys.length === 0) {
-    console.error('[Reading List] Library is empty - no comics available');
-    return null;
-  }
-
-  // Iterate through root folders (object keys)
-  for (const rootFolderKey of libraryKeys) {
-    const rootFolder = window.library[rootFolderKey];
-    const publishers = rootFolder?.publishers || {};
-
-    // Iterate through publishers (object keys)
-    for (const publisherName of Object.keys(publishers)) {
-      const publisher = publishers[publisherName];
-      const seriesEntries = publisher?.series || {};
-
-      // Iterate through series (object keys)
-      for (const seriesName of Object.keys(seriesEntries)) {
-        const comics = seriesEntries[seriesName];
-
-        // Comics is an array
-        if (Array.isArray(comics)) {
-          const comic = comics.find(c => c.id === comicId);
-          if (comic) return comic;
-        }
-      }
-    }
-  }
-
-  console.error(`[Reading List] Comic not found: ${comicId}`);
-  return null;
-}
-
-// Expose to window scope
-window.getComicById = getComicById;
 
 /**
  * Refresh the reading list modal display
@@ -791,7 +746,7 @@ async function refreshReadingListModal() {
 
               if (firstComic) {
                 // Find the comic in the library
-                const comic = getComicById(firstComic.comicId);
+                const comic = window.getComicById(firstComic.comicId);
                 if (comic && typeof window.openComicViewer === 'function') {
                   window.openComicViewer(comic, { readingListId: list.id, readingListName: list.name });
                   closeReadingListModal(); // Close modal after opening comic
@@ -997,7 +952,7 @@ async function showReadingListDetail(listId, listName) {
       }
 
       details.items.forEach((item, index) => {
-      const comic = getComicById(item.comicId);
+      const comic = window.getComicById(item.comicId);
       if (!comic) return; // Skip if comic not found in library
 
       const comicDiv = document.createElement('div');
