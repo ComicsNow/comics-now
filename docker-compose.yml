@@ -1,0 +1,15 @@
+services:
+  comics-now:
+    build: .
+    container_name: comics-now
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./data:/app/data
+      # Mount your comic libraries here. 
+      # Example: - /path/to/your/comics:/comics:ro
+      # The internal path should match what you put in config.json
+    environment:
+      - NODE_ENV=production
+      - DATA_DIR=/app/data
+    restart: unless-stopped

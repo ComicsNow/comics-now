@@ -1,0 +1,1569 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>Comics Now!</title>
+  <script id="app-config"></script>
+  <base href="/">
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#1e1e1e">
+  <link rel="apple-touch-icon" href="icons/icon-192x192.png">
+  <link rel="icon" type="image/png" href="icons/icon-192x192.png">
+  <link rel="stylesheet" href="tailwind.css">
+  <script src="jszip.min.js"></script>
+  <link rel="stylesheet" href="style.css?v=1.7">
+</head>
+<body class="p-4 sm:p-8 pb-[calc(1rem+30px+env(safe-area-inset-bottom))] sm:pb-[calc(2rem+30px+env(safe-area-inset-bottom))]">
+ 
+  <!-- Offline Indicator -->
+  <div id="offline-indicator" class="hidden absolute bottom-20 left-4 sm:top-8 sm:left-8 sm:bottom-auto z-30 bg-orange-600 text-white px-3 py-1 rounded-full text-sm font-medium shadow-lg">
+    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 inline mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 5.636l-12.728 12.728m0-12.728l12.728 12.728" />
+    </svg>
+    Offline
+  </div>
+
+
+  <!-- Download Queue (bottom right) -->
+  <div id="download-queue" class="hidden fixed bottom-16 right-4 sm:bottom-8 sm:right-8 z-40 w-[22rem] max-w-[calc(100vw-2rem)] rounded-2xl overflow-hidden ring-1 ring-white/10 shadow-2xl"></div>
+
+  <!-- Directory Selection Modal -->
+  <div id="directory-selection-modal" class="hidden fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center" style="z-index: 9999;">
+    <div class="bg-gray-800 rounded-lg p-6 w-96 max-w-lg mx-4 shadow-2xl border border-gray-700">
+      <div class="flex justify-between items-center mb-4">
+        <h3 class="text-xl font-bold text-white">Select Destination Directory</h3>
+        <button id="directory-modal-close" class="text-2xl font-bold text-gray-400 hover:text-white transition-colors">&times;</button>
+      </div>
+      <p class="text-sm text-gray-400 mb-4">Choose where to move the comics:</p>
+      <div id="directory-options" class="space-y-3 mb-6">
+        <!-- Directory options will be populated by JavaScript -->
+      </div>
+      <div class="flex justify-end space-x-3">
+        <button id="directory-cancel-btn" class="bg-gray-600 hover:bg-gray-500 text-white font-bold py-2 px-4 rounded-full transition-colors">Cancel</button>
+        <button id="directory-confirm-btn" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-full transition-colors" disabled>Move</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Settings Modal -->
+  <div id="settings-modal" class="hidden fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-40 p-4">
+    <div class="bg-gray-800 rounded-lg w-full h-full sm:h-auto sm:max-h-[90vh] max-w-4xl shadow-lg flex flex-col overflow-hidden">
+        <div class="flex justify-between items-center p-4 sm:p-6 border-b border-gray-700">
+          <h3 class="text-xl sm:text-2xl font-bold">Settings</h3>
+          <button onclick="closeSettingsModal()" class="text-2xl font-bold hover:text-gray-300 transition-colors">&times;</button>
+        </div>
+        <div class="flex overflow-x-auto border-b border-gray-600 px-4 sm:px-6 scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-gray-800 flex-shrink-0">
+          <button id="settings-tab-general" data-text="General" class="tab-button active py-3 px-2 sm:px-4 text-xs sm:text-base whitespace-nowrap">
+            <span>General</span>
+          </button>
+          <button id="settings-tab-logs" data-text="Logs" class="tab-button py-3 px-2 sm:px-4 text-xs sm:text-base whitespace-nowrap">
+            <span>Logs</span>
+          </button>
+          <button id="settings-tab-downloads" data-text="Downloads" class="tab-button py-3 px-2 sm:px-4 text-xs sm:text-base whitespace-nowrap">
+            <span>Downloads</span>
+          </button>
+          <button id="settings-tab-comics-defaults" data-text="Comics Defaults" class="tab-button py-3 px-2 sm:px-4 text-xs sm:text-base whitespace-nowrap">
+            <span>Comics Defaults</span>
+          </button>
+          <button id="settings-tab-devices" data-text="Devices" class="tab-button py-3 px-2 sm:px-4 text-xs sm:text-base whitespace-nowrap">
+            <span>Devices</span>
+          </button>
+          <button id="settings-tab-users" data-text="Users" class="tab-button py-3 px-2 sm:px-4 text-xs sm:text-base whitespace-nowrap">
+            <span>Users</span>
+          </button>
+          <button id="settings-tab-guided-reader" data-text="Guided Reader" class="tab-button py-3 px-2 sm:px-4 text-xs sm:text-base whitespace-nowrap">
+            <span>Guided Reader</span>
+          </button>
+        </div>
+        <div class="flex-1 overflow-y-auto p-4 sm:p-6">
+       
+        <!-- General Settings Tab -->
+        <div id="settings-content-general">
+          <form id="settings-form" class="space-y-4">
+            <div>
+              <h4 class="text-lg font-semibold mb-2">Scan Interval (minutes)</h4>
+              <input type="number" id="scan-interval-input" class="w-full bg-gray-700 text-white p-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500" min="1" value="5">
+            </div>
+            <div>
+              <h4 class="text-lg font-semibold mb-2">Comic Vine API Key</h4>
+              <input type="text" id="api-key-input" class="w-full bg-gray-700 text-white p-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500" placeholder="Enter your Comic Vine API key">
+            </div>
+            <div id="admin-only-libraries" class="border-t border-gray-700 pt-4">
+              <h4 class="text-lg font-semibold mb-2">Library Folders</h4>
+              <p class="text-sm text-gray-400 mb-3">Root directories where your comics are stored.</p>
+              <div id="library-folders-list" class="space-y-2 mb-3">
+                <!-- Populated by JS -->
+              </div>
+              <div class="flex flex-col gap-2">
+                <input type="text" id="new-library-path" class="w-full bg-gray-700 text-white p-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500" placeholder="/path/to/comics">
+                <div class="flex gap-2">
+                  <select id="new-library-mode" class="flex-1 bg-gray-700 text-white p-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500">
+                    <option value="metadata">Metadata Mode (ComicInfo.xml)</option>
+                    <option value="folder">Folder Mode (Physical Structure)</option>
+                  </select>
+                  <button type="button" id="add-library-btn" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg transition-colors">Add</button>
+                </div>
+              </div>
+            </div>
+            <div class="flex flex-col sm:flex-row justify-end gap-2 sm:space-x-2 pt-4">
+              <button type="button" id="scan-button" class="bg-yellow-600 hover:bg-yellow-700 text-white font-bold py-2 px-4 rounded-full transition-colors">Scan Now</button>
+              <button type="button" id="full-scan-button" class="bg-orange-600 hover:bg-orange-700 text-white font-bold py-2 px-4 rounded-full transition-colors">Full Scan</button>
+              <button type="submit" class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-full transition-colors">Save Settings</button>
+            </div>
+            <div id="settings-status" class="text-center mt-2"></div>
+          </form>
+        </div>
+        
+        <!-- Logs Tab -->
+        <div id="settings-content-logs" class="hidden">
+          <div class="flex flex-col sm:flex-row gap-2 mb-4">
+            <select id="log-level-filter" class="bg-gray-700 text-white p-2 rounded-lg flex-1 sm:flex-initial">
+              <option value="ALL">All Levels</option>
+              <option value="INFO">Info</option>
+              <option value="ERROR">Error</option>
+            </select>
+            <select id="log-category-filter" class="bg-gray-700 text-white p-2 rounded-lg flex-1 sm:flex-initial">
+              <option value="ALL">All Categories</option>
+              <option value="SCAN">Scan</option>
+              <option value="DB">Database</option>
+              <option value="THUMBNAIL">Thumbnail</option>
+              <option value="SERVER">Server</option>
+              <option value="CONVERT">Convert</option>
+              <option value="DOWNLOAD">Download</option>
+              <option value="PROGRESS">Progress</option>
+              <option value="LIST">List</option>
+            </select>
+          </div>
+          <div id="logs-container" class="max-h-96 overflow-y-auto"></div>
+        </div>
+
+        <!-- Downloads Tab -->
+        <div id="settings-content-downloads" class="hidden">
+          <div class="bg-gradient-to-r from-purple-900/30 to-blue-900/30 border-2 border-purple-700/50 rounded-xl p-6 shadow-lg hover:shadow-purple-900/20 transition-all duration-300">
+            <div class="flex items-center mb-4">
+              <div class="bg-purple-600/20 p-2 rounded-lg mr-3">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                </svg>
+              </div>
+              <div>
+                <h4 class="text-lg font-bold text-white">Offline Data Management</h4>
+                <p class="text-sm text-gray-400 mt-0.5">Manage your local storage</p>
+              </div>
+            </div>
+
+            <div class="flex items-start mb-6 pl-14">
+              <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 mr-2 text-blue-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <p class="text-xs text-gray-400 leading-relaxed">
+                Comics downloaded for offline reading are stored in your browser's local database. Clearing these will reclaim space but require re-downloading for offline access.
+              </p>
+            </div>
+
+            <div class="bg-black/20 rounded-lg border border-purple-500/30 p-6 flex flex-col items-center">
+              <div id="downloads-info" class="text-lg font-semibold text-gray-300 mb-4">Calculating...</div>
+              <button id="clear-downloads-btn" class="bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-6 rounded-full transition-all shadow-lg hover:shadow-red-900/40">
+                Clear All Downloaded Comics
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Comics Defaults Tab -->
+        <div id="settings-content-comics-defaults" class="hidden">
+          <h4 class="text-lg font-semibold mb-2">Comics Default Settings</h4>
+          <p class="text-sm text-gray-400 mb-4">Set default preferences for your comics reading experience. These apply across all your comics unless overridden.</p>
+
+          <div class="space-y-6">
+            <!-- Manga Mode Section -->
+            <div class="border border-gray-700 rounded-lg p-4">
+              <h5 class="text-md font-semibold mb-3 flex items-center">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 mr-2 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                </svg>
+                Manga Mode (Right-to-Left Reading)
+              </h5>
+              <p class="text-sm text-gray-400 mb-4">Enable right-to-left navigation for manga-style reading across your entire library:</p>
+
+              <div class="space-y-4">
+                <!-- Library Level -->
+                <div class="bg-gradient-to-r from-purple-900/30 to-blue-900/30 border-2 border-purple-700/50 rounded-xl p-6 shadow-lg hover:shadow-purple-900/20 transition-all duration-300">
+                  <!-- Header -->
+                  <div class="flex items-center mb-4">
+                    <div class="bg-purple-600/20 p-2 rounded-lg mr-3">
+                      <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+                      </svg>
+                    </div>
+                    <div>
+                      <h6 class="text-lg font-bold text-white">Library-Wide Manga Mode</h6>
+                      <p class="text-sm text-gray-400 mt-0.5">Global default for all your comics</p>
+                    </div>
+                  </div>
+
+                  <!-- Description -->
+                  <div class="flex items-start mb-6 pl-14">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 mr-2 text-blue-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <p class="text-xs text-gray-400 leading-relaxed">
+                      When enabled, all comics will use right-to-left navigation by default. You can toggle manga mode for individual comics while reading.
+                    </p>
+                  </div>
+
+                  <!-- Toggle Button - Centered and Pretty -->
+                  <div class="flex flex-col items-center justify-center py-6 px-4 bg-black/20 rounded-lg border border-purple-500/30">
+                    <div class="flex items-center justify-center gap-6">
+                      <!-- Standard Label -->
+                      <span id="manga-mode-label-standard" class="text-lg font-bold text-white transition-all duration-300 flex-shrink-0">Standard</span>
+
+                      <!-- iOS-Style Toggle Switch -->
+                      <label for="manga-mode-library" class="cursor-pointer flex-shrink-0">
+                        <input type="checkbox" id="manga-mode-library" class="sr-only peer">
+                        <div class="toggle-bg bg-gray-700 border-2 border-gray-600 h-6 rounded-full" style="width: 3rem;"></div>
+                      </label>
+
+                      <!-- Manga Label -->
+                      <span id="manga-mode-label-manga" class="text-lg font-bold text-gray-400 transition-all duration-300 flex-shrink-0">Manga</span>
+                    </div>
+
+                    <!-- Current Mode Text -->
+                    <div class="mt-4 text-center">
+                      <p id="manga-mode-current-text" class="text-sm text-gray-400">
+                        Current mode: <span id="manga-mode-current-value" class="font-semibold text-gray-300">Standard Reading</span>
+                      </p>
+                    </div>
+                  </div>
+
+                  <!-- Loading Indicator -->
+                  <div id="manga-mode-loading" class="hidden mt-4 flex items-center justify-center">
+                    <svg class="animate-spin h-5 w-5 mr-3 text-purple-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                      <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    <span class="text-sm text-purple-400">Updating manga mode settings...</span>
+                  </div>
+
+                  <!-- Status Message -->
+                  <div id="manga-mode-status" class="hidden mt-4 rounded-lg p-3 transition-all duration-300"></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Allowed Formats Section -->
+            <div id="settings-defaults-formats" class="border border-gray-700 rounded-lg p-4">
+              <h5 class="text-md font-semibold mb-3 flex items-center">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 mr-2 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                Allowed Library Formats
+              </h5>
+              <p class="text-sm text-gray-400 mb-4">Choose which comic file formats to include in your library scans:</p>
+
+              <div class="bg-gradient-to-r from-green-900/30 to-emerald-900/30 border-2 border-green-700/50 rounded-xl p-6 shadow-lg hover:shadow-green-900/20 transition-all duration-300">
+                <div class="flex flex-col md:flex-row items-center justify-between gap-4">
+                  <div class="flex-grow">
+                    <p class="text-white font-medium">Select Formats</p>
+                    <p class="text-xs text-gray-400">Library scanner will only include files with these extensions</p>
+                  </div>
+                  <div class="flex items-center space-x-2">
+                    <select id="allowed-formats-select" class="bg-gray-900 border border-gray-600 text-white text-sm rounded-lg focus:ring-green-500 focus:border-green-500 block w-full p-2.5">
+                      <option value="cbz">CBZ Only</option>
+                      <option value="cbr">CBR Only</option>
+                      <option value="both">Both (CBZ & CBR)</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Metadata Storage Section -->
+            <div id="settings-defaults-metadata" class="border border-gray-700 rounded-lg p-4">
+              <h5 class="text-md font-semibold mb-3 flex items-center">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 mr-2 text-yellow-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4" />
+                </svg>
+                Metadata Storage
+              </h5>
+              <p class="text-sm text-gray-400 mb-4">Choose how comic metadata (ComicInfo.xml) should be stored:</p>
+
+              <div class="bg-gradient-to-r from-yellow-900/30 to-orange-900/30 border-2 border-yellow-700/50 rounded-xl p-6 shadow-lg hover:shadow-yellow-900/20 transition-all duration-300">
+                <div class="flex flex-col md:flex-row items-center justify-between gap-4">
+                  <div class="flex-grow">
+                    <p class="text-white font-medium">Storage Mode</p>
+                    <p class="text-xs text-gray-400">Determines where metadata is written when editing comics</p>
+                  </div>
+                  <div class="flex items-center space-x-2">
+                    <select id="metadata-storage-select" class="bg-gray-900 border border-gray-600 text-white text-sm rounded-lg focus:ring-yellow-500 focus:border-yellow-500 block w-full p-2.5">
+                      <option value="archive">Archive (Internal for CBZ, Database for CBR)</option>
+                      <option value="db">Database Only (No disk writes)</option>
+                    </select>
+                  </div>
+                </div>
+
+                <!-- Migration Options -->
+                <div id="metadata-migration-options" class="hidden mt-6 p-4 bg-black/40 rounded-lg border border-yellow-600/50">
+                  <h6 class="text-sm font-bold text-yellow-400 uppercase tracking-wider mb-3">Migration Available</h6>
+                  <p class="text-xs text-gray-300 mb-4">You have changed the storage mode. You can apply this change to all existing comics in your library.</p>
+                  
+                  <div class="flex items-center mb-4">
+                    <input type="checkbox" id="apply-to-existing-metadata" class="w-4 h-4 text-yellow-600 bg-gray-700 border-gray-600 rounded focus:ring-yellow-500">
+                    <label for="apply-to-existing-metadata" class="ml-2 text-sm text-gray-200 cursor-pointer">Confirm application to existing comics</label>
+                  </div>
+
+                  <button id="migrate-metadata-btn" class="w-full bg-yellow-600 hover:bg-yellow-700 text-white font-bold py-2 px-4 rounded-lg transition-colors shadow-lg shadow-yellow-900/20">
+                    Migrate Existing Comics Now
+                  </button>
+                  <p id="metadata-migration-status" class="text-xs mt-3 text-center min-h-[1rem]"></p>
+                </div>
+              </div>
+            </div>
+
+            <!-- Continuous Mode Section -->
+            <div class="border border-gray-700 rounded-lg p-4">
+              <h5 class="text-md font-semibold mb-3 flex items-center">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 mr-2 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                </svg>
+                Continuous Scroll Mode
+              </h5>
+              <p class="text-sm text-gray-400 mb-4">Enable vertical continuous scrolling for all pages (like webtoon readers):</p>
+
+              <div class="space-y-4">
+                <!-- Library Level -->
+                <div class="bg-gradient-to-r from-blue-900/30 to-cyan-900/30 border-2 border-blue-700/50 rounded-xl p-6 shadow-lg hover:shadow-blue-900/20 transition-all duration-300">
+                  <!-- Header -->
+                  <div class="flex items-center mb-4">
+                    <div class="bg-blue-600/20 p-2 rounded-lg mr-3">
+                      <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                      </svg>
+                    </div>
+                    <div>
+                      <h6 class="text-lg font-bold text-white">Default Continuous Mode</h6>
+                      <p class="text-sm text-gray-400 mt-0.5">Enable vertical scroll by default for new comics</p>
+                    </div>
+                  </div>
+
+                  <!-- Description -->
+                  <div class="flex items-start mb-6 pl-14">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 mr-2 text-cyan-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <p class="text-xs text-gray-400 leading-relaxed">
+                      When enabled, comics will display all pages vertically in a scrollable view. You can toggle continuous mode for individual comics while reading.
+                    </p>
+                  </div>
+
+                  <!-- Toggle Button - Centered and Pretty -->
+                  <div class="flex flex-col items-center justify-center py-6 px-4 bg-black/20 rounded-lg border border-blue-500/30">
+                    <div class="flex items-center justify-center gap-6">
+                      <!-- Paginated Label -->
+                      <span id="continuous-mode-label-paginated" class="text-lg font-bold text-white transition-all duration-300 flex-shrink-0">Paginated</span>
+
+                      <!-- iOS-Style Toggle Switch -->
+                      <label for="continuous-mode-default-toggle" class="cursor-pointer flex-shrink-0">
+                        <input type="checkbox" id="continuous-mode-default-toggle" class="sr-only peer">
+                        <div class="toggle-bg bg-gray-700 border-2 border-gray-600 h-6 rounded-full" style="width: 3rem;"></div>
+                      </label>
+
+                      <!-- Continuous Label -->
+                      <span id="continuous-mode-label-continuous" class="text-lg font-bold text-gray-400 transition-all duration-300 flex-shrink-0">Continuous</span>
+                    </div>
+
+                    <!-- Current Mode Text -->
+                    <div class="mt-4 text-center">
+                      <p id="continuous-mode-current-text" class="text-sm text-gray-400">
+                        Current mode: <span id="continuous-mode-current-value" class="font-semibold text-gray-300">Paginated View</span>
+                      </p>
+                    </div>
+                  </div>
+
+                  <!-- Loading Indicator -->
+                  <div id="continuous-mode-loading" class="hidden mt-4 flex items-center justify-center">
+                    <svg class="animate-spin h-5 w-5 mr-3 text-blue-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                      <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    <span class="text-sm text-blue-400">Updating continuous mode settings...</span>
+                  </div>
+
+                  <!-- Status Message -->
+                  <div id="continuous-mode-status" class="hidden mt-4 rounded-lg p-3 transition-all duration-300"></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Future: Other default settings can be added here -->
+          </div>
+        </div>
+
+        <!-- Manage Devices Tab -->
+        <div id="settings-content-devices" class="hidden">
+          <div class="bg-gradient-to-r from-blue-900/30 to-cyan-900/30 border-2 border-blue-700/50 rounded-xl p-6 shadow-lg hover:shadow-blue-900/20 transition-all duration-300">
+            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+              <div class="flex items-center">
+                <div class="bg-blue-600/20 p-2 rounded-lg mr-3">
+                  <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                  </svg>
+                </div>
+                <div>
+                  <h4 class="text-lg font-bold text-white">Registered Devices</h4>
+                  <p class="text-sm text-gray-400 mt-0.5">Manage your synced devices</p>
+                </div>
+              </div>
+              <button id="refresh-devices-btn" class="pill-button bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-full transition-all shadow-lg hover:shadow-blue-900/40">
+                Refresh
+              </button>
+            </div>
+
+            <!-- Admin-only user filter -->
+            <div id="devices-user-filter" class="hidden mb-6 pl-14">
+              <label class="block text-sm font-semibold text-gray-300 mb-2">Filter by User (Admin Only)</label>
+              <select id="devices-user-select" class="w-full sm:w-auto bg-gray-900 text-white border border-gray-600 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                <option value="">-- Select User --</option>
+              </select>
+            </div>
+
+            <div id="devices-status" class="text-sm text-blue-400 mb-4 pl-14"></div>
+            
+            <div id="devices-list" class="space-y-4">
+              <!-- Devices will be populated by JavaScript -->
+            </div>
+          </div>
+        </div>
+
+        <!-- Users Tab -->
+        <div id="settings-content-users" class="hidden">
+          <div class="bg-gradient-to-r from-purple-900/30 to-indigo-900/30 border-2 border-purple-700/50 rounded-xl p-6 shadow-lg hover:shadow-purple-900/20 transition-all duration-300">
+            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+              <div class="flex items-center">
+                <div class="bg-purple-600/20 p-2 rounded-lg mr-3">
+                  <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+                  </svg>
+                </div>
+                <div>
+                  <h4 class="text-lg font-bold text-white">User Management</h4>
+                  <p class="text-sm text-gray-400 mt-0.5">Manage access and activity</p>
+                </div>
+              </div>
+              <button id="refresh-users-btn" class="pill-button bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-6 rounded-full transition-all shadow-lg hover:shadow-purple-900/40">
+                Refresh
+              </button>
+            </div>
+
+            <div id="users-status" class="text-sm text-purple-400 mb-4 pl-14"></div>
+
+            <div id="users-list" class="space-y-4">
+              <!-- Users will be populated by JavaScript -->
+            </div>
+          </div>
+        </div>
+
+        <!-- Guided Reader Tab -->
+        <div id="settings-content-guided-reader" class="hidden">
+          <div class="space-y-5">
+            <div class="border border-gray-700 rounded-lg p-4">
+              <h5 class="text-md font-semibold mb-2">Status</h5>
+              <div id="guided-status-summary" class="text-sm text-gray-300 grid grid-cols-2 sm:grid-cols-5 gap-2">
+                <div>Pending: <span id="guided-count-pending" class="font-semibold text-yellow-400">–</span></div>
+                <div>Processing: <span id="guided-count-processing" class="font-semibold text-blue-400">–</span></div>
+                <div>Completed: <span id="guided-count-completed" class="font-semibold text-green-400">–</span></div>
+                <div>Failed: <span id="guided-count-failed" class="font-semibold text-red-400">–</span></div>
+                <div>Total: <span id="guided-count-total" class="font-semibold">–</span></div>
+              </div>
+              <div id="guided-current" class="text-sm text-gray-400 mt-3"></div>
+            </div>
+
+            <div class="border border-gray-700 rounded-lg p-4">
+              <h5 class="text-md font-semibold mb-3">Manual Run</h5>
+              <p class="text-sm text-gray-400 mb-3">Process all pending and failed comics across libraries, traversing in folder hierarchy order (Library → Publisher → Series → Issue).</p>
+              <div class="flex gap-2">
+                <button id="guided-run-btn" class="bg-purple-600 hover:bg-purple-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-bold py-2 px-4 rounded-full transition-colors">Run Now</button>
+                <button id="guided-cancel-btn" class="bg-red-600 hover:bg-red-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-bold py-2 px-4 rounded-full transition-colors" disabled>Cancel</button>
+              </div>
+            </div>
+
+            <form id="guided-settings-form" class="border border-gray-700 rounded-lg p-4 space-y-4">
+              <h5 class="text-md font-semibold">Automatic Processing</h5>
+              <label class="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" id="guided-auto-on-add" class="w-4 h-4">
+                <span>Run automatically when new comics are added (after every library scan)</span>
+              </label>
+
+              <div class="pt-2 border-t border-gray-700">
+                <label class="flex items-center gap-2 cursor-pointer mb-3">
+                  <input type="checkbox" id="guided-schedule-enabled" class="w-4 h-4">
+                  <span class="font-medium">Run on a schedule</span>
+                </label>
+                <div class="flex flex-col sm:flex-row gap-2 ml-6">
+                  <span class="self-center text-sm text-gray-400">Every</span>
+                  <input type="number" id="guided-schedule-interval" min="1" max="8760" value="24" class="w-24 bg-gray-700 text-white p-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500">
+                  <select id="guided-schedule-unit" class="bg-gray-700 text-white p-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500">
+                    <option value="hours">hours</option>
+                    <option value="days">days</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="flex justify-end pt-2">
+                <button type="submit" class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-full transition-colors">Save Settings</button>
+              </div>
+              <div id="guided-settings-status" class="text-sm text-center"></div>
+            </form>
+
+            <div class="border border-gray-700 rounded-lg p-4">
+              <div class="flex items-center justify-between mb-2">
+                <h5 class="text-md font-semibold">Live Log</h5>
+                <button id="guided-log-clear" type="button" class="text-xs text-purple-400 hover:text-purple-300 transition-colors">Clear</button>
+              </div>
+              <div class="flex flex-col sm:flex-row gap-2 mb-2">
+                <select id="guided-log-level-filter" class="bg-gray-700 text-white p-2 rounded-lg flex-1 sm:flex-initial text-xs">
+                  <option value="ALL">All Levels</option>
+                  <option value="INFO">Info</option>
+                  <option value="WARN">Warn</option>
+                  <option value="ERROR">Error</option>
+                </select>
+              </div>
+              <div id="guided-log" class="bg-black p-3 overflow-y-auto text-xs rounded font-mono whitespace-pre-wrap" style="min-height: 4rem; max-height: calc(50 * 1.4em);"></div>
+            </div>
+          </div>
+        </div>
+        </div>
+      </div>
+    </div>
+
+  <!-- ComicTagger Modal -->
+  <div id="ct-modal" class="hidden fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-40 p-4">
+    <div class="bg-gray-800 rounded-lg w-full h-full sm:h-auto sm:max-h-[90vh] max-w-3xl shadow-lg flex flex-col overflow-hidden">
+      <div class="flex justify-between items-center p-4 sm:p-6 border-b border-gray-700">
+        <h3 class="text-2xl font-bold">ComicTagger</h3>
+        <button id="ct-close-btn" class="text-2xl font-bold hover:text-gray-300 transition-colors">&times;</button>
+      </div>
+      <div class="flex overflow-x-auto border-b border-gray-600 px-4 sm:px-6 scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-gray-800 flex-shrink-0">
+        <button id="ct-tab-settings" class="tab-button active py-3 px-2 sm:px-4 text-xs sm:text-base whitespace-nowrap">
+          <span>Settings</span>
+        </button>
+        <button id="ct-tab-matches" class="tab-button py-3 px-2 sm:px-4 text-xs sm:text-base whitespace-nowrap relative">
+          <span>Matches</span>
+          <span id="ct-matches-badge" class="hidden absolute top-1 right-1 w-2 h-2 bg-yellow-500 rounded-full"></span>
+        </button>
+        <button id="ct-tab-output" class="tab-button py-3 px-2 sm:px-4 text-xs sm:text-base whitespace-nowrap">
+          <span>Live Output</span>
+        </button>
+        <button id="ct-tab-management" class="tab-button py-3 px-2 sm:px-4 text-xs sm:text-base whitespace-nowrap">
+          <span>Management</span>
+        </button>
+      </div>
+
+      <div class="flex-1 overflow-y-auto p-4 sm:p-6">
+        <!-- Settings Tab -->
+        <div id="ct-content-settings">
+          <div class="mb-4">
+            <label for="ct-schedule-input" class="block mb-2">Schedule (minutes)</label>
+            <input type="number" id="ct-schedule-input" class="w-full bg-gray-700 text-white p-2 rounded-lg" min="0" value="60">
+            <p class="text-xs text-gray-500 mt-1">Set to 0 to disable automated scans.</p>
+          </div>
+          <div class="mb-4">
+            <label for="ct-scan-dir-input" class="block mb-2">Scan Directory</label>
+            <input type="text" id="ct-scan-dir-input" class="w-full bg-gray-700 text-white p-2 rounded-lg" placeholder="/path/to/comics">
+            <p class="text-xs text-gray-500 mt-1">Directory to scan for untagged comics.</p>
+          </div>
+          <div class="mb-4">
+            <button id="ct-save-btn" class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-full transition-colors">Save</button>
+          </div>
+        </div>
+
+        <!-- Matches Tab -->
+        <div id="ct-content-matches" class="hidden">
+          <div class="mb-4">
+            <h4 class="font-semibold mb-2">Possible Matches</h4>
+            <div id="ct-match-container" class="min-h-[200px] max-h-[600px] overflow-y-auto bg-gray-900 p-3 rounded-lg">
+              <div id="ct-no-matches" class="text-gray-500 text-sm text-center py-8">
+                No matches to select. Matches will appear here when ComicTagger finds multiple options.
+              </div>
+              <table class="w-full text-sm hidden" id="ct-match-table">
+                <tbody id="ct-match-body"></tbody>
+              </table>
+            </div>
+            <div class="mt-2 text-xs text-gray-400">
+              Select a match by clicking on it, then click Apply to tag the comic.
+            </div>
+          </div>
+          <div class="flex space-x-2">
+            <button id="ct-apply-btn" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-full transition-colors">Apply</button>
+            <button id="ct-skip-btn" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-full transition-colors">Skip</button>
+          </div>
+          <div id="ct-confirm-bar" class="hidden mt-4 flex items-center space-x-4">
+            <span id="ct-confirm-message" class="text-white"></span>
+            <button id="ct-confirm-yes" class="bg-green-600 hover:bg-green-700 text-white font-bold py-1 px-3 rounded">Yes</button>
+            <button id="ct-confirm-no" class="bg-red-600 hover:bg-red-700 text-white font-bold py-1 px-3 rounded">No</button>
+          </div>
+        </div>
+
+        <!-- Live Output Tab -->
+        <div id="ct-content-output" class="hidden">
+          <div id="ct-output" class="max-h-96 overflow-y-auto"></div>
+          <div class="flex space-x-2">
+            <button id="ct-run-btn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-full transition-colors">Run Manually</button>
+            <button id="ct-clear-output" class="bg-gray-600 hover:bg-gray-500 text-white font-bold py-2 px-4 rounded-full transition-colors">Clear Output</button>
+          </div>
+        </div>
+
+        <!-- Management Tab -->
+        <div id="ct-content-management" class="hidden">
+          <!-- Management sub-tabs -->
+          <div class="flex overflow-x-auto border-b border-gray-700 mb-4 scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-gray-800 flex-shrink-0">
+            <button id="mgmt-tab-operations" class="tab-button active py-2 px-4 text-xs sm:text-sm whitespace-nowrap">
+              <span>Operations</span>
+            </button>
+            <button id="mgmt-tab-errors" class="tab-button py-2 px-4 text-xs sm:text-sm whitespace-nowrap">
+              <span>Errors</span>
+            </button>
+          </div>
+
+          <!-- Operations panel -->
+          <div id="mgmt-content-operations">
+            <div class="space-y-6">
+              <div class="border border-gray-700 rounded-lg p-4">
+                <h5 class="text-md font-semibold mb-2 text-white">Rename CBZ Files</h5>
+                <p class="text-sm text-gray-400 mb-3">Rename CBZ files in the comics/yes directory based on ComicInfo.xml metadata.</p>
+                <div class="flex gap-2 mb-2">
+                  <button id="rename-cbz-btn" class="flex-1 sm:flex-initial bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-full transition-colors">Rename</button>
+                  <button id="rename-clear-output" class="flex-1 sm:flex-initial bg-gray-600 hover:bg-gray-500 text-white font-bold py-2 px-4 rounded-full transition-colors">Clear Output</button>
+                </div>
+                <div id="rename-output" class="hidden bg-black text-green-400 p-3 h-64 overflow-y-auto text-sm mb-2 rounded font-mono"></div>
+                <div id="rename-status" class="text-sm mt-2"></div>
+              </div>
+              <div class="border border-gray-700 rounded-lg p-4">
+                <h5 class="text-md font-semibold mb-2 text-white">Move Comics</h5>
+                <p class="text-sm text-gray-400 mb-3">Move CBZ files from comics/yes to organized publisher/series folders in the comics library.</p>
+                <div class="flex gap-2 mb-2">
+                  <button id="move-comics-btn" class="flex-1 sm:flex-initial bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-full transition-colors">Move Comic</button>
+                  <button id="move-clear-output" class="flex-1 sm:flex-initial bg-gray-600 hover:bg-gray-500 text-white font-bold py-2 px-4 rounded-full transition-colors">Clear Output</button>
+                </div>
+                <div id="move-output" class="hidden bg-black text-green-400 p-3 h-64 overflow-y-auto text-sm mb-2 rounded font-mono"></div>
+                <div id="move-status" class="text-sm mt-2"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Errors panel -->
+          <div id="mgmt-content-errors" class="hidden">
+            <div class="flex items-center justify-between mb-3">
+              <p class="text-sm text-gray-400">Errors from rename and move operations (session only).</p>
+              <button id="errors-refresh-btn" class="text-xs text-purple-400 hover:text-purple-300 transition-colors">Refresh</button>
+            </div>
+            <div id="errors-list" class="space-y-2 max-h-96 overflow-y-auto pr-1"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Reading List Modal -->
+  <div id="reading-list-modal" class="hidden fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-40 p-4">
+    <div class="bg-gray-800 rounded-lg w-full h-full sm:h-auto sm:max-h-[90vh] max-w-3xl shadow-lg flex flex-col overflow-hidden">
+      <div class="flex justify-between items-center p-4 sm:p-6 border-b border-gray-700">
+        <div class="flex items-center gap-3">
+          <h3 class="text-2xl font-bold">Reading Lists</h3>
+          <span id="library-status-badge" class="text-xs px-2 py-1 rounded-full bg-yellow-600">Loading...</span>
+        </div>
+        <div class="flex items-center gap-2">
+          <button id="edit-reading-lists-btn" class="pill-button bg-gray-700 hover:bg-gray-600 text-white text-xs font-bold py-1 px-3 rounded-full transition-all">Edit</button>
+          <button id="save-reading-lists-order-btn" class="hidden pill-button bg-green-600 hover:bg-green-700 text-white text-xs font-bold py-1 px-3 rounded-full transition-all">Save Order</button>
+          <button id="cancel-reading-lists-edit-btn" class="hidden pill-button bg-gray-600 hover:bg-gray-700 text-white text-xs font-bold py-1 px-3 rounded-full transition-all">Cancel</button>
+          <button id="reading-list-close-btn" class="text-2xl font-bold hover:text-gray-300 transition-colors ml-2">&times;</button>
+        </div>
+      </div>
+
+      <div class="flex-1 overflow-y-auto p-4 sm:p-6">
+        <!-- Buttons Section -->
+        <div class="mb-6 space-y-2">
+          <button id="create-reading-list-btn" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-lg transition-colors flex items-center justify-center gap-2">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
+            </svg>
+            <span>Create New Reading List</span>
+          </button>
+          <button id="export-all-lists-btn" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg transition-colors flex items-center justify-center gap-2">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+            </svg>
+            <span>Export All Lists</span>
+          </button>
+          <button id="import-lists-btn" class="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-lg transition-colors flex items-center justify-center gap-2">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L9 8m4-4v12" />
+            </svg>
+            <span>Import Lists</span>
+          </button>
+          <input type="file" id="import-file-input" accept=".json" class="hidden" />
+        </div>
+
+        <!-- Your Reading Lists Section -->
+        <div>
+          <h4 class="text-lg font-semibold mb-3">Your Reading Lists</h4>
+          <div id="reading-lists-container" class="space-y-2">
+            <p class="text-sm text-gray-400 text-center py-4">No reading lists yet. Create one to get started!</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Add to Reading List Selection Modal -->
+  <div id="add-to-list-modal" class="hidden fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center p-4" style="z-index: 9999;">
+    <div class="bg-gray-800 rounded-lg w-full max-w-md shadow-lg flex flex-col overflow-hidden">
+      <div class="flex justify-between items-center p-4 border-b border-gray-700">
+        <h3 class="text-xl font-bold">Add to Reading List</h3>
+        <button id="add-to-list-close-btn" class="text-2xl font-bold hover:text-gray-300 transition-colors">&times;</button>
+      </div>
+
+      <div class="flex-1 overflow-y-auto p-4 max-h-96">
+        <!-- Create New List Button -->
+        <button id="add-to-list-create-new-btn" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg transition-colors mb-4 flex items-center justify-center gap-2">
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
+          </svg>
+          <span>Create New List</span>
+        </button>
+
+        <!-- Reading Lists Checkboxes -->
+        <div id="add-to-list-container" class="space-y-2">
+          <p class="text-sm text-gray-400 text-center py-4">No reading lists yet. Create one to get started!</p>
+        </div>
+      </div>
+
+      <div class="flex justify-end gap-2 p-4 border-t border-gray-700">
+        <button id="add-to-list-cancel-btn" class="bg-gray-600 hover:bg-gray-500 text-white font-bold py-2 px-4 rounded-lg transition-colors">Cancel</button>
+        <button id="add-to-list-save-btn" class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-lg transition-colors">Save</button>
+      </div>
+    </div>
+  </div>
+
+        <!-- Fullscreen Viewer Overlay -->
+    <div id="fullscreen-viewer" class="hidden fullscreen-viewer">
+      <!-- Comic title bar (shows alongside controls) -->
+      <div id="fullscreen-title" class="fullscreen-title hidden" role="heading" aria-level="2"></div>
+
+      <!-- Top-right close button (shows on tap) -->
+      <button
+        id="fullscreen-close-btn"
+        type="button"
+        class="fullscreen-close-button hidden"
+        aria-label="Exit fullscreen reader"
+        title="Exit fullscreen"
+      >
+        <span aria-hidden="true">&times;</span>
+      </button>
+
+      <!-- Fullscreen loading spinner -->
+      <div id="fullscreen-page-loader" class="hidden absolute inset-0 items-center justify-center bg-black bg-opacity-50 z-10">
+        <svg class="animate-spin h-12 w-12 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+        </svg>
+      </div>
+
+      <!-- Bottom info bar - ALWAYS VISIBLE with page info and navigation -->
+      <div
+        id="fullscreen-info-bar"
+        class="fullscreen-info-bar"
+        role="status"
+        aria-live="polite"
+      >
+        <!-- Progress indicator -->
+        <span
+          id="fullscreen-progress-indicator"
+          class="fullscreen-progress-indicator"
+          aria-label="Read progress"
+        >
+          0% read
+        </span>
+
+        <!-- Previous page button -->
+        <button
+          id="fullscreen-prev-page-btn"
+          type="button"
+          class="fullscreen-nav-button"
+          aria-label="Previous page"
+          title="Previous page"
+        >
+          ←
+        </button>
+
+        <!-- Page counter with jump functionality -->
+        <div class="fullscreen-page-counter-wrapper">
+          <button
+            id="fullscreen-page-counter"
+            type="button"
+            class="fullscreen-page-counter-button"
+            title="Jump to page"
+            aria-label="Current page. Tap to jump to a specific page."
+            aria-expanded="false"
+          >
+            &mdash; / &mdash;
+          </button>
+          <input
+            id="fullscreen-page-jump-input"
+            type="number"
+            inputmode="numeric"
+            pattern="[0-9]*"
+            class="fullscreen-page-jump-input hidden"
+            min="1"
+            step="1"
+            autocomplete="off"
+            enterkeyhint="go"
+            placeholder="Page #"
+            aria-label="Enter a page number to jump to"
+          />
+        </div>
+
+        <!-- Next page button -->
+        <button
+          id="fullscreen-next-page-btn"
+          type="button"
+          class="fullscreen-nav-button"
+          aria-label="Next page"
+          title="Next page"
+        >
+          →
+        </button>
+
+        <!-- Close button -->
+        <button
+          id="fullscreen-close-btn-bottom"
+          type="button"
+          class="fullscreen-close-small"
+          aria-label="Exit fullscreen reader"
+          title="Exit fullscreen"
+        >
+          <span aria-hidden="true">&times;</span>
+        </button>
+      </div>
+
+      <!-- Portrait toggle and Manga Mode - shows on tap only -->
+      <div id="fullscreen-controls" class="fullscreen-controls hidden">
+        <button
+          id="fullscreen-orientation-btn"
+          type="button"
+          class="pill-button bg-gray-700 hover:bg-gray-600 text-white transition-colors"
+          aria-pressed="false"
+          title="Toggle page orientation"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect><line x1="12" y1="18" x2="12" y2="18"></line></svg>
+        </button>
+        <button
+          id="fullscreen-manga-mode-btn"
+          type="button"
+          class="manga-mode-btn"
+          title="Toggle Manga Mode"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 3c-1.1 0-2 .9-2 2 0 .52.21 1.04.59 1.41L15 7h-1l-1.5-1.5c-.37-.38-.89-.5-1.41-.5-1.1 0-2 .9-2 2 0 .52.21 1.04.59 1.41L7 11v1l-3 5v2h2l5-3h1l3.59-2.41c.38-.38.5-.89.5-1.41 0-1.1-.9-2-2-2-.52 0-1.04.21-1.41.59L11 10V9l1.5-1.5c.38-.37.89-.5 1.41-.5 1.1 0 2 .9 2 2 0 .52-.21 1.04-.59 1.41L17 12h1l2.41-3.59c.38-.38.59-.9.59-1.41 0-1.1-.9-2-2-2z"></path><path d="M11 13l1 1"></path><path d="M15 9l1 1"></path><path d="M8 16l-4 4"></path></svg>
+        </button>
+        <button
+          id="fullscreen-continuous-mode-btn"
+          type="button"
+          class="continuous-mode-btn"
+          title="Toggle Continuous Mode"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="2" width="16" height="20" rx="2" ry="2"></rect><path d="M12 6v12"></path><path d="M9 9l3-3 3 3"></path><path d="M9 15l3 3 3-3"></path></svg>
+        </button>
+        <button
+          id="fullscreen-full-image-btn"
+          type="button"
+          class="continuous-mode-btn"
+          title="Full Image (pan only)"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg>
+        </button>
+        <button
+          id="fullscreen-zoom-toggle-btn"
+          type="button"
+          class="continuous-mode-btn desktop-only-control"
+          title="Zoom into the page"
+          aria-label="Zoom into the page"
+          aria-pressed="false"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="11" cy="11" r="7"></circle>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+            <line x1="11" y1="8" x2="11" y2="14"></line>
+            <line x1="8" y1="11" x2="14" y2="11"></line>
+          </svg>
+        </button>
+        <button
+          id="guided-toggle-btn" 
+          type="button"
+          class="pill-button bg-gray-700 hover:bg-gray-600 text-white transition-colors"
+          aria-pressed="false"
+          title="Guided panel-by-panel reading (requires processed comic)"
+          disabled
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="7" r="2"></circle><path d="M9 9v7"></path><path d="M6 12l3-2 3 2"></path><path d="M7 21l2-5 2 5"></path><line x1="13" y1="3" x2="13" y2="21"></line><path d="M13 4l7 3-7 3"></path></svg>
+        </button>
+        <button
+          id="bubble-toggle-btn"
+          type="button"
+          class="pill-button bg-gray-700 hover:bg-gray-600 text-white transition-colors"
+          aria-pressed="false"
+          title="Zoom to speech bubbles (Western only)"
+          
+        >
+          Bubble <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line><line x1="11" y1="8" x2="11" y2="14"></line><line x1="8" y1="11" x2="14" y2="11"></line></svg>
+        </button>
+        <button
+          id="hot-zoom-btn"
+          type="button"
+          class="pill-button bg-gray-700 hover:bg-gray-600 text-white transition-colors"
+          aria-pressed="false"
+          title="Click dialogue to zoom (Western only)"
+
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line><line x1="11" y1="8" x2="11" y2="14"></line><line x1="8" y1="11" x2="14" y2="11"></line></svg>
+        </button>
+        <button
+          id="manga-bubble-hot-btn"
+          type="button"
+          class="pill-button bg-gray-700 hover:bg-gray-600 text-white transition-colors"
+          aria-pressed="false"
+          title="Click a speech bubble to zoom (Manga)"
+        >
+          Bubble <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+        </button>
+      </div>
+
+      <!-- End of Comic Navigation for Fullscreen -->
+      <div id="fullscreen-end-of-comic-navigation" class="hidden absolute bottom-24 left-1/2 transform -translate-x-1/2 z-20 bg-gray-900/95 p-4 rounded-lg border border-gray-700 shadow-2xl">
+        <div class="text-center text-gray-300 text-sm mb-3">
+          End of Comic
+        </div>
+        <div id="fullscreen-end-nav-buttons" class="flex gap-3 flex-wrap justify-center">
+          <!-- Next in Series Button -->
+          <button id="fullscreen-next-in-series-btn" type="button" class="hidden pill-button bg-blue-600 hover:bg-blue-500 text-white transition-colors flex items-center gap-2" aria-label="Next comic in series">
+            <span>Next in Series</span>
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"></path>
+            </svg>
+          </button>
+          <!-- Next in Reading List Button -->
+          <button id="fullscreen-next-in-reading-list-btn" type="button" class="hidden pill-button bg-purple-600 hover:bg-purple-500 text-white transition-colors flex items-center gap-2" aria-label="Next comic in reading list">
+            <span>Next in Reading List</span>
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <div id="fullscreen-nav-left" class="fullscreen-nav left"></div>
+      <div id="fullscreen-nav-right" class="fullscreen-nav right"></div>
+      <img id="fullscreen-image" src="" alt="Fullscreen Comic Page" class="fullscreen-image" draggable="false">
+      <div id="fullscreen-pages-continuous" class="hidden overflow-y-auto absolute inset-0">
+        <!-- Pages will be dynamically inserted here in continuous mode -->
+      </div>
+    </div>
+    
+
+  <div id="app" class="container mx-auto">
+    <!-- Heading row: title centered, Ko-fi pinned to the top-right corner -->
+    <div class="relative mb-4">
+      <h1 class="text-4xl font-bold text-center app-title cursor-pointer select-none" onclick="window.goToInitialView && window.goToInitialView()">Comics Now!</h1>
+      <a id="support-link" href="https://ko-fi.com/comicsnow" target="_blank" rel="noopener noreferrer" aria-label="Support on Ko-fi" title="Support on Ko-fi" class="absolute right-0 top-1/2 -translate-y-1/2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#FF5E5B] hover:bg-[#ff7674] text-white text-sm font-semibold shadow-lg transition-colors">
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M11.645 20.91l-.007-.003-.022-.012a15.247 15.247 0 01-.383-.218 25.18 25.18 0 01-4.244-3.17C4.688 15.36 2.25 12.174 2.25 8.25 2.25 5.322 4.714 3 7.688 3A5.5 5.5 0 0112 5.052 5.5 5.5 0 0116.313 3c2.973 0 5.437 2.322 5.437 5.25 0 3.925-2.438 7.111-4.739 9.256a25.175 25.175 0 01-4.244 3.17 15.247 15.247 0 01-.383.219l-.022.012-.007.004-.003.001a.752.752 0 01-.704 0l-.003-.001z"/>
+        </svg>
+        <span class="hidden sm:inline">Support</span>
+      </a>
+    </div>
+
+    <!-- Button Container with Split Layout -->
+    <div class="flex justify-between items-center mb-6 px-2">
+      <!-- Left Group: Logout -->
+      <div class="flex gap-2">
+        <button id="logout-button" aria-label="Logout" class="hidden bg-red-600 hover:bg-red-500 text-white font-bold p-2 rounded-full transition-colors" onclick="handleLogout()">
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+          </svg>
+        </button>
+      </div>
+
+      <!-- Right Group: Reading List, Downloads, ComicTagger, and Settings -->
+      <div class="flex gap-2">
+        <button id="reading-list-button" aria-label="Reading Lists" class="bg-green-600 hover:bg-green-500 text-white p-2 rounded-full transition-colors" onclick="openReadingListModal()">
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
+          </svg>
+        </button>
+        <button id="downloads-button" aria-label="Downloads" class="bg-purple-600 hover:bg-purple-500 text-white p-2 rounded-full transition-colors" onclick="openDownloadsPanel()">
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
+          </svg>
+        </button>
+        <button id="ct-button" aria-label="ComicTagger" class="bg-blue-600 hover:bg-blue-500 text-white p-2 rounded-full transition-colors">
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M9.568 3H5.25A2.25 2.25 0 003 5.25v4.318c0 .597.237 1.17.659 1.591l9.581 9.581c.699.699 1.78.872 2.607.33a18.095 18.095 0 005.223-5.223c.542-.827.369-1.908-.33-2.607L11.16 3.66A2.25 2.25 0 009.568 3z" />
+            <path stroke-linecap="round" stroke-linejoin="round" d="M6 6h.008v.008H6V6z" />
+          </svg>
+        </button>
+        <button onclick="openSettingsModal()" aria-label="Settings" class="bg-gray-700 hover:bg-gray-600 text-white p-2 rounded-full transition-colors">
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M11.049 2.927c.3-1.14 1.902-1.14 2.201 0a1.724 1.724 0 002.591 1.114l.043-.03a1.724 1.724 0 012.448 2.448l-.03.043a1.724 1.724 0 001.114 2.591c1.14.3 1.14 1.902 0 2.201a1.724 1.724 0 00-1.114 2.591l.03.043a1.724 1.724 0 01-2.448 2.448l-.043-.03a1.724 1.724 0 00-2.591 1.114c-.3 1.14-1.902 1.14-2.201 0a1.724 1.724 0 00-2.591-1.114l-.043.03a1.724 1.724 0 01-2.448-2.448l.03-.043a1.724 1.724 0 00-1.114-2.591c-1.14-.3-1.14-1.902 0-2.201a1.724 1.724 0 001.114-2.591l-.03-.043a1.724 1.724 0 012.448-2.448l.043.03a1.724 1.724 0 002.591-1.114z" />
+            <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+          </svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- Search Bar -->
+    <div id="search-container" class="mb-6">
+      <form id="library-search-form" class="flex flex-row gap-2 items-stretch" role="search">
+        <!-- Input with embedded search icon and inline clear button -->
+        <div class="search-input-wrapper flex-1 min-w-0 flex items-center bg-gray-800 rounded-xl ring-1 ring-white/10 overflow-hidden">
+          <span class="pl-3 text-gray-500 pointer-events-none flex-shrink-0">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+          </span>
+          <input type="search" id="library-search-query" class="flex-1 min-w-0 bg-transparent text-white text-sm px-3 py-2.5 focus:outline-none placeholder-gray-500" placeholder="Search..." autocomplete="off" enterkeyhint="search" inputmode="search">
+          <!-- Inline clear button — hidden when input is empty (CSS via :placeholder-shown) -->
+          <button type="button" id="clear-search-btn" class="search-clear-btn" aria-label="Clear search">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+        <!-- Field selector - compact -->
+        <select id="library-search-field" class="search-by-select bg-gray-800 text-gray-300 text-sm rounded-xl ring-1 ring-white/10 focus:outline-none cursor-pointer">
+          <option value="all">All</option>
+          <option value="title">Title</option>
+          <option value="series">Series</option>
+          <option value="publisher">Pub.</option>
+          <option value="character">Char.</option>
+        </select>
+        <!-- Visually-hidden submit so the keyboard "Search" key (and Enter) reliably trigger submit -->
+        <button type="submit" tabindex="-1" aria-hidden="true" style="position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0;">Search</button>
+      </form>
+    </div>
+
+    <div id="filters-container" class="flex flex-col items-center mb-6 gap-2">
+      <!-- Status Filters — narrow within whatever view + smart scope is active.
+           Mobile: All on its own row, then [Unread, In Progress, Read] wrapping next.
+           Desktop (sm+): single row, all four pills inline. -->
+      <div id="filter-buttons" class="flex flex-col sm:flex-row sm:flex-wrap items-center justify-center gap-2">
+        <button class="filter-btn pill-button active bg-gray-700 hover:bg-gray-600 text-white transition-colors" data-filter="all">
+          <span class="pill-label">All</span>
+        </button>
+        <div class="flex flex-wrap justify-center gap-2 sm:contents">
+          <button class="filter-btn pill-button bg-gray-700 hover:bg-gray-600 text-white transition-colors" data-filter="unread">
+            <span class="pill-label">Unread</span>
+            <span class="count-badge" id="unread-count">0</span>
+          </button>
+          <button class="filter-btn pill-button bg-gray-700 hover:bg-gray-600 text-white transition-colors" data-filter="in-progress">
+            <span class="pill-label">In Progress</span>
+            <span class="count-badge" id="in-progress-count">0</span>
+          </button>
+          <button class="filter-btn pill-button bg-gray-700 hover:bg-gray-600 text-white transition-colors" data-filter="read">
+            <span class="pill-label">Read</span>
+            <span class="count-badge" id="read-count">0</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Breadcrumb navigation — shown whenever drilling below root -->
+    <nav id="breadcrumb" class="hidden flex items-center gap-1.5 text-sm mb-4 px-1 flex-wrap"></nav>
+
+    <!-- Smart filter host: lives offscreen by default; JS moves it into the active view's
+         `.smart-filter-mount` slot so it appears immediately under that view's title.
+         Includes the four scope pills + the list/folder render-mode toggle. -->
+    <div id="smart-filter-host" class="hidden flex flex-col items-center gap-2 mb-4">
+      <div id="smart-list-buttons" class="flex flex-wrap justify-center gap-2">
+        <button
+          id="latest-added-btn"
+          class="pill-button bg-gray-700 hover:bg-gray-600 text-white transition-colors"
+          type="button"
+          aria-pressed="false"
+        >
+          <span class="pill-label">New</span>
+          <span class="count-badge" id="latest-added-count">0</span>
+        </button>
+        <button
+          id="downloaded-btn"
+          class="pill-button bg-gray-700 hover:bg-gray-600 text-white transition-colors"
+          type="button"
+          aria-pressed="false"
+        >
+          <span class="pill-label">Down</span>
+          <span class="count-badge" id="downloaded-count">0</span>
+        </button>
+        <button
+          id="guided-smart-list-btn"
+          class="pill-button bg-gray-700 hover:bg-gray-600 text-white transition-colors"
+          type="button"
+          aria-pressed="false"
+        >
+          <span class="pill-label">Guide</span>
+          <span class="count-badge" id="guided-smart-list-count">0</span>
+        </button>
+        <button
+          id="dynamic-manga-filter-btn"
+          class="pill-button bg-gray-700 hover:bg-gray-600 text-white transition-colors hidden"
+          type="button"
+          aria-pressed="false"
+        >
+          <span class="pill-label" id="dynamic-manga-filter-label">Manga</span>
+          <span class="count-badge" id="dynamic-manga-filter-count">0</span>
+        </button>
+      </div>
+
+      <div id="smart-scope-mode-toggle" class="hidden flex justify-center gap-2">
+        <button id="smart-list-mode-list-top" class="view-mode-btn p-2 rounded-lg bg-gray-700 text-gray-400" title="List View" type="button">
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+          </svg>
+        </button>
+        <button id="smart-list-mode-folders-top" class="view-mode-btn p-2 rounded-lg bg-purple-600 text-white" title="Folder View" type="button">
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+          </svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- Search Results View -->
+    <div id="search-results-view" class="hidden">
+      <div class="w-full flex justify-between items-center mb-4">
+        <h2 id="search-results-title" class="text-2xl font-bold ml-4 truncate view-title"></h2>
+        <div id="search-results-view-toggle" class="flex gap-2">
+          <button id="search-mode-list" class="view-mode-btn active p-2 rounded-lg bg-purple-600 text-white" title="List View">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+            </svg>
+          </button>
+          <button id="search-mode-folders" class="view-mode-btn p-2 rounded-lg bg-gray-700 text-gray-400" title="Folder View">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+            </svg>
+          </button>
+        </div>
+      </div>
+      <div class="smart-filter-mount"></div>
+      <div id="search-results-container" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6"></div>
+    </div>
+
+    <!-- Smart List View -->
+    <div id="smart-list-view" class="hidden">
+      <div class="w-full flex justify-between items-center mb-4">
+        <h2 id="smart-list-title" class="text-2xl font-bold truncate view-title"></h2>
+        <div id="smart-list-view-toggle" class="flex gap-2">
+          <button id="smart-list-mode-list" class="view-mode-btn active p-2 rounded-lg bg-purple-600 text-white" title="List View">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+            </svg>
+          </button>
+          <button id="smart-list-mode-folders" class="view-mode-btn p-2 rounded-lg bg-gray-700 text-gray-400" title="Folder View">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+            </svg>
+          </button>
+        </div>
+      </div>
+      <div class="smart-filter-mount"></div>
+      <div id="smart-list-container" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6"></div>
+    </div>
+
+    <!-- Root Folder View -->
+    <div id="root-folder-list">
+      <div class="smart-filter-mount"></div>
+      <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6" id="root-folder-list-container">
+        <div class="skeleton-card"><div class="skeleton-img"></div><div class="p-2 mt-1 space-y-1.5"><div class="skeleton-line w-3/4"></div><div class="skeleton-line w-1/2 mt-1"></div></div></div>
+        <div class="skeleton-card"><div class="skeleton-img"></div><div class="p-2 mt-1 space-y-1.5"><div class="skeleton-line w-3/4"></div><div class="skeleton-line w-1/2 mt-1"></div></div></div>
+        <div class="skeleton-card"><div class="skeleton-img"></div><div class="p-2 mt-1 space-y-1.5"><div class="skeleton-line w-3/4"></div><div class="skeleton-line w-1/2 mt-1"></div></div></div>
+        <div class="skeleton-card"><div class="skeleton-img"></div><div class="p-2 mt-1 space-y-1.5"><div class="skeleton-line w-3/4"></div><div class="skeleton-line w-1/2 mt-1"></div></div></div>
+      </div>
+    </div>
+
+    <!-- Folder Mode View -->
+    <div id="folder-list-view" class="hidden">
+      <div class="w-full flex justify-between items-center mb-4">
+        <h2 id="folder-list-title" class="text-2xl font-bold truncate view-title"></h2>
+      </div>
+      <div class="smart-filter-mount"></div>
+      <div id="folder-list-container" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6"></div>
+    </div>
+
+
+    <!-- Publisher List View -->
+    <div id="publisher-list" class="hidden">
+      <h2 id="publisher-title" class="text-2xl font-bold truncate text-center mb-4 view-title"></h2>
+      <div class="smart-filter-mount"></div>
+      <div class="flex justify-center mb-4">
+        <div id="publisher-alpha-filter" class="flex flex-wrap gap-2 justify-center"></div>
+      </div>
+      <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6" id="publisher-list-container"></div>
+    </div>
+
+    <!-- Series List View -->
+    <div id="series-list" class="hidden">
+      <h2 id="series-title" class="text-2xl font-bold truncate text-center mb-4 view-title"></h2>
+      <div class="smart-filter-mount"></div>
+      <div class="flex justify-center mb-4">
+        <div id="series-alpha-filter" class="flex flex-wrap gap-2 justify-center"></div>
+      </div>
+      <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6" id="series-list-container"></div>
+    </div>
+
+    <!-- Comic List View -->
+    <div id="comic-list" class="hidden">
+      <h2 id="comic-list-title" class="text-2xl font-bold truncate text-center mb-4 view-title"></h2>
+      <div class="smart-filter-mount"></div>
+      <div class="flex justify-center mb-4">
+        <div id="comic-alpha-filter" class="flex flex-wrap gap-2 justify-center"></div>
+      </div>
+      <div id="comic-list-container" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6"></div>
+    </div>
+    
+    <!-- Comic Viewer View -->
+    <div id="comic-viewer" class="hidden flex flex-col items-center">
+      <div class="w-full flex flex-col items-center mb-2 gap-2">
+        <h2 id="comic-title" class="text-2xl font-bold text-center text-white break-words w-full px-2"></h2>
+      </div>
+      <p id="comic-subtitle" class="hidden w-full text-center text-sm text-gray-300 break-words mb-4 px-2"></p>
+      <div id="comic-summary-section" class="hidden w-full mb-4">
+        <div class="flex justify-center">
+          <button
+            id="comic-summary-toggle"
+            type="button"
+            class="comic-summary-toggle"
+            aria-expanded="false"
+            aria-controls="comic-summary"
+          >
+            Show Summary
+          </button>
+        </div>
+        <div
+          id="comic-summary"
+          class="hidden comic-summary-content"
+        ></div>
+      </div>
+      <div class="w-full mb-4 flex justify-center gap-2">
+        <button id="viewer-tab" class="tab-button pill-button active">Viewer</button>
+        <button id="manga-mode-btn" class="manga-mode-btn" title="Toggle Manga Mode">Manga</button>
+        <button id="metadata-tab" class="tab-button pill-button">Metadata</button>
+      </div>
+      <div class="w-full flex justify-center items-center mb-2 space-x-2 flex-wrap gap-2">
+        <button
+          id="fit-height-btn"
+          type="button"
+          class="pill-button bg-gray-700 hover:bg-gray-600 text-white transition-colors"
+          aria-pressed="false"
+        >
+          Fit to Height
+        </button>
+        <button
+          id="orientation-toggle-btn"
+          type="button"
+          class="pill-button bg-gray-700 hover:bg-gray-600 text-white transition-colors"
+          aria-pressed="false"
+          title="Toggle page orientation"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect><line x1="12" y1="18" x2="12" y2="18"></line></svg>
+        </button>
+        <button
+          id="fullscreen-btn"
+          type="button"
+          class="pill-button bg-blue-600 hover:bg-blue-700 text-white transition-colors"
+        >
+          Full Screen
+        </button>
+      </div>
+      <div id="viewer-content" class="w-full viewer-container p-4 rounded-lg shadow-lg overflow-auto">
+        <div class="flex justify-between items-center mb-4">
+          <button id="prev-page-btn" type="button" class="pill-button bg-gray-700 hover:bg-gray-600 text-white transition-colors" aria-label="Previous page">←</button>
+          <div class="flex items-center gap-2">
+            <div class="page-counter-wrapper">
+              <button
+                id="page-counter"
+                type="button"
+                class="page-counter-button"
+                title="Jump to page"
+                aria-label="Current page. Activate to jump to a specific page."
+                aria-expanded="false"
+                aria-live="polite"
+                data-total-pages="0"
+                disabled
+              >
+                &mdash; / &mdash;
+              </button>
+              <input
+                id="page-jump-input"
+                type="number"
+                inputmode="numeric"
+                pattern="[0-9]*"
+                class="page-jump-input hidden"
+                min="1"
+                step="1"
+                autocomplete="off"
+                enterkeyhint="go"
+                placeholder="Page #"
+                aria-label="Enter a page number to jump to"
+              />
+            </div>
+          </div>
+          <button id="next-page-btn" type="button" class="pill-button bg-gray-700 hover:bg-gray-600 text-white transition-colors" aria-label="Next page">→</button>
+        </div>
+        <div id="viewer-pages" class="relative">
+          <div id="page-loader" class="hidden absolute inset-0 items-center justify-center bg-black bg-opacity-50">
+            <svg class="animate-spin h-8 w-8 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+            </svg>
+          </div>
+        </div>
+        <div class="flex justify-between items-center mt-4">
+          <button id="prev-page-btn-bottom" type="button" class="pill-button bg-gray-700 hover:bg-gray-600 text-white transition-colors" aria-label="Previous page">←</button>
+          <div class="flex items-center gap-2">
+            <div class="page-counter-wrapper">
+              <button
+                id="page-counter-bottom"
+                type="button"
+                class="page-counter-button"
+                title="Jump to page"
+                aria-label="Current page. Activate to jump to a specific page."
+                aria-expanded="false"
+                aria-live="polite"
+                data-total-pages="0"
+                disabled
+              >
+                &mdash; / &mdash;
+              </button>
+              <input
+                id="page-jump-input-bottom"
+                type="number"
+                inputmode="numeric"
+                pattern="[0-9]*"
+                class="page-jump-input hidden"
+                min="1"
+                step="1"
+                autocomplete="off"
+                enterkeyhint="go"
+                placeholder="Page #"
+                aria-label="Enter a page number to jump to"
+              />
+            </div>
+          </div>
+          <button id="next-page-btn-bottom" type="button" class="pill-button bg-gray-700 hover:bg-gray-600 text-white transition-colors" aria-label="Next page">→</button>
+        </div>
+
+        <!-- End of Comic Navigation -->
+        <div id="end-of-comic-navigation" class="hidden mt-6 p-4 bg-gray-800/50 rounded-lg border border-gray-700">
+          <div class="text-center text-gray-400 text-sm mb-3">
+            End of Comic
+          </div>
+          <div id="end-nav-buttons" class="flex gap-3">
+            <!-- Next in Series Button -->
+            <button id="next-in-series-btn" type="button" class="hidden pill-button bg-blue-600 hover:bg-blue-500 text-white transition-colors flex items-center gap-2" aria-label="Next comic in series">
+              <span>Next in Series</span>
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"></path>
+              </svg>
+            </button>
+            <!-- Next in Reading List Button -->
+            <button id="next-in-reading-list-btn" type="button" class="hidden pill-button bg-purple-600 hover:bg-purple-500 text-white transition-colors flex items-center gap-2" aria-label="Next comic in reading list">
+              <span>Next in Reading List</span>
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
+              </svg>
+            </button>
+          </div>
+        </div>
+      </div>
+<!-- Metadata tab content -->
+<div id="metadata-content" class="hidden">
+  <!-- Mobile sub-tabs: ComicVine search vs metadata edit. Hidden on md+ where both sections show side-by-side. -->
+  <div id="metadata-subtabs" class="md:hidden flex gap-2 mb-3">
+    <button type="button" id="metadata-subtab-cv" class="pill-button bg-purple-600 text-white flex-1">ComicVine</button>
+    <button type="button" id="metadata-subtab-form" class="pill-button bg-gray-700 hover:bg-gray-600 text-white flex-1">Metadata</button>
+  </div>
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
+    <!-- LEFT: ComicVine Search -->
+<section id="metadata-sub-cv" class="flex flex-col space-y-3">
+      <!-- Sticky search controls -->
+      <div class="sticky top-0 z-10 bg-gray-900/80 backdrop-blur p-4 rounded-xl border border-gray-800">
+        <form id="search-form" class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          <div class="sm:col-span-2">
+            <label for="search-query" class="text-xs text-gray-400">Search</label>
+            <input id="search-query" type="text" placeholder="Title, series, etc."
+                   class="w-full bg-gray-700 text-white p-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500" />
+          </div>
+
+          <div>
+            <label for="cv-field" class="text-xs text-gray-400">Field</label>
+            <select id="cv-field" class="w-full bg-gray-700 text-white p-2 rounded-lg">
+              <option value="all">All</option>
+              <option value="title">Title</option>
+            </select>
+          </div>
+
+          <div>
+            <label for="cv-resources" class="text-xs text-gray-400">Type</label>
+            <select id="cv-resources" class="w-full bg-gray-700 text-white p-2 rounded-lg">
+              <option value="volume">Volume</option>
+              <option value="issue">Issue</option>
+            </select>
+          </div>
+
+          <div>
+            <label for="cv-sort" class="text-xs text-gray-400">Sort</label>
+            <select id="cv-sort" class="w-full bg-gray-700 text-white p-2 rounded-lg">
+              <option value="">Relevance</option>
+              <option value="name:asc">Name ↑</option>
+              <option value="name:desc">Name ↓</option>
+              <option value="cover_date:desc">Cover date ↓</option>
+              <option value="cover_date:asc">Cover date ↑</option>
+              <option value="date_added:desc">Date added ↓</option>
+              <option value="date_added:asc">Date added ↑</option>
+            </select>
+          </div>
+
+          <div class="flex items-end">
+            <button type="submit"
+                    class="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-lg">
+              Search
+            </button>
+          </div>
+        </form>
+        <p id="search-status" class="text-sm text-gray-400 mt-2"></p>
+      </div>
+
+      <!-- Results list -->
+<div class="pr-2">
+        <ul id="search-results" class="space-y-2"></ul>
+
+        <!-- Pager -->
+        <div class="flex items-center justify-between mt-3">
+          <button id="cv-prev"
+                  class="pill-button bg-gray-700 hover:bg-gray-600 text-white transition-colors disabled:opacity-40"
+                  disabled>Prev</button>
+          <span id="cv-page-info" class="text-sm text-gray-400"></span>
+          <button id="cv-next"
+                  class="pill-button bg-gray-700 hover:bg-gray-600 text-white transition-colors disabled:opacity-40"
+                  disabled>Next</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- RIGHT: Editable Metadata Form (sticky) -->
+    <section id="metadata-sub-form" class="relative">
+      <div class="sticky top-0">
+        <form id="metadata-form" class="space-y-3 bg-gray-800 p-4 rounded-xl border border-gray-700">
+          <!-- The form fields are dynamically injected by app.js (renderMetadataDisplay) -->
+          <div id="save-status" class="text-sm text-gray-300"></div>
+          <!-- submit button is added by JS if missing -->
+        </form>
+      </div>
+    </section>
+</div>
+</div>
+
+  <script src="js/router.js"></script>
+  <script src="js/globals.js"></script>
+  <script src="js/utils/device-detection.js"></script>
+  <script>
+    // Hide download buttons and Downloaded filter on desktop devices
+    if (typeof isDesktopDevice === 'function' && isDesktopDevice()) {
+      const style = document.createElement('style');
+      style.textContent = `
+        .download-btn { display: none !important; }
+        [data-filter="downloaded"] { display: none !important; }
+      `;
+      document.head.appendChild(style);
+    }
+
+    // Open downloads panel (shows download queue)
+    function openDownloadsPanel() {
+      // Wait for download manager to be initialized
+      if (typeof window.OfflineDownloads !== 'undefined' &&
+          window.OfflineDownloads.downloadManager) {
+        window.OfflineDownloads.downloadManager.showQueue();
+      }
+    }
+
+    // Mobile metadata sub-tabs. On md+ both sections are visible side-by-side
+    // (handled by the responsive grid). On smaller screens we toggle a class
+    // that hides one of the two sections.
+    document.addEventListener('DOMContentLoaded', function() {
+      const cvBtn = document.getElementById('metadata-subtab-cv');
+      const formBtn = document.getElementById('metadata-subtab-form');
+      const cvSec = document.getElementById('metadata-sub-cv');
+      const formSec = document.getElementById('metadata-sub-form');
+      if (!cvBtn || !formBtn || !cvSec || !formSec) return;
+      const style = document.createElement('style');
+      style.textContent = `
+        @media (max-width: 767px) {
+          #metadata-sub-cv.metadata-sub-hidden,
+          #metadata-sub-form.metadata-sub-hidden { display: none !important; }
+        }
+      `;
+      document.head.appendChild(style);
+      function activate(which) {
+        const cvActive = which === 'cv';
+        cvBtn.classList.toggle('bg-purple-600', cvActive);
+        cvBtn.classList.toggle('bg-gray-700', !cvActive);
+        cvBtn.classList.toggle('hover:bg-gray-600', !cvActive);
+        formBtn.classList.toggle('bg-purple-600', !cvActive);
+        formBtn.classList.toggle('bg-gray-700', cvActive);
+        formBtn.classList.toggle('hover:bg-gray-600', cvActive);
+        cvSec.classList.toggle('metadata-sub-hidden', !cvActive);
+        formSec.classList.toggle('metadata-sub-hidden', cvActive);
+      }
+      cvBtn.addEventListener('click', () => activate('cv'));
+      formBtn.addEventListener('click', () => activate('form'));
+      activate('cv');
+    });
+  </script>
+  <script src="js/offline/db.js"></script>
+  <script src="js/jwt-capture.js"></script>
+  <script src="js/offline/status.js"></script>
+  <script src="js/offline/downloads.js"></script>
+  <script src="js/offline.js"></script>
+  <script src="js/library/data.js"></script>
+  <script src="js/library/smartlists.js"></script>
+  <script src="js/library/render.js"></script>
+  <script src="js/library/folder-viewer.js"></script>
+  <script src="js/library/device-library.js"></script>
+  <script src="js/library.js"></script>
+  <!-- Context menu and manga mode modules -->
+  <script src="js/context-menu/menu-builder.js"></script>
+  <script src="js/manga.js"></script>
+  <script src="js/continuous.js"></script>
+  <script src="js/context-menu/menu-actions.js"></script>
+  <script src="js/metadata.js"></script>
+  <script src="js/bulk-status.js"></script>
+  <script src="js/viewer/fullscreen.js"></script>
+  <script src="js/viewer/full-image.js"></script>
+  <script src="js/viewer/ui.js"></script>
+  <script src="js/viewer/navigation.js"></script>
+  <script src="js/viewer/viewer-server.js"></script>
+  <script src="js/viewer/viewer-local.js"></script>
+  <script src="js/viewer/end-navigation.js"></script>
+  <script src="js/viewer/guided.js"></script>
+  <script src="js/settings.js"></script>
+  <script src="js/guided-reader.js"></script>
+  <script src="js/comictagger.js" data-cfasync="false"></script>
+  <script src="js/events.js"></script>
+  <script src="js/comicvine.js"></script>
+  <script src="js/progress.js"></script>
+  <script src="js/sync.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/reading-lists.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
+

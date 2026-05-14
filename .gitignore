@@ -1,0 +1,15 @@
+node_modules/
+config.json
+comics-now.db
+thumbnails/
+metadata/
+.gemini_security/
+conductor/
+temp/
+.env
+dist/
+build/
+*.log
+models/western/
+data/
+docs/plans/
