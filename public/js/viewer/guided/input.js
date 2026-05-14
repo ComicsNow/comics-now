@@ -46,7 +46,7 @@
     const ny = ry * (img.naturalHeight / rect.height);
 
     if (activeMode && activeMode.handleImageClick) {
-      const handled = activeMode.handleImageClick(nx, ny);
+      const handled = activeMode.handleImageClick(nx, ny, e);
       if (handled) {
         e.preventDefault();
         e.stopPropagation();

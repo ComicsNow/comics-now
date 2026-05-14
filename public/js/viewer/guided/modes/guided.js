@@ -97,11 +97,16 @@
       }
     },
 
-    handleImageClick(nx, ny) {
-      // Guided sequential mode usually doesn't have specific click-to-zoom 
-      // in the same way Hot Zoom does, but it consumes clicks if needed.
-      // In index.js, handleImageClick didn't have specific logic for 'active'
-      // other than checking if any mode is active to potentially consume/ignore.
+    handleImageClick(nx, ny, e) {
+      if (!e || !e.target) return false;
+      // If the click is on a navigation hotspot, let it pass through to trigger navigation.
+      if (typeof e.target.closest === 'function' && e.target.closest('#fullscreen-nav-left, #fullscreen-nav-right')) {
+        return false;
+      }
+      
+      // Otherwise, it's a non-navigating click. Show the menu.
+      global.showFullscreenControls?.(true);
+      return true;
     }
   };
 
