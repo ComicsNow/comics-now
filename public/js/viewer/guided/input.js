@@ -46,11 +46,17 @@
     const ny = ry * (img.naturalHeight / rect.height);
 
     if (activeMode && activeMode.handleImageClick) {
-      const handled = activeMode.handleImageClick(nx, ny, e);
+      const handled = activeMode.handleImageClick(nx, ny);
       if (handled) {
         e.preventDefault();
         e.stopPropagation();
+      } else {
+        // Not handled by the mode -> show menu
+        global.showFullscreenControls?.(true);
       }
+    } else {
+      // No active mode or no click handler -> show menu
+      global.showFullscreenControls?.(true);
     }
   }
 

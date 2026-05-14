@@ -97,16 +97,11 @@
       }
     },
 
-    handleImageClick(nx, ny, e) {
-      if (!e || !e.target) return false;
-      // If the click is on a navigation hotspot, let it pass through to trigger navigation.
-      if (typeof e.target.closest === 'function' && e.target.closest('#fullscreen-nav-left, #fullscreen-nav-right')) {
-        return false;
-      }
-      
-      // Otherwise, it's a non-navigating click. Show the menu.
-      global.showFullscreenControls?.(true);
-      return true;
+    handleImageClick(nx, ny) {
+      // Navigation is owned by the dedicated side-nav hotspots
+      // (#fullscreen-nav-left / -right), which route through tryGuidedAdvance.
+      // Image clicks should not navigate — return false so the menu surfaces.
+      return false;
     }
   };
 
