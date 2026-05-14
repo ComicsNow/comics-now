@@ -67,14 +67,23 @@ Bulk updates the status of all comics in a series.
 
 ## Reading Preferences
 
-Per-user and per-comic reading mode toggles.
+Per-user and per-comic reading mode toggles. Note: Guided navigation preferences (Guided Mode, Bubble Mode, Hot Zoom) are handled client-side via Local Storage and no longer have server-side endpoints.
 
-- **POST `/comics/:id/guided-mode`**: Toggle sequential panel navigation.
-- **POST `/comics/:id/bubble-mode`**: Toggle the speech bubble magnifier.
-- **POST `/comics/:id/hot-zoom-mode`**: Toggle interactive "click-to-zoom" panels/bubbles.
-- **POST `/comics/manga-mode`**: Toggle Right-to-Left mode for a specific comic.
-- **POST `/comics/set-all-manga-mode`**: Set bulk Manga mode preference (for publishers, series, or entire library).
-- **POST `/comics/continuous-mode`**: Toggle vertical scroll mode for a specific comic.
+### Manga Mode (Right-to-Left)
+- **GET `/manga-mode-preference`**: Returns the library-level manga mode preference for the user.
+- **POST `/comics/manga-mode`**
+  - **Body:** `{ comicId, mangaMode }` (boolean)
+- **POST `/comics/set-all-manga-mode`**: Set bulk Manga mode preference.
+  - **Body (Optional):** `{ mangaMode, preferenceType, targetId }`. If `preferenceType` ('comic', 'series', 'publisher', 'library') and `targetId` are provided, sets at that level. Otherwise, sets for the entire library.
+
+### Continuous Mode (Vertical Scroll)
+- **GET `/continuous-mode-preference`**: Returns the user's default continuous mode preference.
+- **POST `/continuous-mode-preference`**
+  - **Body:** `{ continuousMode }` (boolean)
+- **POST `/comics/continuous-mode`**
+  - **Body:** `{ comicId, continuousMode }` (boolean)
+- **POST `/comics/set-all-continuous-mode`**: Wipes per-comic overrides and sets the default for the entire library.
+  - **Body:** `{ continuousMode }` (boolean)
 
 ---
 
