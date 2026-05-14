@@ -13,3 +13,4 @@ build/
 models/western/
 data/
 docs/plans/
+.github/workflows/docker-publish.yml

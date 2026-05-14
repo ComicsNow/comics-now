@@ -3,7 +3,7 @@
 
 const SCOPE_URL = new URL(self.registration.scope);
 const BASE_PATH = SCOPE_URL.pathname;
-const CACHE_VERSION = 'v7.0';
+const CACHE_VERSION = 'v7.1';
 const CACHE_NAME = `comics-now-${CACHE_VERSION}-${BASE_PATH}`;
 const DOWNLOADS_CACHE_NAME = 'comics-now-downloads';
 
