@@ -263,16 +263,29 @@ function toTrimmedString(value) {
   return String(value).trim();
 }
 
-window.getComicById = function(id) {
+window.getComicById = function(id, includeContext = false) {
   if (!window.library) return null;
-  for (const root of Object.values(window.library)) {
+  for (const rootPath of Object.keys(window.library)) {
+    const root = window.library[rootPath];
     if (!root.publishers) continue;
-    for (const pub of Object.values(root.publishers)) {
+    for (const pubName of Object.keys(root.publishers)) {
+      const pub = root.publishers[pubName];
       if (!pub.series) continue;
-      for (const seriesComics of Object.values(pub.series)) {
+      for (const seriesName of Object.keys(pub.series)) {
+        const seriesComics = pub.series[seriesName];
         if (!Array.isArray(seriesComics)) continue;
-        const found = seriesComics.find(c => c.id === id);
-        if (found) return found;
+        const found = seriesComics.find(c => c.id == id);
+        if (found) {
+          if (includeContext) {
+            return {
+              comic: found,
+              rootFolder: rootPath,
+              publisher: pubName,
+              series: seriesName
+            };
+          }
+          return found;
+        }
       }
     }
   }

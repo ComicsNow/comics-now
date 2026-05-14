@@ -190,8 +190,7 @@ module.exports = function attach(router, deps) {
             publisher: r.publisher,
             mangaMode: mangaMode,
             continuousMode: continuousMode,
-            guidedViewStatus: r.guidedViewStatus || 'pending',
-            guidedMode: !!r.guidedMode
+            guidedViewStatus: r.guidedViewStatus || 'pending'
           });
         }
       }

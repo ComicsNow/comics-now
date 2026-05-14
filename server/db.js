@@ -24,59 +24,8 @@ function dbRun(sql, params = []) {
   });
 }
 
-// Helper function to drop mangaMode column from comics table
-async function dropMangaModeColumn() {
-  log('INFO', 'DB', 'Dropping mangaMode column from comics table...');
-
-  try {
-    // Get all current columns
-    const cols = await dbAll('PRAGMA table_info(comics)');
-    const colNames = cols
-      .map(c => c.name)
-      .filter(name => name !== 'mangaMode');
-    
-    // Build column definitions for CREATE TABLE
-    const colDefs = cols
-      .filter(c => c.name !== 'mangaMode')
-      .map(c => {
-        let def = `${c.name} ${c.type}`;
-        if (c.pk) def += ' PRIMARY KEY';
-        if (c.notnull) def += ' NOT NULL';
-        if (c.dflt_value !== null) def += ` DEFAULT ${c.dflt_value}`;
-        // Explicitly handle UNIQUE constraint for path column
-        if (c.name === 'path') def += ' UNIQUE';
-        return def;
-      })
-      .join(', ');
-
-    const colList = colNames.join(', ');
-
-    await dbRun('BEGIN TRANSACTION');
-    
-    // Step 1: Create new table without mangaMode column
-    await dbRun(`CREATE TABLE comics_new (${colDefs})`);
-
-    // Step 2: Copy data from old table to new table (excluding mangaMode)
-    await dbRun(`INSERT INTO comics_new (${colList}) SELECT ${colList} FROM comics`);
-
-    // Step 3: Drop old table
-    await dbRun(`DROP TABLE comics`);
-
-    // Step 4: Rename new table to original name
-    await dbRun(`ALTER TABLE comics_new RENAME TO comics`);
-
-    await dbRun('COMMIT');
-    log('INFO', 'DB', 'Successfully dropped mangaMode column from comics table');
-  } catch (err) {
-    await dbRun('ROLLBACK').catch(() => {});
-    log('ERROR', 'DB', `Failed to drop mangaMode column: ${err.message}`);
-    throw err;
-  }
-}
-
 async function initializeDatabase() {
-  log('INFO', 'DB', 'Initializing database...');
-  try {
+  log('INFO', 'DB', 'Initializing database...');  try {
     await dbRun(`CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT)`);
     await dbRun(`CREATE TABLE IF NOT EXISTS comics (
       id TEXT PRIMARY KEY,
@@ -237,12 +186,6 @@ async function initializeDatabase() {
     if (!cols.some(c => c.name === 'guidedViewStatus')) await dbRun("ALTER TABLE comics ADD COLUMN guidedViewStatus TEXT DEFAULT 'pending'");
     if (!cols.some(c => c.name === 'guidedViewError')) await dbRun('ALTER TABLE comics ADD COLUMN guidedViewError TEXT');
     if (!cols.some(c => c.name === 'guidedViewPath')) await dbRun('ALTER TABLE comics ADD COLUMN guidedViewPath TEXT');
-    if (!cols.some(c => c.name === 'guidedMode')) await dbRun('ALTER TABLE comics ADD COLUMN guidedMode INTEGER DEFAULT 0');
-    if (!cols.some(c => c.name === 'bubbleMode')) await dbRun('ALTER TABLE comics ADD COLUMN bubbleMode INTEGER DEFAULT 0');
-    if (!cols.some(c => c.name === 'hotZoomMode')) await dbRun('ALTER TABLE comics ADD COLUMN hotZoomMode INTEGER DEFAULT 0');
-    if (!cols.some(c => c.name === 'mangaBubbleHotMode')) await dbRun('ALTER TABLE comics ADD COLUMN mangaBubbleHotMode INTEGER DEFAULT 0');
-    if (!cols.some(c => c.name === 'landscapeMode')) await dbRun('ALTER TABLE comics ADD COLUMN landscapeMode INTEGER DEFAULT 0');
-    if (!cols.some(c => c.name === 'fullImageMode')) await dbRun('ALTER TABLE comics ADD COLUMN fullImageMode INTEGER DEFAULT 0');
     if (!cols.some(c => c.name === 'libraryMode')) await dbRun("ALTER TABLE comics ADD COLUMN libraryMode TEXT DEFAULT 'metadata'");
 
     // Migration: Move mangaMode from comics table to user_reading_preferences
@@ -263,7 +206,6 @@ async function initializeDatabase() {
             updatedAt = excluded.updatedAt
         `, [now, now]);
 
-        await dropMangaModeColumn();
         await dbRun(`INSERT OR REPLACE INTO settings (key, value) VALUES ('manga_mode_migration_v1', 'completed')`);
       }
     }

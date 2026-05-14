@@ -898,7 +898,7 @@
           </svg>
         </button>
         <button
-          id="guided-toggle-btn" 
+          id="manga-guided-toggle-btn" 
           type="button"
           class="pill-button bg-gray-700 hover:bg-gray-600 text-white transition-colors"
           aria-pressed="false"
@@ -908,33 +908,41 @@
           <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="7" r="2"></circle><path d="M9 9v7"></path><path d="M6 12l3-2 3 2"></path><path d="M7 21l2-5 2 5"></path><line x1="13" y1="3" x2="13" y2="21"></line><path d="M13 4l7 3-7 3"></path></svg>
         </button>
         <button
-          id="bubble-toggle-btn"
+          id="western-guided-toggle-btn"
           type="button"
           class="pill-button bg-gray-700 hover:bg-gray-600 text-white transition-colors"
           aria-pressed="false"
-          title="Zoom to speech bubbles (Western only)"
+          title="Guided View across comic dialogue"
           
-        >
-          Bubble <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line><line x1="11" y1="8" x2="11" y2="14"></line><line x1="8" y1="11" x2="14" y2="11"></line></svg>
-        </button>
-        <button
-          id="hot-zoom-btn"
-          type="button"
-          class="pill-button bg-gray-700 hover:bg-gray-600 text-white transition-colors"
-          aria-pressed="false"
-          title="Click dialogue to zoom (Western only)"
-
         >
           <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line><line x1="11" y1="8" x2="11" y2="14"></line><line x1="8" y1="11" x2="14" y2="11"></line></svg>
         </button>
         <button
-          id="manga-bubble-hot-btn"
+          id="western-speech-zoom"
+          type="button"
+          class="pill-button bg-gray-700 hover:bg-gray-600 text-white transition-colors"
+          aria-pressed="false"
+          title="User initiated dialog zoom"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+        </button>
+        <button
+          id="manga-panel-zoom"
+          type="button"
+          class="pill-button bg-gray-700 hover:bg-gray-600 text-white transition-colors"
+          aria-pressed="false"
+          title="Click a panel to zoom (Manga)"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect></svg>
+        </button>
+        <button
+          id="manga-speech-zoom-btn"
           type="button"
           class="pill-button bg-gray-700 hover:bg-gray-600 text-white transition-colors"
           aria-pressed="false"
           title="Click a speech bubble to zoom (Manga)"
         >
-          Bubble <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
         </button>
       </div>
 
@@ -1546,7 +1554,20 @@
   <script src="js/viewer/viewer-server.js"></script>
   <script src="js/viewer/viewer-local.js"></script>
   <script src="js/viewer/end-navigation.js"></script>
-  <script src="js/viewer/guided.js"></script>
+  <script src="js/viewer/guided/data.js"></script>
+  <script src="js/viewer/guided/geometry.js"></script>
+  <script src="js/viewer/guided/overlay.js"></script>
+  <script src="js/viewer/guided/mode-registry.js"></script>
+  <script src="js/viewer/guided/modes/guided.js"></script>
+  <script src="js/viewer/guided/modes/bubble.js"></script>
+  <script src="js/viewer/guided/modes/western-speech-zoom.js"></script>
+  <script src="js/viewer/guided/modes/manga-panel-zoom.js"></script>
+  <script src="js/viewer/guided/modes/manga-speech-zoom.js"></script>
+  <script src="js/viewer/guided/pan.js"></script>
+  <script src="js/viewer/guided/input.js"></script>
+  <script src="js/viewer/guided/lifecycle.js"></script>
+  <script src="js/viewer/guided/buttons.js"></script>
+  <script src="js/viewer/guided/index.js"></script>
   <script src="js/settings.js"></script>
   <script src="js/guided-reader.js"></script>
   <script src="js/comictagger.js" data-cfasync="false"></script>
