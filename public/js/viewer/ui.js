@@ -596,6 +596,7 @@
 
     global.isLandscapeOrientation = newIsLandscape;
     if (typeof global.resetLandscapePan === 'function') global.resetLandscapePan();
+    if (typeof global.refreshGuidedToggle === 'function') global.refreshGuidedToggle();
     updateOrientationButtons();
     applyViewerOrientation();
     applyFullscreenOrientation();

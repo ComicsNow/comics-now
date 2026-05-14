@@ -58,10 +58,10 @@
       if (img) img.style.transform = '';
     }
 
-    // 3. Bubble overlay (Western sequential, Bubble Zoom, Hot Zoom)
+    // 3. Bubble overlay (Western sequential, Bubble Zoom, Western Speech Zoom, Manga Panel Zoom)
     const isWesternSequential = activeModeName === 'guided' && !isManga;
     const manualOverrideBox = registry.getManualOverrideBox();
-    if (isWesternSequential || activeModeName === 'bubble' || activeModeName === 'hot-zoom' || activeModeName === 'manga-bubble-hot' || manualOverrideBox) {
+    if (isWesternSequential || activeModeName === 'bubble' || activeModeName === 'western-speech-zoom' || activeModeName === 'manga-panel-zoom' || activeModeName === 'manga-speech-zoom' || manualOverrideBox) {
       global.GuidedView.applyBubbleOverlay(targetBox, isPanelZoom);
     } else {
       global.GuidedView.applyBubbleOverlay(null);
@@ -70,7 +70,7 @@
 
   function updateAllUI() {
     const registry = global.GuidedView.ModeRegistry;
-    ['guided', 'bubble', 'hot-zoom', 'manga-bubble-hot'].forEach(name => {
+    ['guided', 'bubble', 'western-speech-zoom', 'manga-panel-zoom', 'manga-speech-zoom'].forEach(name => {
       const mode = registry.get(name);
       if (mode) mode.updateUI();
     });
@@ -102,15 +102,20 @@
   async function toggleBubble() { return global.GuidedView.ModeRegistry.toggle('bubble'); }
   function isBubbleActive() { return global.GuidedView.ModeRegistry.getActiveModeName() === 'bubble'; }
 
-  async function enableHotZoom() { return global.GuidedView.ModeRegistry.enable('hot-zoom'); }
-  function disableHotZoom() { global.GuidedView.ModeRegistry.disable('hot-zoom'); }
-  async function toggleHotZoom() { return global.GuidedView.ModeRegistry.toggle('hot-zoom'); }
-  function isHotZoomActive() { return global.GuidedView.ModeRegistry.getActiveModeName() === 'hot-zoom'; }
+  async function enableWesternSpeechZoom() { return global.GuidedView.ModeRegistry.enable('western-speech-zoom'); }
+  function disableWesternSpeechZoom() { global.GuidedView.ModeRegistry.disable('western-speech-zoom'); }
+  async function toggleWesternSpeechZoom() { return global.GuidedView.ModeRegistry.toggle('western-speech-zoom'); }
+  function isWesternSpeechZoomActive() { return global.GuidedView.ModeRegistry.getActiveModeName() === 'western-speech-zoom'; }
 
-  async function enableMangaBubbleHot() { return global.GuidedView.ModeRegistry.enable('manga-bubble-hot'); }
-  function disableMangaBubbleHot() { global.GuidedView.ModeRegistry.disable('manga-bubble-hot'); }
-  async function toggleMangaBubbleHot() { return global.GuidedView.ModeRegistry.toggle('manga-bubble-hot'); }
-  function isMangaBubbleHotActive() { return global.GuidedView.ModeRegistry.getActiveModeName() === 'manga-bubble-hot'; }
+  async function enableMangaPanelZoom() { return global.GuidedView.ModeRegistry.enable('manga-panel-zoom'); }
+  function disableMangaPanelZoom() { global.GuidedView.ModeRegistry.disable('manga-panel-zoom'); }
+  async function toggleMangaPanelZoom() { return global.GuidedView.ModeRegistry.toggle('manga-panel-zoom'); }
+  function isMangaPanelZoomActive() { return global.GuidedView.ModeRegistry.getActiveModeName() === 'manga-panel-zoom'; }
+
+  async function enableMangaSpeechZoom() { return global.GuidedView.ModeRegistry.enable('manga-speech-zoom'); }
+  function disableMangaSpeechZoom() { global.GuidedView.ModeRegistry.disable('manga-speech-zoom'); }
+  async function toggleMangaSpeechZoom() { return global.GuidedView.ModeRegistry.toggle('manga-speech-zoom'); }
+  function isMangaSpeechZoomActive() { return global.GuidedView.ModeRegistry.getActiveModeName() === 'manga-speech-zoom'; }
 
   function init() {
     if (typeof global.GuidedView.bindToggleButton === 'function') global.GuidedView.bindToggleButton();
@@ -124,6 +129,7 @@
           -webkit-touch-callout: none !important;
           -webkit-user-select: none !important;
           user-select: none !important;
+          touch-action: none !important;
         }
         .guided-zoom-no-touchmenu img { pointer-events: auto; }
       `;
@@ -138,12 +144,21 @@
     global.GuidedView.ModeRegistry.disableAll();
   }
 
+  function getActiveModeName() { return global.GuidedView.ModeRegistry.getActiveModeName(); }
+
+  function isAnyActive() {
+    const registry = global.GuidedView.ModeRegistry;
+    return !!registry.getActiveModeName() || !!registry.getManualOverrideBox();
+  }
+
   Object.assign(global.GuidedView, {
     getRenderState, refreshRender, updateAllUI, tryAdvance, 
+    getActiveModeName, isAnyActive,
     enable, disable, toggle, isActive,
     enableBubble, disableBubble, toggleBubble, isBubbleActive,
-    enableHotZoom, disableHotZoom, toggleHotZoom, isHotZoomActive,
-    enableMangaBubbleHot, disableMangaBubbleHot, toggleMangaBubbleHot, isMangaBubbleHotActive,
+    enableWesternSpeechZoom, disableWesternSpeechZoom, toggleWesternSpeechZoom, isWesternSpeechZoomActive,
+    enableMangaPanelZoom, disableMangaPanelZoom, toggleMangaPanelZoom, isMangaPanelZoomActive,
+    enableMangaSpeechZoom, disableMangaSpeechZoom, toggleMangaSpeechZoom, isMangaSpeechZoomActive,
     disableAll
   });
 
@@ -151,7 +166,9 @@
   global.onGuidedPageRendered = (typeof global.GuidedView.onPageRendered === 'function') ? global.GuidedView.onPageRendered : null;
   global.toggleGuidedView = toggle;
   global.toggleBubbleView = toggleBubble;
-  global.toggleHotZoomView = toggleHotZoom;
+  global.toggleWesternSpeechZoomView = toggleWesternSpeechZoom;
+  global.toggleMangaPanelZoomView = toggleMangaPanelZoom;
+  global.toggleMangaSpeechZoomView = toggleMangaSpeechZoom;
   global.refreshGuidedToggle = (typeof global.GuidedView.refreshGuidedToggle === 'function') ? global.GuidedView.refreshGuidedToggle : null;
 
 })(typeof window !== 'undefined' ? window : globalThis);

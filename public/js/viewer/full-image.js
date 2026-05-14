@@ -73,6 +73,7 @@
     const newVal = !!enable;
     const persist = options.persist !== false;
     global.isFullImageMode = newVal;
+    if (typeof global.refreshGuidedToggle === 'function') global.refreshGuidedToggle();
 
     const btn = document.getElementById('fullscreen-full-image-btn');
     if (btn) btn.classList.toggle('active', newVal);

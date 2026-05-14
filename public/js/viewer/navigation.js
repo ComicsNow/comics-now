@@ -297,15 +297,41 @@
       }
     }
 
-    // Override breadcrumb when entering via a reading list
-    if (options.readingListId && typeof global.updateBreadcrumb === 'function') {
-      const listName = options.readingListName || 'Reading List';
-      global.updateBreadcrumb([
-        { label: 'Libraries', action: () => global.showRootFolderList?.({ force: true }) },
-        { label: 'Reading Lists', action: () => global.openReadingListModal?.() },
-        { label: listName },
-      ]);
+    // Breadcrumb logic
+    if (typeof global.updateBreadcrumb === 'function') {
+      if (options.readingListId) {
+        // Override breadcrumb when entering via a reading list
+        const listName = options.readingListName || 'Reading List';
+        global.updateBreadcrumb([
+          { label: 'Libraries', action: () => global.showRootFolderList?.({ force: true }) },
+          { label: 'Reading Lists', action: () => global.openReadingListModal?.() },
+          { label: listName },
+        ]);
+      } else {
+        // Standard breadcrumb path
+        const root = global.currentRootFolder;
+        const pub = global.currentPublisher;
+        const series = global.currentSeries;
+        const libLabel = root ? root.replace(/[\\\/]+$/, '').split(/[\\\/]/).pop() || root : '';
+        const displayInfo = global.applyDisplayInfoToComic?.(comic) || {};
+        
+        const crumbs = [
+          { label: 'Libraries', action: () => global.showRootFolderList?.({ force: true }) }
+        ];
+        if (libLabel) {
+          crumbs.push({ label: libLabel, action: () => global.showPublisherList?.(root, { force: true }) });
+        }
+        if (pub) {
+          crumbs.push({ label: pub, action: () => global.showSeriesList?.(pub, { force: true }) });
+        }
+        if (series) {
+          crumbs.push({ label: series, action: () => global.showComicList?.(series, { force: true }) });
+        }
+        crumbs.push({ label: (displayInfo.displayTitle || comic.name || 'Comic') });
+        global.updateBreadcrumb(crumbs);
+      }
     }
+
     global.currentView = 'comic';
 
     setLibraryControlsVisibility(false);

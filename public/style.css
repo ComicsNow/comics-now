@@ -207,11 +207,11 @@ body::after {
     will-change: transform;
     backface-visibility: hidden;
 }
-#guided-toggle-btn.active {
+#manga-guided-toggle-btn.active {
     color: #38bdf8;
     background-color: rgba(56, 189, 248, 0.12);
 }
-#guided-toggle-btn[disabled] {
+#manga-guided-toggle-btn[disabled] {
     opacity: 0.45;
     cursor: not-allowed;
 }
@@ -1467,30 +1467,32 @@ body::after {
 
 
 /* Bubble Zoom Active State */
-#bubble-toggle-btn.active {
+#western-guided-toggle-btn.active {
     background-color: #a855f7 !important;
     color: #ffffff !important;
 }
 
-#bubble-toggle-btn.active:hover {
+#western-guided-toggle-btn.active:hover {
     background-color: #9333ea !important;
 }
 
-#hot-zoom-btn.active {
+#western-speech-zoom.active,
+#manga-panel-zoom.active {
     background-color: #a855f7 !important;
     color: #ffffff !important;
 }
 
-#hot-zoom-btn.active:hover {
+#western-speech-zoom.active:hover,
+#manga-panel-zoom.active:hover {
     background-color: #9333ea !important;
 }
 
-#manga-bubble-hot-btn.active {
+#manga-speech-zoom-btn.active {
     background-color: #a855f7 !important;
     color: #ffffff !important;
 }
 
-#manga-bubble-hot-btn.active:hover {
+#manga-speech-zoom-btn.active:hover {
     background-color: #9333ea !important;
 }
 

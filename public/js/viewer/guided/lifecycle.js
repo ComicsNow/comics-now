@@ -25,23 +25,28 @@
 
   // Refresh button enabled state and auto-enable per saved preference.
   async function refreshGuidedToggle() {
-    const btn = document.getElementById('guided-toggle-btn');
-    const bubbleBtn = document.getElementById('bubble-toggle-btn');
-    const hotZoomBtn = document.getElementById('hot-zoom-btn');
-    const mangaBubbleHotBtn = document.getElementById('manga-bubble-hot-btn');
+    const btn = document.getElementById('manga-guided-toggle-btn');
+    const westernBtn = document.getElementById('western-guided-toggle-btn');
+    const westernSpeechBtn = document.getElementById('western-speech-zoom');
+    const mangaPanelBtn = document.getElementById('manga-panel-zoom');
+    const mangaSpeechBtn = document.getElementById('manga-speech-zoom-btn');
 
     const comic = global.currentComic;
     if (!comic) {
       if (btn) btn.style.display = 'none';
-      if (bubbleBtn) bubbleBtn.style.display = 'none';
-      if (hotZoomBtn) hotZoomBtn.style.display = 'none';
-      if (mangaBubbleHotBtn) mangaBubbleHotBtn.style.display = 'none';
+      if (westernBtn) westernBtn.style.display = 'none';
+      if (westernSpeechBtn) westernSpeechBtn.style.display = 'none';
+      if (mangaPanelBtn) mangaPanelBtn.style.display = 'none';
+      if (mangaSpeechBtn) mangaSpeechBtn.style.display = 'none';
       return;
     }
 
     const isManga = !!(comic && (comic.mangaMode === true || comic.mangaMode == 1));
     const processed = !!(comic && comic.guidedViewStatus === 'completed');
     const isContinuous = !!global.isContinuousMode;
+    const isFullImage = !!global.isFullImageMode;
+    const isLandscape = !!global.isLandscapeOrientation;
+    const isDesktop = typeof global.isDesktopDevice === 'function' && global.isDesktopDevice();
 
     if (processed && !global.GuidedView.cache.has(comic.id)) {
       await global.GuidedView.loadGuidedView(comic.id);
@@ -54,35 +59,43 @@
         if (Array.isArray(p)) return p.length > 0;
         return p && p.panels && p.panels.length > 0;
       });
-      const ready = isManga && processed && hasPanels && !isContinuous;
+      const ready = isManga && processed && hasPanels && !isContinuous && !isFullImage && !isLandscape;
       btn.style.display = ready ? 'flex' : 'none';
       btn.disabled = !ready;
     }
 
-    if (bubbleBtn) {
+    if (westernBtn) {
       const hasBubbles = data && data.pages && Object.values(data.pages).some(p => p && p.bubbles && p.bubbles.length > 0);
       const hasSequence = data && data.pages && Object.values(data.pages).some(p => p && p.sequence && p.sequence.length > 0);
-      const bubbleReady = !isManga && processed && (hasBubbles || hasSequence) && !isContinuous;
-      bubbleBtn.style.display = bubbleReady ? 'flex' : 'none';
-      bubbleBtn.disabled = !bubbleReady;
+      const bubbleReady = !isManga && processed && (hasBubbles || hasSequence) && !isContinuous && !isFullImage && !isLandscape;
+      westernBtn.style.display = bubbleReady ? 'flex' : 'none';
+      westernBtn.disabled = !bubbleReady;
     }
 
-    if (hotZoomBtn) {
+    if (westernSpeechBtn) {
       const hasBubbles = data && data.pages && Object.values(data.pages).some(p => p && p.bubbles && p.bubbles.length > 0);
-      const hasMangaBoxes = data && data.pages && Object.values(data.pages).some(p => p && Array.isArray(p.panels) && p.panels.length > 0);
-      const hotZoomReady = processed && (isManga ? hasMangaBoxes : hasBubbles) && !isContinuous;
-      hotZoomBtn.style.display = hotZoomReady ? 'flex' : 'none';
-      hotZoomBtn.disabled = !hotZoomReady;
+      const ready = !isManga && processed && hasBubbles && !isContinuous && !isFullImage && !isLandscape && !isDesktop;
+      westernSpeechBtn.style.display = ready ? 'flex' : 'none';
+      westernSpeechBtn.disabled = !ready;
     }
 
-    if (mangaBubbleHotBtn) {
+    if (mangaPanelBtn) {
       const hasMangaBoxes = data && data.pages && Object.values(data.pages).some(p => p && Array.isArray(p.panels) && p.panels.length > 0);
-      const ready = isManga && processed && hasMangaBoxes;
-      mangaBubbleHotBtn.style.display = ready ? 'flex' : 'none';
-      mangaBubbleHotBtn.disabled = !ready;
+      const ready = isManga && processed && hasMangaBoxes && !isContinuous && !isFullImage && !isLandscape;
+      mangaPanelBtn.style.display = ready ? 'flex' : 'none';
+      mangaPanelBtn.disabled = !ready;
+    }
+
+    if (mangaSpeechBtn) {
+      const hasMangaBoxes = data && data.pages && Object.values(data.pages).some(p => p && Array.isArray(p.panels) && p.panels.length > 0);
+      const ready = isManga && processed && hasMangaBoxes && !isContinuous && !isFullImage && !isLandscape && !isDesktop;
+      mangaSpeechBtn.style.display = ready ? 'flex' : 'none';
+      mangaSpeechBtn.disabled = !ready;
     }
 
     const registry = global.GuidedView.ModeRegistry;
+    if (registry.isTransitioning()) return;
+
     if (!isFullscreenOpen()) {
       registry.disableAll();
       if (typeof global.GuidedView.updateAllUI === 'function') global.GuidedView.updateAllUI();
@@ -90,10 +103,29 @@
     }
     
     const activeModeName = registry.getActiveModeName();
+    
+    // Load local preference to override database state
+    try {
+      const localPref = localStorage.getItem(`guided_pref_${comic.id}`);
+      if (localPref) {
+        // Reset all mode flags on the comic object to false first
+        comic.guidedMode = false;
+        comic.bubbleMode = false;
+        comic.hotZoomMode = false;
+        comic.mangaBubbleHotMode = false;
+
+        // Apply the stored preference to the correct flag
+        if (localPref === 'guided') comic.guidedMode = true;
+        else if (localPref === 'bubble') comic.bubbleMode = true;
+        else if (localPref === 'western-speech-zoom' || localPref === 'manga-panel-zoom') comic.hotZoomMode = true;
+        else if (localPref === 'manga-speech-zoom') comic.mangaBubbleHotMode = true;
+      }
+    } catch (e) { /* ignore */ }
+
     const guidedModePref = !!(comic.guidedMode === true || comic.guidedMode == 1);
     const bubbleModePref = !!(comic.bubbleMode === true || comic.bubbleMode == 1);
     const hotZoomModePref = !!(comic.hotZoomMode === true || comic.hotZoomMode == 1);
-    const mangaBubbleHotPref = !!(comic.mangaBubbleHotMode === true || comic.mangaBubbleHotMode == 1);
+    const mangaSpeechPref = !!(comic.mangaBubbleHotMode === true || comic.mangaBubbleHotMode == 1);
 
     if (isManga && processed && guidedModePref && activeModeName !== 'guided') {
       if (global.GuidedView.enable) await global.GuidedView.enable();
@@ -107,16 +139,22 @@
       if (global.GuidedView.disableBubble) global.GuidedView.disableBubble();
     }
 
-    if (processed && hotZoomModePref && activeModeName !== 'hot-zoom') {
-      if (global.GuidedView.enableHotZoom) await global.GuidedView.enableHotZoom();
-    } else if ((!processed || !hotZoomModePref) && activeModeName === 'hot-zoom') {
-      if (global.GuidedView.disableHotZoom) global.GuidedView.disableHotZoom();
+    if (!isManga && processed && hotZoomModePref && activeModeName !== 'western-speech-zoom' && !isDesktop) {
+      if (global.GuidedView.enableWesternSpeechZoom) await global.GuidedView.enableWesternSpeechZoom();
+    } else if (!isManga && (!processed || !hotZoomModePref || isDesktop) && activeModeName === 'western-speech-zoom') {
+      if (global.GuidedView.disableWesternSpeechZoom) global.GuidedView.disableWesternSpeechZoom();
     }
 
-    if (isManga && processed && mangaBubbleHotPref && activeModeName !== 'manga-bubble-hot') {
-      if (global.GuidedView.enableMangaBubbleHot) await global.GuidedView.enableMangaBubbleHot();
-    } else if (isManga && (!processed || !mangaBubbleHotPref) && activeModeName === 'manga-bubble-hot') {
-      if (global.GuidedView.disableMangaBubbleHot) global.GuidedView.disableMangaBubbleHot();
+    if (isManga && processed && hotZoomModePref && activeModeName !== 'manga-panel-zoom') {
+      if (global.GuidedView.enableMangaPanelZoom) await global.GuidedView.enableMangaPanelZoom();
+    } else if (isManga && (!processed || !hotZoomModePref) && activeModeName === 'manga-panel-zoom') {
+      if (global.GuidedView.disableMangaPanelZoom) global.GuidedView.disableMangaPanelZoom();
+    }
+
+    if (isManga && processed && mangaSpeechPref && activeModeName !== 'manga-speech-zoom' && !isDesktop) {
+      if (global.GuidedView.enableMangaSpeechZoom) await global.GuidedView.enableMangaSpeechZoom();
+    } else if (isManga && (!processed || !mangaSpeechPref || isDesktop) && activeModeName === 'manga-speech-zoom') {
+      if (global.GuidedView.disableMangaSpeechZoom) global.GuidedView.disableMangaSpeechZoom();
     }
 
     if (typeof global.GuidedView.updateAllUI === 'function') global.GuidedView.updateAllUI();

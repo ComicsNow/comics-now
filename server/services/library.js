@@ -733,11 +733,7 @@ async function buildLibrary(userId = 'default-user') {
       mangaMode: mangaMode,
       continuousMode: continuousMode,
       guidedViewStatus: r.guidedViewStatus || 'pending',
-      libraryMode: r.libraryMode,
-      guidedMode: !!r.guidedMode, bubbleMode: !!r.bubbleMode,
-      hotZoomMode: !!r.hotZoomMode, mangaBubbleHotMode: !!r.mangaBubbleHotMode,
-      landscapeMode: !!r.landscapeMode,
-      fullImageMode: !!r.fullImageMode
+      libraryMode: r.libraryMode
     });
   }
 

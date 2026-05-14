@@ -248,7 +248,7 @@
   }
 
   async function navigatePage(direction) {
-    if (isNavigating || global.isFullscreenZoomed || global.isFullImageMode) return;
+    if (isNavigating || global.isFullscreenZoomed || global.isFullImageMode || global.GuidedView?.isPanning) return;
     if (!global.currentComic) return;
     
     if (typeof global.hideFullscreenControls === 'function') {

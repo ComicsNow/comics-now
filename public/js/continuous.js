@@ -195,6 +195,7 @@
     global.GuidedView?.disableAll?.();
     isContinuousMode = true;
     global.isContinuousMode = true;
+    if (typeof global.refreshGuidedToggle === 'function') global.refreshGuidedToggle();
     if (typeof global.refreshGuidedToggle === 'function') {
       try { await global.refreshGuidedToggle(); } catch (_) {}
     }
@@ -317,6 +318,7 @@
   async function disableContinuousMode() {
     isContinuousMode = false;
     global.isContinuousMode = false;
+    if (typeof global.refreshGuidedToggle === 'function') global.refreshGuidedToggle();
     if (typeof global.refreshGuidedToggle === 'function') {
       try { await global.refreshGuidedToggle(); } catch (_) {}
     }

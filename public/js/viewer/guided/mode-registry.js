@@ -6,6 +6,7 @@
   const modes = new Map();
   let activeModeName = null;
   let manualOverrideBox = null;
+  let transitioning = false;
 
   const ModeRegistry = {
     register(name, mode) {
@@ -24,20 +25,40 @@
       return activeModeName;
     },
 
+    isTransitioning() {
+      return transitioning;
+    },
+
     async enable(name) {
+      if (transitioning) return false;
       const mode = modes.get(name);
       if (!mode) return false;
+      if (activeModeName === name) return true;
 
-      if (activeModeName && activeModeName !== name) {
-        this.disable(activeModeName);
-      }
+      transitioning = true;
+      try {
+        if (activeModeName) {
+          // Synchronously clear the old state variables and internal flags
+          this.disable(activeModeName);
+        }
 
-      const success = await mode.enable();
-      if (success) {
+        // Pre-set the active mode name so that any refreshRender() calls 
+        // triggered inside mode.enable() correctly identify the new mode.
         activeModeName = name;
+
+        // Persist the intent immediately so that concurrent lifecycle checks 
+        // (e.g. from resize or orientation changes) don't try to revert us.
         this.persistOnlyMode(global.currentComic, name);
+
+        const success = await mode.enable();
+        if (!success) {
+          activeModeName = null;
+          global.GuidedView.refreshRender?.();
+        }
+        return success;
+      } finally {
+        transitioning = false;
       }
-      return success;
     },
 
     disable(name) {
@@ -46,6 +67,7 @@
         mode.disable();
         if (activeModeName === name) {
           activeModeName = null;
+          this.persistOnlyMode(global.currentComic, null);
         }
       }
       manualOverrideBox = null;
@@ -80,10 +102,31 @@
       const modeMapping = {
         'guided': 'guidedMode',
         'bubble': 'bubbleMode',
-        'hot-zoom': 'hotZoomMode',
-        'manga-bubble-hot': 'mangaBubbleHotMode'
+        'western-speech-zoom': 'hotZoomMode',
+        'manga-panel-zoom': 'hotZoomMode',
+        'manga-speech-zoom': 'mangaBubbleHotMode'
       };
 
+      // Set the kept mode to true
+      if (kept && modeMapping[kept]) {
+        const prefKey = modeMapping[kept];
+        if (!comic[prefKey]) {
+          comic[prefKey] = true;
+          global.updateComicInLibrary?.(comic.id, { [prefKey]: true });
+          this.saveModePreference(comic.id, kept, true);
+        }
+        // Persist to local storage per-comic
+        try {
+          localStorage.setItem(`guided_pref_${comic.id}`, kept);
+        } catch (e) { /* ignore */ }
+      } else if (kept === null) {
+        // Clear preference if disabling all
+        try {
+          localStorage.removeItem(`guided_pref_${comic.id}`);
+        } catch (e) { /* ignore */ }
+      }
+
+      // Clear all other modes
       Object.entries(modeMapping).forEach(([key, prefKey]) => {
         if (kept !== key && comic[prefKey]) {
           comic[prefKey] = false;
@@ -94,29 +137,17 @@
     },
 
     async saveModePreference(comicId, modeName, value) {
-      const endpointMap = {
-        'guided': 'guided-mode',
-        'bubble': 'bubble-mode',
-        'hot-zoom': 'hot-zoom-mode',
-        'manga-bubble-hot': 'manga-bubble-hot-mode'
-      };
-      
-      const endpoint = endpointMap[modeName];
-      if (!endpoint) return;
-
+      // Local storage is the primary source of truth for "remembering"
       try {
-        const body = {};
-        const prefKey = modeName === 'guided' ? 'guidedMode' : 
-                        modeName === 'bubble' ? 'bubbleMode' :
-                        modeName === 'hot-zoom' ? 'hotZoomMode' : 'mangaBubbleHotMode';
-        body[prefKey] = !!value;
-
-        await fetch(global.GuidedView.api(`/api/v1/comics/${encodeURIComponent(comicId)}/${endpoint}`), {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(body)
-        });
-      } catch (_) { /* non-fatal */ }
+        if (value) {
+          localStorage.setItem(`guided_pref_${comicId}`, modeName);
+        } else {
+          const current = localStorage.getItem(`guided_pref_${comicId}`);
+          if (current === modeName) {
+            localStorage.removeItem(`guided_pref_${comicId}`);
+          }
+        }
+      } catch (e) { /* ignore */ }
     }
   };
 

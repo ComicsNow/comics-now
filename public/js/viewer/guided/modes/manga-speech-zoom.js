@@ -2,9 +2,9 @@
   'use strict';
 
   let active = false;
-  let mangaBubbleHotIdx = -1;
+  let mangaSpeechZoomIdx = -1;
 
-  const MangaBubbleHotMode = {
+  const MangaSpeechZoomMode = {
     async enable() {
       if (!global.GuidedView.isFullscreenOpen()) return false;
       const comic = global.currentComic;
@@ -14,7 +14,7 @@
       if (!data) return false;
 
       active = true;
-      mangaBubbleHotIdx = -1;
+      mangaSpeechZoomIdx = -1;
       global.GuidedView.refreshRender();
       this.updateUI();
       return true;
@@ -22,17 +22,17 @@
 
     disable() {
       active = false;
-      mangaBubbleHotIdx = -1;
+      mangaSpeechZoomIdx = -1;
       global.GuidedView.refreshRender();
       this.updateUI();
     },
 
     toggle() {
-      return global.GuidedView.ModeRegistry.toggle('manga-bubble-hot');
+      return global.GuidedView.ModeRegistry.toggle('manga-speech-zoom');
     },
 
     updateUI() {
-      global.GuidedView.updateMangaBubbleHotUI(active);
+      global.GuidedView.updateMangaSpeechZoomUI(active);
     },
 
     isActive() {
@@ -44,8 +44,8 @@
 
       const bubbles = global.GuidedView.mangaPageBubbles();
       let targetBox = null;
-      if (mangaBubbleHotIdx >= 0 && mangaBubbleHotIdx < bubbles.length) {
-        targetBox = bubbles[mangaBubbleHotIdx];
+      if (mangaSpeechZoomIdx >= 0 && mangaSpeechZoomIdx < bubbles.length) {
+        targetBox = bubbles[mangaSpeechZoomIdx];
       }
       return { targetBox, isPanelZoom: false };
     },
@@ -56,7 +56,7 @@
 
     onPageRendered() {
       if (active) {
-        mangaBubbleHotIdx = -1;
+        mangaSpeechZoomIdx = -1;
       }
     },
 
@@ -73,12 +73,12 @@
         }
       }
       if (bestIdx !== -1) {
-        mangaBubbleHotIdx = (mangaBubbleHotIdx === bestIdx) ? -1 : bestIdx;
+        mangaSpeechZoomIdx = (mangaSpeechZoomIdx === bestIdx) ? -1 : bestIdx;
         global.GuidedView.refreshRender();
         return true;
       }
-      if (mangaBubbleHotIdx !== -1) {
-        mangaBubbleHotIdx = -1;
+      if (mangaSpeechZoomIdx !== -1) {
+        mangaSpeechZoomIdx = -1;
         global.GuidedView.refreshRender();
         return true;
       }
@@ -86,6 +86,6 @@
     }
   };
 
-  global.GuidedView.ModeRegistry.register('manga-bubble-hot', MangaBubbleHotMode);
+  global.GuidedView.ModeRegistry.register('manga-speech-zoom', MangaSpeechZoomMode);
 
 })(typeof window !== 'undefined' ? window : globalThis);

@@ -67,7 +67,7 @@
     if (global.isFullImageMode) return;
     const registry = global.GuidedView.ModeRegistry;
     const activeModeName = registry.getActiveModeName();
-    if (activeModeName !== 'hot-zoom' && activeModeName !== 'bubble' && activeModeName !== 'manga-bubble-hot') return;
+    if (activeModeName !== 'western-speech-zoom' && activeModeName !== 'manga-panel-zoom' && activeModeName !== 'bubble' && activeModeName !== 'manga-speech-zoom') return;
     
     const img = getImg();
     if (!img || !img.naturalWidth || !img.naturalHeight) return;
@@ -109,7 +109,7 @@
     if (event.pointerType === 'mouse' && event.button !== 0) return;
     const registry = global.GuidedView.ModeRegistry;
     const activeModeName = registry.getActiveModeName();
-    if (activeModeName !== 'hot-zoom' && activeModeName !== 'bubble' && activeModeName !== 'manga-bubble-hot') { lastTapAt = 0; return; }
+    if (activeModeName !== 'western-speech-zoom' && activeModeName !== 'manga-panel-zoom' && activeModeName !== 'bubble' && activeModeName !== 'manga-speech-zoom') { lastTapAt = 0; return; }
     
     const now = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
     const dx = event.clientX - lastTapX, dy = event.clientY - lastTapY;

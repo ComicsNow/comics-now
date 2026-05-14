@@ -1,7 +1,7 @@
 (function (global) {
   'use strict';
 
-  const FULLSCREEN_CONTROLS_AUTOHIDE_DELAY = 3000;
+  const FULLSCREEN_CONTROLS_AUTOHIDE_DELAY = 2000;
   const FULLSCREEN_MIN_ZOOM_SCALE = 1;
   const FULLSCREEN_MAX_ZOOM_SCALE = 4;
   const FS_DOUBLE_TAP_MS = 300;
@@ -57,7 +57,7 @@
     if (!global.isLandscapeOrientation) return false;
     if (global.isFullImageMode) return false;
     const gv = global.GuidedView;
-    if (gv && (gv.isActive?.() || gv.isBubbleActive?.() || gv.isHotZoomActive?.() || gv.isMangaBubbleHotActive?.())) {
+    if (gv && (gv.isActive?.() || gv.isBubbleActive?.() || gv.isWesternSpeechZoomActive?.() || gv.isMangaPanelZoomActive?.() || gv.isMangaSpeechZoomActive?.())) {
       return false;
     }
     return true;
@@ -124,7 +124,8 @@
   }
 
   function showFullscreenControls(autoHide = false) {
-    if (global.isFullImageMode) autoHide = false;
+    const isMangaPanelZoom = global.GuidedView?.getActiveModeName?.() === 'manga-panel-zoom';
+    if (global.isFullImageMode || isMangaPanelZoom) autoHide = false;
     const controls = global.fullscreenControls;
     const closeBtn = global.fullscreenCloseBtn;
     const title = global.fullscreenTitle;
@@ -155,7 +156,8 @@
   }
 
   function hideFullscreenControls() {
-    if (global.isFullImageMode) return;
+    const isMangaPanelZoom = global.GuidedView?.getActiveModeName?.() === 'manga-panel-zoom';
+    if (global.isFullImageMode || isMangaPanelZoom) return;
     const controls = global.fullscreenControls;
     const closeBtn = global.fullscreenCloseBtn;
     const title = global.fullscreenTitle;
@@ -318,7 +320,7 @@
 
   // ─── Long-press to navigate ────────────────────────────────────────────────
   // Press and hold near the left or right edge for ~450 ms to flip pages. Works
-  // in every mode (normal, HotZoom, Bubble, MangaBubbleHot, etc.) and removes
+  // in every mode (normal, HotZoom, Bubble, MangaSpeechZoom, etc.) and removes
   // the dblclick-vs-side-tap conflict entirely.
   const LONG_PRESS_MS = 250;
   const LONG_PRESS_MOVE_TOLERANCE = 12; // pixels before we treat it as a drag
@@ -347,12 +349,14 @@
       }
       if (global.isFullscreenZoomed) return;
       if (global.isFullImageMode) return;
+      if (global.GuidedView?.isPanning) return;
       longPressPointerId = event.pointerId;
       longPressStartX = event.clientX;
       longPressStartY = event.clientY;
       clearLongPress();
       longPressTimer = setTimeout(() => {
         longPressTimer = null;
+        if (global.GuidedView?.isPanning) return;
         longPressJustFired = true;
         if (typeof navigator !== 'undefined' && navigator.vibrate) {
           try { navigator.vibrate(15); } catch (_) {}
@@ -399,6 +403,7 @@
       // Removed: if (!isDesktop) return;
       if (global.isFullscreenZoomed) return;
       if (global.isFullImageMode) return;
+      if (global.GuidedView?.isPanning) return;
       // Defer the navigation so a dblclick that lands (partly) on the hotspot
       // can cancel it via cancelPendingSideNav() and run the zoom path. The
       // delay is chosen to comfortably exceed a typical dblclick interval
@@ -438,10 +443,7 @@
     if (global.isFullImageMode) return;
     // Don't fight any active guided/bubble/hot-zoom mode — those own their own
     // zoom presentation. Their own pointerup-based dbltap detector handles it.
-    const gv = global.GuidedView;
-    if (gv && (gv.isActive?.() || gv.isBubbleActive?.() || gv.isHotZoomActive?.() || gv.isMangaBubbleHotActive?.())) {
-      return;
-    }
+    if (global.GuidedView?.isAnyActive?.()) return;
     const image = global.fullscreenImage;
     if (!image) return;
     const rect = image.getBoundingClientRect();
@@ -472,7 +474,7 @@
     if (event.pointerType === 'mouse' && event.button !== 0) return;
     // Skip if a guided mode owns the gesture — guided.js has its own detector.
     const gv = global.GuidedView;
-    if (gv && (gv.isActive?.() || gv.isBubbleActive?.() || gv.isHotZoomActive?.() || gv.isMangaBubbleHotActive?.())) {
+    if (gv && (gv.isActive?.() || gv.isBubbleActive?.() || gv.isWesternSpeechZoomActive?.() || gv.isMangaPanelZoomActive?.() || gv.isMangaSpeechZoomActive?.())) {
       fsLastTapAt = 0;
       return;
     }
@@ -538,7 +540,7 @@
       // Don't fight guided/full-image modes — they own the image.
       if (global.isFullImageMode) return;
       const gv = global.GuidedView;
-      if (gv && (gv.isActive?.() || gv.isBubbleActive?.() || gv.isHotZoomActive?.() || gv.isMangaBubbleHotActive?.())) {
+      if (gv && (gv.isActive?.() || gv.isBubbleActive?.() || gv.isWesternSpeechZoomActive?.() || gv.isMangaPanelZoomActive?.() || gv.isMangaSpeechZoomActive?.())) {
         return;
       }
       if (global.isFullscreenZoomed) {
@@ -618,7 +620,7 @@
     // owns its own zoom presentation and stacking native zoom on top breaks
     // the overlay/transform math.
     const gv = global.GuidedView;
-    if (gv && (gv.isActive?.() || gv.isBubbleActive?.() || gv.isHotZoomActive?.() || gv.isMangaBubbleHotActive?.())) {
+    if (gv && (gv.isActive?.() || gv.isBubbleActive?.() || gv.isWesternSpeechZoomActive?.() || gv.isMangaPanelZoomActive?.() || gv.isMangaSpeechZoomActive?.())) {
       return;
     }
 

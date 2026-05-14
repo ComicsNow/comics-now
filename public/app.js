@@ -1463,16 +1463,26 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     window.router.addRoute('/comic/:id', (params) => {
-      const comic = window.getComicById(params.id);
-      if (comic && window.openComicViewer) {
-        window.openComicViewer(comic);
+      const result = window.getComicById(params.id, true);
+      if (result && window.openComicViewer) {
+        // Recover context if missing (e.g. on refresh)
+        if (result.rootFolder) window.currentRootFolder = result.rootFolder;
+        if (result.publisher) window.currentPublisher = result.publisher;
+        if (result.series) window.currentSeries = result.series;
+        
+        window.openComicViewer(result.comic);
       }
     });
 
     window.router.addRoute('/comic/:id/page/:pageNumber', (params) => {
-      const comic = window.getComicById(params.id);
-      if (comic && window.openComicViewer) {
-        window.openComicViewer(comic);
+      const result = window.getComicById(params.id, true);
+      if (result && window.openComicViewer) {
+        // Recover context if missing
+        if (result.rootFolder) window.currentRootFolder = result.rootFolder;
+        if (result.publisher) window.currentPublisher = result.publisher;
+        if (result.series) window.currentSeries = result.series;
+
+        window.openComicViewer(result.comic);
         const pageNum = parseInt(params.pageNumber, 10);
         setTimeout(() => {
           if (window.turnToPage) window.turnToPage(pageNum - 1); 

@@ -237,7 +237,8 @@
     // 5. Guided View/Bubble Zoom toggle (single comic) — available if guided view JSON ready.
     if (comic.guidedViewStatus === 'completed') {
       const isManga = comic.mangaMode === true;
-      const isGuidedActive = isManga ? (comic.guidedMode === true) : (comic.bubbleMode === true);
+      const activeModeName = global.GuidedView?.getActiveModeName?.();
+      const isGuidedActive = isManga ? (activeModeName === 'guided') : (activeModeName === 'bubble');
       const label = isManga ? 'Guided View' : 'Bubble Zoom';
       const guidedItem = document.createElement('div');
       guidedItem.className = 'comic-context-menu-item' + (isGuidedActive ? ' text-blue-400' : '');
@@ -246,36 +247,11 @@
         e.preventDefault();
         e.stopPropagation();
         closeContextMenu();
-        const newMode = !isGuidedActive;
-        try {
-          const base = (typeof API_BASE_URL !== 'undefined' ? API_BASE_URL : '') || '';
-          const endpoint = isManga ? 'guided-mode' : 'bubble-mode';
-          await fetch(`${base}/api/v1/comics/${encodeURIComponent(comic.id)}/${endpoint}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(isManga ? { guidedMode: newMode } : { bubbleMode: newMode })
-          });
-          
-          if (isManga) comic.guidedMode = newMode;
-          else comic.bubbleMode = newMode;
-          
-          if (typeof global.updateComicInLibrary === 'function') {
-            global.updateComicInLibrary(comic.id, isManga ? { guidedMode: newMode } : { bubbleMode: newMode });
-          }
-          
-          if (global.currentComic && global.currentComic.id === comic.id) {
-            if (isManga) global.currentComic.guidedMode = newMode;
-            else global.currentComic.bubbleMode = newMode;
-            
-            if (newMode && global.GuidedView) {
-              if (isManga) await global.GuidedView.enable();
-              else await global.GuidedView.enableBubble?.();
-            } else if (global.GuidedView) {
-              if (isManga) global.GuidedView.disable();
-              else global.GuidedView.disableBubble?.();
-            }
-          }
-        } catch (_) { /* non-fatal */ }
+        
+        if (global.GuidedView) {
+          if (isManga) await global.GuidedView.toggle();
+          else await global.GuidedView.toggleBubble();
+        }
       });
       menu.appendChild(guidedItem);
     }
