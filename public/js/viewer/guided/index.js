@@ -6,7 +6,6 @@
 (function (global) {
   'use strict';
 
-  const cache = new Map(); // comicId -> data | null
   let active = false;
   // -1 = full-page view (default on each new page);
   //  0..N-1 = zoomed to that panel.
@@ -35,11 +34,6 @@
   // dblclick (toggle off) or when the active mode is disabled.
   let manualOverrideBox = null;
 
-  function api(p) {
-    const base = (typeof API_BASE_URL !== 'undefined' ? API_BASE_URL : '') || '';
-    return `${base}${p}`;
-  }
-
   function isFullscreenOpen() {
     const fv = document.getElementById('fullscreen-viewer');
     return !!(fv && !fv.classList.contains('hidden'));
@@ -48,123 +42,6 @@
   function getStage() { return document.getElementById('fullscreen-viewer'); }
   function getImg() { return document.getElementById('fullscreen-image'); }
 
-  async function loadGuidedView(comicId) {
-    if (!comicId) return null;
-    if (cache.has(comicId)) return cache.get(comicId);
-    try {
-      const res = await fetch(api(`/api/v1/comics/${encodeURIComponent(comicId)}/guided-view`));
-      if (!res.ok) { cache.set(comicId, null); return null; }
-      const data = await res.json();
-      cache.set(comicId, data);
-      return data;
-    } catch {
-      cache.set(comicId, null);
-      return null;
-    }
-  }
-
-  function currentPagePanels() {
-    const comic = global.currentComic;
-    if (!comic) return [];
-    const data = cache.get(comic.id);
-    if (!data || !data.pages) return [];
-    const pages = global.getViewerPages?.() || [];
-    const fname = pages[global.currentPageIndex];
-    if (!fname) return [];
-    
-    // Handle multiple schema versions
-    const pageData = data.pages[fname];
-    if (Array.isArray(pageData)) return pageData;
-    if (pageData) {
-      // Prioritize granular sequence if available
-      if (Array.isArray(pageData.sequence) && pageData.sequence.length > 0) return pageData.sequence;
-      if (Array.isArray(pageData.panels)) return pageData.panels;
-    }
-    return [];
-  }
-
-  function currentPageBubbles() {
-    const comic = global.currentComic;
-    if (!comic) return [];
-    const data = cache.get(comic.id);
-    if (!data || !data.pages) return [];
-    const pages = global.getViewerPages?.() || [];
-    const fname = pages[global.currentPageIndex];
-    if (!fname) return [];
-    
-    const pageData = data.pages[fname];
-    if (pageData && Array.isArray(pageData.bubbles)) return pageData.bubbles;
-    return [];
-  }
-
-  // Raw boxes from the manga model (panels + bubbles mixed, pre-sequencing).
-  // For manga sidecars, `panels` field holds the full unfiltered detection set.
-  function currentPageRawBoxes() {
-    const comic = global.currentComic;
-    if (!comic) return [];
-    const data = cache.get(comic.id);
-    if (!data || !data.pages) return [];
-    const pages = global.getViewerPages?.() || [];
-    const fname = pages[global.currentPageIndex];
-    if (!fname) return [];
-    const pd = data.pages[fname];
-    if (pd && Array.isArray(pd.panels)) return pd.panels;
-    return [];
-  }
-
-  function isMangaComic() {
-    const c = global.currentComic;
-    return !!(c && (c.mangaMode === true || c.mangaMode == 1));
-  }
-
-  // Fraction of box A's area that lies inside box B.
-  function intersectionOverArea(a, b) {
-    const [ax, ay, aw, ah] = a;
-    const [bx, by, bw, bh] = b;
-    const x1 = Math.max(ax, bx), y1 = Math.max(ay, by);
-    const x2 = Math.min(ax + aw, bx + bw), y2 = Math.min(ay + ah, by + bh);
-    const iw = Math.max(0, x2 - x1), ih = Math.max(0, y2 - y1);
-    const inter = iw * ih;
-    const area = aw * ah;
-    return area > 0 ? inter / area : 0;
-  }
-
-  // Classify the manga raw boxes into panels with their child bubbles.
-  // Returns [{ box, bubbles: [box, ...] }, ...].
-  function classifyMangaPage() {
-    const boxes = currentPageRawBoxes();
-    if (boxes.length === 0) return [];
-    const isChild = boxes.map((b, i) =>
-      boxes.some((other, j) => i !== j && intersectionOverArea(b, other) >= 0.7)
-    );
-    const panels = [];
-    const panelOriginalIdx = [];
-    for (let i = 0; i < boxes.length; i++) {
-      if (!isChild[i]) {
-        panelOriginalIdx.push(i);
-        panels.push({ box: boxes[i], bubbles: [] });
-      }
-    }
-    for (let i = 0; i < boxes.length; i++) {
-      if (!isChild[i]) continue;
-      let bestParent = -1, bestRatio = 0.6;
-      for (let p = 0; p < panels.length; p++) {
-        const r = intersectionOverArea(boxes[i], panels[p].box);
-        if (r > bestRatio) { bestRatio = r; bestParent = p; }
-      }
-      if (bestParent >= 0) panels[bestParent].bubbles.push(boxes[i]);
-    }
-    return panels;
-  }
-
-  // Flat list of speech-bubble boxes for the current manga page.
-  function mangaPageBubbles() {
-    const out = [];
-    const panels = classifyMangaPage();
-    for (const p of panels) for (const b of p.bubbles) out.push(b);
-    return out;
-  }
-
   function applyTransform() {
     const stage = getStage();
     const img = getImg();
@@ -172,7 +49,7 @@
 
     // For Western comics in sequential Guided mode, we use the magnifier overlay.
     // The main image stays centered/contained.
-    if (active && !isMangaComic()) {
+    if (active && !global.GuidedView.isMangaComic()) {
       img.style.transform = '';
       applyBubbleOverlay();
       return;
@@ -186,7 +63,7 @@
     const stageH = stage.clientHeight;
     if (!stageW || !stageH) return;
 
-    const panels = currentPagePanels();
+    const panels = global.GuidedView.currentPagePanels();
     const inPanel = panelIndex >= 0 && panelIndex < panels.length;
 
     if (!inPanel) {
@@ -259,7 +136,7 @@
     if (!isFullscreenOpen()) { disable(); disableBubble(); return false; }
     
     if (active) {
-      const panels = currentPagePanels();
+      const panels = global.GuidedView.currentPagePanels();
       if (panels.length === 0) return false; // no panel data → fall through to page nav
       if (direction > 0) {
         if (panelIndex >= panels.length - 1) return false; // last panel → next page
@@ -277,7 +154,7 @@
     }
     
     if (bubbleActive) {
-      const bubbles = currentPageBubbles();
+      const bubbles = global.GuidedView.currentPageBubbles();
       if (bubbles.length === 0) return false;
       if (direction > 0) {
         if (bubbleIndex >= bubbles.length - 1) return false;
@@ -352,7 +229,7 @@
     const comic = global.currentComic;
     if (!comic) return false;
     if (comic.guidedViewStatus !== 'completed') return false;
-    const data = await loadGuidedView(comic.id);
+    const data = await global.GuidedView.loadGuidedView(comic.id);
     if (!data) return false;
 
     // Guided View, Bubble Zoom, and Hot Zoom modes are mutually exclusive.
@@ -385,7 +262,7 @@
 
   async function saveGuidedMode(comicId, value) {
     try {
-      await fetch(api(`/api/v1/comics/${encodeURIComponent(comicId)}/guided-mode`), {
+      await fetch(global.GuidedView.api(`/api/v1/comics/${encodeURIComponent(comicId)}/guided-mode`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ guidedMode: !!value })
@@ -395,7 +272,7 @@
   
   async function saveBubbleMode(comicId, value) {
     try {
-      await fetch(api(`/api/v1/comics/${encodeURIComponent(comicId)}/bubble-mode`), {
+      await fetch(global.GuidedView.api(`/api/v1/comics/${encodeURIComponent(comicId)}/bubble-mode`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ bubbleMode: !!value })
@@ -427,22 +304,22 @@
       // Double-click zoom is in effect — render at the synthetic box rather than
       // the per-mode panel/bubble.
       targetBox = manualOverrideBox;
-    } else if (hotZoomActive && isMangaComic()) {
-      const panels = classifyMangaPage();
+    } else if (hotZoomActive && global.GuidedView.isMangaComic()) {
+      const panels = global.GuidedView.classifyMangaPage();
       if (mangaHotPanelIdx >= 0 && panels[mangaHotPanelIdx]) {
         targetBox = panels[mangaHotPanelIdx].box;
         isPanelZoom = true;
       }
     } else if (mangaBubbleHotActive) {
-      const bubbles = mangaPageBubbles();
+      const bubbles = global.GuidedView.mangaPageBubbles();
       if (mangaBubbleHotIdx >= 0 && mangaBubbleHotIdx < bubbles.length) {
         targetBox = bubbles[mangaBubbleHotIdx];
       }
-    } else if (active && !isMangaComic()) {
-      const sequence = currentPagePanels();
+    } else if (active && !global.GuidedView.isMangaComic()) {
+      const sequence = global.GuidedView.currentPagePanels();
       if (panelIndex >= 0 && panelIndex < sequence.length) targetBox = sequence[panelIndex];
     } else {
-      const bubbles = currentPageBubbles();
+      const bubbles = global.GuidedView.currentPageBubbles();
       const index = bubbleActive ? bubbleIndex : hotZoomIndex;
       if (index >= 0 && index < bubbles.length) targetBox = bubbles[index];
     }
@@ -614,7 +491,7 @@
     if (!comic) return false;
     if (comic.guidedViewStatus !== 'completed') return false;
     if (comic.mangaMode) return false;
-    const data = await loadGuidedView(comic.id);
+    const data = await global.GuidedView.loadGuidedView(comic.id);
     if (!data) return false;
     
     if (active) disable();
@@ -651,7 +528,7 @@
     const comic = global.currentComic;
     if (!comic) return false;
     if (comic.guidedViewStatus !== 'completed') return false;
-    const data = await loadGuidedView(comic.id);
+    const data = await global.GuidedView.loadGuidedView(comic.id);
     if (!data) return false;
 
     if (active) disable();
@@ -691,7 +568,7 @@
     if (!comic) return false;
     if (comic.guidedViewStatus !== 'completed') return false;
     if (!comic.mangaMode) return false;
-    const data = await loadGuidedView(comic.id);
+    const data = await global.GuidedView.loadGuidedView(comic.id);
     if (!data) return false;
 
     if (active) disable();
@@ -738,7 +615,7 @@
 
   async function saveMangaBubbleHotMode(comicId, value) {
     try {
-      await fetch(api(`/api/v1/comics/${encodeURIComponent(comicId)}/manga-bubble-hot-mode`), {
+      await fetch(global.GuidedView.api(`/api/v1/comics/${encodeURIComponent(comicId)}/manga-bubble-hot-mode`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ mangaBubbleHotMode: !!value })
@@ -748,7 +625,7 @@
 
   async function saveHotZoomMode(comicId, value) {
     try {
-      await fetch(api(`/api/v1/comics/${encodeURIComponent(comicId)}/hot-zoom-mode`), {
+      await fetch(global.GuidedView.api(`/api/v1/comics/${encodeURIComponent(comicId)}/hot-zoom-mode`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ hotZoomMode: !!value })
@@ -784,12 +661,12 @@
     const isContinuous = !!global.isContinuousMode;
 
     // Pre-load data if missing so we can check for bubbles/panels
-    if (processed && !cache.has(comic.id)) {
-      await loadGuidedView(comic.id);
+    if (processed && !global.GuidedView.cache.has(comic.id)) {
+      await global.GuidedView.loadGuidedView(comic.id);
     }
 
     const isDesktop = typeof global.isDesktopDevice === 'function' && global.isDesktopDevice();
-    const data = cache.get(comic.id);
+    const data = global.GuidedView.cache.get(comic.id);
 
     if (btn) {
       const hasPanels = data && data.pages && Object.values(data.pages).some(p => {
@@ -1057,7 +934,7 @@
     // Check hit against current page's sequence or bubbles
     if (bubbleActive) {
       // Western mode: Jump to specific bubble in sequence
-      const bubbles = currentPageBubbles();
+      const bubbles = global.GuidedView.currentPageBubbles();
       for (let i = 0; i < bubbles.length; i++) {
         const [bx, by, bw, bh] = bubbles[i];
         if (nx >= bx && nx <= bx + bw && ny >= by && ny <= by + bh) {
@@ -1071,7 +948,7 @@
     } else if (mangaBubbleHotActive) {
       // Manga Bubble Hot Zoom: click any speech bubble to zoom; click empty
       // space (while zoomed) to zoom out. Same micro-magnifier UX as Western.
-      const bubbles = mangaPageBubbles();
+      const bubbles = global.GuidedView.mangaPageBubbles();
       let bestIdx = -1, minArea = Infinity;
       for (let i = 0; i < bubbles.length; i++) {
         const [bx, by, bw, bh] = bubbles[i];
@@ -1094,10 +971,10 @@
         applyBubbleOverlay();
       }
       return;
-    } else if (hotZoomActive && isMangaComic()) {
+    } else if (hotZoomActive && global.GuidedView.isMangaComic()) {
       // Manga Hot Zoom: single-level zoom (page → panel). Click a panel to
       // zoom in; click anywhere while zoomed to zoom back out.
-      const panels = classifyMangaPage();
+      const panels = global.GuidedView.classifyMangaPage();
       if (panels.length === 0) return;
 
       if (mangaHotPanelIdx >= 0) {
@@ -1128,7 +1005,7 @@
       return;
     } else if (hotZoomActive) {
       // Western mode: Hot Zoom (Interactive click)
-      const bubbles = currentPageBubbles();
+      const bubbles = global.GuidedView.currentPageBubbles();
       let bestIndex = -1;
       let minArea = Infinity;
 

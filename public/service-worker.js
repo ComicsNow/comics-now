@@ -39,6 +39,8 @@ const ASSET_PATHS = [
   'js/viewer/navigation.js',
   'js/viewer/ui.js',
   'js/viewer/end-navigation.js',
+  'js/viewer/guided/data.js',
+  'js/viewer/guided/geometry.js',
   'js/viewer/guided/index.js',
   'js/settings.js',
   'js/guided-reader.js',
