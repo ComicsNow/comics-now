@@ -241,7 +241,7 @@
     if (isDesktop) {
       btn.innerHTML = 'Bubble ' + ZOOM_ICON_HTML;
     } else {
-      btn.innerHTML = GUIDE_ICON_HTML;
+      btn.innerHTML = ZOOM_ICON_HTML;
     }
   }
 
@@ -257,7 +257,7 @@
     if (isDesktop) {
       btn.innerHTML = (isManga ? 'Panel ' : '') + ZOOM_ICON_HTML;
     } else {
-      btn.innerHTML = isManga ? 'Panel' : ZOOM_ICON_HTML;
+      btn.innerHTML = ZOOM_ICON_HTML;
     }
   }
 

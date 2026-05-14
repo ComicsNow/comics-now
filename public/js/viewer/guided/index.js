@@ -6,30 +6,6 @@
 (function (global) {
   'use strict';
 
-  let active = false;
-  // -1 = full-page view (default on each new page);
-  //  0..N-1 = zoomed to that panel.
-  let panelIndex = -1;
-
-  let bubbleActive = false;
-  let bubbleIndex = -1;
-
-  let hotZoomActive = false;
-  let hotZoomIndex = -1;
-
-  // Manga Hot Zoom (panels): -1 = no panel zoomed (full page).
-  let mangaHotPanelIdx = -1;
-
-  // Manga Bubble Hot Zoom (speech bubbles): independent toggle, click any
-  // bubble to zoom (same micro-magnifier UX as Western Hot Zoom).
-  let mangaBubbleHotActive = false;
-  let mangaBubbleHotIdx = -1;
-
-  // Synthetic target box from a double-click zoom. When set, applyBubbleOverlay
-  // uses this instead of the per-mode panel/bubble target. Cleared on second
-  // dblclick (toggle off) or when the active mode is disabled.
-  let manualOverrideBox = null;
-
   function isFullscreenOpen() {
     const fv = document.getElementById('fullscreen-viewer');
     return !!(fv && !fv.classList.contains('hidden'));
@@ -43,32 +19,18 @@
    * based on active modes and indices.
    */
   function getRenderState() {
-    let targetBox = null;
-    let isPanelZoom = false;
-
+    const registry = global.GuidedView.ModeRegistry;
+    const manualOverrideBox = registry.getManualOverrideBox();
     if (manualOverrideBox) {
-      targetBox = manualOverrideBox;
-    } else if (hotZoomActive && global.GuidedView.isMangaComic()) {
-      const panels = global.GuidedView.classifyMangaPage();
-      if (mangaHotPanelIdx >= 0 && panels[mangaHotPanelIdx]) {
-        targetBox = panels[mangaHotPanelIdx].box;
-        isPanelZoom = true;
-      }
-    } else if (mangaBubbleHotActive) {
-      const bubbles = global.GuidedView.mangaPageBubbles();
-      if (mangaBubbleHotIdx >= 0 && mangaBubbleHotIdx < bubbles.length) {
-        targetBox = bubbles[mangaBubbleHotIdx];
-      }
-    } else if (active && !global.GuidedView.isMangaComic()) {
-      const sequence = global.GuidedView.currentPagePanels();
-      if (panelIndex >= 0 && panelIndex < sequence.length) targetBox = sequence[panelIndex];
-    } else {
-      const bubbles = global.GuidedView.currentPageBubbles();
-      const index = bubbleActive ? bubbleIndex : hotZoomIndex;
-      if (index >= 0 && index < bubbles.length) targetBox = bubbles[index];
+      return { targetBox: manualOverrideBox, isPanelZoom: false };
     }
 
-    return { targetBox, isPanelZoom };
+    const activeMode = registry.getActiveMode();
+    if (activeMode) {
+      return activeMode.getRenderState();
+    }
+
+    return { targetBox: null, isPanelZoom: false };
   }
 
   /**
@@ -77,18 +39,22 @@
    */
   function refreshRender() {
     const { targetBox, isPanelZoom } = getRenderState();
+    const registry = global.GuidedView.ModeRegistry;
+    const activeModeName = registry.getActiveModeName();
     
     // 1. Classes and CSS
     const isManga = global.GuidedView.isMangaComic();
-    const needsMangaLayout = active && isManga;
+    const needsMangaLayout = activeModeName === 'guided' && isManga;
     global.GuidedView.applyClasses(needsMangaLayout);
 
-    const isAnyActive = active || bubbleActive || hotZoomActive || mangaBubbleHotActive || !!manualOverrideBox;
+    const isAnyActive = !!activeModeName || !!registry.getManualOverrideBox();
     global.GuidedView.applyZoomCss(isAnyActive);
 
     // 2. Main image transform (Manga sequential only)
     if (needsMangaLayout) {
+      const activeMode = registry.getActiveMode();
       const panels = global.GuidedView.currentPagePanels();
+      const panelIndex = activeMode.getPanelIndex ? activeMode.getPanelIndex() : -1;
       const currentTarget = (panelIndex >= 0 && panelIndex < panels.length) ? panels[panelIndex] : null;
       global.GuidedView.applyTransform(currentTarget, isManga);
     } else {
@@ -97,8 +63,9 @@
     }
 
     // 3. Bubble overlay (Western sequential, Bubble Zoom, Hot Zoom)
-    const isWesternSequential = active && !isManga;
-    if (isWesternSequential || bubbleActive || hotZoomActive || mangaBubbleHotActive || manualOverrideBox) {
+    const isWesternSequential = activeModeName === 'guided' && !isManga;
+    const manualOverrideBox = registry.getManualOverrideBox();
+    if (isWesternSequential || activeModeName === 'bubble' || activeModeName === 'hot-zoom' || activeModeName === 'manga-bubble-hot' || manualOverrideBox) {
       global.GuidedView.applyBubbleOverlay(targetBox, isPanelZoom);
     } else {
       global.GuidedView.applyBubbleOverlay(null);
@@ -106,276 +73,63 @@
   }
 
   function updateAllUI() {
-    global.GuidedView.updateToggleUI(active);
-    global.GuidedView.updateBubbleToggleUI(bubbleActive);
-    global.GuidedView.updateHotZoomToggleUI(hotZoomActive);
-    global.GuidedView.updateMangaBubbleHotUI(mangaBubbleHotActive);
+    const registry = global.GuidedView.ModeRegistry;
+    ['guided', 'bubble', 'hot-zoom', 'manga-bubble-hot'].forEach(name => {
+      const mode = registry.get(name);
+      if (mode) mode.updateUI();
+    });
   }
 
   // True if guided/bubble consumed the navigation; false → caller advances page.
   // Index walk: -1 (full page) → 0 → 1 → ... → N-1 → page advance.
   // Reverse:    -1 (full page) → previous page; 0 → -1; 1 → 0; etc.
   function tryAdvance(direction) {
-    if (!active && !bubbleActive) return false;
-    if (!isFullscreenOpen()) { disable(); disableBubble(); return false; }
+    const registry = global.GuidedView.ModeRegistry;
+    const activeMode = registry.getActiveMode();
+    if (!activeMode) return false;
     
-    if (active) {
-      const panels = global.GuidedView.currentPagePanels();
-      if (panels.length === 0) return false; // no panel data → fall through to page nav
-      if (direction > 0) {
-        if (panelIndex >= panels.length - 1) return false; // last panel → next page
-        panelIndex += 1;
-        refreshRender();
-        return true;
-      }
-      if (direction < 0) {
-        if (panelIndex <= -1) return false; // already on full-page → previous page
-        panelIndex -= 1;
-        refreshRender();
-        return true;
-      }
-      return false;
+    if (!isFullscreenOpen()) { 
+      registry.disableAll();
+      return false; 
     }
     
-    if (bubbleActive) {
-      const bubbles = global.GuidedView.currentPageBubbles();
-      if (bubbles.length === 0) return false;
-      if (direction > 0) {
-        if (bubbleIndex >= bubbles.length - 1) return false;
-        bubbleIndex += 1;
-        refreshRender();
-        return true;
-      }
-      if (direction < 0) {
-        if (bubbleIndex <= -1) return false;
-        bubbleIndex -= 1;
-        refreshRender();
-        return true;
-      }
-      return false;
-    }
+    return activeMode.tryAdvance(direction);
   }
 
   function onPageRendered() {
-    if (!active && !bubbleActive && !hotZoomActive && !mangaBubbleHotActive) return;
-    if (!isFullscreenOpen()) { disable(); disableBubble(); disableHotZoom(); disableMangaBubbleHot(); return; }
+    const registry = global.GuidedView.ModeRegistry;
+    if (!registry.getActiveModeName()) return;
     
-    if (active) panelIndex = -1;
-    if (bubbleActive) bubbleIndex = -1;
-    if (hotZoomActive) { hotZoomIndex = -1; mangaHotPanelIdx = -1; }
-    if (mangaBubbleHotActive) mangaBubbleHotIdx = -1;
-
-    requestAnimationFrame(refreshRender);
-  }
-
-  // Persist that the *other* modes are off.
-  function persistOnlyMode(comic, kept) {
-    if (!comic) return;
-    if (kept !== 'guided' && comic.guidedMode) {
-      comic.guidedMode = false;
-      global.updateComicInLibrary?.(comic.id, { guidedMode: false });
-      saveGuidedMode(comic.id, false);
+    if (!isFullscreenOpen()) { 
+      registry.disableAll();
+      return; 
     }
-    if (kept !== 'bubble' && comic.bubbleMode) {
-      comic.bubbleMode = false;
-      global.updateComicInLibrary?.(comic.id, { bubbleMode: false });
-      saveBubbleMode(comic.id, false);
-    }
-    if (kept !== 'hotZoom' && comic.hotZoomMode) {
-      comic.hotZoomMode = false;
-      global.updateComicInLibrary?.(comic.id, { hotZoomMode: false });
-      saveHotZoomMode(comic.id, false);
-    }
-    if (kept !== 'mangaBubbleHot' && comic.mangaBubbleHotMode) {
-      comic.mangaBubbleHotMode = false;
-      global.updateComicInLibrary?.(comic.id, { mangaBubbleHotMode: false });
-      saveMangaBubbleHotMode(comic.id, false);
-    }
-  }
-
-  async function enable() {
-    if (!isFullscreenOpen()) return false;
-    const comic = global.currentComic;
-    if (!comic) return false;
-    if (comic.guidedViewStatus !== 'completed') return false;
-    const data = await global.GuidedView.loadGuidedView(comic.id);
-    if (!data) return false;
-
-    // Modes are mutually exclusive.
-    if (hotZoomActive) disableHotZoom();
-    if (bubbleActive) disableBubble();
-    if (mangaBubbleHotActive) disableMangaBubbleHot();
-    persistOnlyMode(comic, 'guided');
-
-    active = true;
-    panelIndex = -1; // start at full-page view
-    requestAnimationFrame(refreshRender);
-    updateAllUI();
-    return true;
-  }
-
-  function disable() {
-    active = false;
-    panelIndex = -1;
-    requestAnimationFrame(refreshRender);
-    updateAllUI();
-  }
-
-  async function toggle() {
-    if (active) { disable(); return false; }
-    return enable();
-  }
-
-  function isActive() { return active; }
-
-  async function saveGuidedMode(comicId, value) {
-    try {
-      await fetch(global.GuidedView.api(`/api/v1/comics/${encodeURIComponent(comicId)}/guided-mode`), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ guidedMode: !!value })
-      });
-    } catch (_) { /* non-fatal */ }
-  }
-  
-  async function saveBubbleMode(comicId, value) {
-    try {
-      await fetch(global.GuidedView.api(`/api/v1/comics/${encodeURIComponent(comicId)}/bubble-mode`), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ bubbleMode: !!value })
-      });
-    } catch (_) { /* non-fatal */ }
-  }
-
-  async function enableBubble() {
-    if (!isFullscreenOpen()) return false;
-    const comic = global.currentComic;
-    if (!comic) return false;
-    if (comic.guidedViewStatus !== 'completed') return false;
-    if (comic.mangaMode) return false;
-    const data = await global.GuidedView.loadGuidedView(comic.id);
-    if (!data) return false;
     
-    if (active) disable();
-    if (hotZoomActive) disableHotZoom();
-    if (mangaBubbleHotActive) disableMangaBubbleHot();
-    persistOnlyMode(comic, 'bubble');
+    const activeMode = registry.getActiveMode();
+    if (activeMode) activeMode.onPageRendered();
 
-    bubbleActive = true;
-    bubbleIndex = -1;
     requestAnimationFrame(refreshRender);
-    updateAllUI();
-    return true;
   }
 
-  function disableBubble() {
-    bubbleActive = false;
-    bubbleIndex = -1;
-    manualOverrideBox = null;
-    requestAnimationFrame(refreshRender);
-    updateAllUI();
-  }
+  async function enable() { return global.GuidedView.ModeRegistry.enable('guided'); }
+  function disable() { global.GuidedView.ModeRegistry.disable('guided'); }
+  async function toggle() { return global.GuidedView.ModeRegistry.toggle('guided'); }
+  function isActive() { return global.GuidedView.ModeRegistry.getActiveModeName() === 'guided'; }
 
-  async function toggleBubble() {
-    if (bubbleActive) { disableBubble(); return false; }
-    return enableBubble();
-  }
+  async function enableBubble() { return global.GuidedView.ModeRegistry.enable('bubble'); }
+  function disableBubble() { global.GuidedView.ModeRegistry.disable('bubble'); }
+  async function toggleBubble() { return global.GuidedView.ModeRegistry.toggle('bubble'); }
+  function isBubbleActive() { return global.GuidedView.ModeRegistry.getActiveModeName() === 'bubble'; }
 
-  function isBubbleActive() { return bubbleActive; }
+  async function enableHotZoom() { return global.GuidedView.ModeRegistry.enable('hot-zoom'); }
+  function disableHotZoom() { global.GuidedView.ModeRegistry.disable('hot-zoom'); }
+  async function toggleHotZoom() { return global.GuidedView.ModeRegistry.toggle('hot-zoom'); }
+  function isHotZoomActive() { return global.GuidedView.ModeRegistry.getActiveModeName() === 'hot-zoom'; }
 
-  async function enableHotZoom() {
-    if (!isFullscreenOpen()) return false;
-    const comic = global.currentComic;
-    if (!comic) return false;
-    if (comic.guidedViewStatus !== 'completed') return false;
-    const data = await global.GuidedView.loadGuidedView(comic.id);
-    if (!data) return false;
-
-    if (active) disable();
-    if (bubbleActive) disableBubble();
-    if (mangaBubbleHotActive) disableMangaBubbleHot();
-    persistOnlyMode(comic, 'hotZoom');
-
-    hotZoomActive = true;
-    hotZoomIndex = -1;
-    mangaHotPanelIdx = -1;
-    requestAnimationFrame(refreshRender);
-    updateAllUI();
-    return true;
-  }
-
-  function disableHotZoom() {
-    hotZoomActive = false;
-    hotZoomIndex = -1;
-    mangaHotPanelIdx = -1;
-    manualOverrideBox = null;
-    requestAnimationFrame(refreshRender);
-    updateAllUI();
-  }
-
-  async function toggleHotZoom() {
-    if (hotZoomActive) { disableHotZoom(); return false; }
-    return enableHotZoom();
-  }
-
-  function isHotZoomActive() { return hotZoomActive; }
-
-  async function enableMangaBubbleHot() {
-    if (!isFullscreenOpen()) return false;
-    const comic = global.currentComic;
-    if (!comic) return false;
-    if (comic.guidedViewStatus !== 'completed') return false;
-    if (!comic.mangaMode) return false;
-    const data = await global.GuidedView.loadGuidedView(comic.id);
-    if (!data) return false;
-
-    if (active) disable();
-    if (bubbleActive) disableBubble();
-    if (hotZoomActive) disableHotZoom();
-    persistOnlyMode(comic, 'mangaBubbleHot');
-
-    mangaBubbleHotActive = true;
-    mangaBubbleHotIdx = -1;
-    requestAnimationFrame(refreshRender);
-    updateAllUI();
-    return true;
-  }
-
-  function disableMangaBubbleHot() {
-    mangaBubbleHotActive = false;
-    mangaBubbleHotIdx = -1;
-    manualOverrideBox = null;
-    requestAnimationFrame(refreshRender);
-    updateAllUI();
-  }
-
-  async function toggleMangaBubbleHot() {
-    if (mangaBubbleHotActive) { disableMangaBubbleHot(); return false; }
-    return enableMangaBubbleHot();
-  }
-
-  function isMangaBubbleHotActive() { return mangaBubbleHotActive; }
-
-  async function saveMangaBubbleHotMode(comicId, value) {
-    try {
-      await fetch(global.GuidedView.api(`/api/v1/comics/${encodeURIComponent(comicId)}/manga-bubble-hot-mode`), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mangaBubbleHotMode: !!value })
-      });
-    } catch (_) { /* non-fatal */ }
-  }
-
-  async function saveHotZoomMode(comicId, value) {
-    try {
-      await fetch(global.GuidedView.api(`/api/v1/comics/${encodeURIComponent(comicId)}/hot-zoom-mode`), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ hotZoomMode: !!value })
-      });
-    } catch (_) { /* non-fatal */ }
-  }
+  async function enableMangaBubbleHot() { return global.GuidedView.ModeRegistry.enable('manga-bubble-hot'); }
+  function disableMangaBubbleHot() { global.GuidedView.ModeRegistry.disable('manga-bubble-hot'); }
+  async function toggleMangaBubbleHot() { return global.GuidedView.ModeRegistry.toggle('manga-bubble-hot'); }
+  function isMangaBubbleHotActive() { return global.GuidedView.ModeRegistry.getActiveModeName() === 'manga-bubble-hot'; }
 
   // Refresh button enabled state and auto-enable per saved preference.
   async function refreshGuidedToggle() {
@@ -436,41 +190,40 @@
       mangaBubbleHotBtn.disabled = !ready;
     }
 
+    const registry = global.GuidedView.ModeRegistry;
     if (!isFullscreenOpen()) {
-      if (active) disable();
-      if (bubbleActive) disableBubble();
-      if (hotZoomActive) disableHotZoom();
-      if (mangaBubbleHotActive) disableMangaBubbleHot();
+      registry.disableAll();
       updateAllUI();
       return;
     }
     
+    const activeModeName = registry.getActiveModeName();
     const guidedModePref = !!(comic.guidedMode === true || comic.guidedMode == 1);
     const bubbleModePref = !!(comic.bubbleMode === true || comic.bubbleMode == 1);
     const hotZoomModePref = !!(comic.hotZoomMode === true || comic.hotZoomMode == 1);
     const mangaBubbleHotPref = !!(comic.mangaBubbleHotMode === true || comic.mangaBubbleHotMode == 1);
 
-    if (isManga && processed && guidedModePref && !active) {
+    if (isManga && processed && guidedModePref && activeModeName !== 'guided') {
       await enable();
-    } else if (isManga && (!processed || !guidedModePref) && active) {
+    } else if (isManga && (!processed || !guidedModePref) && activeModeName === 'guided') {
       disable();
     }
     
-    if (!isManga && processed && bubbleModePref && !bubbleActive) {
+    if (!isManga && processed && bubbleModePref && activeModeName !== 'bubble') {
       await enableBubble();
-    } else if (!isManga && (!processed || !bubbleModePref) && bubbleActive) {
+    } else if (!isManga && (!processed || !bubbleModePref) && activeModeName === 'bubble') {
       disableBubble();
     }
 
-    if (processed && hotZoomModePref && !hotZoomActive) {
+    if (processed && hotZoomModePref && activeModeName !== 'hot-zoom') {
       await enableHotZoom();
-    } else if ((!processed || !hotZoomModePref) && hotZoomActive) {
+    } else if ((!processed || !hotZoomModePref) && activeModeName === 'hot-zoom') {
       disableHotZoom();
     }
 
-    if (isManga && processed && mangaBubbleHotPref && !mangaBubbleHotActive) {
+    if (isManga && processed && mangaBubbleHotPref && activeModeName !== 'manga-bubble-hot') {
       await enableMangaBubbleHot();
-    } else if (isManga && (!processed || !mangaBubbleHotPref) && mangaBubbleHotActive) {
+    } else if (isManga && (!processed || !mangaBubbleHotPref) && activeModeName === 'manga-bubble-hot') {
       disableMangaBubbleHot();
     }
 
@@ -478,19 +231,20 @@
   }
 
   function bindToggleButton() {
+    const registry = global.GuidedView.ModeRegistry;
+
     const btn = document.getElementById('guided-toggle-btn');
     if (btn && !btn._guidedBound) {
       btn._guidedBound = true;
       btn.addEventListener('click', async (e) => {
-        e.preventDefault();
-        e.stopPropagation();
+        e.preventDefault(); e.stopPropagation();
         const comic = global.currentComic;
         if (!comic || comic.guidedViewStatus !== 'completed' || !isFullscreenOpen()) return;
-        const willActivate = !active;
+        const willActivate = registry.getActiveModeName() !== 'guided';
         if (willActivate) await enable(); else disable();
         comic.guidedMode = willActivate;
         if (typeof global.updateComicInLibrary === 'function') global.updateComicInLibrary(comic.id, { guidedMode: willActivate });
-        saveGuidedMode(comic.id, willActivate);
+        registry.saveModePreference(comic.id, 'guided', willActivate);
       });
     }
 
@@ -498,15 +252,14 @@
     if (bubbleBtn && !bubbleBtn._bubbleBound) {
       bubbleBtn._bubbleBound = true;
       bubbleBtn.addEventListener('click', async (e) => {
-        e.preventDefault();
-        e.stopPropagation();
+        e.preventDefault(); e.stopPropagation();
         const comic = global.currentComic;
         if (!comic || comic.guidedViewStatus !== 'completed' || !!comic.mangaMode || !isFullscreenOpen()) return;
-        const willActivate = !bubbleActive;
+        const willActivate = registry.getActiveModeName() !== 'bubble';
         if (willActivate) await enableBubble(); else disableBubble();
         comic.bubbleMode = willActivate;
         if (typeof global.updateComicInLibrary === 'function') global.updateComicInLibrary(comic.id, { bubbleMode: willActivate });
-        saveBubbleMode(comic.id, willActivate);
+        registry.saveModePreference(comic.id, 'bubble', willActivate);
       });
     }
 
@@ -514,15 +267,14 @@
     if (mangaBubbleHotBtn && !mangaBubbleHotBtn._mangaBubbleHotBound) {
       mangaBubbleHotBtn._mangaBubbleHotBound = true;
       mangaBubbleHotBtn.addEventListener('click', async (e) => {
-        e.preventDefault();
-        e.stopPropagation();
+        e.preventDefault(); e.stopPropagation();
         const comic = global.currentComic;
         if (!comic || comic.guidedViewStatus !== 'completed' || !comic.mangaMode || !isFullscreenOpen()) return;
-        const willActivate = !mangaBubbleHotActive;
+        const willActivate = registry.getActiveModeName() !== 'manga-bubble-hot';
         if (willActivate) await enableMangaBubbleHot(); else disableMangaBubbleHot();
         comic.mangaBubbleHotMode = willActivate;
         if (typeof global.updateComicInLibrary === 'function') global.updateComicInLibrary(comic.id, { mangaBubbleHotMode: willActivate });
-        saveMangaBubbleHotMode(comic.id, willActivate);
+        registry.saveModePreference(comic.id, 'manga-bubble-hot', willActivate);
       });
     }
 
@@ -530,15 +282,14 @@
     if (hotZoomBtn && !hotZoomBtn._hotZoomBound) {
       hotZoomBtn._hotZoomBound = true;
       hotZoomBtn.addEventListener('click', async (e) => {
-        e.preventDefault();
-        e.stopPropagation();
+        e.preventDefault(); e.stopPropagation();
         const comic = global.currentComic;
         if (!comic || comic.guidedViewStatus !== 'completed' || !isFullscreenOpen()) return;
-        const willActivate = !hotZoomActive;
+        const willActivate = registry.getActiveModeName() !== 'hot-zoom';
         if (willActivate) await enableHotZoom(); else disableHotZoom();
         comic.hotZoomMode = willActivate;
         if (typeof global.updateComicInLibrary === 'function') global.updateComicInLibrary(comic.id, { hotZoomMode: willActivate });
-        saveHotZoomMode(comic.id, willActivate);
+        registry.saveModePreference(comic.id, 'hot-zoom', willActivate);
       });
     }
   }
@@ -549,37 +300,38 @@
     const observer = new MutationObserver(() => {
       const open = isFullscreenOpen();
       if (open) refreshGuidedToggle();
-      else {
-        if (active) disable();
-        if (bubbleActive) disableBubble();
-        if (hotZoomActive) disableHotZoom();
-        if (mangaBubbleHotActive) disableMangaBubbleHot();
-      }
+      else global.GuidedView.ModeRegistry.disableAll();
     });
     observer.observe(fv, { attributes: true, attributeFilter: ['class'] });
     fv._guidedObserver = observer;
   }
 
   function isZoomEngaged() {
-    if (manualOverrideBox) return true;
-    if (bubbleActive && bubbleIndex >= 0) return true;
-    if (hotZoomActive && (hotZoomIndex >= 0 || mangaHotPanelIdx >= 0)) return true;
-    if (mangaBubbleHotActive && mangaBubbleHotIdx >= 0) return true;
-    return false;
+    const registry = global.GuidedView.ModeRegistry;
+    if (registry.getManualOverrideBox()) return true;
+    const activeMode = registry.getActiveMode();
+    // Simplified check: if any mode is active, we assume it might be engaged 
+    // but we can be more specific if needed.
+    // Actually, we can just check if getRenderState().targetBox is set.
+    return !!getRenderState().targetBox;
   }
 
   function isAnyGuidedActive() {
-    return active || bubbleActive || hotZoomActive || mangaBubbleHotActive;
+    return !!global.GuidedView.ModeRegistry.getActiveModeName();
   }
 
   function handleImageClick(e) {
-    if (!active && !bubbleActive && !hotZoomActive && !mangaBubbleHotActive) return;
+    const registry = global.GuidedView.ModeRegistry;
+    const activeMode = registry.getActiveMode();
+    const manualOverrideBox = registry.getManualOverrideBox();
+
+    if (!activeMode && !manualOverrideBox) return;
 
     if (manualOverrideBox) {
       const now = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
       if (now - lastDblZoomAt < 500) { e.preventDefault(); e.stopPropagation(); return; }
       e.preventDefault(); e.stopPropagation();
-      manualOverrideBox = null;
+      registry.setManualOverrideBox(null);
       requestAnimationFrame(refreshRender);
       return;
     }
@@ -599,80 +351,11 @@
     const nx = rx * (img.naturalWidth / rect.width);
     const ny = ry * (img.naturalHeight / rect.height);
 
-    if (bubbleActive) {
-      const bubbles = global.GuidedView.currentPageBubbles();
-      for (let i = 0; i < bubbles.length; i++) {
-        const [bx, by, bw, bh] = bubbles[i];
-        if (nx >= bx && nx <= bx + bw && ny >= by && ny <= by + bh) {
-          e.preventDefault(); e.stopPropagation();
-          bubbleIndex = i;
-          requestAnimationFrame(refreshRender);
-          return;
-        }
-      }
-    } else if (mangaBubbleHotActive) {
-      const bubbles = global.GuidedView.mangaPageBubbles();
-      let bestIdx = -1, minArea = Infinity;
-      for (let i = 0; i < bubbles.length; i++) {
-        const [bx, by, bw, bh] = bubbles[i];
-        if (nx >= bx && nx <= bx + bw && ny >= by && ny <= by + bh) {
-          const area = bw * bh;
-          if (area < minArea) { minArea = area; bestIdx = i; }
-        }
-      }
-      if (bestIdx !== -1) {
-        e.preventDefault(); e.stopPropagation();
-        mangaBubbleHotIdx = (mangaBubbleHotIdx === bestIdx) ? -1 : bestIdx;
-        requestAnimationFrame(refreshRender);
-        return;
-      }
-      if (mangaBubbleHotIdx !== -1) {
-        e.preventDefault(); e.stopPropagation();
-        mangaBubbleHotIdx = -1;
-        requestAnimationFrame(refreshRender);
-      }
-      return;
-    } else if (hotZoomActive && global.GuidedView.isMangaComic()) {
-      const panels = global.GuidedView.classifyMangaPage();
-      if (panels.length === 0) return;
-      if (mangaHotPanelIdx >= 0) {
-        e.preventDefault(); e.stopPropagation();
-        mangaHotPanelIdx = -1;
-        requestAnimationFrame(refreshRender);
-        return;
-      }
-      let bestIdx = -1, bestArea = Infinity;
-      for (let i = 0; i < panels.length; i++) {
-        const [px, py, pw, ph] = panels[i].box;
-        if (nx >= px && nx <= px + pw && ny >= py && ny <= py + ph) {
-          const area = pw * ph;
-          if (area < bestArea) { bestArea = area; bestIdx = i; }
-        }
-      }
-      if (bestIdx >= 0) {
-        e.preventDefault(); e.stopPropagation();
-        mangaHotPanelIdx = bestIdx;
-        requestAnimationFrame(refreshRender);
-      }
-      return;
-    } else if (hotZoomActive) {
-      const bubbles = global.GuidedView.currentPageBubbles();
-      let bestIndex = -1, minArea = Infinity;
-      for (let i = 0; i < bubbles.length; i++) {
-        const [bx, by, bw, bh] = bubbles[i];
-        if (nx >= bx && nx <= bx + bw && ny >= by && ny <= by + bh) {
-          const area = bw * bh;
-          if (area < minArea) { minArea = area; bestIndex = i; }
-        }
-      }
-      if (bestIndex !== -1) {
-        e.preventDefault(); e.stopPropagation();
-        hotZoomIndex = (hotZoomIndex === bestIndex) ? -1 : bestIndex;
-        requestAnimationFrame(refreshRender);
-      } else if (hotZoomIndex !== -1) {
-        e.preventDefault(); e.stopPropagation();
-        hotZoomIndex = -1;
-        requestAnimationFrame(refreshRender);
+    if (activeMode && activeMode.handleImageClick) {
+      const handled = activeMode.handleImageClick(nx, ny);
+      if (handled) {
+        e.preventDefault();
+        e.stopPropagation();
       }
     }
   }
@@ -684,7 +367,7 @@
     if (stage) {
       stage.addEventListener('click', handleImageClick, true);
       stage.addEventListener('contextmenu', (e) => {
-        if (active || bubbleActive || hotZoomActive || mangaBubbleHotActive) e.preventDefault();
+        if (isAnyGuidedActive()) e.preventDefault();
       });
     }
     if (!document.getElementById('__guided_zoom_style')) {
@@ -706,12 +389,7 @@
   else init();
 
   function disableAll() {
-    const comic = global.currentComic;
-    if (active) disable();
-    if (bubbleActive) disableBubble();
-    if (hotZoomActive) disableHotZoom();
-    if (mangaBubbleHotActive) disableMangaBubbleHot();
-    if (comic) persistOnlyMode(comic, null);
+    global.GuidedView.ModeRegistry.disableAll();
   }
 
   Object.assign(global.GuidedView, {
@@ -719,7 +397,8 @@
     enableBubble, disableBubble, toggleBubble, isBubbleActive,
     enableHotZoom, disableHotZoom, toggleHotZoom, isHotZoomActive,
     enableMangaBubbleHot, disableMangaBubbleHot, toggleMangaBubbleHot, isMangaBubbleHotActive,
-    disableAll, isZoomEngaged, isAnyGuidedActive
+    disableAll, isZoomEngaged, isAnyGuidedActive,
+    isFullscreenOpen, refreshRender // Need these for modes to call back
   });
   global.tryGuidedAdvance = tryAdvance;
   global.onGuidedPageRendered = onPageRendered;
@@ -729,7 +408,7 @@
   global.refreshGuidedToggle = refreshGuidedToggle;
 
   window.addEventListener('resize', () => {
-    if (active || bubbleActive || hotZoomActive || mangaBubbleHotActive) {
+    if (isAnyGuidedActive()) {
       requestAnimationFrame(refreshRender);
     }
   });
@@ -737,7 +416,10 @@
   let lastDblZoomAt = 0;
   function handleDoubleClickZoom(event) {
     if (global.isFullImageMode) return;
-    if (!hotZoomActive && !bubbleActive && !mangaBubbleHotActive) return;
+    const registry = global.GuidedView.ModeRegistry;
+    const activeModeName = registry.getActiveModeName();
+    if (activeModeName !== 'hot-zoom' && activeModeName !== 'bubble' && activeModeName !== 'manga-bubble-hot') return;
+    
     const img = getImg();
     if (!img || !img.naturalWidth || !img.naturalHeight) return;
     const now = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
@@ -746,8 +428,9 @@
     if (typeof global.cancelPendingSideNav === 'function') global.cancelPendingSideNav();
     const isPointerEvt = event && (event.type === 'pointerup' || event.type === 'pointerdown');
 
+    const manualOverrideBox = registry.getManualOverrideBox();
     if (manualOverrideBox) {
-      manualOverrideBox = null;
+      registry.setManualOverrideBox(null);
       if (!isPointerEvt) { event.preventDefault?.(); event.stopPropagation?.(); }
       requestAnimationFrame(refreshRender);
       return;
@@ -761,7 +444,7 @@
     const boxH = img.naturalHeight * 0.4;
     const cx = ratioX * img.naturalWidth;
     const cy = ratioY * img.naturalHeight;
-    manualOverrideBox = [cx - boxW / 2, cy - boxH / 2, boxW, boxH];
+    registry.setManualOverrideBox([cx - boxW / 2, cy - boxH / 2, boxW, boxH]);
     if (!isPointerEvt) { event.preventDefault?.(); event.stopPropagation?.(); }
     requestAnimationFrame(refreshRender);
   }
@@ -772,7 +455,10 @@
 
   function handlePointerUpForDblTap(event) {
     if (event.pointerType === 'mouse' && event.button !== 0) return;
-    if (!hotZoomActive && !bubbleActive && !mangaBubbleHotActive) { lastTapAt = 0; return; }
+    const registry = global.GuidedView.ModeRegistry;
+    const activeModeName = registry.getActiveModeName();
+    if (activeModeName !== 'hot-zoom' && activeModeName !== 'bubble' && activeModeName !== 'manga-bubble-hot') { lastTapAt = 0; return; }
+    
     const now = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
     const dx = event.clientX - lastTapX, dy = event.clientY - lastTapY;
     if ((now - lastTapAt) <= DOUBLE_TAP_MS && (dx * dx + dy * dy) <= (DOUBLE_TAP_MOVE_TOLERANCE * DOUBLE_TAP_MOVE_TOLERANCE)) {
