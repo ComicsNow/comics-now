@@ -44,6 +44,8 @@ const ASSET_PATHS = [
   'js/viewer/guided/overlay.js',
   'js/viewer/guided/mode-registry.js',
   'js/viewer/guided/input.js',
+  'js/viewer/guided/lifecycle.js',
+  'js/viewer/guided/buttons.js',
   'js/viewer/guided/modes/guided.js',
   'js/viewer/guided/modes/bubble.js',
   'js/viewer/guided/modes/hot-zoom.js',
