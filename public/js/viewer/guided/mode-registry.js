@@ -64,11 +64,14 @@
     disable(name) {
       const mode = modes.get(name);
       if (mode) {
-        mode.disable();
+        // IMPORTANT: Clear the state BEFORE calling the cleanup.
+        // This ensures that the re-render triggered inside mode.disable()
+        // correctly sees that there is NO active mode.
         if (activeModeName === name) {
           activeModeName = null;
           this.persistOnlyMode(global.currentComic, null);
         }
+        mode.disable();
       }
       manualOverrideBox = null;
     },

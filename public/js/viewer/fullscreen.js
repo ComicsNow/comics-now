@@ -227,21 +227,33 @@
   }
 
   async function closeFullscreen() {
-    if (global.GuidedView && typeof global.GuidedView.disableAll === 'function') {
-      global.GuidedView.disableAll();
-    }
-    hideFullscreenControls();
+    // 1. HIDE IMMEDIATELY - Don't wait for anything
     const viewer = global.fullscreenViewer;
-    const image = global.fullscreenImage;
-    if (!viewer) return;
+    if (viewer) {
+      viewer.classList.add('hidden');
+      viewer.style.display = 'none'; // Force hide even if CSS is fighting
+    }
+    
+    hideFullscreenControls();
 
-    // Disable continuous mode if active
-    if (global.isContinuousMode && typeof global.disableContinuousMode === 'function') {
-      await global.disableContinuousMode();
+    // 2. CLEANUP IN BACKGROUND
+    try {
+      if (global.GuidedView && typeof global.GuidedView.disableAll === 'function') {
+        global.GuidedView.disableAll();
+      }
+    } catch (e) {
+      console.error('[closeFullscreen] GuidedView cleanup failed:', e);
     }
 
-    viewer.classList.add('hidden');
+    try {
+      if (global.isContinuousMode && typeof global.disableContinuousMode === 'function') {
+        // Don't await, let it finish in background
+        global.disableContinuousMode().catch(() => {});
+      }
+    } catch (e) {}
 
+    const image = global.fullscreenImage;
+    
     // Cancel RAF before releasing pointer capture
     if (fullscreenPanRAF) {
       cancelAnimationFrame(fullscreenPanRAF);
@@ -251,24 +263,26 @@
     if (fullscreenPanPointerId !== null && image && typeof image.releasePointerCapture === 'function') {
       try {
         image.releasePointerCapture(fullscreenPanPointerId);
-      } catch (error) {
-
-      }
+      } catch (error) {}
     }
 
     isFullscreenPanning = false;
     fullscreenPanPointerId = null;
-    if (typeof global.resetFullscreenZoom === 'function') {
-      global.resetFullscreenZoom();
-    }
+    
+    try {
+      if (typeof global.resetFullscreenZoom === 'function') {
+        global.resetFullscreenZoom();
+      }
+    } catch (e) {}
 
     if (document.fullscreenElement === viewer && document.exitFullscreen) {
       document.exitFullscreen().catch(() => {});
     }
 
-    // Render current page in normal viewer to show correct position
+    // 3. FINAL UI SYNC
     if (typeof global.renderPage === 'function') {
-      await global.renderPage();
+      // Don't await, just trigger
+      global.renderPage().catch(() => {});
     }
   }
 

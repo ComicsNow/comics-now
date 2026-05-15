@@ -44,6 +44,7 @@
         const ty = (stageH - img.naturalHeight * s) / 2;
         img.style.transform = `translate(${tx}px, ${ty}px) scale(${s})`;
       } else {
+        // RESET: Ensure transform is cleared if we are not in Manga mode or disabling
         img.style.transform = '';
       }
       return;
@@ -231,8 +232,13 @@
       if (needsGuidedLayout) {
         img.classList.remove('orientation-landscape');
       } else {
+        // FULL RESET: When disabling, clear all Guided-specific transforms and styles
         img.style.transform = '';
-        if (global.isLandscapeOrientation) img.classList.add('orientation-landscape');
+        if (global.isLandscapeOrientation) {
+          img.classList.add('orientation-landscape');
+        } else {
+          img.classList.remove('orientation-landscape');
+        }
       }
     }
   }
