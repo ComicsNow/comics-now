@@ -97,18 +97,29 @@ module.exports = function attach(router, deps) {
     res.setHeader('Connection', 'keep-alive');
     // Tell reverse proxies (Cloudflare, nginx) NOT to buffer this response.
     res.setHeader('X-Accel-Buffering', 'no');
-    if (typeof res.flushHeaders === 'function') res.flushHeaders();
+    
+    registerGuidedClient(res);
+
     if (res.socket && typeof res.socket.setNoDelay === 'function') {
       res.socket.setNoDelay(true);
     }
+
+    // Initial keep-alive to help establish connection
+    res.write(':ok\n\n');
+
+    if (typeof res.flushHeaders === 'function') {
+      res.flushHeaders();
+    }
+
     // Replay buffered logs
     for (const entry of getGuidedLogs()) {
       res.write(`data: ${JSON.stringify(entry)}\n\n`);
     }
+
     const keepalive = setInterval(() => {
       try { res.write(': keepalive\n\n'); } catch (_) {}
     }, 15000);
-    registerGuidedClient(res);
+
     req.on('close', () => {
       clearInterval(keepalive);
       unregisterGuidedClient(res);

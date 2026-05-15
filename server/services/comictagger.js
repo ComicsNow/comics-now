@@ -15,7 +15,7 @@ function getScanLibrary() {
 
 // Interactive mode: use -i flag to prompt for matches
 const CT_ARGS = ['-s', '-t', 'cr', '-f', '-o', '-i'];
-const CT_SUCCESS_PATTERNS = [/tag\s+written/i, /archive\s+already\s+tagged/i, /tag\s+script:\s*success/i, /sidecar\s+written/i, /sidecar\s+updated/i];
+const CT_SUCCESS_PATTERNS = [/save\s+complete/i, /tag\s+written/i, /archive\s+already\s+tagged/i, /tag\s+script:\s*success/i, /sidecar\s+written/i, /sidecar\s+updated/i];
 const CT_FAIL_PATTERNS = [/no\s+match/i, /could\s+not\s+(?:identify|find)/i, /tag\s+script:\s*failed/i];
 
 let ctInterval = null;
@@ -31,38 +31,43 @@ let pendingMatchState = null; // Stores info about pending match for later respo
  */
 function parseMatchLine(line) {
   try {
-    // Pattern: number. Title (YEAR) #issue [Publisher] (date) - Subtitle
-    const match = line.match(/^(\d+)\.\s*(.+?)\s*\((\d{4})\)\s*#(\d+)\s*\[([^\]]+)\](?:\s*\(([^)]+)\))?(?:\s*-\s*(.+))?$/);
+    // 1. Strip all leading junk (symbols, spaces, progress markers)
+    // We look for the FIRST pattern of "Number." or "Number:" 
+    // This handles symbols like ❯, ✓, or even just leading spaces.
+    const cleanLine = line.replace(/^.*?(\d+[.:])/, '$1').trim();
 
-    if (match) {
+    // 2. Extract choice and rest using anchored regex for precision
+    const startMatch = cleanLine.match(/^(\d+)[.:]\s*(.+)$/);
+    if (!startMatch) return null;
+
+    const choice = startMatch[1];
+    const rest = startMatch[2].trim();
+
+    // Now try to parse the rich metadata from the "rest"
+    // Title (YEAR) #issue [Publisher] ...
+    const richMatch = rest.match(/^(.+?)(?:\s+\((\d{4})\))?(?:\s+(?:#)?(\d+[\w\d]*)?)?(?:\s+\[([^\]]+)\])?(?:\s+(.+))?$/);
+
+    if (richMatch) {
       return {
-        choice: match[1],
-        title: match[2].trim(),
-        year: match[3],
-        issue: match[4],
-        publisher: match[5].trim(),
-        date: match[6] ? match[6].trim() : null,
-        subtitle: match[7] ? match[7].trim() : null
+        choice: choice,
+        title: richMatch[1].trim(),
+        year: richMatch[2] || null,
+        issue: richMatch[3] || '?',
+        publisher: richMatch[4] ? richMatch[4].trim() : 'Unknown',
+        extra: richMatch[5] ? richMatch[5].trim() : null
       };
     }
 
-    // Fallback: simpler pattern without date/subtitle
-    const simpleMatch = line.match(/^(\d+)\.\s*(.+?)\s*\((\d{4})\)\s*#(\d+)\s*\[([^\]]+)\]/);
-    if (simpleMatch) {
-      return {
-        choice: simpleMatch[1],
-        title: simpleMatch[2].trim(),
-        year: simpleMatch[3],
-        issue: simpleMatch[4],
-        publisher: simpleMatch[5].trim(),
-        date: null,
-        subtitle: null
-      };
-    }
-
-    return null;
+    // Fallback if rich parsing fails
+    return {
+      choice: choice,
+      title: rest,
+      year: null,
+      issue: '?',
+      publisher: 'Unknown',
+      extra: null
+    };
   } catch (error) {
-    ctLog(`Warning: Failed to parse match line: ${line}`);
     return null;
   }
 }
@@ -126,13 +131,56 @@ async function runComicTagger() {
         let collectedMatches = [];
         let autoSelectedMatch = null;
         let userSelectedChoice = null;
+        let stdoutRemainder = '';
+        let stderrRemainder = '';
+
+        const stripAnsi = (str) => str.replace(/[\u001b\u009b][[()#;?]*(?:[0-9]{1,4}(?:;[0-9]{0,4})*)?[0-9A-ORZcf-nqry=><]/g, '');
 
         const handleLine = (l) => {
           // Skip empty lines
-          const trimmed = l.trim();
+          let trimmed = l.trim();
           if (!trimmed) return;
+          
+          // Strip ANSI colors/codes that ComicTagger might output
+          trimmed = stripAnsi(trimmed);
 
           ctLog(trimmed);
+
+          // 1. Check for failure patterns IMMEDIATELY to avoid misidentifying headers
+          if (CT_FAIL_PATTERNS.some(r => r.test(trimmed))) {
+            decision = 'no';
+            if (collectingMatches || awaitingUserInput) {
+              ctLog(`ⓘ FAILURE DETECTED: Aborting match collection/input.`);
+              collectingMatches = false;
+              awaitingUserInput = false;
+              if (userChoiceResolver) {
+                userChoiceResolver('skip');
+              }
+              pendingMatchState = null;
+            }
+            return;
+          }
+
+          // 2. Check for success patterns
+          if (CT_SUCCESS_PATTERNS.some(r => r.test(trimmed))) {
+            decision = 'yes';
+            // If we were expecting input or collecting matches, a success pattern means
+            // the operation is finished (likely an auto-match or script completion).
+            if (collectingMatches || awaitingUserInput) {
+              ctLog(`ⓘ SUCCESS DETECTED: Clearing pending match state.`);
+              collectingMatches = false;
+              awaitingUserInput = false;
+              if (userChoiceResolver) {
+                userChoiceResolver('skip');
+              }
+              pendingMatchState = null;
+            }
+          }
+
+          // Add debug logging during collection
+          if (collectingMatches) {
+            ctLog(`[DEBUG] Processing line during collection: ${trimmed}`);
+          }
 
           // Detect auto-selected match (usually has a checkmark or arrow)
           if (/^[✓❯]\s*\d+\./.test(trimmed)) {
@@ -141,51 +189,103 @@ async function runComicTagger() {
           }
 
           // Start collecting matches when we see the header
-          if (/low-confidence match/i.test(l) || /Multiple.*matches/i.test(l) || /Archives with low-confidence/i.test(l)) {
-            collectingMatches = true;
-            collectedMatches = [];
-            return;
-          }
+          // Broad check for headers: "Matches found", "Possible matches", "Search results", "Archives with", etc.
+          // REFINED: Exclude lines that explicitly say "No matches" or "Successful matches"
+          const isMatchHeader = (/matches/i.test(trimmed) || 
+                                 /Archives with/i.test(trimmed) || 
+                                 /Search results/i.test(trimmed) || 
+                                 /Multiple.*found/i.test(trimmed) || 
+                                 /Suggested matches/i.test(trimmed)) && 
+                                !/no\s+matches/i.test(trimmed) &&
+                                !/Successful matches/i.test(trimmed);
 
-          // Collect match lines
-          const cleanedLine = trimmed.replace(/^[❯⊘✓✗►▶•]\s*/, '');
-          if (collectingMatches && /^\d+\./.test(cleanedLine)) {
-            const parsed = parseMatchLine(cleanedLine);
-            if (parsed) {
-              collectedMatches.push(parsed);
-            }
-            return;
-          }
-
-          // Detect when ComicTagger is asking for user selection
-          if (/Choose a match.*or.*skip/i.test(l)) {
-            if (!awaitingUserInput) {
-              awaitingUserInput = true;
-              ctLog('>>> WAITING FOR USER SELECTION <<<');
-
+          if (isMatchHeader) {
+            // Only reset if we aren't already collecting to avoid double-resetting on multi-line headers
+            if (!collectingMatches) {
+              collectingMatches = true;
+              collectedMatches = [];
+              ctLog(`ⓘ DETECTED MATCH LIST START: ${trimmed}`);
+              
+              // Ensure we have an absolute path for the preview endpoint
+              const absolutePath = path.isAbsolute(filePath) ? filePath : path.resolve(filePath);
+              
+              // Pre-initialize pending state
               pendingMatchState = {
                 fileName: entry.name,
-                filePath: filePath,
-                matches: collectedMatches,
+                filePath: absolutePath,
+                matches: [],
                 timestamp: new Date().toISOString(),
-                waitingForResponse: true
+                waitingForResponse: true,
+                isFinal: false,
+                previewBuffer: null,
+                previewMime: null
               };
 
-              collectingMatches = false;
-
+              // INITIALIZE RESOLVER EARLY: This allows "Apply" to work even if we haven't
+              // officially hit the prompt yet in the logs (race condition fix).
               pendingUserChoice = new Promise((resolveChoice) => {
                 userChoiceResolver = resolveChoice;
                 currentProcess.resolveUserChoice = resolveChoice;
                 currentProcess.currentFile = entry.name;
               });
+              
+              // Background extract and cache the preview image
+              (async () => {
+                try {
+                  const library = require('./library');
+                  const pages = await library.getComicPages(absolutePath);
+                  if (pages && pages.length > 0) {
+                    const firstPage = pages[0];
+                    const buffer = await library.extractPageBuffer(absolutePath, firstPage);
+                    if (buffer && pendingMatchState && pendingMatchState.filePath === absolutePath) {
+                      const { getMimeFromExt } = require('../utils');
+                      pendingMatchState.previewBuffer = buffer;
+                      pendingMatchState.previewMime = getMimeFromExt(firstPage);
+                      ctLog(`ⓘ Cached preview image for: ${entry.name}`);
+                    }
+                  }
+                } catch (err) {}
+              })();
+
+              ctLog(`ⓘ Initialized pending match state for: ${entry.name}`);
+            }
+            // NO RETURN HERE - let the line fall through in case a match is on the same line!
+          }
+
+          // Collect match lines
+          if (collectingMatches) {
+            // Check if we hit the prompt
+            // Pattern covers: "Choose a match", "Enter selection", "[1-5]:", "[1-5] (s to skip):"
+            if (/Choose a match/i.test(trimmed) || /Enter selection/i.test(trimmed) || /Select an option/i.test(trimmed) || /Select a match/i.test(trimmed) || /\[\d+-\d+\]/.test(trimmed)) {
+              awaitingUserInput = true;
+              collectingMatches = false;
+
+              // Finalize match list for UI
+              if (pendingMatchState) {
+                pendingMatchState.matches = [...collectedMatches];
+                pendingMatchState.isFinal = true;
+              }
+
+              // Safety check: if we hit a prompt but have no matches, don't hang the UI
+              if (collectedMatches.length === 0) {
+                ctLog('⚠️ WARNING: No matches were parsed during collection phase! Auto-skipping prompt.');
+                if (userChoiceResolver) {
+                  userChoiceResolver('skip');
+                }
+                pendingMatchState = null;
+                awaitingUserInput = false;
+                return;
+              }
+
+              ctLog(`>>> WAITING FOR USER SELECTION (Found ${collectedMatches.length} matches)`);
 
               pendingUserChoice.then((choice) => {
                 if (choice === 'skip' || choice === 's' || choice === 'timeout') {
                   decision = 'no';
                   ctLog(`✗ User skipped match`);
                 } else {
-                  decision = 'yes';
                   userSelectedChoice = choice;
+                  decision = 'yes';
                   ctLog(`✓ User selected match #${choice}`);
                 }
                 pendingMatchState = null;
@@ -193,20 +293,46 @@ async function runComicTagger() {
                 ctLog(`✗ Error handling user choice: ${err.message}`);
                 pendingMatchState = null;
               });
+              return;
             }
-          }
 
-          if (CT_SUCCESS_PATTERNS.some(r => r.test(l))) decision = 'yes';
-          if (CT_FAIL_PATTERNS.some(r => r.test(l))) decision = 'no';
+            const parsed = parseMatchLine(trimmed);
+            if (parsed) {
+              collectedMatches.push(parsed);
+              // Update state in real-time so "Grab Matches" works even before the prompt
+              if (pendingMatchState) {
+                pendingMatchState.matches = [...collectedMatches];
+              }
+            } else {
+               // Log lines that look like matches but failed to parse
+               if (/^\d+[.:]/.test(trimmed) || /^[✓❯]\s*\d+[.:]/.test(trimmed)) {
+                 ctLog(`⚠️ FAILED TO PARSE POTENTIAL MATCH: ${trimmed}`);
+               }
+            }
+            return;
+          }
         };
 
-        currentProcess.stdout.on('data', d => d.toString().split(/\r?\n/).forEach(l => l && handleLine(l)));
-        currentProcess.stderr.on('data', d => d.toString().split(/\r?\n/).forEach(l => l && handleLine(l)));
+        currentProcess.stdout.on('data', d => {
+          // Split on both \n and \r to handle progress bars and line updates correctly
+          const lines = (stdoutRemainder + d.toString()).split(/\r\n|\r|\n/);
+          stdoutRemainder = lines.pop();
+          lines.forEach(l => handleLine(l));
+        });
+
+        currentProcess.stderr.on('data', d => {
+          const lines = (stderrRemainder + d.toString()).split(/\r\n|\r|\n/);
+          stderrRemainder = lines.pop();
+          lines.forEach(l => handleLine(l));
+        });
 
         currentProcess.on('close', async (code) => {
           processExited = true;
+          if (stdoutRemainder) handleLine(stdoutRemainder);
+          if (stderrRemainder) handleLine(stderrRemainder);
 
           if (awaitingUserInput && userChoiceResolver) {
+            ctLog('ⓘ Process closed while waiting for user input - resolving as timeout');
             userChoiceResolver('timeout');
             pendingMatchState = null;
           }
@@ -218,6 +344,8 @@ async function runComicTagger() {
           // For CBRs, if no explicit failure and we have a match, consider it successful
           const isSuccessful = decision === 'yes' || (!decision && code === 0 && (autoSelectedMatch || userSelectedChoice));
           
+          ctLog(`ⓘ Process finished with code ${code}. Decision: ${decision || 'none'}. Successful: ${isSuccessful}`);
+
           if (isSuccessful) {
             let matchToUse = autoSelectedMatch;
             if (userSelectedChoice) {
@@ -252,10 +380,10 @@ async function runComicTagger() {
               ctLog(`✓ SUCCESS → Moved to /yes/ folder: ${entry.name}`);
               hasChanges = true;
             } catch (err) {
-              ctLog(`✗ Failed to move file: ${err.message}`);
+              ctLog(`✗ Failed to move file to ${destDir}: ${err.message}`);
             }
           } else {
-            ctLog(`➜ KEPT (no changes): ${entry.name}`);
+            ctLog(`➜ KEPT in place (not a confirmed match): ${entry.name}`);
           }
           ctLog('');
           currentProcess = null;
@@ -292,27 +420,53 @@ function getPendingMatch() {
 
 function applyUserSelection(selections) {
   if (!currentProcess || !currentProcess.resolveUserChoice) {
+    ctLog('⚠ ERROR: No process waiting for user input when trying to apply selection');
     throw new Error('No process waiting for user input');
   }
 
-  // Send selection to ComicTagger stdin
-  const choice = selections[0] || '0'; // Take first selection or skip
-  currentProcess.stdin.write(`${choice}\n`);
-  currentProcess.resolveUserChoice(choice);
-
-  ctLog(`✓ Applied user selection: #${choice}`);
+  const choice = selections[0] || '0';
+  
+  try {
+    if (currentProcess.stdin.writable) {
+      ctLog(`ⓘ Sending selection #${choice} to ComicTagger and closing stdin...`);
+      // Using end() ensures the input is flushed and the stream is closed, 
+      // which some CLI tools prefer for single inputs.
+      currentProcess.stdin.end(`${choice}\n`);
+      ctLog(`✓ Selection #${choice} sent successfully`);
+      
+      // Resolve the internal promise
+      currentProcess.resolveUserChoice(choice);
+    } else {
+      ctLog('⚠ ERROR: ComicTagger stdin is not writable!');
+      currentProcess.resolveUserChoice('timeout');
+    }
+  } catch (err) {
+    ctLog(`✗ CRITICAL ERROR applying selection: ${err.message}`);
+    currentProcess.resolveUserChoice('timeout');
+  }
 }
 
 function skipCurrentMatch() {
   if (!currentProcess || !currentProcess.resolveUserChoice) {
+    ctLog('⚠ ERROR: No process waiting for user input when trying to skip');
     throw new Error('No process waiting for user input');
   }
 
-  // Send 's' to skip (ComicTagger expects 's' character)
-  currentProcess.stdin.write('s\n');
-  currentProcess.resolveUserChoice('skip');
-
-  ctLog('⊘ User skipped match');
+  try {
+    if (currentProcess.stdin.writable) {
+      ctLog(`ⓘ Sending skip command 's' to ComicTagger and closing stdin...`);
+      currentProcess.stdin.end('s\n');
+      ctLog(`✓ Skip command sent successfully`);
+      
+      currentProcess.resolveUserChoice('skip');
+    } else {
+      ctLog('⚠ ERROR: ComicTagger stdin is not writable for skip!');
+      currentProcess.resolveUserChoice('skip');
+    }
+  } catch (err) {
+    ctLog(`✗ CRITICAL ERROR applying skip: ${err.message}`);
+    currentProcess.resolveUserChoice('skip');
+  }
 }
 
 function scheduleCtRun() {

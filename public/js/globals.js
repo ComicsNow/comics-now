@@ -509,7 +509,6 @@ const ctMatchesBadge = document.getElementById('ct-matches-badge');
 let logInterval = null;
 let ctEventSource = null;
 let ctAwaitingMatches = false;
-let ctPollInterval = null;
 
 // --- STATE MANAGEMENT ---
 var library = {};

@@ -12,3 +12,4 @@ metadata
 data
 docs/plans/
 .github/workflows/docker-publish.yml
+.remember

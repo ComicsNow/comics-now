@@ -301,10 +301,26 @@ module.exports = function attach(router, deps) {
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Connection', 'keep-alive');
-    res.flushHeaders();
+    res.setHeader('X-Accel-Buffering', 'no'); // Prevent proxy buffering
+    
     registerMoveClient(res);
+
+    // Initial keep-alive
+    res.write(':ok\n\n');
+
+    if (typeof res.flushHeaders === 'function') {
+      res.flushHeaders();
+    }
+
+    // Send history
     getMoveLogs().forEach(entry => res.write(`data: ${JSON.stringify(entry)}\n\n`));
+    
+    const keepalive = setInterval(() => {
+      try { res.write(': keepalive\n\n'); } catch (_) {}
+    }, 15000);
+
     req.on('close', () => {
+      clearInterval(keepalive);
       unregisterMoveClient(res);
     });
   });

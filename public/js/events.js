@@ -202,10 +202,26 @@ ctSkipBtn.addEventListener('click', () => showCtConfirm('skip'));
 ctConfirmYes.addEventListener('click', handleCtConfirmYes);
 ctConfirmNo.addEventListener('click', handleCtConfirmNo);
 ctClearOutputBtn.addEventListener('click', () => { ctOutputDiv.innerHTML = ''; });
+document.getElementById('ct-grab-btn')?.addEventListener('click', function() {
+  const btn = this;
+  const icon = btn.querySelector('svg');
+  if (icon) icon.classList.add('animate-spin');
+  btn.classList.add('opacity-50', 'pointer-events-none');
+  
+  if (typeof fetchPendingMatchDetails === 'function') {
+    fetchPendingMatchDetails().finally(() => {
+      setTimeout(() => {
+        if (icon) icon.classList.remove('animate-spin');
+        btn.classList.remove('opacity-50', 'pointer-events-none');
+      }, 800);
+    });
+  }
+});
 ctRunBtn.addEventListener('click', async () => {
   await fetch(`${API_BASE_URL}/api/v1/comictagger/run`, { method: 'POST' });
 });
 ctTabSettings.addEventListener('click', () => {
+  if (ctTabSettings.classList.contains('active')) return;
   if (!window._isNavigatingFromRouter && window.router) {
     window.router.navigate('/comictagger', true);
   }
@@ -222,6 +238,7 @@ ctTabSettings.addEventListener('click', () => {
   if (typeof window.stopMoveStream === 'function') window.stopMoveStream();
 });
 ctTabMatches.addEventListener('click', () => {
+  if (ctTabMatches.classList.contains('active')) return;
   if (!window._isNavigatingFromRouter && window.router) {
     window.router.navigate('/comictagger/matches', true);
   }
@@ -240,6 +257,7 @@ ctTabMatches.addEventListener('click', () => {
   if (typeof window.stopMoveStream === 'function') window.stopMoveStream();
 });
 ctTabOutput.addEventListener('click', () => {
+  if (ctTabOutput.classList.contains('active')) return;
   if (!window._isNavigatingFromRouter && window.router) {
     window.router.navigate('/comictagger/output', true);
   }
@@ -256,6 +274,7 @@ ctTabOutput.addEventListener('click', () => {
   if (typeof window.stopMoveStream === 'function') window.stopMoveStream();
 });
 ctTabManagement.addEventListener('click', () => {
+  if (ctTabManagement.classList.contains('active')) return;
   if (!window._isNavigatingFromRouter && window.router) {
     window.router.navigate('/comictagger/management', true);
   }

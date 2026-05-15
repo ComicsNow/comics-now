@@ -77,7 +77,7 @@ const {
 } = require('./server/services/library');
 const { scheduleCtRun, runComicTagger, applyUserSelection, skipCurrentMatch, getPendingMatch } = require('./server/services/comictagger');
 const guidedReader = require('./server/services/guided-reader');
-const { saveMetadataToComic } = require('./server/services/metadata');
+const { saveMetadataToComic, getComicInfoFromArchive } = require('./server/services/metadata');
 const {
   cvFetchJson,
   normalizeCvId,
@@ -219,6 +219,7 @@ const apiRouter = createApiRouter({
   skipCurrentMatch,
   getPendingMatch,
   saveMetadataToComic,
+  getComicInfoFromArchive,
   cvFetchJson,
   normalizeCvId,
   stripHtml,

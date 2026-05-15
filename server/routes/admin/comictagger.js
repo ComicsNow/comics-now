@@ -40,14 +40,27 @@ module.exports = function attach(router, deps) {
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Connection', 'keep-alive');
-
+    res.setHeader('X-Accel-Buffering', 'no'); // Prevent proxy buffering
+    
+    // Register before flushing
     registerCtClient(res);
 
+    // Initial keep-alive to help establish connection through some proxies
+    res.write(':ok\n\n');
+
+    if (typeof res.flushHeaders === 'function') {
+      res.flushHeaders();
+    }
+
+    const keepalive = setInterval(() => {
+      try { res.write(': keepalive\n\n'); } catch (_) {}
+    }, 15000);
+
     req.on('close', () => {
+      clearInterval(keepalive);
       unregisterCtClient(res);
     });
   });
-
   router.get('/api/v1/comictagger/schedule', (req, res) => {
     res.json({ 
       minutes: getCtScheduleMinutes(),
@@ -110,7 +123,7 @@ module.exports = function attach(router, deps) {
     res.json(pending || { waitingForResponse: false });
   });
 
-  // Get detailed pending match info including first page as base64 data URI
+  // Get detailed pending match info
   router.get('/api/v1/comictagger/pending-details', async (req, res) => {
     try {
       const pending = getPendingMatch();
@@ -118,47 +131,63 @@ module.exports = function attach(router, deps) {
         return res.json({ waitingForResponse: false });
       }
 
-      // Get first page of the comic being tagged as base64 data URI
-      let firstPageUrl = null;
-      if (pending.filePath) {
-        try {
-          const pages = await getComicPages(pending.filePath);
-          if (pages && pages.length > 0) {
-            const firstPage = pages[0];
-            const { extractPageBuffer } = deps;
-            const imageBuffer = await extractPageBuffer(pending.filePath, firstPage);
-
-            if (imageBuffer) {
-              // Determine mime type from file extension
-              const mimeType = getMimeFromExt(firstPage);
-              const base64Image = imageBuffer.toString('base64');
-              firstPageUrl = `data:${mimeType};base64,${base64Image}`;
-
-              log('INFO', 'CT', `Generated base64 data URI for first page (${Math.round(base64Image.length / 1024)}KB)`);
-            }
-          }
-        } catch (error) {
-          log('ERROR', 'CT', `Failed to get first page: ${error.message}`);
-        }
-      }
-
       const response = {
         ...pending,
-        firstPageUrl,
+        firstPageUrl: null, // Removed to reduce JSON size
         matches: pending.matches || []
       };
 
-      log('INFO', 'CT', `Returning pending details: ${response.matches.length} match(es), waitingForResponse: ${response.waitingForResponse}`);
+      log('INFO', 'CT', `Returning pending details: ${response.matches.length} match(es)`);
 
-      // Prevent caching to ensure fresh data on external networks (Cloudflare)
+      // Prevent caching
       res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
-      res.set('Pragma', 'no-cache');
-      res.set('Expires', '0');
-
       res.json(response);
     } catch (error) {
       log('ERROR', 'CT', `Failed to get pending details: ${error.message}`);
       res.status(500).json({ error: 'Failed to get pending details' });
+    }
+  });
+
+  // Dedicated endpoint for the first page preview to avoid huge base64 payloads in JSON
+  router.get('/api/v1/comictagger/preview', async (req, res) => {
+    try {
+      const pending = getPendingMatch();
+      if (!pending) {
+        return res.status(404).end();
+      }
+
+      // Check for cached buffer
+      if (pending.previewBuffer && pending.previewMime) {
+        res.setHeader('Content-Type', pending.previewMime);
+        res.setHeader('Cache-Control', 'public, max-age=3600');
+        return res.send(pending.previewBuffer);
+      }
+
+      // Fallback if not yet cached or failed to cache
+      if (!pending.filePath || !fs.existsSync(pending.filePath)) {
+        return res.status(404).end();
+      }
+
+      const pages = await getComicPages(pending.filePath);
+      if (!pages || pages.length === 0) {
+        return res.status(404).end();
+      }
+
+      const firstPage = pages[0];
+      const { extractPageBuffer } = deps;
+      const imageBuffer = await extractPageBuffer(pending.filePath, firstPage);
+
+      if (!imageBuffer) {
+        return res.status(404).end();
+      }
+
+      const mimeType = getMimeFromExt(firstPage);
+      res.setHeader('Content-Type', mimeType);
+      res.setHeader('Cache-Control', 'public, max-age=3600');
+      res.send(imageBuffer);
+    } catch (error) {
+      log('ERROR', 'CT', `Failed to get preview image: ${error.message}`);
+      res.status(500).end();
     }
   });
 
@@ -210,21 +239,27 @@ module.exports = function attach(router, deps) {
         }
       };
 
-      // Use Promise.allSettled to ensure one failure doesn't break all matches
-      const results = await Promise.allSettled(
-        matches.map(match => fetchCoverWithTimeout(match))
-      );
+      // Enrich matches with ComicVine cover images sequentially to avoid hanging the Pi
+      const enrichedMatches = [];
+      const MAX_MATCHES_TO_ENRICH = 25; // Safety cap
+      const matchesToProcess = matches.slice(0, MAX_MATCHES_TO_ENRICH);
 
-      // Extract values from settled promises (all should be fulfilled since we catch errors)
-      const enrichedMatches = results.map((result, index) => {
-        if (result.status === 'fulfilled') {
-          return result.value;
-        } else {
-          // This should rarely happen since we catch errors in fetchCoverWithTimeout
-          log('ERROR', 'CT', `Unexpected rejection for match ${index}: ${result.reason}`);
-          return { ...matches[index], coverUrl: null };
+      for (const match of matchesToProcess) {
+        const result = await fetchCoverWithTimeout(match);
+        enrichedMatches.push(result);
+        
+        // Small delay between requests to be nice to ComicVine and the Pi CPU
+        if (matchesToProcess.length > 1) {
+          await new Promise(resolve => setTimeout(resolve, 200));
         }
-      });
+      }
+
+      // Add back any unenriched matches if we hit the cap
+      if (matches.length > MAX_MATCHES_TO_ENRICH) {
+        for (let i = MAX_MATCHES_TO_ENRICH; i < matches.length; i++) {
+          enrichedMatches.push({ ...matches[i], coverUrl: null });
+        }
+      }
 
       log('INFO', 'CT', `Successfully enriched ${enrichedMatches.length} match(es)`);
 
@@ -368,10 +403,26 @@ module.exports = function attach(router, deps) {
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Connection', 'keep-alive');
-    if (typeof res.flushHeaders === 'function') res.flushHeaders();
+    res.setHeader('X-Accel-Buffering', 'no'); // Prevent proxy buffering
+    
     registerRenameClient(res);
+
+    // Initial keep-alive
+    res.write(':ok\n\n');
+
+    if (typeof res.flushHeaders === 'function') {
+      res.flushHeaders();
+    }
+
+    // Send history
     getRenameLogs().forEach(entry => res.write(`data: ${JSON.stringify(entry)}\n\n`));
+    
+    const keepalive = setInterval(() => {
+      try { res.write(': keepalive\n\n'); } catch (_) {}
+    }, 15000);
+
     req.on('close', () => {
+      clearInterval(keepalive);
       unregisterRenameClient(res);
     });
   });

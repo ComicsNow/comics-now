@@ -139,13 +139,32 @@ async function loadCtSavedLogs() {
   }
 }
 
+let isCtModalInitializing = false;
+
 function openCTModal() {
+  // Guard against recursive calls from the router/tabs
+  if (isCtModalInitializing) return;
+  if (!ctModal.classList.contains('hidden')) {
+    // Modal is already open, just ensure settings/logs are fresh if needed
+    // but don't re-initialize the whole thing (breaks EventSource)
+    return;
+  }
+  
+  isCtModalInitializing = true;
+
   if (!window._isNavigatingFromRouter && window.router) {
     if (!getRelativePath().startsWith('/comictagger')) {
       window.router.navigate('/comictagger', true);
     }
   }
   ctModal.classList.remove('hidden');
+
+  // Clean up existing resources if they exist
+  if (ctEventSource) {
+    ctEventSource.close();
+    ctEventSource = null;
+  }
+
   fetchCtSettings();
   clearCtMatches();
   ctOutputDiv.innerHTML = ''; // Use innerHTML instead of textContent for formatted output
@@ -156,19 +175,31 @@ function openCTModal() {
   // Check for pending matches
   checkPendingMatch().then(() => {
     // If a match is pending, switch to the Matches tab automatically
+    // BUT only if we aren't already there
     const indicator = document.getElementById('ct-pending-indicator');
-    if (indicator && ctTabMatches) {
+    if (indicator && ctTabMatches && !ctTabMatches.classList.contains('active')) {
       ctTabMatches.click();
     }
+    isCtModalInitializing = false;
+  }).catch(() => {
+    isCtModalInitializing = false;
   });
 
-  // Fetch and display pending match details if available
-  // This ensures matches appear even if user opens modal hours after detection
-  fetchPendingMatchDetails();
-
   ctEventSource = new EventSource(`${API_BASE_URL}/api/v1/comictagger/stream`);
+  
+  ctEventSource.onopen = () => {
+    console.log('[CT] SSE stream connected successfully');
+  };
+
+  ctEventSource.onerror = (err) => {
+    console.error('[CT] SSE stream error:', err);
+    // Browser will auto-reconnect, but we should log it
+  };
+
   ctEventSource.onmessage = (e) => {
     try {
+      if (e.data === ':ok' || e.data === ': keepalive') return;
+      
       const data = JSON.parse(e.data);
       const msg = data.message;
 
@@ -177,50 +208,113 @@ function openCTModal() {
       ctOutputDiv.appendChild(logLine);
       ctOutputDiv.scrollTop = ctOutputDiv.scrollHeight;
 
-      if (/Single low-confidence match:/i.test(msg) || /Multiple matches found/i.test(msg)) {
+      if (/low-confidence match/i.test(msg) || /matches found/i.test(msg) || /Multiple.*matches/i.test(msg) || /Archives with/i.test(msg)) {
         ctAwaitingMatches = true;
-        clearCtMatches();
-        tempMatches = []; // Reset temp matches
+        tempMatches = []; 
       } else if (ctAwaitingMatches) {
-        if (/^Choose a match/i.test(msg) || /^\s*Enter selection/i.test(msg)) {
+        if (/Choose a match/i.test(msg) || /Enter selection/i.test(msg)) {
+          console.log('[CT] Match prompt detected in stream');
           ctAwaitingMatches = false;
-          // Fetch and render matches with images
-          fetchPendingMatchDetails();
+          checkPendingMatch();
+          
+          if (ctTabMatches && ctTabMatches.classList.contains('active')) {
+            debouncedFetchPendingMatchDetails();
+          }
         } else {
           const parsed = parseCtSuggestion(msg);
           if (parsed) {
             tempMatches.push(parsed);
           }
         }
-      } else if (/^Choose a match/i.test(msg)) {
-        // If we see "Choose a match" prompt when not awaiting, it's a new file
-        // This happens after user skipped/applied the previous file
-        ctAwaitingMatches = false;
-        clearCtMatches();
-        tempMatches = [];
       }
-    } catch {}
-  };
-
-  // Auto-refresh pending matches every 2 seconds while modal is open
-  // This ensures matches appear immediately even if modal was opened before detection
-  ctPollInterval = setInterval(async () => {
-    if (ctModal.classList.contains('hidden')) {
-      clearInterval(ctPollInterval);
-      ctPollInterval = null;
-      return;
+    } catch (err) {
+      // Ignore parse errors for heartbeats
     }
-    await fetchPendingMatchDetails();
-  }, 2000);
+  };
 }
 
+/**
+ * Fetch a single match cover on demand
+ */
+window.fetchSingleMatchCover = async (matchChoice, btn) => {
+  if (!matchChoice || !btn) return;
+  
+  const originalHtml = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = `
+    <svg class="animate-spin h-6 w-6 text-purple-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+      <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+      <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+    </svg>
+  `;
+
+  try {
+    const matchObj = {
+      choice: matchChoice,
+      title: btn.dataset.title,
+      year: btn.dataset.year,
+      issue: btn.dataset.issue,
+      publisher: btn.dataset.publisher
+    };
+
+    const res = await fetch(`${API_BASE_URL}/api/v1/comictagger/match-covers`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ matches: [matchObj] })
+    });
+
+    if (!res.ok) throw new Error('Failed to fetch cover');
+    
+    const data = await res.json();
+    const coverUrl = data.matches && data.matches[0] ? data.matches[0].coverUrl : null;
+
+    const container = btn.closest('.ct-cover-container');
+    if (coverUrl) {
+      container.innerHTML = `
+        <img src="${escapeHtml(coverUrl)}"
+             alt="Cover"
+             class="w-full h-auto rounded border border-purple-500/30 shadow-lg group-hover:border-purple-500 transition-colors"
+             loading="lazy">
+      `;
+    } else {
+      container.innerHTML = `
+        <div class="w-full h-32 rounded border border-gray-700 bg-gray-900 flex items-center justify-center text-[10px] text-gray-600 uppercase tracking-tighter text-center px-1">No Cover Found</div>
+      `;
+    }
+  } catch (error) {
+    console.error('[CT] Error fetching single cover:', error);
+    btn.disabled = false;
+    btn.innerHTML = originalHtml;
+    
+    // Add a small error indicator
+    if (!btn.querySelector('.ct-retry-text')) {
+      const errSpan = document.createElement('span');
+      errSpan.className = 'ct-retry-text text-[8px] text-red-500 absolute bottom-1';
+      errSpan.textContent = 'Retry';
+      btn.appendChild(errSpan);
+    }
+  }
+};
+
 function clearCtMatches() {
+  console.log('[CT] Clearing matches UI');
   ctMatchBody.innerHTML = '';
+  const previewContainer = document.getElementById('ct-preview-container');
+  if (previewContainer) {
+    previewContainer.innerHTML = '';
+    previewContainer.classList.add('hidden');
+  }
+  
   const noMatchesDiv = document.getElementById('ct-no-matches');
   const matchTable = document.getElementById('ct-match-table');
-  if (noMatchesDiv) noMatchesDiv.classList.remove('hidden');
+  if (noMatchesDiv) {
+    noMatchesDiv.innerHTML = 'No matches to select. Matches will appear here when ComicTagger finds multiple options.';
+    noMatchesDiv.classList.remove('hidden');
+  }
   if (matchTable) matchTable.classList.add('hidden');
   if (ctMatchesBadge) ctMatchesBadge.classList.add('hidden');
+  lastRenderedMatchesHash = null; // Reset hash so fetchPendingMatchDetails will re-render
+  lastRenderedFileName = null;
 }
 
 function closeCTModal() {
@@ -229,10 +323,6 @@ function closeCTModal() {
   if (ctEventSource) {
     ctEventSource.close();
     ctEventSource = null;
-  }
-  if (ctPollInterval) {
-    clearInterval(ctPollInterval);
-    ctPollInterval = null;
   }
   // Reset hash so fresh matches render on next modal open
   lastRenderedMatchesHash = null;
@@ -260,40 +350,66 @@ async function fetchCtSettings() {
 }
 
 function parseCtSuggestion(line) {
-  // Format: "1. Jimmy's Bastards (2017) #1 [Aftershock Comics] (6/2017) - Get Daddy"
-  // Pattern: number. title #issue [publisher] (date) - subtitle
-  const regex = /^\s*(\d+)\.\s+(.+?)\s+#(\d+)\s+\[([^\]]+)\]\s+\(([^)]+)\)\s*-?\s*(.*)$/;
-  const m = line.match(regex);
-  if (!m) return null;
+  try {
+    // Remove ALL leading symbols, including dots, arrows, checkmarks, etc.
+    const cleaned = line.replace(/^[^\w\d]*(\d+\.)/, '$1').trim();
+    
+    // Pattern: 1. Title (YEAR) #issue [Publisher] (date) - Subtitle
+    const match = cleaned.match(/^(\d+)\.\s+(.+?)(?:\s+\((\d{4})\))?(?:\s+(?:#)?(\d+[\w\d]*)?)?(?:\s+\[([^\]]+)\])?(?:\s+(.+))?$/);
+    
+    if (match) {
+      return {
+        choice: match[1],
+        title: match[2].trim(),
+        year: match[3] || '',
+        issue: match[4] || '?',
+        publisher: match[5] ? match[5].trim() : 'Unknown',
+        extra: match[6] ? match[6].trim() : ''
+      };
+    }
 
-  // Extract year from title if it contains (YYYY)
-  const titleWithYear = m[2];
-  const yearMatch = titleWithYear.match(/\((\d{4})\)/);
-  const year = yearMatch ? yearMatch[1] : '';
-  const title = titleWithYear.replace(/\s*\(\d{4}\)\s*/, '').trim();
-
-  return {
-    choice: m[1],
-    title: title,
-    year: year,
-    number: m[3],
-    publisher: m[4],
-    confidence: m[6] || ''
-  };
+    // Ultra-fallback
+    const fallback = cleaned.match(/^(\d+)\.\s+(.+)$/);
+    if (fallback) {
+      return {
+        choice: fallback[1],
+        title: fallback[2].trim(),
+        year: '',
+        issue: '?',
+        publisher: 'Unknown',
+        extra: ''
+      };
+    }
+    return null;
+  } catch (e) {
+    return null;
+  }
 }
 
 // Store temporarily collected matches
 let tempMatches = [];
 let lastRenderedMatchesHash = null;
+let lastRenderedFileName = null;
+let isFetchingCtDetails = false;
+let ctFetchDebounceTimer = null;
+
+function debouncedFetchPendingMatchDetails() {
+  if (ctFetchDebounceTimer) clearTimeout(ctFetchDebounceTimer);
+  ctFetchDebounceTimer = setTimeout(() => {
+    fetchPendingMatchDetails();
+  }, 500);
+}
 
 /**
  * Fetch pending match details including images and render UI
+ * @param {boolean} isManual - If true, ignore "isFinal" check and render immediately
  */
-async function fetchPendingMatchDetails() {
-  try {
+async function fetchPendingMatchDetails(isManual = false) {
+  if (isFetchingCtDetails && !isManual) return;
+  isFetchingCtDetails = true;
 
-    // Get pending match details including first page URL
-    // Add cache-busting query parameter to prevent Cloudflare caching
+  try {
+    // Get pending match details
     const detailsRes = await fetch(`${API_BASE_URL}/api/v1/comictagger/pending-details?_t=${Date.now()}`);
     if (!detailsRes.ok) {
       throw new Error(`Failed to fetch pending details: ${detailsRes.status}`);
@@ -301,149 +417,162 @@ async function fetchPendingMatchDetails() {
     const details = await detailsRes.json();
 
     if (!details.waitingForResponse) {
+      console.log('[CT] No process waiting for response');
       return;
     }
 
-    const firstPageUrl = details.firstPageUrl;
+    const matchesToRender = details.matches || [];
 
-    // Use matches from backend if available, otherwise use temp collected matches
-    const matchesToEnrich = details.matches && details.matches.length > 0
-      ? details.matches
-      : tempMatches;
+    // If no matches yet, just show the preview
+    if (matchesToRender.length === 0) {
+      console.log('[CT] Backend returned 0 matches for:', details.fileName);
+      if (details.fileName && details.fileName !== lastRenderedFileName) {
+        clearCtMatches();
+        const previewUrl = `${API_BASE_URL}/api/v1/comictagger/preview?_t=${Date.now()}`;
+        renderComicPreview(previewUrl, details.fileName);
+        lastRenderedFileName = details.fileName;
+      }
+      isFetchingCtDetails = false;
+      return;
+    }
 
+    // POLICY: Render if isFinal OR if user clicked manually OR if we are on the output tab (watching progress)
+    const shouldRender = details.isFinal || isManual || (matchesToRender.length > 0 && matchesToRender.length !== (JSON.parse(lastRenderedMatchesHash || '{}').count || 0));
 
-    if (matchesToEnrich.length === 0) {
+    if (!shouldRender) {
+      console.log('[CT] Matches available but not final yet, skipping auto-render to prevent flicker');
+      isFetchingCtDetails = false;
       return;
     }
 
     // Create hash of current matches to detect changes
-    const currentHash = JSON.stringify(matchesToEnrich.map(m => `${m.choice}|${m.title}|${m.issue}`));
+    const currentHash = JSON.stringify({
+      file: details.fileName,
+      count: matchesToRender.length,
+      matches: matchesToRender.map(m => `${m.choice}|${m.title}|${m.issue || m.number}`)
+    });
 
-    // If matches haven't changed, don't re-render (preserves radio selection)
-    if (currentHash === lastRenderedMatchesHash) {
+    // LATCH: If we are already displaying matches for this EXACT state, EXIT IMMEDIATELY.
+    if (currentHash === lastRenderedMatchesHash && ctMatchBody.children.length > 0) {
+      console.log('[CT] Matches already rendered and unchanged');
+      isFetchingCtDetails = false;
       return;
     }
 
-    // Show notification badge if not on the matches tab
-    if (ctMatchesBadge && !ctTabMatches.classList.contains('active')) {
-      ctMatchesBadge.classList.remove('hidden');
+    // NEW SAFETY: If we already have matches showing for THIS file, never clear or re-render
+    // unless the content (the hash) has actually changed.
+    if (details.fileName === lastRenderedFileName && ctMatchBody.children.length > 0 && !isManual && currentHash === lastRenderedMatchesHash) {
+       isFetchingCtDetails = false;
+       return;
     }
 
-    try {
-      // Enrich matches with ComicVine cover images
-      // Add cache-busting query parameter to prevent Cloudflare caching
-      const coversRes = await fetch(`${API_BASE_URL}/api/v1/comictagger/match-covers?_t=${Date.now()}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ matches: matchesToEnrich })
-      });
+    console.log('[CT] Rendering matches for:', details.fileName, `(Count: ${matchesToRender.length}, Final: ${details.isFinal})`);
 
-      if (!coversRes.ok) {
-        throw new Error(`Cover fetch failed: ${coversRes.status}`);
-      }
-
-      const { matches: enrichedMatches } = await coversRes.json();
-
-      if (!Array.isArray(enrichedMatches) || enrichedMatches.length === 0) {
-        throw new Error('No enriched matches returned');
-      }
-
-      // Clear and render each match with images
+    // ATOMIC RENDERING: Only clear and re-render preview if filename changed. 
+    if (details.fileName !== lastRenderedFileName) {
       clearCtMatches();
-      enrichedMatches.forEach(match => {
-        renderCtMatch(match, firstPageUrl);
-      });
-
-      // Update hash after successful render
-      lastRenderedMatchesHash = currentHash;
-
-    } catch (coverError) {
-      // Fallback: render matches without cover images if enrichment fails
-      clearCtMatches();
-      matchesToEnrich.forEach(match => {
-        renderCtMatch({ ...match, coverUrl: null }, firstPageUrl);
-      });
-
-      // Update hash after fallback render
-      lastRenderedMatchesHash = currentHash;
-
+      const previewUrl = `${API_BASE_URL}/api/v1/comictagger/preview?_t=${Date.now()}`;
+      renderComicPreview(previewUrl, details.fileName);
+      lastRenderedFileName = details.fileName;
     }
 
-    // Clear temp matches
-    tempMatches = [];
+    // Build Match List in memory
+    let matchHtml = '';
+    matchesToRender.forEach(match => {
+      matchHtml += getCtMatchHtml(match);
+    });
+
+    // Update DOM once
+    const noMatchesDiv = document.getElementById('ct-no-matches');
+    const matchTable = document.getElementById('ct-match-table');
+    if (noMatchesDiv) noMatchesDiv.classList.add('hidden');
+    if (matchTable) matchTable.classList.remove('hidden');
+    
+    ctMatchBody.innerHTML = matchHtml;
+    lastRenderedMatchesHash = currentHash;
+    tempMatches = []; 
 
   } catch (error) {
     console.error('[CT] Fatal error fetching match details:', error);
-
-    // Last resort fallback: try to render tempMatches if we have them
-    if (tempMatches.length > 0) {
-      clearCtMatches();
-      tempMatches.forEach(match => renderCtMatch(match, null));
-      tempMatches = [];
-    } else {
-      console.error('[CT] No matches available to render!');
-    }
+  } finally {
+    isFetchingCtDetails = false;
   }
 }
 
-function renderCtMatch(match, comicFirstPageUrl) {
-  // Show the table and hide the "no matches" message
-  const noMatchesDiv = document.getElementById('ct-no-matches');
-  const matchTable = document.getElementById('ct-match-table');
-  if (noMatchesDiv) noMatchesDiv.classList.add('hidden');
-  if (matchTable) matchTable.classList.remove('hidden');
+function getCtMatchHtml(match) {
+  return `
+      <tr class="border-b border-gray-700 hover:bg-gray-800 transition-colors duration-150 cursor-pointer" 
+          onclick="if (!event.target.closest('button') && !event.target.closest('a')) { const radio = this.querySelector('input[type=\'radio\']'); if (radio) radio.checked = true; }">
+      <td class="px-4 py-4 align-top w-12">
+        <div class="flex items-center justify-center h-full pt-1">
+          <input type="radio"
+                 name="ct-match-choice"
+                 class="ct-match-select w-6 h-6 cursor-pointer accent-purple-500"
+                 data-choice="${escapeHtml(match.choice)}"
+                 id="match-${escapeHtml(match.choice)}">
+        </div>
+      </td>
+      <td class="py-4 pr-4">
+        <div class="flex space-x-4 group">
+          <div class="flex-shrink-0 w-24 ct-cover-container" id="ct-cover-container-${escapeHtml(match.choice)}">
+            ${match.coverUrl
+              ? `<img src="${escapeHtml(match.coverUrl)}"
+                     alt="Cover"
+                     class="w-full h-auto rounded border border-purple-500/30 shadow-lg group-hover:border-purple-500 transition-colors"
+                     loading="lazy">`
+              : `<button type="button" 
+                         onclick="window.fetchSingleMatchCover('${escapeHtml(match.choice)}', this); event.stopPropagation();"
+                         data-title="${escapeHtml(match.title)}"
+                         data-year="${escapeHtml(match.year)}"
+                         data-issue="${escapeHtml(match.issue || match.number)}"
+                         data-publisher="${escapeHtml(match.publisher)}"
+                         class="w-full h-32 rounded border border-purple-500/30 bg-purple-900/20 hover:bg-purple-900/40 flex flex-col items-center justify-center transition-all group/btn relative">
+                  <svg class="w-8 h-8 text-purple-400 mb-2 group-hover/btn:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                  </svg>
+                  <span class="text-[10px] text-purple-300 font-bold uppercase tracking-tight">Load Cover</span>
+                </button>`
+            }
+          </div>
+          <label for="match-${escapeHtml(match.choice)}" class="flex-1 min-w-0 cursor-pointer">
+            <div class="font-bold text-white text-lg truncate mb-1 group-hover:text-purple-300 transition-colors">
+              ${escapeHtml(match.choice)}. ${escapeHtml(match.title)} ${match.year ? `(${escapeHtml(match.year)})` : ''}
+            </div>
+            <div class="text-sm text-gray-300 space-y-0.5">
+              <div class="flex items-center"><span class="text-gray-500 w-20 flex-shrink-0">Issue:</span> <span class="font-medium">#${escapeHtml(match.issue || match.number || '?')}</span></div>
+              <div class="flex items-center"><span class="text-gray-500 w-20 flex-shrink-0">Publisher:</span> <span class="font-medium">${escapeHtml(match.publisher)}</span></div>
+              ${match.extra ? `<div class="italic text-gray-400 mt-1 border-l-2 border-gray-700 pl-2">"${escapeHtml(match.extra)}"</div>` : ''}
+            </div>
+          </label>
+        </div>
+      </td>
+      </tr>`;
+}
 
-  // Build image comparison section
-  const imageComparisonHtml = `
-    <div class="flex items-center space-x-4 mb-3">
-      <div class="flex-1 text-center">
-        <div class="text-xs text-gray-400 mb-1">Your Comic</div>
-        ${comicFirstPageUrl
-          ? `<img src="${escapeHtml(comicFirstPageUrl)}"
-                 alt="Comic page"
-                 class="w-full max-w-[150px] h-auto mx-auto rounded border-2 border-gray-600 object-cover"
-                 loading="lazy">`
-          : `<div class="w-full max-w-[150px] h-48 mx-auto rounded border-2 border-gray-600 bg-gray-800 flex items-center justify-center text-xs text-gray-500">No preview</div>`
+function renderComicPreview(url, fileName) {
+  const previewContainer = document.getElementById('ct-preview-container');
+  if (!previewContainer) return;
+
+  previewContainer.innerHTML = `
+    <div class="bg-gray-800/50 rounded-xl p-4 mb-6 border border-gray-700 flex flex-col md:flex-row items-center md:items-start space-y-4 md:space-y-0 md:space-x-6">
+      <div class="flex-shrink-0">
+        ${url 
+          ? `<img src="${escapeHtml(url)}" class="w-48 h-auto rounded-lg shadow-2xl border-2 border-gray-600 object-cover" alt="Comic Preview">`
+          : `<div class="w-48 h-72 rounded-lg bg-gray-900 flex items-center justify-center border-2 border-dashed border-gray-700 text-gray-500 italic text-sm text-center px-4">Preview unavailable for this file</div>`
         }
       </div>
-      <div class="text-2xl text-gray-500">⟷</div>
-      <div class="flex-1 text-center">
-        <div class="text-xs text-gray-400 mb-1">ComicVine Match</div>
-        ${match.coverUrl
-          ? `<img src="${escapeHtml(match.coverUrl)}"
-                 alt="ComicVine cover"
-                 class="w-full max-w-[150px] h-auto mx-auto rounded border-2 border-purple-500 object-cover"
-                 loading="lazy">`
-          : `<div class="w-full max-w-[150px] h-48 mx-auto rounded border-2 border-gray-600 bg-gray-800 flex items-center justify-center text-xs text-gray-500">No cover</div>`
-        }
+      <div class="flex-1 min-w-0 text-center md:text-left">
+        <h3 class="text-xs font-bold text-gray-500 uppercase tracking-widest mb-1">Currently Processing</h3>
+        <div class="text-xl font-bold text-white break-all mb-4">${escapeHtml(fileName)}</div>
+        
+        <div class="inline-flex items-center px-3 py-1 rounded-full bg-blue-900/30 text-blue-400 text-xs font-medium border border-blue-800/50">
+          <svg class="w-3 h-3 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+          Select the correct match from the options below
+        </div>
       </div>
     </div>
   `;
-
-  const tr = document.createElement('tr');
-  tr.className = 'border-b border-gray-700 hover:bg-gray-800';
-  tr.innerHTML = `
-      <td class="pr-3 py-2 align-top">
-        <input type="radio"
-               name="ct-match-choice"
-               class="ct-match-select w-5 h-5 cursor-pointer"
-               data-choice="${escapeHtml(match.choice)}"
-               id="match-${escapeHtml(match.choice)}">
-      </td>
-      <td class="py-2">
-        <label for="match-${escapeHtml(match.choice)}" class="cursor-pointer block">
-          <div class="font-semibold text-white text-lg mb-2">
-            ${escapeHtml(match.choice)}. ${escapeHtml(match.title)} ${match.year ? `(${escapeHtml(match.year)})` : ''}
-          </div>
-          ${imageComparisonHtml}
-          <div class="text-sm text-gray-300 space-y-1">
-            <div><span class="text-gray-400">Issue:</span> #${escapeHtml(match.issue || match.number)}</div>
-            <div><span class="text-gray-400">Publisher:</span> ${escapeHtml(match.publisher)}</div>
-            ${match.subtitle ? `<div><span class="text-gray-400">Subtitle:</span> ${escapeHtml(match.subtitle)}</div>` : ''}
-          </div>
-        </label>
-      </td>`;
-  ctMatchBody.appendChild(tr);
+  previewContainer.classList.remove('hidden');
 }
 
 async function saveCtSettings() {
@@ -506,8 +635,12 @@ function handleCtConfirmNo() {
   ctConfirmBar.classList.add('hidden');
 }
 
+let isUpdatingCtIndicator = false;
+
 // Periodically check for pending matches and update CT button indicator
 async function updateCtButtonIndicator() {
+  if (isUpdatingCtIndicator) return;
+  isUpdatingCtIndicator = true;
   try {
     const res = await fetch(`${API_BASE_URL}/api/v1/comictagger/pending`);
 
@@ -537,6 +670,8 @@ async function updateCtButtonIndicator() {
     }
   } catch (error) {
     
+  } finally {
+    isUpdatingCtIndicator = false;
   }
 }
 
@@ -545,4 +680,14 @@ if (typeof window !== 'undefined') {
   setInterval(updateCtButtonIndicator, 10000);
   // Initial check on page load
   setTimeout(updateCtButtonIndicator, 2000);
+}
+
+// Hook Fetch to Tab Click
+if (typeof ctTabMatches !== 'undefined' && ctTabMatches) {
+  ctTabMatches.addEventListener('click', () => {
+    // Small delay to let the tab UI switch happen first
+    setTimeout(() => {
+      fetchPendingMatchDetails();
+    }, 50);
+  });
 }
