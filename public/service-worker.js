@@ -3,7 +3,7 @@
 
 const SCOPE_URL = new URL(self.registration.scope);
 const BASE_PATH = SCOPE_URL.pathname;
-const CACHE_VERSION = 'v7.2';
+const CACHE_VERSION = 'v7.4';
 const CACHE_NAME = `comics-now-${CACHE_VERSION}-${BASE_PATH}`;
 const DOWNLOADS_CACHE_NAME = 'comics-now-downloads';
 
@@ -39,7 +39,20 @@ const ASSET_PATHS = [
   'js/viewer/navigation.js',
   'js/viewer/ui.js',
   'js/viewer/end-navigation.js',
-  'js/viewer/guided.js',
+  'js/viewer/guided/data.js',
+  'js/viewer/guided/geometry.js',
+  'js/viewer/guided/overlay.js',
+  'js/viewer/guided/mode-registry.js',
+  'js/viewer/guided/modes/guided.js',
+  'js/viewer/guided/modes/bubble.js',
+  'js/viewer/guided/modes/western-speech-zoom.js',
+  'js/viewer/guided/modes/manga-panel-zoom.js',
+  'js/viewer/guided/modes/manga-speech-zoom.js',
+  'js/viewer/guided/pan.js',
+  'js/viewer/guided/input.js',
+  'js/viewer/guided/lifecycle.js',
+  'js/viewer/guided/buttons.js',
+  'js/viewer/guided/index.js',
   'js/settings.js',
   'js/guided-reader.js',
   'js/comictagger.js',

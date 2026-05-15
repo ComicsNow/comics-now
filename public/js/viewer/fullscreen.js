@@ -227,6 +227,9 @@
   }
 
   async function closeFullscreen() {
+    if (global.GuidedView && typeof global.GuidedView.disableAll === 'function') {
+      global.GuidedView.disableAll();
+    }
     hideFullscreenControls();
     const viewer = global.fullscreenViewer;
     const image = global.fullscreenImage;

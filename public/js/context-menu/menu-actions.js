@@ -234,28 +234,6 @@
       menu.appendChild(continuousModeItem);
     }
 
-    // 5. Guided View/Bubble Zoom toggle (single comic) — available if guided view JSON ready.
-    if (comic.guidedViewStatus === 'completed') {
-      const isManga = comic.mangaMode === true;
-      const activeModeName = global.GuidedView?.getActiveModeName?.();
-      const isGuidedActive = isManga ? (activeModeName === 'guided') : (activeModeName === 'bubble');
-      const label = isManga ? 'Guided View' : 'Bubble Zoom';
-      const guidedItem = document.createElement('div');
-      guidedItem.className = 'comic-context-menu-item' + (isGuidedActive ? ' text-blue-400' : '');
-      guidedItem.innerHTML = `${isGuidedActive ? ICONS.CHECKMARK : ICONS.BOOK}<span>${isGuidedActive ? 'Disable' : 'Enable'} ${label}</span>`;
-      guidedItem.addEventListener('click', async (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        closeContextMenu();
-        
-        if (global.GuidedView) {
-          if (isManga) await global.GuidedView.toggle();
-          else await global.GuidedView.toggleBubble();
-        }
-      });
-      menu.appendChild(guidedItem);
-    }
-
     // 5b. Run Guided Detection (single comic).
     //     Available for any comic; relabels if already processed.
     if (isEligibleComic(comic)) {
