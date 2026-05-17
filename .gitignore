@@ -14,3 +14,6 @@ models/western/
 data/
 docs/plans/
 .remember/
+CODE_REVIEW.md
+verify_migration.js
+plans/
