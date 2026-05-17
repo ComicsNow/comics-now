@@ -65,6 +65,22 @@ Bulk updates the status of all comics in a series.
 
 ---
 
+## Devices
+
+### `POST /device/register`
+Registers a new device for the user.
+
+### `GET /devices`
+Returns a list of all devices registered to the current user.
+
+### `DELETE /devices/:deviceId`
+Removes a registered device.
+
+### `GET /sync/devices/:comicId`
+Fetches synchronization info for all devices for a specific comic.
+
+---
+
 ## Reading Preferences
 
 Per-user and per-comic reading mode toggles. Note: Guided navigation preferences (Guided Mode, Bubble Mode, Hot Zoom) are handled client-side via Local Storage and no longer have server-side endpoints.
@@ -85,6 +101,10 @@ Per-user and per-comic reading mode toggles. Note: Guided navigation preferences
 - **POST `/comics/set-all-continuous-mode`**: Wipes per-comic overrides and sets the default for the entire library.
   - **Body:** `{ continuousMode }` (boolean)
 
+### Global Library Preferences
+- **GET `/user/library-preferences`**: Returns the user's global library preferences.
+- **POST `/user/library-preferences`**: Updates the user's global library preferences.
+
 ---
 
 ## Reading Lists
@@ -96,8 +116,18 @@ Returns all reading lists for the current user with progress statistics.
 **Body:** `{ name, description, comicIds? }`
 Creates a new reading list.
 
+### `PUT /reading-lists/reorder`
+**Body:** `{ listOrder }` (Array of list IDs)
+Updates the global ordering of all reading lists.
+
 ### `GET /reading-lists/:id`
 Returns detailed information and all comic items for a specific list.
+
+### `PUT /reading-lists/:id`
+Updates the name and description of a reading list.
+
+### `DELETE /reading-lists/:id`
+Deletes a reading list.
 
 ### `POST /reading-lists/:id/comics`
 **Body:** `{ comicIds }`
@@ -109,7 +139,10 @@ Removes comics from a reading list.
 
 ### `PUT /reading-lists/:id/reorder`
 **Body:** `{ comicOrder }` (Array of comic IDs)
-Updates the reading order within a list.
+Updates the reading order within a specific list.
+
+### `POST /reading-lists/:id/mark-read`
+Marks all comics within the specific reading list as read.
 
 ### `POST /reading-lists/export` / `POST /reading-lists/import`
 Handles JSON-based export/import of reading list definitions.
@@ -144,15 +177,28 @@ Fetches detailed metadata and creator credits for a specific ComicVine resource.
 - **GET `/admin/libraries`**: List root library folders.
 - **POST `/admin/libraries`**: Add a new root library folder.
 - **DELETE `/admin/libraries`**: Remove a root library folder.
+- **GET `/comics-directories`**: Lists accessible local directories.
+- **POST `/rename-cbz`**: Renames a single comic archive.
+- **GET `/rename/stream`**: SSE stream for rename operations.
+- **POST `/move-comics`**: Bulk moves or restructures comics.
+- **GET `/move/stream`**: SSE stream for move operations.
+- **POST `/admin/metadata/migrate`**: Migrates metadata between formats/storage.
 
 ### Automation (ComicTagger & ML)
 - **POST `/comictagger/run`**: Starts the automated metadata tagging process.
+- **GET `/comictagger/schedule`**: Returns current automation schedule.
+- **POST `/comictagger/schedule`**: Updates the automation schedule.
 - **GET `/comictagger/pending`**: Returns the current match awaiting manual review.
+- **GET `/comictagger/preview`**: Returns preview data for tagging.
 - **POST `/comictagger/apply`**: Applies a selected metadata match to a comic.
+- **POST `/comictagger/skip`**: Skips the current pending match.
+- **POST `/comictagger/match-covers`**: Initiates cover matching process.
 - **POST `/guided/run`**: Starts the machine learning scan for panel detection.
+- **POST `/guided/run-scope`**: Starts ML scan restricted to specific items.
 - **GET `/guided/status`**: Returns the status of the Guided Reader background worker.
 
 ### System
+- **GET `/settings`**: Retrieves global server settings.
 - **POST `/settings`**: Updates global settings (ComicVine API key, scan interval).
 - **GET `/logs`**: Returns system event logs.
 - **GET `/comictagger/stream`** / **GET `/guided/stream`**: Server-Sent Events (SSE) streams for real-time operation logs.
