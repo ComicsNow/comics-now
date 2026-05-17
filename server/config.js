@@ -18,6 +18,30 @@ const DEFAULT_CONFIG = {
 
 let config = { ...DEFAULT_CONFIG };
 
+function applyEnvOverrides() {
+  if (process.env.PORT) config.port = parseInt(process.env.PORT, 10);
+  if (process.env.BASE_URL) config.baseUrl = process.env.BASE_URL;
+  if (process.env.COMICTAGGER_PATH) config.comictaggerPath = process.env.COMICTAGGER_PATH;
+  if (process.env.COMICS_LOCATION) config.comicsLocation = process.env.COMICS_LOCATION;
+  if (process.env.SCAN_INTERVAL_MINUTES) config.scanIntervalMinutes = parseInt(process.env.SCAN_INTERVAL_MINUTES, 10);
+  if (process.env.COMICVINE_API_KEY) config.comicVineApiKey = process.env.COMICVINE_API_KEY;
+  if (process.env.CT_SCHEDULE_MINUTES) config.ctScheduleMinutes = parseInt(process.env.CT_SCHEDULE_MINUTES, 10);
+  if (process.env.ALLOWED_FORMATS) config.allowed_formats = process.env.ALLOWED_FORMATS;
+  if (process.env.METADATA_STORAGE) config.metadata_storage = process.env.METADATA_STORAGE;
+
+  if (process.env.CORS_ENABLED) {
+    if (!config.cors) config.cors = {};
+    config.cors.enabled = process.env.CORS_ENABLED === 'true';
+  }
+  if (process.env.CORS_ALLOWED_ORIGINS) {
+    if (!config.cors) config.cors = {};
+    config.cors.allowedOrigins = process.env.CORS_ALLOWED_ORIGINS.split(',').map(s => s.trim());
+  }
+}
+
+// Initial apply
+applyEnvOverrides();
+
 function normalizeDirectory(dir) {
   if (typeof dir !== 'string') return null;
   const trimmed = dir.trim();
@@ -145,9 +169,12 @@ function loadConfigFromDisk() {
     // Sanitize libraries
     config.libraries = sanitizeDirectories(config.libraries);
 
-  } catch (e) {
+    // Apply env overrides over disk config
+    applyEnvOverrides();
+    } catch (e) {
     log('ERROR', 'SERVER', `Bad config.json; using defaults. ${e.message}`);
     config = { ...DEFAULT_CONFIG };
+    applyEnvOverrides();
   }
 
   // Fallback to comicsLocation if no libraries configured

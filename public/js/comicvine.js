@@ -15,6 +15,14 @@ const cvPageInfo  = document.getElementById('cv-page-info');
 
 // Performs the search and renders paged results with ISSUE/VOLUME badge + publisher + cover preview
 async function performCvSearch() {
+  // Disable search for local/device comics
+  const comic = window.currentComic;
+  const isLocal = comic && (comic.handle || comic.file || (comic.id && String(comic.id).startsWith('device-')));
+  if (isLocal) {
+    searchStatusDiv.textContent = 'ComicVine search is only available for library comics.';
+    return;
+  }
+
   const query     = cvState.lastQuery;
   const resources = cvState.lastResources || 'volume';
   const sort      = cvState.lastSort || '';
@@ -191,6 +199,11 @@ cvNextBtn?.addEventListener('click', async () => {
 });
 
 async function applyMetadataFromSearch(volumeId) {
+  // Disable for local/device comics
+  const comic = window.currentComic;
+  const isLocal = comic && (comic.handle || comic.file || (comic.id && String(comic.id).startsWith('device-')));
+  if (isLocal) return;
+
   const prevStatus = searchStatusDiv.textContent;
   searchStatusDiv.textContent = 'Fetching details...';
   try {
@@ -206,6 +219,11 @@ async function applyMetadataFromSearch(volumeId) {
 
 // Apply ISSUE metadata from ComicVine to the Edit form
 async function applyIssueMetadataFromSearch(issueId) {
+  // Disable for local/device comics
+  const comic = window.currentComic;
+  const isLocal = comic && (comic.handle || comic.file || (comic.id && String(comic.id).startsWith('device-')));
+  if (isLocal) return;
+
   const prevStatus = searchStatusDiv.textContent;
   searchStatusDiv.textContent = 'Fetching issue details...';
   try {

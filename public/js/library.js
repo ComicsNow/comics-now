@@ -217,11 +217,9 @@ function initializeLibraryUIControls() {
     clearSearchBtn.addEventListener('click', clearSearchBtn._clickListener);
   }
 
-  // Two pairs of list/folder mode buttons exist: one inside #smart-list-view (only visible
-  // in list mode), and a persistent pair near the smart pill row (visible whenever a scope
-  // is active). Wire both pairs to the same handlers and keep their visual state in sync.
+  // The list/folder mode buttons exist near the smart pill row (visible whenever a scope
+  // is active). Wire them to the handlers and keep their visual state in sync.
   const modeButtonPairs = [
-    [document.getElementById('smart-list-mode-list'), document.getElementById('smart-list-mode-folders')],
     [document.getElementById('smart-list-mode-list-top'), document.getElementById('smart-list-mode-folders-top')],
   ].filter(([l, f]) => l && f);
 

@@ -1,19 +1,6 @@
 (function (global) {
   'use strict';
 
-  const OfflineDB = global.OfflineDB || {};
-  const {
-    saveComicToDB,
-    getAllDownloadedComics,
-    deleteOfflineComic,
-    forceStorageCleanup,
-    saveQueueItemToDB,
-    getQueueFromDB,
-    removeQueueItemFromDB,
-    updateQueuePriorities,
-    clearCompletedQueueItems,
-  } = OfflineDB;
-
   // ============================================================================
   // BACKGROUND DOWNLOAD MANAGER
   // ============================================================================
@@ -74,7 +61,10 @@
      */
     async loadQueue() {
       try {
-        this.persistentQueue = await getQueueFromDB();
+        const db = global.OfflineDB || {};
+        if (db.getQueueFromDB) {
+          this.persistentQueue = await db.getQueueFromDB();
+        }
         return this.persistentQueue;
       } catch (error) {
         console.error('[DOWNLOAD MANAGER] Error loading queue:', error);
@@ -87,16 +77,16 @@
      */
     async addToQueue(comic) {
       // Ensure comic has userId before adding to queue
-      if (!comic.userId && typeof getCurrentUserId === "function") {
-        comic.userId = getCurrentUserId();
+      if (!comic.userId && typeof global.getCurrentUserId === "function") {
+        comic.userId = global.getCurrentUserId();
       }
 
-      const displayInfo = applyDisplayInfoToComic(comic);
+      const displayInfo = typeof global.applyDisplayInfoToComic === 'function' ? global.applyDisplayInfoToComic(comic) : comic;
       const queueItem = {
         id: comic.id,
         comicPath: comic.path,
         comicName: comic.name || 'Comic',
-        displayName: displayInfo.displayTitle,
+        displayName: displayInfo.displayTitle || comic.name || 'Comic',
         status: 'pending',
         progress: 0,
         priority: this.persistentQueue.length, // Add to end
@@ -105,7 +95,10 @@
       };
 
       this.persistentQueue.push(queueItem);
-      await saveQueueItemToDB(queueItem);
+      const db = global.OfflineDB || {};
+      if (db.saveQueueItemToDB) {
+        await db.saveQueueItemToDB(queueItem);
+      }
 
       // Update UI
       this.updateQueueUI();
@@ -162,7 +155,10 @@
 
       // Remove from persistent queue
       this.persistentQueue = this.persistentQueue.filter(item => item.id !== comicId);
-      await removeQueueItemFromDB(comicId);
+      const db = global.OfflineDB || {};
+      if (db.removeQueueItemFromDB) {
+        await db.removeQueueItemFromDB(comicId);
+      }
 
       this.updateQueueUI();
     }
@@ -187,8 +183,13 @@
       // Drop everything from the persistent queue + IndexedDB.
       const ids = this.persistentQueue.map(i => i.id);
       this.persistentQueue = [];
+      const db = global.OfflineDB || {};
       for (const id of ids) {
-        try { await removeQueueItemFromDB(id); } catch (_) {}
+        try { 
+          if (db.removeQueueItemFromDB) {
+            await db.removeQueueItemFromDB(id);
+          }
+        } catch (_) {}
       }
       this.updateQueueUI();
     }
@@ -205,7 +206,10 @@
       item.progress = 0;
       item.error = null;
 
-      await saveQueueItemToDB(item);
+      const db = global.OfflineDB || {};
+      if (db.saveQueueItemToDB) {
+        await db.saveQueueItemToDB(item);
+      }
 
       this.updateQueueUI();
 
@@ -245,7 +249,10 @@
       }
 
       item.status = 'paused';
-      await saveQueueItemToDB(item);
+      const db = global.OfflineDB || {};
+      if (db.saveQueueItemToDB) {
+        await db.saveQueueItemToDB(item);
+      }
 
       this.updateQueueUI();
       return true;
@@ -259,7 +266,10 @@
       if (!item || item.status !== 'paused') return false;
 
       item.status = 'pending';
-      await saveQueueItemToDB(item);
+      const db = global.OfflineDB || {};
+      if (db.saveQueueItemToDB) {
+        await db.saveQueueItemToDB(item);
+      }
 
       this.updateQueueUI();
 
@@ -286,7 +296,10 @@
       this.persistentQueue.splice(newPriority, 0, item);
 
       // Update all priorities
-      await updateQueuePriorities(this.persistentQueue);
+      const db = global.OfflineDB || {};
+      if (db.updateQueuePriorities) {
+        await db.updateQueuePriorities(this.persistentQueue);
+      }
 
       this.updateQueueUI();
       return true;
@@ -300,7 +313,10 @@
       this.persistentQueue = this.persistentQueue.filter(
         item => item.status !== 'completed' && item.status !== 'error'
       );
-      await clearCompletedQueueItems();
+      const db = global.OfflineDB || {};
+      if (db.clearCompletedQueueItems) {
+        await db.clearCompletedQueueItems();
+      }
       const cleared = beforeCount - this.persistentQueue.length;
 
       this.updateQueueUI();
@@ -324,7 +340,10 @@
 
         this.currentDownload = nextItem;
         nextItem.status = 'downloading';
-        await saveQueueItemToDB(nextItem);
+        const db = global.OfflineDB || {};
+        if (db.saveQueueItemToDB) {
+          await db.saveQueueItemToDB(nextItem);
+        }
         this.updateQueueUI();
 
 
@@ -335,13 +354,17 @@
         } catch (error) {
           if (error.name === 'AbortError') {
             // Remove from queue, don't mark as error
-            await removeQueueItemFromDB(nextItem.id);
+            if (db.removeQueueItemFromDB) {
+              await db.removeQueueItemFromDB(nextItem.id);
+            }
             this.persistentQueue = this.persistentQueue.filter(item => item.id !== nextItem.id);
           } else {
             console.error('[DOWNLOAD MANAGER] Download failed:', nextItem.displayName, error);
             nextItem.status = 'error';
             nextItem.error = error.message || 'Download failed';
-            await saveQueueItemToDB(nextItem);
+            if (db.saveQueueItemToDB) {
+              await db.saveQueueItemToDB(nextItem);
+            }
           }
         }
 
@@ -351,7 +374,9 @@
         // Remove completed items after 3 seconds
         if (nextItem.status === 'completed') {
           setTimeout(async () => {
-            await removeQueueItemFromDB(nextItem.id);
+            if (db.removeQueueItemFromDB) {
+              await db.removeQueueItemFromDB(nextItem.id);
+            }
             this.persistentQueue = this.persistentQueue.filter(item => item.id !== nextItem.id);
             this.updateQueueUI();
           }, 3000);
@@ -399,6 +424,8 @@
       let lastSavedProgress = 0;
       let lastUIUpdate = 0;
 
+      const db = global.OfflineDB || {};
+
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
@@ -412,7 +439,9 @@
 
           const now = Date.now();
           if (progress - lastSavedProgress >= 0.05 || now - lastUIUpdate >= 800) {
-            await saveQueueItemToDB(queueItem);
+            if (db.saveQueueItemToDB) {
+              await db.saveQueueItemToDB(queueItem);
+            }
             this.updateQueueUI();
             lastSavedProgress = progress;
             lastUIUpdate = now;
@@ -421,6 +450,19 @@
       }
 
       const blob = new Blob(chunks);
+      
+      // Fetch guided view data to cache it
+      try {
+        const guidedViewUrl = `${API_BASE_URL}/api/v1/comics/${encodeURIComponent(comic.id)}/guided-view`;
+        const gvRes = await fetch(guidedViewUrl, { credentials: 'include' });
+        if (gvRes.ok && 'caches' in window) {
+          const cache = await caches.open('comics-now-downloads');
+          await cache.put(guidedViewUrl, gvRes);
+        }
+      } catch (gvErr) {
+        console.error('[DOWNLOAD MANAGER] Guided view fetch failed:', gvErr);
+      }
+
       await this.saveComic(comic, blob);
       this.abortController = null;
     }
@@ -435,19 +477,22 @@
         downloadedAt: Date.now(),
       };
 
-      await saveComicToDB(comicRecord, blob);
+      const db = global.OfflineDB || {};
+      if (db.saveComicToDB) {
+        await db.saveComicToDB(comicRecord, blob);
+      }
 
       if (!global.downloadedComicIds) global.downloadedComicIds = new Set();
       global.downloadedComicIds.add(comic.id);
 
       // Refresh library to show checkmark
-      if (typeof fetchLibrary === 'function') {
-        await fetchLibrary();
+      if (typeof global.fetchLibrary === 'function') {
+        await global.fetchLibrary();
       }
 
       // Refresh downloads info
-      if (typeof refreshDownloadsInfo === 'function') {
-        await refreshDownloadsInfo();
+      if (typeof global.refreshDownloadsInfo === 'function') {
+        await global.refreshDownloadsInfo();
       }
     }
 
@@ -823,444 +868,7 @@
       downloadManager.updateQueueUI();
     }
   }
-
-  async function fetchWithProgress(url, onProgress) {
-    const res = await fetch(url, { method: 'GET', credentials: 'include' });
-    if (!res.ok) throw new Error(`Download failed: ${res.status}`);
-    const total = Number(res.headers.get('Content-Length')) || 0;
-    const reader = res.body?.getReader();
-    if (!reader) {
-      const blob = await res.blob();
-      onProgress?.(1);
-      return blob;
-    }
-    let received = 0;
-    const chunks = [];
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      chunks.push(value);
-      received += value.length;
-      if (total) {
-        onProgress?.(received / total);
-      }
-    }
-    return new Blob(chunks);
-  }
-
-  async function refreshDownloadsInfo() {
-    if (!downloadsInfoDiv) return;
-
-    downloadsInfoDiv.innerHTML = 'Calculating...';
-    const downloadedComics = await getAllDownloadedComics();
-    let totalSize = 0;
-    let content = '<ul>';
-    downloadedComics.forEach(comic => {
-      totalSize += comic.fileBlob?.size || 0;
-      const comicInfo = comic.comicInfo || {};
-      const info = applyDisplayInfoToComic(comicInfo);
-      const displayName = info.displayTitle || comicInfo.name || 'Unknown Comic';
-      const escapedName = displayName
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#39;');
-
-      content += `<li class="text-sm flex justify-between items-center">` +
-        `<span title="${escapedName}">${escapedName}</span>` +
-        `<button class="delete-download-btn text-red-500 hover:text-red-700" data-id="${comic.id}" data-name="${escapedName}">Delete</button>` +
-        `</li>`;
-    });
-    content += '</ul>';
-
-    downloadsInfoDiv.innerHTML = `
-      <p><strong>${downloadedComics.length}</strong> comics downloaded.</p>
-      <p><strong>Total size:</strong> ${(totalSize / 1024 / 1024).toFixed(2)} MB</p>
-      <div class="mt-4 max-h-48 overflow-y-auto">${content}</div>
-    `;
-
-    document.querySelectorAll('.delete-download-btn').forEach(btn => {
-      btn.addEventListener('click', async (event) => {
-        event.preventDefault();
-        const target = event.currentTarget;
-        const id = target.dataset.id;
-        const comicName = target.dataset.name || target.closest('li')?.querySelector('span')?.textContent || 'comic';
-
-        if (!confirm(`Delete "${comicName}" from offline storage?`)) {
-          return;
-        }
-
-        try {
-          target.disabled = true;
-          target.textContent = 'Deleting...';
-
-          await deleteOfflineComic(id);
-          await forceStorageCleanup();
-          if (typeof fetchLibrary === 'function') {
-            await fetchLibrary();
-          }
-          await refreshDownloadsInfo();
-        } catch (error) {
-          
-          alert('Failed to delete comic. Please try again.');
-          target.disabled = false;
-          target.textContent = 'Delete';
-        }
-      });
-    });
-  }
-
-  /**
-   * Download a comic using the background download manager
-   * @param {Object} comic - Comic object
-   * @param {HTMLElement} btn - Download button element
-   * @returns {Promise<boolean>}
-   */
-  async function downloadComic(comic, btn) {
-    try {
-      // Block downloads on desktop devices
-      if (typeof isDesktopDevice === 'function' && isDesktopDevice()) {
-        alert('Comic downloads are only available on mobile devices.\n\nUse a mobile device or tablet to download comics for offline reading.');
-        return false;
-      }
-
-      // Skip if already downloaded
-      if (global.downloadedComicIds?.has(comic.id)) {
-        return true;
-      }
-
-      // Update button UI immediately
-      if (btn) {
-        btn._origHtml = btn.innerHTML;
-        btn.disabled = true;
-        btn.innerHTML = `
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6"
-               viewBox="0 0 24 24" fill="none" stroke="currentColor">
-            <circle cx="12" cy="12" r="10" stroke-width="2" opacity=".5"/>
-            <path d="M12 2v8m0 0l4-4m-4 4L8 6m4 14v-4" stroke-width="2" stroke-linecap="round"/>
-          </svg>
-          <span class="text-xs">Queued</span>`;
-      }
-
-      // Add to background download queue
-      await downloadManager.addToQueue(comic);
-
-      return true;
-    } catch (error) {
-      console.error('[DOWNLOAD] Error adding to queue:', error);
-
-      // Restore button on error
-      if (btn) {
-        btn.disabled = false;
-        btn.innerHTML = btn._origHtml || btn.innerHTML;
-      }
-
-      alert('Failed to add comic to download queue.');
-      return false;
-    }
-  }
-
-  /**
-   * Download all comics in a series using the background download manager
-   * @param {Array|Object} comics - Array of comics or series object
-   * @param {HTMLElement} btn - Download button element
-   */
-  async function downloadSeries(comics, btn) {
-    if (!btn) return;
-
-    // Block downloads on desktop devices
-    if (typeof isDesktopDevice === 'function' && isDesktopDevice()) {
-      alert('Comic downloads are only available on mobile devices.\n\nUse a mobile device or tablet to download comics for offline reading.');
-      return false;
-    }
-
-    try {
-      let comicsToDownload = [];
-
-      // Handle different input formats
-      if (Array.isArray(comics)) {
-        comicsToDownload = comics;
-      } else if (comics && comics._hasDetails === false) {
-        const { dataset } = btn;
-        if (!dataset.rootFolder || !dataset.publisher || !dataset.seriesName) {
-          throw new Error('Missing series information for download');
-        }
-        if (typeof getSeriesComics === 'function') {
-          comicsToDownload = await getSeriesComics(dataset.rootFolder, dataset.publisher, dataset.seriesName);
-        } else {
-          throw new Error('Cannot load series details - getSeriesComics not available');
-        }
-      } else {
-        throw new Error('Invalid comics data format');
-      }
-
-      // Confirmation before kicking off a bulk download (library / publisher /
-      // series). The button's data attributes and the comic list together tell
-      // us scope and size — surface both in the prompt.
-      const queueable = comicsToDownload.filter(c => !global.downloadedComicIds?.has(c.id));
-      if (queueable.length === 0) {
-        alert('All comics in this selection are already downloaded.');
-        return false;
-      }
-      const ds = btn.dataset || {};
-      let scopeLabel = '';
-      if (ds.seriesName) scopeLabel = `series "${ds.seriesName}"`;
-      else if (ds.publisher) scopeLabel = `publisher "${ds.publisher}"`;
-      else if (ds.rootFolder) scopeLabel = `library "${ds.rootFolder.split('/').filter(Boolean).pop() || ds.rootFolder}"`;
-      const promptMsg = scopeLabel
-        ? `Queue ${queueable.length} comic${queueable.length === 1 ? '' : 's'} from ${scopeLabel} for download?`
-        : `Queue ${queueable.length} comic${queueable.length === 1 ? '' : 's'} for download?`;
-      if (!window.confirm(promptMsg)) {
-        return false;
-      }
-
-      btn._origHtml = btn.innerHTML;
-      btn.disabled = true;
-      btn.innerHTML = `
-        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6"
-             viewBox="0 0 24 24" fill="none" stroke="currentColor">
-          <circle cx="12" cy="12" r="10" stroke-width="2" opacity=".5"/>
-          <path d="M12 2v8m0 0l4-4m-4 4L8 6m4 14v-4" stroke-width="2" stroke-linecap="round"/>
-        </svg>
-        <span class="text-xs">Queueing...</span>`;
-
-      // Add queueable comics (already filtered above to skip downloaded).
-      let queuedCount = 0;
-      for (const comic of queueable) {
-        await downloadManager.addToQueue(comic);
-        queuedCount++;
-      }
-
-      // Update button to show queued
-      btn.innerHTML = `
-        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" viewBox="0 0 20 20" fill="currentColor">
-          <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
-        </svg>
-        <span class="text-xs">${queuedCount} queued</span>`;
-
-
-      // Re-enable button after queueing
-      setTimeout(() => {
-        btn.disabled = false;
-      }, 2000);
-
-    } catch (error) {
-      console.error('[DOWNLOAD] Series download error:', error);
-      alert('Failed to queue series for download.');
-      btn.disabled = false;
-      btn.innerHTML = btn._origHtml;
-    }
-  }
-
-  /**
-   * Download all comics in a reading list
-   * @param {number} listId - The reading list ID
-   * @param {string} listName - The reading list name (for user feedback)
-   * @param {HTMLElement} btn - The button element to update
-   */
-  async function downloadReadingList(listId, listName, btn) {
-    if (!btn) return;
-
-    // Block downloads on desktop devices
-    if (typeof isDesktopDevice === 'function' && isDesktopDevice()) {
-      alert('Comic downloads are only available on mobile devices.\n\nUse a mobile device or tablet to download comics for offline reading.');
-      return false;
-    }
-
-    // Check if library is loaded
-    if (!global.library || Object.keys(global.library).length === 0) {
-      alert('Library is still loading. Please wait a moment and try again.');
-      return false;
-    }
-
-    btn._origHtml = btn.innerHTML;
-    btn.disabled = true;
-    btn.innerHTML = `
-      <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6"
-           viewBox="0 0 24 24" fill="none" stroke="currentColor">
-        <circle cx="12" cy="12" r="10" stroke-width="2" opacity=".5"/>
-        <path d="M12 2v8m0 0l4-4m-4 4L8 6m4 14v-4" stroke-width="2" stroke-linecap="round"/>
-      </svg>
-      <span class="text-xs">Queueing...</span>`;
-
-    try {
-      // Fetch reading list details
-      if (typeof global.ReadingLists?.getReadingListDetails !== 'function') {
-        throw new Error('Reading list API not available');
-      }
-
-      const listDetails = await global.ReadingLists.getReadingListDetails(listId);
-      if (!listDetails || !listDetails.items || listDetails.items.length === 0) {
-        throw new Error('Reading list is empty or not found');
-      }
-
-      // Convert comic IDs to full comic objects
-      const comicsToDownload = [];
-      for (const item of listDetails.items) {
-        if (typeof global.getComicById === 'function') {
-          const comic = global.getComicById(item.comicId);
-          if (comic) {
-            comicsToDownload.push(comic);
-          } else {
-          }
-        }
-      }
-
-      if (comicsToDownload.length === 0) {
-        throw new Error('No comics found in library. They may have been moved or deleted.');
-      }
-
-      // Add all comics to queue (skip already downloaded)
-      let queuedCount = 0;
-      for (const comic of comicsToDownload) {
-        if (!global.downloadedComicIds?.has(comic.id)) {
-          await downloadManager.addToQueue(comic);
-          queuedCount++;
-        }
-      }
-
-      // Update button to show queued
-      btn.innerHTML = `
-        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" viewBox="0 0 20 20" fill="currentColor">
-          <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
-        </svg>
-        <span class="text-xs">${queuedCount} queued</span>`;
-
-
-      // Re-enable button and revert after delay
-      setTimeout(() => {
-        btn.disabled = false;
-        if (btn._origHtml) {
-          btn.innerHTML = btn._origHtml;
-        }
-      }, 3000);
-
-    } catch (error) {
-      console.error('[DOWNLOAD] Reading list download error:', error);
-      alert('Failed to queue reading list for download: ' + error.message);
-      btn.disabled = false;
-      if (btn._origHtml) {
-        btn.innerHTML = btn._origHtml;
-      }
-    }
-  }
-
-  const OfflineDownloads = {
-    renderDownloadQueue,
-    fetchWithProgress,
-    refreshDownloadsInfo,
-    downloadComic,
-    downloadSeries,
-    downloadReadingList,
-    downloadManager, // Expose the download manager
-    initializeDownloadQueue: async () => {
-      await downloadManager.loadQueue();
-      // If items exist in queue, resume processing
-      if (downloadManager.persistentQueue.length > 0) {
-        if (downloadManager.useServiceWorker) {
-          await downloadManager.registerBackgroundSync();
-          // Explicitly trigger SW to resume
-          if (navigator.serviceWorker && navigator.serviceWorker.controller) {
-            navigator.serviceWorker.controller.postMessage({ type: 'start-downloads' });
-          }
-        } else {
-          downloadManager.processQueue();
-        }
-      }
-    },
-    cancelDownload: (comicId) => downloadManager.cancelDownload(comicId),
-    restartDownload: (comicId) => downloadManager.restartDownload(comicId),
-    pauseDownload: (comicId) => downloadManager.pauseDownload(comicId),
-    resumeDownload: (comicId) => downloadManager.resumeDownload(comicId),
-    clearCompletedDownloads: () => downloadManager.clearCompleted(),
-  };
-
-  // ============================================================================
-  // SERVICE WORKER MESSAGE LISTENER
-  // ============================================================================
-
-  /**
-   * Listen for Service Worker messages (progress updates, status changes)
-   */
-  if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.addEventListener('message', async (event) => {
-      const { type, comicId, progress, status, error } = event.data;
-
-
-      // Reload queue from IndexedDB to get latest state
-      await downloadManager.loadQueue();
-
-      // Find the item in queue
-      const item = downloadManager.persistentQueue.find(i => i.id === comicId);
-
-      if (item) {
-        // Update item based on message type
-        if (type === 'download-progress' && typeof progress !== 'undefined') {
-          item.progress = progress;
-        } else if (type === 'download-status' && status) {
-          item.status = status;
-        } else if (type === 'download-complete') {
-          item.status = 'completed';
-          item.progress = 1;
-
-          // Sync downloadedComicIds from IndexedDB — the SW saved the comic there
-          // but downloadedComicIds in the page context was never updated
-          if (typeof OfflineDB !== 'undefined' && typeof OfflineDB.getAllDownloadedComicIds === 'function') {
-            await OfflineDB.getAllDownloadedComicIds();
-          } else if (comicId && global.downloadedComicIds) {
-            global.downloadedComicIds.add(comicId);
-          }
-
-          // Re-render to show download checkmarks
-          if (typeof applyFilterAndRender === 'function') {
-            applyFilterAndRender();
-          }
-
-          // Refresh downloads info in settings
-          if (typeof refreshDownloadsInfo === 'function') {
-            await refreshDownloadsInfo();
-          }
-        } else if (type === 'download-error' && error) {
-          item.status = 'error';
-          item.error = error;
-        }
-
-        // Update UI
-        downloadManager.updateQueueUI();
-      }
-    });
-
-  }
-
-  // ============================================================================
-  // NOTIFICATION PERMISSION
-  // ============================================================================
-
-  /**
-   * Request notification permission for download completion alerts
-   */
-  async function requestNotificationPermission() {
-    if (!('Notification' in window)) {
-      return false;
-    }
-
-    if (Notification.permission === 'granted') {
-      return true;
-    }
-
-    if (Notification.permission === 'denied') {
-      return false;
-    }
-
-    try {
-      const permission = await Notification.requestPermission();
-      return permission === 'granted';
-    } catch (error) {
-      console.error('[DOWNLOAD] Error requesting notification permission:', error);
-      return false;
-    }
-  }
+  global.renderDownloadQueue = renderDownloadQueue;
 
   // Request notification permission on first download if background sync is supported
   let notificationPermissionRequested = false;
@@ -1270,16 +878,14 @@
     // Request notification permission on first download
     if (!notificationPermissionRequested && BackgroundDownloadManager.isBackgroundSyncSupported()) {
       notificationPermissionRequested = true;
-      await requestNotificationPermission();
+      if (typeof global.requestNotificationPermission === 'function') {
+        await global.requestNotificationPermission();
+      }
     }
 
     return originalAddToQueue(comic);
   };
 
-  global.OfflineDownloads = OfflineDownloads;
-  Object.assign(global, OfflineDownloads);
-
   // Expose download manager globally
   global.downloadManager = downloadManager;
-  global.requestNotificationPermission = requestNotificationPermission;
 })(typeof window !== 'undefined' ? window : globalThis);

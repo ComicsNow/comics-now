@@ -6,14 +6,6 @@ const rawConsole = {
   error: console.error.bind(console)
 };
 
-function withTimestamp(fn) {
-  return (...args) => fn(`[${new Date().toISOString()}]`, ...args);
-}
-
-console.log = withTimestamp(rawConsole.log);
-console.warn = withTimestamp(rawConsole.warn);
-console.error = withTimestamp(rawConsole.error);
-
 const logs = [];
 const ctLogs = [];
 const ctClients = new Set();

@@ -24,8 +24,10 @@
         await scanDeviceLibrary(libraryId, handle);
         
         // Refresh UI
-        if (global.renderRootFolders) {
-          global.renderRootFolders(true);
+        if (typeof global.showRootFolderList === 'function') {
+          global.showRootFolderList({ force: true });
+        } else if (typeof global.applyFilterAndRender === 'function') {
+          global.applyFilterAndRender();
         }
       } catch (err) {
         if (err.name !== 'AbortError') {
@@ -59,8 +61,10 @@
         await saveLegacyDeviceLibrary(libraryId, libraryName, files);
         
         // Refresh UI
-        if (global.renderRootFolders) {
-          global.renderRootFolders(true);
+        if (typeof global.showRootFolderList === 'function') {
+          global.showRootFolderList({ force: true });
+        } else if (typeof global.applyFilterAndRender === 'function') {
+          global.applyFilterAndRender();
         }
       };
       
@@ -226,7 +230,11 @@
 
     return new Promise((resolve, reject) => {
       tx.oncomplete = () => {
-        if (global.renderRootFolders) global.renderRootFolders(true);
+        if (typeof global.showRootFolderList === 'function') {
+          global.showRootFolderList({ force: true });
+        } else if (typeof global.applyFilterAndRender === 'function') {
+          global.applyFilterAndRender();
+        }
         resolve();
       };
       tx.onerror = () => reject(tx.error);
@@ -273,13 +281,13 @@
           <svg xmlns="http://www.w3.org/2000/svg" class="w-16 h-16 ${isDisconnected ? 'text-gray-600' : 'text-gray-500'} mb-2 group-hover:text-purple-400 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
           </svg>
-          <div class="text-white font-bold truncate w-full">${lib.name}</div>
+          <div class="text-white font-bold truncate w-full">${global.escapeHtml(lib.name)}</div>
           <div class="text-gray-400 text-sm mt-1">Local Device Library</div>
           <div class="text-xs text-gray-500 mt-2">${comics.length} Comics</div>
           ${statusHtml}
         </div>
-        <div class="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
-          <button class="bg-red-600/80 hover:bg-red-600 text-white p-1.5 rounded-full remove-device-lib" data-id="${lib.id}" title="Remove Library">
+        <div class="absolute top-2 right-2 z-20">
+          <button class="bg-red-600/80 hover:bg-red-600 text-white p-1.5 rounded-full remove-device-lib shadow-lg backdrop-blur-sm transition-all" data-id="${lib.id}" title="Remove Library">
             <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
             </svg>
@@ -308,7 +316,11 @@
             if (await lib.handle.requestPermission({ mode: 'read' }) !== 'granted') {
               return;
             }
-            if (global.renderRootFolders) global.renderRootFolders(true);
+            if (typeof global.showRootFolderList === 'function') {
+          global.showRootFolderList({ force: true });
+        } else if (typeof global.applyFilterAndRender === 'function') {
+          global.applyFilterAndRender();
+        }
           }
         }
 
@@ -358,7 +370,11 @@
 
       tx.oncomplete = () => {
         console.log(`Re-attached ${reattachedCount} files to library ${libraryId}`);
-        if (global.renderRootFolders) global.renderRootFolders(true);
+        if (typeof global.showRootFolderList === 'function') {
+          global.showRootFolderList({ force: true });
+        } else if (typeof global.applyFilterAndRender === 'function') {
+          global.applyFilterAndRender();
+        }
         showDeviceLibraryComics(libraryId, 'Local Files');
       };
     };
@@ -406,7 +422,7 @@
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
           </svg>
           <div class="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-2">
-            <div class="text-white text-xs font-bold truncate">${comic.name}</div>
+            <div class="text-white text-xs font-bold truncate">${global.escapeHtml(comic.name)}</div>
           </div>
         </div>
       `;

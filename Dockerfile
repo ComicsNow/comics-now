@@ -14,8 +14,7 @@ WORKDIR /app
 
 # Install Node.js dependencies
 COPY package*.json ./
-# Create dummy script to satisfy postinstall if it runs
-RUN mkdir -p scripts && touch scripts/check-dependencies.js
+COPY scripts/check-dependencies.js ./scripts/
 RUN npm ci --omit=dev
 
 # Install ComicTagger in a virtual environment
@@ -37,9 +36,9 @@ RUN apt-get update && apt-get install -y \
 WORKDIR /app
 
 # Copy production node_modules and built assets
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /opt/venv /opt/venv
-COPY . .
+COPY --from=builder --chown=node:node /app/node_modules ./node_modules
+COPY --from=builder --chown=node:node /opt/venv /opt/venv
+COPY --chown=node:node . .
 
 # Setup environment
 ENV PATH="/opt/venv/bin:$PATH"

@@ -6,6 +6,8 @@
 
   let activeContextMenu = null;
   let activeOverlay = null;
+  let activeKeyHandler = null;
+  let activeClickHandler = null;
 
   // ============================================================================
   // SVG ICON CONSTANTS
@@ -109,29 +111,34 @@
   /**
    * Attach click-outside close handler to a context menu
    * @param {HTMLElement} menu - The menu element to attach handler to
-   * Note: With overlay in place, this is primarily for desktop right-click + Esc key
    */
   function attachCloseHandler(menu) {
+    // Ensure any previous listeners are removed
+    if (activeKeyHandler || activeClickHandler) {
+      closeContextMenu();
+    }
+
     // Handle Escape key to close menu
-    const keyHandler = (e) => {
+    activeKeyHandler = (e) => {
       if (e.key === 'Escape') {
         closeContextMenu();
-        document.removeEventListener('keydown', keyHandler);
       }
     };
 
-    document.addEventListener('keydown', keyHandler);
+    document.addEventListener('keydown', activeKeyHandler);
 
-    // Desktop right-click outside menu area (overlay handles mobile)
-    const clickHandler = (e) => {
-      if (activeOverlay && !menu.contains(e.target) && e.target !== activeOverlay) {
-        return; // Let overlay handle it
+    // Click handler to catch clicks that might bypass the overlay (e.g. captures)
+    activeClickHandler = (e) => {
+      if (activeContextMenu && !activeContextMenu.contains(e.target) && e.target !== activeOverlay) {
+        closeContextMenu();
       }
     };
 
     // Add a small delay to avoid immediate closure from the triggering event
     setTimeout(() => {
-      document.addEventListener('click', clickHandler, true);
+      if (activeKeyHandler) { // Check if we haven't already closed
+        document.addEventListener('click', activeClickHandler, true);
+      }
     }, 100);
   }
 
@@ -139,6 +146,16 @@
    * Close the active context menu and remove overlay
    */
   function closeContextMenu() {
+    // Remove event listeners
+    if (activeKeyHandler) {
+      document.removeEventListener('keydown', activeKeyHandler);
+      activeKeyHandler = null;
+    }
+    if (activeClickHandler) {
+      document.removeEventListener('click', activeClickHandler, true);
+      activeClickHandler = null;
+    }
+
     if (activeContextMenu) {
       activeContextMenu.remove();
       activeContextMenu = null;

@@ -4,6 +4,15 @@ async function loadMetadata() {
   // Security check: only admins can view metadata
   const isAdmin = window.syncManager && window.syncManager.userRole === 'admin';
   if (!isAdmin) return;
+
+  // Local/device comics don't have editable metadata on the server
+  const comic = window.currentComic;
+  const isLocal = comic && (comic.handle || comic.file || (comic.id && String(comic.id).startsWith('device-')));
+  if (isLocal) {
+    window.metadataForm.innerHTML = `<p class="text-gray-400 text-center italic">Metadata management is only available for library comics.</p>`;
+    return;
+  }
+
   try {
     if (!window.currentComic) {
       throw new Error('No comic loaded');

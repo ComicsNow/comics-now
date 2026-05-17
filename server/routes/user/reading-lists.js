@@ -6,7 +6,7 @@ module.exports = function attach(router, deps) {
     dbRun,
     dbGet,
     createId,
-    formatErrorMessage,
+    formatErrorMessage, validateComicId,
     log
   } = deps;
 
@@ -17,70 +17,28 @@ module.exports = function attach(router, deps) {
   // Get all reading lists for current user with progress stats
   router.get('/api/v1/reading-lists', requireAuth, async (req, res) => {
     try {
-      const lists = await dbAll(
-        'SELECT * FROM reading_lists WHERE userId = ? ORDER BY sortOrder ASC, created DESC',
+      const listsWithStats = await dbAll(
+        `SELECT 
+            rl.*,
+            COUNT(rli.comicId) as totalComics,
+            SUM(CASE WHEN ucs.lastReadPage >= ucs.totalPages - 1 AND ucs.totalPages > 0 THEN 1 ELSE 0 END) as readComics,
+            SUM(CASE WHEN ucs.lastReadPage > 0 AND ucs.lastReadPage < ucs.totalPages - 1 THEN 1 ELSE 0 END) as inProgressComics,
+            SUM(CASE WHEN rli.comicId IS NOT NULL AND (ucs.comicId IS NULL OR (ucs.lastReadPage = 0)) THEN 1 ELSE 0 END) as unreadComics
+         FROM reading_lists rl
+         LEFT JOIN reading_list_items rli ON rl.id = rli.listId
+         LEFT JOIN user_comic_status ucs ON rli.comicId = ucs.comicId AND ucs.userId = rl.userId
+         WHERE rl.userId = ?
+         GROUP BY rl.id
+         ORDER BY rl.sortOrder ASC, rl.created DESC`,
         [req.user.userId]
       );
 
-      // Get stats for each list
-      const listsWithStats = await Promise.all(lists.map(async (list) => {
-        // Get all comic IDs in this list
-        const items = await dbAll(
-          'SELECT comicId FROM reading_list_items WHERE listId = ? ORDER BY sortOrder ASC',
-          [list.id]
-        );
-
-        const comicIds = items.map(item => item.comicId);
-        const totalComics = comicIds.length;
-
-        if (totalComics === 0) {
-          return {
-            ...list,
-            totalComics: 0,
-            readComics: 0,
-            inProgressComics: 0,
-            unreadComics: 0,
-            progressPercent: 0
-          };
-        }
-
-        // Get progress for these comics
-        const placeholders = comicIds.map(() => '?').join(',');
-        const progressRows = await dbAll(
-          `SELECT comicId, lastReadPage, totalPages FROM user_comic_status
-           WHERE userId = ? AND comicId IN (${placeholders})`,
-          [req.user.userId, ...comicIds]
-        );
-
-        // Calculate status for each comic
-        let readComics = 0;
-        let inProgressComics = 0;
-        let unreadComics = 0;
-
-        comicIds.forEach(comicId => {
-          const progress = progressRows.find(p => p.comicId === comicId);
-          if (!progress || !progress.totalPages || progress.lastReadPage === 0) {
-            unreadComics++;
-          } else if (progress.lastReadPage >= progress.totalPages - 1) {
-            readComics++;
-          } else {
-            inProgressComics++;
-          }
-        });
-
-        const progressPercent = Math.round((readComics / totalComics) * 100);
-
-        return {
-          ...list,
-          totalComics,
-          readComics,
-          inProgressComics,
-          unreadComics,
-          progressPercent
-        };
+      const processedLists = listsWithStats.map(list => ({
+        ...list,
+        progressPercent: list.totalComics > 0 ? Math.round((list.readComics / list.totalComics) * 100) : 0
       }));
 
-      res.json({ ok: true, lists: listsWithStats });
+      res.json({ ok: true, lists: processedLists });
     } catch (error) {
       res.status(500).json({
         message: formatErrorMessage(error, req, 'Failed to load reading lists')
@@ -133,12 +91,15 @@ module.exports = function attach(router, deps) {
 
       // Add comics to the list if provided
       if (comicIds && Array.isArray(comicIds) && comicIds.length > 0) {
-        const stmt = await Promise.all(comicIds.map((comicId, index) =>
-          dbRun(
+        for (const [index, comicId] of comicIds.entries()) {
+          const v = validateComicId(comicId);
+          if (!v.valid) return res.status(400).json({ message: `Invalid comic ID at index ${index}: ${v.error}` });
+          
+          await dbRun(
             'INSERT INTO reading_list_items (listId, comicId, addedAt, sortOrder) VALUES (?, ?, ?, ?)',
-            [listId, comicId, now, index]
-          )
-        ));
+            [listId, v.sanitized, now, index]
+          );
+        }
       }
 
       res.json({ ok: true, listId });
@@ -265,11 +226,15 @@ module.exports = function attach(router, deps) {
       const now = Date.now();
 
       // Add comics (ignore duplicates)
-      for (const comicId of comicIds) {
+      for (const [index, comicId] of comicIds.entries()) {
+        const v = validateComicId(comicId);
+        if (!v.valid) return res.status(400).json({ message: `Invalid comic ID at index ${index}: ${v.error}` });
+        const cleanId = v.sanitized;
+
         try {
           await dbRun(
             'INSERT OR IGNORE INTO reading_list_items (listId, comicId, addedAt, sortOrder) VALUES (?, ?, ?, ?)',
-            [req.params.id, comicId, now, nextOrder]
+            [req.params.id, cleanId, now, nextOrder]
           );
           nextOrder++;
         } catch (err) {
@@ -297,6 +262,13 @@ module.exports = function attach(router, deps) {
         return res.status(400).json({ message: 'Comic IDs are required' });
       }
 
+      const cleanIds = [];
+      for (const [index, comicId] of comicIds.entries()) {
+        const v = validateComicId(comicId);
+        if (!v.valid) return res.status(400).json({ message: `Invalid comic ID at index ${index}: ${v.error}` });
+        cleanIds.push(v.sanitized);
+      }
+
       // Verify ownership
       const list = await dbGet(
         'SELECT id FROM reading_lists WHERE id = ? AND userId = ?',
@@ -307,10 +279,10 @@ module.exports = function attach(router, deps) {
         return res.status(404).json({ message: 'Reading list not found' });
       }
 
-      const placeholders = comicIds.map(() => '?').join(',');
+      const placeholders = cleanIds.map(() => '?').join(',');
       await dbRun(
         `DELETE FROM reading_list_items WHERE listId = ? AND comicId IN (${placeholders})`,
-        [req.params.id, ...comicIds]
+        [req.params.id, ...cleanIds]
       );
 
       // Update list timestamp
@@ -344,10 +316,13 @@ module.exports = function attach(router, deps) {
       }
 
       // Update sort order for each comic
-      for (let i = 0; i < comicOrder.length; i++) {
+      for (const [i, comicId] of comicOrder.entries()) {
+        const v = validateComicId(comicId);
+        if (!v.valid) return res.status(400).json({ message: `Invalid comic ID at index ${i}: ${v.error}` });
+        
         await dbRun(
           'UPDATE reading_list_items SET sortOrder = ? WHERE listId = ? AND comicId = ?',
-          [i, req.params.id, comicOrder[i]]
+          [i, req.params.id, v.sanitized]
         );
       }
 

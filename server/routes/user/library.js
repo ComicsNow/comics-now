@@ -15,7 +15,10 @@ module.exports = function attach(router, deps) {
     resolvePath,
     generateVirtualMetadata,
     checkComicAccess,
-    getAllMangaModePreferences,
+    getAllReadingPreferences,
+    getReadingPrefMaps,
+    resolveReadingModes,
+    validateSearchQuery,
     requireAuth
   } = deps;
 
@@ -78,47 +81,43 @@ module.exports = function attach(router, deps) {
   router.get('/api/v1/search', requireAuth, async (req, res) => {
     log('INFO', 'LIST', 'Searching library');
     try {
-      const { query = '', field = 'all' } = req.query;
-      const q = query.toLowerCase();
+      const { query = '' } = req.query;
+      const v = validateSearchQuery(query);
+      if (!v.valid) {
+        return res.status(400).json({ message: v.error });
+      }
+      const q = v.sanitized;
       const userId = req.user?.userId || 'default-user';
       const user = await dbGet('SELECT role FROM users WHERE userId = ?', [userId]);
       const userRole = user?.role || 'user';
 
-      const rows = await dbAll('SELECT * FROM comics');
+      if (!q) {
+        return res.json([]);
+      }
 
-      // Load per-user progress
+      // 1. Optimize: Filter in database using LIKE
+      const searchPattern = `%${q}%`;
+      const rows = await dbAll(
+        'SELECT * FROM comics WHERE (name LIKE ? OR series LIKE ? OR publisher LIKE ? OR metadata LIKE ?)',
+        [searchPattern, searchPattern, searchPattern, searchPattern]
+      );
+
+      // 2. Load per-user progress once
       const userProgress = await dbAll(
-        'SELECT comicId, lastReadPage, totalPages, continuousMode FROM user_comic_status WHERE userId = ?',
+        'SELECT comicId, lastReadPage, totalPages FROM user_comic_status WHERE userId = ?',
         [userId]
       );
 
       const progressMap = {};
-      const continuousModeMap = {};
       for (const p of userProgress) {
         progressMap[p.comicId] = { lastReadPage: p.lastReadPage, totalPages: p.totalPages };
-        if (p.continuousMode !== null && p.continuousMode !== undefined) {
-          continuousModeMap[p.comicId] = p.continuousMode === 1;
-        }
       }
 
-      // Load user manga mode preferences
-      const allPrefs = await getAllMangaModePreferences(userId);
-
-      // Create maps for each preference type
-      const prefMaps = {
-        comic: new Map(),
-        series: new Map(),
-        publisher: new Map(),
-        library: new Map()
-      };
-
-      for (const pref of allPrefs) {
-        if (prefMaps[pref.preferenceType]) {
-          prefMaps[pref.preferenceType].set(pref.targetId, pref.mangaMode === 1);
-        }
-      }
-
+      // 3. Load user reading preferences using helper
+      const prefMaps = await getReadingPrefMaps(userId);
       const directories = getComicsDirectories();
+
+      // 4. Load access list for checkComicAccess
       const accessList = userRole === 'admin' ? [] : await dbAll(
         `SELECT accessType, accessValue, direct_access, child_access
          FROM user_library_access
@@ -145,54 +144,34 @@ module.exports = function attach(router, deps) {
         }
 
         const meta = (() => { try { return JSON.parse(r.metadata || '{}'); } catch { return {}; } })();
-        const hay = {
-          title: r.name || '',
-          series: r.series || '',
-          publisher: r.publisher || '',
-          character: meta.Characters || '',
-          all: `${r.name} ${r.series} ${r.publisher} ${meta.Characters || ''} ${meta.Summary || ''}`
-        };
-        if ((hay[field] || hay.all).toLowerCase().includes(q)) {
-          // Apply hierarchical manga mode preference
-          let mangaMode = false;
-          const absoluteRootDir = directories.find(d => r.path.startsWith(d));
-          const rootDir = absoluteRootDir || 'Library';
+        
+        // Resolve reading modes using hierarchical helper
+        const { mangaMode, continuousMode } = resolveReadingModes(r.id, r.series, r.publisher, r.path, prefMaps, directories);
 
-          if (prefMaps.comic.has(r.id)) {
-            mangaMode = prefMaps.comic.get(r.id);
-          } else if (prefMaps.series.has(r.series)) {
-            mangaMode = prefMaps.series.get(r.series);
-          } else if (prefMaps.publisher.has(r.publisher)) {
-            mangaMode = prefMaps.publisher.get(r.publisher);
-          } else if (prefMaps.library.has(rootDir)) {
-            mangaMode = prefMaps.library.get(rootDir);
-          }
+        const userProg = progressMap[r.id] || {};
 
-          const rootDirKey = getLibraryIdFromPath(absoluteRootDir) || 'Library';
+        const absoluteRootDir = directories.find(d => r.path.startsWith(d));
+        const rootDirKey = getLibraryIdFromPath(absoluteRootDir) || 'Library';
 
-          const continuousMode = continuousModeMap[r.id] !== undefined ? continuousModeMap[r.id] : false;
-          const userProg = progressMap[r.id] || {};
+        // Redact absolute path
+        const redactedPath = path.join(rootDirKey, path.relative(absoluteRootDir || '/', r.path));
 
-          // Redact absolute path
-          const redactedPath = path.join(rootDirKey, path.relative(absoluteRootDir, r.path));
-
-          results.push({
-            id: r.id,
-            name: r.name,
-            path: redactedPath,
-            thumbnailPath: r.thumbnailPath,
-            progress: { 
-              lastReadPage: userProg.lastReadPage !== undefined ? userProg.lastReadPage : (r.lastReadPage || 0), 
-              totalPages: userProg.totalPages !== undefined ? userProg.totalPages : (r.totalPages || 0)
-            },
-            metadata: meta,
-            series: r.series,
-            publisher: r.publisher,
-            mangaMode: mangaMode,
-            continuousMode: continuousMode,
-            guidedViewStatus: r.guidedViewStatus || 'pending'
-          });
-        }
+        results.push({
+          id: r.id,
+          name: r.name,
+          path: redactedPath,
+          thumbnailPath: r.thumbnailPath,
+          progress: { 
+            lastReadPage: userProg.lastReadPage !== undefined ? userProg.lastReadPage : (r.lastReadPage || 0), 
+            totalPages: userProg.totalPages !== undefined ? userProg.totalPages : (r.totalPages || 0)
+          },
+          metadata: meta,
+          series: r.series,
+          publisher: r.publisher,
+          mangaMode: mangaMode,
+          continuousMode: continuousMode ?? false,
+          guidedViewStatus: r.guidedViewStatus || 'pending'
+        });
       }
       res.json(results);
     } catch (e) {
@@ -206,8 +185,11 @@ module.exports = function attach(router, deps) {
    * Returns contents of a directory, including subdirectories and comics.
    * Path is base64 encoded. If missing or 'root', returns library root folders.
    */
-  router.get('/api/v1/folders/:path(*)?', requireAuth, async (req, res) => {    try {
-      const { path: encodedPath } = req.params;
+  router.get('/api/v1/folders/:path(*)?', requireAuth, async (req, res) => {
+    const { path: encodedPath } = req.params;
+    let rawPath = '';
+    let decodedPath = '';
+    try {
       const userId = req.user.userId;
       const userRole = req.user.role;
       const directories = getComicsDirectories();
@@ -239,8 +221,6 @@ module.exports = function attach(router, deps) {
       }
 
       // Decode path
-      let decodedPath;
-      let rawPath;
       try {
         rawPath = Buffer.from(encodedPath, 'base64').toString('utf-8');
         decodedPath = resolvePath(rawPath);
@@ -314,6 +294,8 @@ module.exports = function attach(router, deps) {
         const paths = comicFiles.map(f => f.path);
         const placeholders = paths.map(() => '?').join(',');
         
+        const prefMaps = await getReadingPrefMaps(userId);
+
         const dbComics = await dbAll(`
           SELECT c.id, c.name, c.path, c.thumbnailPath, c.publisher, c.series, c.totalPages as dbTotalPages,
                  ucs.lastReadPage, ucs.totalPages as userTotalPages
@@ -343,11 +325,15 @@ module.exports = function attach(router, deps) {
 
             if (!hasAccess) return null;
 
+            const { mangaMode, continuousMode } = resolveReadingModes(dbComic.id, dbComic.series, dbComic.publisher, dbComic.path, prefMaps, directories);
+
             return {
               id: dbComic.id,
               name: dbComic.name || f.name,
               path: dbComic.path,
               thumbnailPath: dbComic.thumbnailPath,
+              mangaMode: mangaMode,
+              continuousMode: continuousMode ?? false,
               progress: {
                 lastReadPage: dbComic.lastReadPage !== null ? dbComic.lastReadPage : 0,
                 totalPages: dbComic.userTotalPages || dbComic.dbTotalPages || 0

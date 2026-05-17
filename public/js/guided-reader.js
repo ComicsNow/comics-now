@@ -13,15 +13,6 @@
     return sel ? sel.value : 'ALL';
   }
 
-  function escapeHtml(s) {
-    return String(s)
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&#39;');
-  }
-
   function entryMatches(entry, levelFilter) {
     if (levelFilter === 'ALL') return true;
     return (entry.level || 'INFO').toUpperCase() === levelFilter;

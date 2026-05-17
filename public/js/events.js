@@ -1,23 +1,38 @@
 // --- EVENT LISTENERS ---
+
+// Helper to switch settings tabs and update UI
+function switchSettingsTab(tabName) {
+  const tabs = ['general', 'logs', 'downloads', 'comics-defaults', 'devices', 'users', 'guided-reader'];
+  
+  tabs.forEach(tab => {
+    const tabEl = document.getElementById(`settings-tab-${tab}`);
+    const contentEl = document.getElementById(`settings-content-${tab}`);
+    
+    if (tabEl) {
+      if (tab === tabName) {
+        tabEl.classList.add('active');
+      } else {
+        tabEl.classList.remove('active');
+      }
+    }
+    
+    if (contentEl) {
+      if (tab === tabName) {
+        contentEl.classList.remove('hidden');
+      } else {
+        contentEl.classList.add('hidden');
+      }
+    }
+  });
+
+  if (logInterval) clearInterval(logInterval);
+}
+
 document.getElementById('settings-tab-general')?.addEventListener('click', () => {
   if (!window._isNavigatingFromRouter && window.router) {
     window.router.navigate('/settings', true);
   }
-  document.getElementById('settings-tab-general')?.classList.add('active');
-  document.getElementById('settings-tab-logs')?.classList.remove('active');
-  document.getElementById('settings-tab-downloads').classList.remove('active');
-  document.getElementById('settings-tab-comics-defaults')?.classList.remove('active');
-  document.getElementById('settings-tab-devices').classList.remove('active');
-  document.getElementById('settings-tab-users')?.classList.remove('active');
-  document.getElementById('settings-tab-guided-reader')?.classList.remove('active');
-  document.getElementById('settings-content-general')?.classList.remove('hidden');
-  document.getElementById('settings-content-logs')?.classList.add('hidden');
-  document.getElementById('settings-content-downloads').classList.add('hidden');
-  document.getElementById('settings-content-comics-defaults')?.classList.add('hidden');
-  document.getElementById('settings-content-devices').classList.add('hidden');
-  document.getElementById('settings-content-users')?.classList.add('hidden');
-  document.getElementById('settings-content-guided-reader')?.classList.add('hidden');
-  if (logInterval) clearInterval(logInterval);
+  switchSettingsTab('general');
   if (typeof fetchSettings === 'function') fetchSettings();
   if (typeof refreshLibraryFolders === 'function') refreshLibraryFolders();
 });
@@ -26,22 +41,8 @@ document.getElementById('settings-tab-logs')?.addEventListener('click', () => {
   if (!window._isNavigatingFromRouter && window.router) {
     window.router.navigate('/settings/logs', true);
   }
-  document.getElementById('settings-tab-logs')?.classList.add('active');
-  document.getElementById('settings-tab-general')?.classList.remove('active');
-  document.getElementById('settings-tab-downloads').classList.remove('active');
-  document.getElementById('settings-tab-comics-defaults')?.classList.remove('active');
-  document.getElementById('settings-tab-devices').classList.remove('active');
-  document.getElementById('settings-tab-users')?.classList.remove('active');
-  document.getElementById('settings-tab-guided-reader')?.classList.remove('active');
-  document.getElementById('settings-content-logs')?.classList.remove('hidden');
-  document.getElementById('settings-content-general')?.classList.add('hidden');
-  document.getElementById('settings-content-downloads').classList.add('hidden');
-  document.getElementById('settings-content-comics-defaults')?.classList.add('hidden');
-  document.getElementById('settings-content-devices').classList.add('hidden');
-  document.getElementById('settings-content-users')?.classList.add('hidden');
-  document.getElementById('settings-content-guided-reader')?.classList.add('hidden');
+  switchSettingsTab('logs');
   fetchLogs();
-  if (logInterval) clearInterval(logInterval);
   logInterval = setInterval(fetchLogs, 3000);
 });
 
@@ -49,22 +50,7 @@ document.getElementById('settings-tab-downloads').addEventListener('click', asyn
   if (!window._isNavigatingFromRouter && window.router) {
     window.router.navigate('/settings/downloads', true);
   }
-  document.getElementById('settings-tab-downloads').classList.add('active');
-  document.getElementById('settings-tab-general')?.classList.remove('active');
-  document.getElementById('settings-tab-logs')?.classList.remove('active');
-  document.getElementById('settings-tab-comics-defaults')?.classList.remove('active');
-  document.getElementById('settings-tab-devices').classList.remove('active');
-  document.getElementById('settings-tab-users')?.classList.remove('active');
-  document.getElementById('settings-tab-guided-reader')?.classList.remove('active');
-  document.getElementById('settings-content-downloads').classList.remove('hidden');
-  document.getElementById('settings-content-general')?.classList.add('hidden');
-  document.getElementById('settings-content-logs')?.classList.add('hidden');
-  document.getElementById('settings-content-comics-defaults')?.classList.add('hidden');
-  document.getElementById('settings-content-devices').classList.add('hidden');
-  document.getElementById('settings-content-users')?.classList.add('hidden');
-  document.getElementById('settings-content-guided-reader')?.classList.add('hidden');
-  if (logInterval) clearInterval(logInterval);
-
+  switchSettingsTab('downloads');
   await refreshDownloadsInfo();
 });
 
@@ -72,21 +58,7 @@ document.getElementById('settings-tab-comics-defaults')?.addEventListener('click
   if (!window._isNavigatingFromRouter && window.router) {
     window.router.navigate('/settings/defaults', true);
   }
-  document.getElementById('settings-tab-comics-defaults')?.classList.add('active');
-  document.getElementById('settings-tab-general')?.classList.remove('active');
-  document.getElementById('settings-tab-logs')?.classList.remove('active');
-  document.getElementById('settings-tab-downloads').classList.remove('active');
-  document.getElementById('settings-tab-devices').classList.remove('active');
-  document.getElementById('settings-tab-users')?.classList.remove('active');
-  document.getElementById('settings-tab-guided-reader')?.classList.remove('active');
-  document.getElementById('settings-content-comics-defaults')?.classList.remove('hidden');
-  document.getElementById('settings-content-general')?.classList.add('hidden');
-  document.getElementById('settings-content-logs')?.classList.add('hidden');
-  document.getElementById('settings-content-downloads').classList.add('hidden');
-  document.getElementById('settings-content-devices').classList.add('hidden');
-  document.getElementById('settings-content-users')?.classList.add('hidden');
-  document.getElementById('settings-content-guided-reader')?.classList.add('hidden');
-  if (logInterval) clearInterval(logInterval);
+  switchSettingsTab('comics-defaults');
 
   // Load user's manga mode preferences when tab is opened
   await loadComicsDefaults();
@@ -101,21 +73,7 @@ document.getElementById('settings-tab-devices').addEventListener('click', async 
   if (!window._isNavigatingFromRouter && window.router) {
     window.router.navigate('/settings/devices', true);
   }
-  document.getElementById('settings-tab-devices').classList.add('active');
-  document.getElementById('settings-tab-general')?.classList.remove('active');
-  document.getElementById('settings-tab-logs')?.classList.remove('active');
-  document.getElementById('settings-tab-downloads').classList.remove('active');
-  document.getElementById('settings-tab-comics-defaults')?.classList.remove('active');
-  document.getElementById('settings-tab-users')?.classList.remove('active');
-  document.getElementById('settings-tab-guided-reader')?.classList.remove('active');
-  document.getElementById('settings-content-devices').classList.remove('hidden');
-  document.getElementById('settings-content-general')?.classList.add('hidden');
-  document.getElementById('settings-content-logs')?.classList.add('hidden');
-  document.getElementById('settings-content-downloads').classList.add('hidden');
-  document.getElementById('settings-content-comics-defaults')?.classList.add('hidden');
-  document.getElementById('settings-content-users')?.classList.add('hidden');
-  document.getElementById('settings-content-guided-reader')?.classList.add('hidden');
-  if (logInterval) clearInterval(logInterval);
+  switchSettingsTab('devices');
 
   // Load user list for admin filter (if admin)
   await loadUserList();
@@ -129,21 +87,7 @@ if (settingsTabUsersEl) {
     if (!window._isNavigatingFromRouter && window.router) {
       window.router.navigate('/settings/users', true);
     }
-    document.getElementById('settings-tab-users')?.classList.add('active');
-    document.getElementById('settings-tab-general')?.classList.remove('active');
-    document.getElementById('settings-tab-logs')?.classList.remove('active');
-    document.getElementById('settings-tab-downloads').classList.remove('active');
-    document.getElementById('settings-tab-comics-defaults')?.classList.remove('active');
-    document.getElementById('settings-tab-devices').classList.remove('active');
-    document.getElementById('settings-tab-guided-reader')?.classList.remove('active');
-    document.getElementById('settings-content-users')?.classList.remove('hidden');
-    document.getElementById('settings-content-general')?.classList.add('hidden');
-    document.getElementById('settings-content-logs')?.classList.add('hidden');
-    document.getElementById('settings-content-downloads').classList.add('hidden');
-    document.getElementById('settings-content-comics-defaults')?.classList.add('hidden');
-    document.getElementById('settings-content-devices').classList.add('hidden');
-    document.getElementById('settings-content-guided-reader')?.classList.add('hidden');
-    if (logInterval) clearInterval(logInterval);
+    switchSettingsTab('users');
 
     // Load users list
     if (typeof refreshUsersList === 'function') {
@@ -173,21 +117,7 @@ document.getElementById('settings-tab-guided-reader')?.addEventListener('click',
   if (!window._isNavigatingFromRouter && window.router) {
     window.router.navigate('/settings/guided-reader', true);
   }
-  document.getElementById('settings-tab-guided-reader')?.classList.add('active');
-  document.getElementById('settings-tab-general')?.classList.remove('active');
-  document.getElementById('settings-tab-logs')?.classList.remove('active');
-  document.getElementById('settings-tab-downloads').classList.remove('active');
-  document.getElementById('settings-tab-comics-defaults')?.classList.remove('active');
-  document.getElementById('settings-tab-devices').classList.remove('active');
-  document.getElementById('settings-tab-users')?.classList.remove('active');
-  document.getElementById('settings-content-guided-reader')?.classList.remove('hidden');
-  document.getElementById('settings-content-general')?.classList.add('hidden');
-  document.getElementById('settings-content-logs')?.classList.add('hidden');
-  document.getElementById('settings-content-downloads').classList.add('hidden');
-  document.getElementById('settings-content-comics-defaults')?.classList.add('hidden');
-  document.getElementById('settings-content-devices').classList.add('hidden');
-  document.getElementById('settings-content-users')?.classList.add('hidden');
-  if (logInterval) clearInterval(logInterval);
+  switchSettingsTab('guided-reader');
   if (typeof openGuidedReaderTab === 'function') openGuidedReaderTab();
 });
 

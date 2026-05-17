@@ -1,4 +1,4 @@
-const { db, dbAll, dbRun } = require('./db');
+const { dbAll, dbRun } = require('./db');
 const { log } = require('./logger');
 const {
   setScanIntervalMinutes,
@@ -72,6 +72,5 @@ async function saveSetting(key, value) {
 
 module.exports = {
   loadSettings,
-  saveSetting,
-  db
+  saveSetting
 };

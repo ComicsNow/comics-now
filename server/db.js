@@ -1,5 +1,7 @@
 const sqlite3 = require('sqlite3').verbose();
 const { promisify } = require('util');
+const fs = require('fs');
+const path = require('path');
 const { DB_FILE } = require('./constants');
 const { log } = require('./logger');
 
@@ -24,9 +26,35 @@ function dbRun(sql, params = []) {
   });
 }
 
+async function runMigrations() {
+  await dbRun(`CREATE TABLE IF NOT EXISTS migrations (name TEXT PRIMARY KEY, applied_at INTEGER)`);
+  
+  const migrationsDir = path.join(__dirname, 'migrations');
+  if (!fs.existsSync(migrationsDir)) return;
+
+  const files = fs.readdirSync(migrationsDir).filter(f => f.endsWith('.js')).sort();
+  
+  for (const file of files) {
+    const migrationName = file;
+    const alreadyApplied = await dbGet(`SELECT 1 FROM migrations WHERE name = ?`, [migrationName]);
+    
+    if (!alreadyApplied) {
+      log('INFO', 'DB', `Applying migration: ${migrationName}`);
+      const migration = require(path.join(migrationsDir, file));
+      await migration.up(dbRun, dbGet, dbAll);
+      await dbRun(`INSERT INTO migrations (name, applied_at) VALUES (?, ?)`, [migrationName, Date.now()]);
+    }
+  }
+}
+
 async function initializeDatabase() {
-  log('INFO', 'DB', 'Initializing database...');  try {
+  log('INFO', 'DB', 'Initializing database...');
+  try {
+    await dbRun('BEGIN TRANSACTION');
+
+    // Core schema
     await dbRun(`CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT)`);
+
     await dbRun(`CREATE TABLE IF NOT EXISTS comics (
       id TEXT PRIMARY KEY,
       publisher TEXT,
@@ -125,6 +153,7 @@ async function initializeDatabase() {
       preferenceType TEXT NOT NULL,
       targetId TEXT NOT NULL,
       mangaMode INTEGER DEFAULT 0,
+      continuousMode INTEGER DEFAULT NULL,
       createdAt INTEGER DEFAULT (strftime('%s', 'now') * 1000),
       updatedAt INTEGER DEFAULT (strftime('%s', 'now') * 1000),
       PRIMARY KEY (userId, preferenceType, targetId),
@@ -165,132 +194,8 @@ async function initializeDatabase() {
       FOREIGN KEY (listId) REFERENCES reading_lists(id) ON DELETE CASCADE
     )`);
 
-    // Migration: Add sortOrder column to reading_lists table
-    const readingListCols = await dbAll('PRAGMA table_info(reading_lists)');
-    if (!readingListCols.some(c => c.name === 'sortOrder')) {
-      await dbRun('ALTER TABLE reading_lists ADD COLUMN sortOrder INTEGER DEFAULT 0');
-      log('INFO', 'DB', 'Added sortOrder column to reading_lists table');
-    }
-
-    // Add userId column to devices table (nullable for backward compatibility)
-    const deviceCols = await dbAll('PRAGMA table_info(devices)');
-    if (!deviceCols.some(c => c.name === 'userId')) {
-      await dbRun('ALTER TABLE devices ADD COLUMN userId TEXT');
-      log('INFO', 'DB', 'Added userId column to devices table');
-    }
-
-    // Check for missing columns in comics table
-    const cols = await dbAll('PRAGMA table_info(comics)');
-    if (!cols.some(c => c.name === 'thumbnailPath')) await dbRun('ALTER TABLE comics ADD COLUMN thumbnailPath TEXT');
-    if (!cols.some(c => c.name === 'convertedAt')) await dbRun('ALTER TABLE comics ADD COLUMN convertedAt INTEGER');
-    if (!cols.some(c => c.name === 'guidedViewStatus')) await dbRun("ALTER TABLE comics ADD COLUMN guidedViewStatus TEXT DEFAULT 'pending'");
-    if (!cols.some(c => c.name === 'guidedViewError')) await dbRun('ALTER TABLE comics ADD COLUMN guidedViewError TEXT');
-    if (!cols.some(c => c.name === 'guidedViewPath')) await dbRun('ALTER TABLE comics ADD COLUMN guidedViewPath TEXT');
-    if (!cols.some(c => c.name === 'libraryMode')) await dbRun("ALTER TABLE comics ADD COLUMN libraryMode TEXT DEFAULT 'metadata'");
-
-    // Migration: Move mangaMode from comics table to user_reading_preferences
-    if (cols.some(c => c.name === 'mangaMode')) {
-      const migrationCheck = await dbGet(`SELECT value FROM settings WHERE key = 'manga_mode_migration_v1'`);
-      if (!migrationCheck) {
-        log('INFO', 'DB', 'Detected mangaMode column in comics table - starting migration...');
-        
-        const now = Date.now();
-        // Optimized migration: single SQL statement to cross-join users and comics with mangaMode=1
-        await dbRun(`
-          INSERT INTO user_reading_preferences (userId, preferenceType, targetId, mangaMode, createdAt, updatedAt)
-          SELECT u.userId, 'comic', c.id, 1, ?, ?
-          FROM users u, comics c
-          WHERE c.mangaMode = 1
-          ON CONFLICT(userId, preferenceType, targetId) DO UPDATE SET
-            mangaMode = 1,
-            updatedAt = excluded.updatedAt
-        `, [now, now]);
-
-        await dbRun(`INSERT OR REPLACE INTO settings (key, value) VALUES ('manga_mode_migration_v1', 'completed')`);
-      }
-    }
-
-    // Migration: Add new access columns to existing table
-    const accessCols = await dbAll('PRAGMA table_info(user_library_access)');
-    if (accessCols && accessCols.length > 0) {
-      const hasGranted = accessCols.some(c => c.name === 'granted');
-      const hasDirectAccess = accessCols.some(c => c.name === 'direct_access');
-      const hasRecursiveAccess = accessCols.some(c => c.name === 'recursive_access');
-      const hasChildAccess = accessCols.some(c => c.name === 'child_access');
-
-      if (hasGranted && !hasDirectAccess && !hasRecursiveAccess) {
-        log('INFO', 'DB', 'Migrating user_library_access from granted to direct_access/recursive_access...');
-        await dbRun(`ALTER TABLE user_library_access ADD COLUMN direct_access INTEGER DEFAULT 0`);
-        await dbRun(`ALTER TABLE user_library_access ADD COLUMN recursive_access INTEGER DEFAULT 0`);
-        await dbRun(`UPDATE user_library_access SET recursive_access = granted, direct_access = granted WHERE granted = 1`);
-      }
-
-      if (hasRecursiveAccess && !hasChildAccess) {
-        log('INFO', 'DB', 'Migrating user_library_access from recursive_access to child_access...');
-        await dbRun(`ALTER TABLE user_library_access ADD COLUMN child_access INTEGER DEFAULT 0`);
-        await dbRun(`UPDATE user_library_access SET child_access = recursive_access`);
-      }
-    }
-
-    // Migration: Grant full access to existing users (one-time)
-    const accessMigrationCheck = await dbGet(`SELECT value FROM settings WHERE key = 'access_migration_v2'`);
-    if (!accessMigrationCheck) {
-      const users = await dbAll(`SELECT userId, role FROM users`);
-      if (users && users.length > 0) {
-        const { getComicsDirectories } = require('./config');
-        const rootFolders = getComicsDirectories();
-        if (rootFolders.length > 0) {
-          const stmt = db.prepare(`INSERT OR IGNORE INTO user_library_access (userId, accessType, accessValue, direct_access, child_access) VALUES (?, ?, ?, 1, 1)`);
-          for (const user of users) {
-            if (user.role === 'admin') continue;
-            for (const folder of rootFolders) {
-              await new Promise((resolve, reject) => {
-                stmt.run(user.userId, 'root_folder', folder, (err) => err ? reject(err) : resolve());
-              });
-            }
-          }
-          await new Promise((resolve) => stmt.finalize(resolve));
-          await dbRun(`INSERT OR REPLACE INTO settings (key, value) VALUES ('access_migration_v2', 'completed')`);
-          log('INFO', 'DB', 'Completed user access migration v2 for existing users');
-        }
-      }
-    }
-
-    // Migration: Add continuous mode columns
-    const userSettingsCols = await dbAll('PRAGMA table_info(user_settings)');
-    if (!userSettingsCols.some(c => c.name === 'continuousModeDefault')) {
-      await dbRun('ALTER TABLE user_settings ADD COLUMN continuousModeDefault INTEGER DEFAULT 0');
-      log('INFO', 'DB', 'Added continuousModeDefault column to user_settings table');
-    }
-
-    const userComicStatusCols = await dbAll('PRAGMA table_info(user_comic_status)');
-    if (!userComicStatusCols.some(c => c.name === 'continuousMode')) {
-      await dbRun('ALTER TABLE user_comic_status ADD COLUMN continuousMode INTEGER');
-      log('INFO', 'DB', 'Added continuousMode column to user_comic_status table');
-    }
-
-    // Migration: Populate libraryMode for existing comics based on folder structure
-    const folderMigrationCheck = await dbGet(`SELECT value FROM settings WHERE key = 'folder_mode_migration_v1'`);
-    if (!folderMigrationCheck) {
-      log('INFO', 'DB', 'Starting folder mode migration (populating libraryMode)...');
-      const { getLibraries } = require('./config');
-      const libraries = getLibraries();
-      const comics = await dbAll(`SELECT id, path FROM comics`);
-      if (comics && comics.length > 0) {
-        log('INFO', 'DB', `Migrating libraryMode for ${comics.length} comics...`);
-        const stmt = db.prepare(`UPDATE comics SET libraryMode = ? WHERE id = ?`);
-        for (const comic of comics) {
-          const library = libraries.find(lib => comic.path.startsWith(lib.path));
-          const mode = library ? library.hierarchyMode : 'metadata';
-          await new Promise((resolve, reject) => {
-            stmt.run(mode, comic.id, (err) => err ? reject(err) : resolve());
-          });
-        }
-        await new Promise((resolve) => stmt.finalize(resolve));
-      }
-      await dbRun(`INSERT OR REPLACE INTO settings (key, value) VALUES ('folder_mode_migration_v1', 'completed')`);
-      log('INFO', 'DB', 'Completed folder mode migration');
-    }
+    // Run incremental migrations
+    await runMigrations();
 
     // Final step: Create/ensure all indexes exist
     // This is done last to ensure any table reconstructions (migrations) have finished
@@ -300,8 +205,10 @@ async function initializeDatabase() {
     await dbRun(`CREATE INDEX IF NOT EXISTS idx_comics_updatedAt ON comics(updatedAt)`);
     await dbRun(`CREATE INDEX IF NOT EXISTS idx_reading_list_items_comic ON reading_list_items(comicId)`);
 
+    await dbRun('COMMIT');
     log('INFO', 'DB', 'Database initialization complete');
   } catch (err) {
+    await dbRun('ROLLBACK').catch(() => {});
     log('ERROR', 'DB', `Database initialization failed: ${err.message}`);
     throw err;
   }
@@ -311,181 +218,93 @@ async function initializeDatabase() {
 // Helper function to check if user has access to a specific comic
 // Uses hierarchical access control: root_folder -> publisher -> series
 // Series is the lowest level - having series access grants access to all comics in that series
+const { checkComicAccess: checkAccessLogic } = require('./access-control');
+
+// Helper function to check if user has access to a specific comic
+// Uses hierarchical access control: root_folder -> publisher -> series
 async function checkComicAccess(userId, userRole, comicPath, publisher, series, rootFolders, comicId = null, preFetchedAccessList = null) {
-  // Admins have access to everything
-  if (userRole === 'admin') {
-    return true;
-  }
-
-  // Determine which root folder this comic belongs to
-  let rootFolder = 'Unknown';
-  for (const folder of rootFolders) {
-    if (comicPath.startsWith(folder)) {
-      rootFolder = folder;
-      break;
-    }
-  }
-
-  // Get user's access permissions (all at once for efficiency)
-  const accessList = preFetchedAccessList || await dbAll(
-    `SELECT accessType, accessValue, direct_access, child_access
-     FROM user_library_access
-     WHERE userId = ? AND (direct_access = 1 OR child_access = 1)`,
-    [userId]
-  );
-
-  // Hierarchical access control: Check from top to bottom
-  // User MUST have access at root folder level first, then publisher, then series
-  // Child access at any parent level grants access to all descendants
-
-  // Check if any parent has child_access that would grant access to this comic
-  // Check root folder child_access
-  const rootChildAccess = accessList.find(a =>
-    a.accessType === 'root_folder' &&
-    a.accessValue === rootFolder &&
-    a.child_access === 1
-  );
-
-  if (rootChildAccess) {
-    return true; // Root folder child_access grants access to everything under it
-  }
-
-  // Check publisher child_access
-  const publisherChildAccess = accessList.find(a =>
-    a.accessType === 'publisher' &&
-    a.accessValue === publisher &&
-    a.child_access === 1
-  );
-  if (publisherChildAccess) {
-    // Publisher has child_access, but we still need root folder access
-    const rootAccess = accessList.find(a =>
-      a.accessType === 'root_folder' &&
-      a.accessValue === rootFolder &&
-      (a.direct_access === 1 || a.child_access === 1)
-    );
-    if (rootAccess) {
-      return true; // Publisher child_access + root access grants access to all series/comics
-    }
-  }
-
-  // Check series child_access
-  const seriesChildAccess = accessList.find(a =>
-    a.accessType === 'series' &&
-    a.accessValue === series &&
-    a.child_access === 1
-  );
-  if (seriesChildAccess) {
-    // Series has child_access, check if we have publisher and root access
-    const rootAccess = accessList.find(a =>
-      a.accessType === 'root_folder' &&
-      a.accessValue === rootFolder &&
-      (a.direct_access === 1 || a.child_access === 1)
-    );
-    const publisherAccess = accessList.find(a =>
-      a.accessType === 'publisher' &&
-      a.accessValue === publisher &&
-      (a.direct_access === 1 || a.child_access === 1)
-    );
-    if (rootAccess && publisherAccess) {
-      return true; // Series child_access + publisher + root access grants access to all comics
-    }
-  }
-
-  // No child_access found, check for direct_access at each level
-  // Step 1: Check ROOT FOLDER direct access (mandatory)
-  const rootDirectAccess = accessList.find(a =>
-    a.accessType === 'root_folder' &&
-    a.accessValue === rootFolder &&
-    a.direct_access === 1
-  );
-  if (!rootDirectAccess) {
-    return false; // No root folder access at all
-  }
-
-  // Step 2: Check PUBLISHER direct access
-  const publisherDirectAccess = accessList.find(a =>
-    a.accessType === 'publisher' &&
-    a.accessValue === publisher &&
-    a.direct_access === 1
-  );
-  if (!publisherDirectAccess) {
-    return false; // No publisher access
-  }
-
-  // Step 3: Check SERIES access
-  // Series is the lowest level - having series access grants access to all comics in that series
-  const seriesDirectAccess = accessList.find(a =>
-    a.accessType === 'series' &&
-    a.accessValue === series &&
-    a.direct_access === 1
-  );
-  if (!seriesDirectAccess) {
-    return false; // No series access
-  }
-
-  // Series access granted - user has access to all comics in this series
-  return true;
+  return checkAccessLogic(userId, userRole, comicPath, publisher, series, rootFolders, comicId, preFetchedAccessList, dbAll);
 }
 
 // ============================================================================
-// PER-USER MANGA MODE PREFERENCES (HIERARCHICAL)
+// PER-USER READING PREFERENCES (HIERARCHICAL)
 // ============================================================================
 
 /**
- * Set manga mode preference for a user at a specific level
+ * Set reading preference (manga mode, continuous mode) for a user at a specific level
  * @param {string} userId - User ID
  * @param {string} preferenceType - 'comic', 'series', 'publisher', or 'library'
  * @param {string} targetId - The ID/name of the target (comic ID, series name, etc.)
- * @param {boolean} mangaMode - The manga mode value
+ * @param {boolean|null} mangaMode - The manga mode value (optional)
+ * @param {boolean|null} continuousMode - The continuous mode value (optional)
  */
-async function setMangaModePreference(userId, preferenceType, targetId, mangaMode) {
+async function setReadingPreference(userId, preferenceType, targetId, mangaMode, continuousMode) {
   try {
     const now = Date.now();
-    await dbRun(
-      `INSERT INTO user_reading_preferences (userId, preferenceType, targetId, mangaMode, createdAt, updatedAt)
-       VALUES (?, ?, ?, ?, ?, ?)
-       ON CONFLICT(userId, preferenceType, targetId) DO UPDATE SET
-         mangaMode = excluded.mangaMode,
-         updatedAt = excluded.updatedAt`,
-      [userId, preferenceType, targetId, mangaMode ? 1 : 0, now, now]
-    );
-    log('INFO', 'MANGA_PREFS', `Set ${preferenceType} '${targetId}' manga mode to ${mangaMode} for user ${userId}`);
+    let sets = ['updatedAt = excluded.updatedAt'];
+    let params = [userId, preferenceType, targetId, now, now];
+    let columns = ['userId', 'preferenceType', 'targetId', 'updatedAt', 'createdAt'];
+    let placeholders = ['?', '?', '?', '?', '?'];
+
+    if (mangaMode !== undefined) {
+      columns.push('mangaMode');
+      placeholders.push('?');
+      params.push(mangaMode === null ? null : (mangaMode ? 1 : 0));
+      sets.push('mangaMode = excluded.mangaMode');
+    }
+    if (continuousMode !== undefined) {
+      columns.push('continuousMode');
+      placeholders.push('?');
+      params.push(continuousMode === null ? null : (continuousMode ? 1 : 0));
+      sets.push('continuousMode = excluded.continuousMode');
+    }
+
+    const sql = `
+      INSERT INTO user_reading_preferences (${columns.join(', ')})
+      VALUES (${placeholders.join(', ')})
+      ON CONFLICT(userId, preferenceType, targetId) DO UPDATE SET
+        ${sets.join(', ')}
+    `;
+
+    await dbRun(sql, params);
+    log('INFO', 'READING_PREFS', `Set ${preferenceType} '${targetId}' preferences (manga: ${mangaMode}, continuous: ${continuousMode}) for user ${userId}`);
     return true;
   } catch (error) {
-    log('ERROR', 'MANGA_PREFS', `Failed to set manga mode preference: ${error.message}`);
+    log('ERROR', 'READING_PREFS', `Failed to set reading preference: ${error.message}`);
     return false;
   }
 }
 
 /**
- * Get all manga mode preferences for a user (bulk query for efficiency)
+ * Get all reading preferences for a user
  */
-async function getAllMangaModePreferences(userId) {
+async function getAllReadingPreferences(userId) {
   try {
     const prefs = await dbAll(
-      `SELECT preferenceType, targetId, mangaMode FROM user_reading_preferences
+      `SELECT preferenceType, targetId, mangaMode, continuousMode FROM user_reading_preferences
        WHERE userId = ?`,
       [userId]
     );
     return prefs;
   } catch (error) {
-    log('ERROR', 'MANGA_PREFS', `Failed to get all manga mode preferences: ${error.message}`);
+    log('ERROR', 'READING_PREFS', `Failed to get all reading preferences: ${error.message}`);
     return [];
   }
 }
 
 /**
- * Get unified manga preference maps
- * @param {number|null} userId - If provided, gets preferences for a specific user. If null, gets global positive preferences.
+ * Get unified reading preference maps
+ * @param {number|null} userId - If provided, gets preferences for a specific user.
  */
-async function getMangaPrefMaps(userId = null) {
-  let query = `SELECT preferenceType, targetId, mangaMode FROM user_reading_preferences`;
+async function getReadingPrefMaps(userId = null) {
+  let query = `SELECT preferenceType, targetId, mangaMode, continuousMode FROM user_reading_preferences`;
   let params = [];
   if (userId) {
     query += ` WHERE userId = ?`;
     params.push(userId);
   } else {
-    query += ` WHERE mangaMode = 1`;
+    // If no userId, get all rows where at least one preference is explicitly set
+    query += ` WHERE mangaMode IS NOT NULL OR continuousMode IS NOT NULL`;
   }
   
   const rows = await dbAll(query, params);
@@ -499,8 +318,10 @@ async function getMangaPrefMaps(userId = null) {
 
   for (const pref of rows) {
     if (prefMaps[pref.preferenceType]) {
-      // If user-specific, respect the 0 or 1. If global, it's always 1.
-      prefMaps[pref.preferenceType].set(pref.targetId, pref.mangaMode === 1);
+      prefMaps[pref.preferenceType].set(pref.targetId, {
+        mangaMode: pref.mangaMode === 1 ? true : (pref.mangaMode === 0 ? false : null),
+        continuousMode: pref.continuousMode === 1 ? true : (pref.continuousMode === 0 ? false : null)
+      });
     }
   }
   
@@ -508,17 +329,54 @@ async function getMangaPrefMaps(userId = null) {
 }
 
 /**
- * Resolve manga mode hierarchically
+ * Resolve reading modes hierarchically
  */
-function resolveMangaMode(comicId, series, publisher, comicPath, prefMaps, comicsRoots) {
-  if (prefMaps.comic.has(comicId)) return prefMaps.comic.get(comicId);
-  if (series && prefMaps.series.has(series)) return prefMaps.series.get(series);
-  if (publisher && prefMaps.publisher.has(publisher)) return prefMaps.publisher.get(publisher);
+function resolveReadingModes(comicId, series, publisher, comicPath, prefMaps, comicsRoots) {
+  const levels = [];
+  if (prefMaps.comic.has(comicId)) levels.push(prefMaps.comic.get(comicId));
+  if (series && prefMaps.series.has(series)) levels.push(prefMaps.series.get(series));
+  if (publisher && prefMaps.publisher.has(publisher)) levels.push(prefMaps.publisher.get(publisher));
   if (comicPath && comicsRoots) {
     const root = comicsRoots.find(d => comicPath.startsWith(d));
-    if (root && prefMaps.library.has(root)) return prefMaps.library.get(root);
+    if (root && prefMaps.library.has(root)) levels.push(prefMaps.library.get(root));
   }
-  return false;
+
+  let mangaMode = false;
+  let continuousMode = false;
+
+  // Find first non-null mangaMode
+  for (const level of levels) {
+    if (level.mangaMode !== null && level.mangaMode !== undefined) {
+      mangaMode = level.mangaMode;
+      break;
+    }
+  }
+
+  // Find first non-null continuousMode
+  for (const level of levels) {
+    if (level.continuousMode !== null && level.continuousMode !== undefined) {
+      continuousMode = level.continuousMode;
+      break;
+    }
+  }
+
+  return { mangaMode, continuousMode };
+}
+
+async function closeDb() {
+  return new Promise((resolve, reject) => {
+    if (db) {
+      db.close((err) => {
+        if (err) {
+          reject(err);
+        } else {
+          resolve();
+        }
+      });
+    } else {
+      resolve();
+    }
+  });
 }
 
 module.exports = {
@@ -527,9 +385,17 @@ module.exports = {
   dbRun,
   dbAll,
   initializeDatabase,
+  closeDb,
   checkComicAccess,
-  setMangaModePreference,
-  getAllMangaModePreferences,
-  getMangaPrefMaps,
-  resolveMangaMode
+  setReadingPreference,
+  getAllReadingPreferences,
+  getReadingPrefMaps,
+  resolveReadingModes,
+  // Aliases for backward compatibility during transition
+  setMangaModePreference: setReadingPreference,
+  getMangaPrefMaps: getReadingPrefMaps,
+  resolveMangaMode: (c, s, p, path, maps, roots) => {
+    const res = resolveReadingModes(c, s, p, path, maps, roots);
+    return res.mangaMode;
+  }
 };

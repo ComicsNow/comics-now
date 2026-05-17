@@ -1,36 +1,14 @@
 /**
  * @jest-environment jsdom
  */
-const fs = require('fs');
-const path = require('path');
+
+// Mock global functions used in public/app.js before requiring it
+global.openOfflineDB = jest.fn().mockResolvedValue(null);
+global.escapeHtml = jest.fn(str => str);
+global.initializeApp = jest.fn();
 
 describe('Metadata Restriction', () => {
-    let hideAdminUI;
-
-    beforeAll(() => {
-        const appJsPath = path.join(__dirname, '../public/app.js');
-        const appJs = fs.readFileSync(appJsPath, 'utf8');
-        // Extract hideAdminUI function
-        const startIdx = appJs.indexOf('function hideAdminUI() {');
-        if (startIdx === -1) throw new Error('hideAdminUI not found');
-        
-        let braceCount = 0;
-        let endIdx = -1;
-        for (let i = startIdx; i < appJs.length; i++) {
-            if (appJs[i] === '{') braceCount++;
-            else if (appJs[i] === '}') {
-                braceCount--;
-                if (braceCount === 0) {
-                    endIdx = i + 1;
-                    break;
-                }
-            }
-        }
-        
-        const functionStr = appJs.substring(startIdx, endIdx);
-        // Create function and run it
-        hideAdminUI = new Function('return ' + functionStr)();
-    });
+    const { hideAdminUI } = require('../public/app.js');
 
     test('hideAdminUI removes metadata-tab and metadata-content for non-admin users', () => {
         document.body.innerHTML = `

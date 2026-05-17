@@ -266,8 +266,15 @@
   }
 
   async function openComicViewer(comic, options = {}) {
-    if (!window._isNavigatingFromRouter && window.router) {
-       window.router.navigate(`/comic/${comic.id}`, true);
+    const isLocal = !!(comic.handle || comic.file || (comic.id && String(comic.id).startsWith('device-')));
+
+    if (!window._isNavigatingFromRouter && window.router && !isLocal) {
+       let navPath = `/comic/${comic.id}`;
+       if (global.currentFolderPath) {
+         navPath += `?folderPath=${encodeURIComponent(global.currentFolderPath)}`;
+       }
+       window.router.navigate(navPath, true);
+       return;
     }
 
     global.viewerReturnContext = {
@@ -281,8 +288,6 @@
     };
 
     // Routing: Determine which viewer to use
-    const isLocal = comic.handle || comic.file || (comic.id && String(comic.id).startsWith('device-'));
-    
     if (isLocal) {
       if (typeof global.initLocalViewer === 'function') {
         global.initLocalViewer();
@@ -318,16 +323,72 @@
         const crumbs = [
           { label: 'Libraries', action: () => global.showRootFolderList?.({ force: true }) }
         ];
-        if (libLabel) {
-          crumbs.push({ label: libLabel, action: () => global.showPublisherList?.(root, { force: true }) });
+
+        // Check if we're in folder mode
+        const rootData = global.library?.[root];
+        const isFolderMode = rootData?.hierarchyMode === 'folder' || global.currentView === 'folder' || !!global.currentFolderPath;
+
+        // Recover folderPath if missing in folder mode (e.g. on refresh without query param)
+        if (isFolderMode && !global.currentFolderPath && comic.path) {
+          global.currentFolderPath = comic.path.substring(0, comic.path.lastIndexOf('/')).replace(/\\/g, '/');
         }
-        if (pub) {
-          crumbs.push({ label: pub, action: () => global.showSeriesList?.(pub, { force: true }) });
+
+        if (isFolderMode && global.currentFolderPath && typeof global.showFolderView === 'function') {
+          // Build Folder Mode Breadcrumbs
+          const folderPath = global.currentFolderPath;
+          const normPath = folderPath.replace(/[\\\/]+$/, '');
+          const rootFolders = (global.configuredRootFolders || []).map(f => f.replace(/[\\\/]+$/, ''));
+          const matchedRoot = rootFolders.find(d => normPath === d || normPath.startsWith(d + '/')) || root;
+
+          if (matchedRoot) {
+            const rootName = (window.LIBRARY_NAMES && window.LIBRARY_NAMES[matchedRoot]) || matchedRoot.replace(/[\\\/]+$/, '').split(/[\\\/]/).pop() || matchedRoot;
+            crumbs.push({
+              label: rootName,
+              action: () => global.showFolderView(matchedRoot, { force: true })
+            });
+
+            const relative = normPath.substring(matchedRoot.length).replace(/^\/+/, '');
+            const parts = relative ? relative.split('/') : [];
+            let currentPath = matchedRoot;
+            
+            parts.forEach((part) => {
+              if (part) {
+                currentPath += '/' + part;
+                const targetPath = currentPath;
+                crumbs.push({
+                  label: part,
+                  action: () => global.showFolderView(targetPath, { force: true })
+                });
+              }
+            });
+          }
+        } else {
+          // Standard Metadata Mode Breadcrumbs
+          const rootName = (window.LIBRARY_NAMES && window.LIBRARY_NAMES[root]) || libLabel;
+          if (rootName) {
+            crumbs.push({ label: rootName, action: () => global.showPublisherList?.(root, { force: true }) });
+          }
+
+          // Recover metadata if missing from global state (e.g. on refresh)
+          const effectivePub = pub || comic.publisher;
+          const effectiveSeries = series || comic.series;
+
+          if (effectivePub && effectivePub !== 'Unknown Publisher') {
+            crumbs.push({ label: effectivePub, action: () => global.showSeriesList?.(effectivePub, { force: true }) });
+          }
+          if (effectiveSeries && effectiveSeries !== 'Unknown Series') {
+            crumbs.push({ label: effectiveSeries, action: () => global.showComicList?.(effectiveSeries, { force: true }) });
+          }
         }
-        if (series) {
-          crumbs.push({ label: series, action: () => global.showComicList?.(series, { force: true }) });
-        }
-        crumbs.push({ label: (displayInfo.displayTitle || comic.name || 'Comic') });
+
+        // Determine the label for the last segment (the comic itself)
+        // In folder mode, we prefer the specific title (filename without extension) or name 
+        // to avoid redundancy with the parent folder segments already in the breadcrumb.
+        const breadcrumbLabel = isFolderMode 
+          ? (displayInfo.titleText || comic.name || 'Comic') 
+          : (displayInfo.displayTitle || comic.name || 'Comic');
+
+        crumbs.push({ label: breadcrumbLabel });
         global.updateBreadcrumb(crumbs);
       }
     }
@@ -340,6 +401,16 @@
 
     if (global.comicViewerDiv) {
       global.comicViewerDiv.style.display = '';
+    }
+
+    // Toggle Metadata tab visibility based on comic source (Hide for local/device comics)
+    if (global.metadataTabBtn) {
+      if (isLocal) {
+        global.metadataTabBtn.classList.add('hidden');
+      } else {
+        const isAdmin = window.syncManager && window.syncManager.userRole === 'admin';
+        global.metadataTabBtn.classList.toggle('hidden', !isAdmin);
+      }
     }
 
     const displayInfo = global.applyDisplayInfoToComic?.(comic) || {};

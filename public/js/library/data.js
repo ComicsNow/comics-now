@@ -1,23 +1,35 @@
 (function (global) {
   'use strict';
 
-  function estimateLibrarySize(library) {
-    if (!library || typeof library !== 'object') return 0;
+  // Shared index for O(1) lookups
+  global.comicIdMap = new Map();
 
-    let totalComics = 0;
+  function buildComicIdMap(library) {
+    global.comicIdMap.clear();
+    if (!library || typeof library !== 'object') return;
+
     for (const rootFolder of Object.keys(library)) {
+      if (rootFolder.startsWith('_')) continue;
       const publishers = library[rootFolder]?.publishers || {};
       for (const publisherName of Object.keys(publishers)) {
         const seriesEntries = publishers[publisherName]?.series || {};
         for (const seriesName of Object.keys(seriesEntries)) {
           const comics = seriesEntries[seriesName];
           if (Array.isArray(comics)) {
-            totalComics += comics.length;
+            for (const comic of comics) {
+              global.comicIdMap.set(comic.id, comic);
+            }
           }
         }
       }
     }
-    return totalComics;
+  }
+
+  function estimateLibrarySize(library) {
+    if (!global.comicIdMap.size && library && typeof library === 'object') {
+       buildComicIdMap(library);
+    }
+    return global.comicIdMap.size;
   }
 
   async function fetchLibrary() {
@@ -36,6 +48,7 @@
 
       global.library = await response.json();
       applyDisplayInfoToLibrary(global.library);
+      buildComicIdMap(global.library);
 
       global.library._isLazyLoaded = true;
 
@@ -57,12 +70,13 @@
 
     global.library = await response.json();
     applyDisplayInfoToLibrary(global.library);
+    buildComicIdMap(global.library);
 
     if (typeof saveLibraryCacheToDB === 'function') {
       try {
         await saveLibraryCacheToDB(global.library);
       } catch (error) {
-
+        console.warn('Failed to save library cache to IndexedDB:', error);
       }
     }
 
@@ -116,7 +130,7 @@
       );
 
       if (!response.ok) {
-
+        console.error(`Failed to load series details: ${response.status}`);
         return false;
       }
 
@@ -124,10 +138,15 @@
 
       global.library[rootFolder].publishers[publisher].series[series] = comics;
 
+      // Update the flat ID map with the new details
+      for (const comic of comics) {
+        comicIdMap.set(comic.id, comic);
+      }
+
       debugLog('LAZY', `Successfully loaded ${comics.length} comics for series ${series}`);
       return true;
     } catch (error) {
-
+      console.error('Error in ensureSeriesLoaded:', error);
       return false;
     }
   }
@@ -140,7 +159,7 @@
     if (Array.isArray(seriesData)) {
       return seriesData;
     } else if (seriesData && seriesData._hasDetails === false) {
-
+      console.warn(`Series data for ${series} exists but has no details`);
       return [];
     }
 
@@ -151,25 +170,14 @@
     if (!global.library || typeof global.library !== 'object' || !comicId || !updates) return false;
 
     try {
-      for (const rootFolder of Object.keys(global.library)) {
-        const publishers = global.library[rootFolder]?.publishers || {};
-        for (const publisherName of Object.keys(publishers)) {
-          const seriesEntries = publishers[publisherName]?.series || {};
-          for (const seriesName of Object.keys(seriesEntries)) {
-            const comics = seriesEntries[seriesName];
-            if (Array.isArray(comics)) {
-              const comic = comics.find(c => c.id === comicId);
-              if (comic) {
-                Object.assign(comic, updates);
-                return true;
-              }
-            }
-          }
-        }
+      const comic = comicIdMap.get(comicId);
+      if (comic) {
+        Object.assign(comic, updates);
+        return true;
       }
       return false;
     } catch (error) {
-
+      console.error('Error updating comic in library:', error);
       return false;
     }
   }
@@ -183,7 +191,7 @@
       if (typeof window !== 'undefined' && window.syncManager) {
         syncPromises.push(
           window.syncManager.initializeDevice().catch(error => {
-            
+            console.error('SyncManager initialization failed:', error);
             return null;
           })
         );
@@ -192,7 +200,7 @@
       if (typeof getAllDownloadedComicIds === 'function') {
         syncPromises.push(
           getAllDownloadedComicIds().catch(error => {
-            
+            console.error('Failed to get downloaded comic IDs:', error);
             return null;
           })
         );
@@ -201,7 +209,7 @@
       if (typeof removeStaleDownloads === 'function') {
         syncPromises.push(
           removeStaleDownloads().catch(error => {
-            
+            console.error('Failed to remove stale downloads:', error);
             return null;
           })
         );
@@ -210,7 +218,7 @@
       if (typeof rebuildDownloadedComics === 'function') {
         syncPromises.push(
           rebuildDownloadedComics({ skipRender: true }).catch(error => {
-            
+            console.error('Failed to rebuild downloaded comics:', error);
             return null;
           })
         );
@@ -230,7 +238,7 @@
 
       debugLog('SYNC', 'Background sync operations completed');
     } catch (error) {
-      
+      console.error('Fatal error in background sync:', error);
     }
   }
 

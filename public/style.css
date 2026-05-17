@@ -82,6 +82,20 @@ body::after {
     background-clip: text;
     letter-spacing: -0.02em;
 }
+
+/* Offline Mode UI Adjustments */
+body.is-offline #logout-button,
+body.is-offline #support-link,
+body.is-offline #settings-button,
+body.is-offline #ct-button,
+body.is-offline #downloads-button {
+    display: none !important;
+}
+
+/* Hide specific context menu items offline */
+body.is-offline .comic-context-menu-item.hide-offline {
+    display: none !important;
+}
 .comic-card, .series-card, .folder-card {
     background: linear-gradient(175deg, #222222 0%, #1a1a1a 100%);
     border: 1px solid rgba(255, 255, 255, 0.065);

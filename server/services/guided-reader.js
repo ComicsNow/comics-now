@@ -4,7 +4,7 @@
 // Phase 2 will swap `processComic` for the real ONNX panel detector.
 
 const path = require('path');
-const { dbAll, dbGet, dbRun, getMangaPrefMaps, resolveMangaMode } = require('../db');
+const { dbAll, dbGet, dbRun, getReadingPrefMaps, resolveReadingModes } = require('../db');
 const { log, guidedLog } = require('../logger');
 const { getComicsDirectories } = require('../config');
 const panelDetector = require('./panel-detector');
@@ -80,7 +80,7 @@ async function getStatus() {
 //   statuses: optional override for guidedViewStatus values to include
 async function buildQueue(scope = null) {
   const roots = getComicsDirectories();
-  const mangaMaps = await getMangaPrefMaps();
+  const readingMaps = await getReadingPrefMaps();
   const queue = [];
   const statuses = (scope && Array.isArray(scope.statuses) && scope.statuses.length)
     ? scope.statuses
@@ -122,7 +122,8 @@ async function buildQueue(scope = null) {
 
     const rows = await dbAll(sql, params);
     for (const r of rows) {
-      const type = resolveMangaMode(r.id, r.series, r.publisher, r.path, mangaMaps, roots) ? 'manga' : 'western';
+      const { mangaMode } = resolveReadingModes(r.id, r.series, r.publisher, r.path, readingMaps, roots);
+      const type = mangaMode ? 'manga' : 'western';
       queue.push({ ...r, _root: root, type });
     }
   }

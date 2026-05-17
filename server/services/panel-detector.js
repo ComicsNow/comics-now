@@ -424,4 +424,4 @@ async function processComic(id, comicPath, type, opts = {}) {
   return { panels: totalPanels, pagesProcessed, pageCount: pages.length, outputPath: path.join(GUIDED_VIEW_DIR, id + '.json') };
 }
 
-module.exports = { processComic, detectPanels, detectBubbles, sortReadingOrder, extractPageBuffer, listPages, GUIDED_VIEW_DIR, MODEL_PATHS };
+module.exports = { processComic, extractPageBuffer, listPages, GUIDED_VIEW_DIR };

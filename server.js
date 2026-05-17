@@ -2,7 +2,40 @@
 // Features: CBR→CBZ conversion, thumbnails, dynamic baseUrl injection, full API used by the SPA.
 // When the rain pours, cozy up with Comics Now.
 
+/**
+ * Self-healing dependency check.
+ * If a required module is missing, attempt to install it before booting.
+ */
+(function checkDeps() {
+  // Critical modules that must be present for the app to start
+  const criticalDeps = ['express', 'cors', 'helmet', 'onnxruntime-node', 'sharp', 'sqlite3'];
+  let missing = false;
+  for (const dep of criticalDeps) {
+    try {
+      require.resolve(dep);
+    } catch (e) {
+      missing = true;
+      break;
+    }
+  }
+
+  if (missing) {
+    console.warn('\x1b[33m%s\x1b[0m', '--- MISSING NODE MODULES DETECTED ---');
+    console.log('Required modules are missing. Attempting to install them automatically...');
+    try {
+      require('child_process').execSync('npm install --production', { stdio: 'inherit' });
+      console.log('\x1b[32m%s\x1b[0m', '--- INSTALL COMPLETE ---');
+      console.log('Dependencies have been updated. Please restart the server.');
+      process.exit(0);
+    } catch (err) {
+      console.error('Failed to auto-install modules. Please run "npm install" manually.');
+      process.exit(1);
+    }
+  }
+})();
+
 const express = require('express');
+const cors = require('cors');
 const helmet = require('helmet');
 const fs = require('fs');
 
@@ -64,7 +97,7 @@ const {
   clearGuidedLogs
 } = require('./server/logger');
 
-const { initializeDatabase, dbGet, dbRun, dbAll } = require('./server/db');
+const { initializeDatabase, dbGet, dbRun, dbAll, closeDb } = require('./server/db');
 const { loadSettings, saveSetting } = require('./server/settings');
 const {
   scanLibrary,
@@ -110,56 +143,32 @@ app.use(helmet({
   hsts: false,
 }));
 
-// CORS middleware - configured via config.json
-app.use((req, res, next) => {
+// CORS middleware - standardized using the 'cors' package
+app.use(cors((req, callback) => {
   const corsConfig = getCorsConfig();
+  const origin = req.header('Origin');
+  
+  const options = {
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Cf-Access-Jwt-Assertion']
+  };
 
-  // If CORS is disabled, skip
-  if (!corsConfig.enabled) {
-    return next();
+  if (!corsConfig.enabled || !origin) {
+    options.origin = false;
+    return callback(null, options);
   }
 
-  const origin = req.headers.origin;
-  const allowedOrigins = corsConfig.allowedOrigins || [];
+  const isAllowed = (corsConfig.allowedOrigins || []).some(allowed => {
+    if (allowed === origin) return true;
+    const allowedWithoutProtocol = allowed.replace(/^https?:\/\//, '');
+    const originWithoutProtocol = origin.replace(/^https?:\/\//, '');
+    return allowedWithoutProtocol === originWithoutProtocol;
+  });
 
-  // Check if origin is allowed
-  let isAllowed = false;
-
-  // Allow same-origin requests (no origin header)
-  // This is needed for Service Worker requests from the same origin
-  if (!origin) {
-    isAllowed = true;
-  } else {
-    isAllowed = allowedOrigins.some(allowed => {
-      // Exact match
-      if (allowed === origin) return true;
-
-      // Protocol-agnostic match (e.g., allow both http and https)
-      const allowedWithoutProtocol = allowed.replace(/^https?:\/\//, '');
-      const originWithoutProtocol = origin.replace(/^https?:\/\//, '');
-      return allowedWithoutProtocol === originWithoutProtocol;
-    });
-  }
-
-  // If origin is allowed, set CORS headers
-  if (isAllowed) {
-    // For same-origin requests without origin header, don't set CORS headers
-    // (they're not needed and could cause issues)
-    if (origin) {
-      res.setHeader('Access-Control-Allow-Origin', origin);
-      res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-      res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Cf-Access-Jwt-Assertion');
-      res.setHeader('Access-Control-Allow-Credentials', 'true');
-    }
-  }
-
-  // Handle preflight OPTIONS requests
-  if (req.method === 'OPTIONS') {
-    return res.status(204).end();
-  }
-
-  next();
-});
+  options.origin = isAllowed ? origin : false;
+  callback(null, options);
+}));
 
 const apiRouter = createApiRouter({
   log,
@@ -271,22 +280,7 @@ app.use(baseUrl, staticRouter);
     }
   });
 
-  // Also try to ensure library directories, but expect failure if they are system-wide
-  getComicsDirectories().forEach(dir => {
-    try {
-      if (dir && !fs.existsSync(dir)) {
-        // Only try to create if it's likely a relative or user-writable path
-        if (!dir.startsWith('/') || dir.startsWith(ROOT_DIR)) {
-          fs.mkdirSync(dir, { recursive: true });
-          log('INFO', 'SERVER', `Ensured library dir: ${dir}`);
-        }
-      }
-    } catch (e) {
-      // Quietly ignore library directory creation failures - they likely already exist or are read-only
-    }
-  });
-
-  app.listen(PORT, () => {
+  const server = app.listen(PORT, () => {
     log('INFO', 'SERVER', `Server is running on http://localhost:${PORT}`);
     log('INFO', 'SERVER', `App is available at http://localhost:${PORT}${baseUrl}`);
     log('INFO', 'SERVER', `Scan interval = ${getScanIntervalMinutes()} minutes`);
@@ -298,6 +292,33 @@ app.use(baseUrl, staticRouter);
       log('INFO', 'AUTH', `Authentication: DISABLED (Open access)`);
     }
   });
+
+  let shuttingDown = false;
+  async function shutdown(signal) {
+    if (shuttingDown) return;
+    shuttingDown = true;
+    log('INFO', 'SERVER', `Received ${signal}, shutting down…`);
+    
+    server.close(async () => {
+      log('INFO', 'SERVER', 'HTTP server closed.');
+      try {
+        await closeDb();
+        log('INFO', 'SERVER', 'DB closed cleanly.');
+      } catch (e) {
+        log('ERROR', 'SERVER', `closeDb failed: ${e.message}`);
+      }
+      process.exit(0);
+    });
+
+    // Fallback exit if server.close hangs
+    setTimeout(() => {
+      log('WARN', 'SERVER', 'Shutdown timed out, forcing exit.');
+      process.exit(1);
+    }, 10000);
+  }
+
+  process.on('SIGTERM', () => shutdown('SIGTERM'));
+  process.on('SIGINT',  () => shutdown('SIGINT'));
 
   scheduleCtRun();
   await guidedReader.initialize();

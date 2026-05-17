@@ -1,7 +1,7 @@
 module.exports = function attach(router, deps) {
   const {
     dbGet, dbRun, dbAll, log, formatErrorMessage,
-    validateFingerprint, validateDeviceId, validateDeviceName, createId,
+    validateFingerprint, validateDeviceId, validateDeviceName, validateComicId, createId,
     requireAuth
   } = deps;
 
@@ -133,7 +133,11 @@ module.exports = function attach(router, deps) {
 
   router.get('/api/v1/sync/devices/:comicId', requireAuth, async (req, res) => {
     try {
-      const { comicId } = req.params;
+      const { comicId: rawId } = req.params;
+      const v = validateComicId(rawId);
+      if (!v.valid) return res.status(400).json({ ok: false, message: v.error });
+      const comicId = v.sanitized;
+
       const { currentDeviceId } = req.query;
 
       // Get userId from authenticated user (or default if auth disabled)

@@ -379,7 +379,7 @@ class SyncManager {
           <p class="text-gray-300 mb-4">This comic was read on another device:</p>
           <div class="bg-gray-700 p-4 rounded-lg mb-4">
             <div class="text-sm text-gray-400 mb-2">Last read on:</div>
-            <div class="text-white font-medium">${serverProgress.lastSyncDeviceName || 'Unknown Device'}</div>
+            <div class="text-white font-medium">${escapeHtml(serverProgress.lastSyncDeviceName || 'Unknown Device')}</div>
             <div class="text-gray-400 text-sm">${serverDate}</div>
           </div>
 
@@ -471,7 +471,7 @@ class SyncManager {
              ${isOtherDevice ? 'data-selectable="true"' : ''}>
           <div class="flex justify-between items-start">
             <div class="flex-1">
-              <div class="text-white font-medium">${device.deviceName || 'Unnamed Device'}</div>
+              <div class="text-white font-medium">${escapeHtml(device.deviceName || 'Unnamed Device')}</div>
               <div class="text-gray-400 text-sm">Last seen: ${lastSeen}</div>
               ${device.isCurrentDevice ? '<div class="text-blue-400 text-sm font-medium">This Device</div>' : ''}
             </div>
@@ -709,7 +709,7 @@ class SyncManager {
       <div class="flex items-center justify-between">
         <div>
           <div class="font-medium">Sync Available</div>
-          <div class="text-sm opacity-90">Updated on ${syncData.serverProgress?.lastSyncDeviceName || 'Another Device'}</div>
+          <div class="text-sm opacity-90">Updated on ${escapeHtml(syncData.serverProgress?.lastSyncDeviceName || 'Another Device')}</div>
         </div>
         <button id="sync-notification-close" class="ml-4 text-white hover:text-gray-200">
           <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

@@ -35,8 +35,7 @@
     const btn = document.getElementById('dynamic-manga-filter-btn');
     if (!span || !label || !btn) return;
 
-    // Use loose truthy check for the preference
-    const isMangaDefault = !!(global.mangaModePreference === true || global.mangaModePreference == 1);
+    const isMangaDefault = global.mangaModePreference === true;
     
     if (isMangaDefault) {
       label.textContent = 'Non-Manga';
@@ -52,23 +51,13 @@
   function rebuildMangaSmartLists() {
     const manga = [];
     const nonManga = [];
-    if (library && typeof library === 'object') {
-      for (const rootFolder of Object.keys(library)) {
-        const publishers = library[rootFolder]?.publishers || {};
-        for (const publisherName of Object.keys(publishers)) {
-          const seriesEntries = publishers[publisherName]?.series || {};
-          for (const seriesName of Object.keys(seriesEntries)) {
-            const comics = seriesEntries[seriesName];
-            if (!Array.isArray(comics)) continue;
-            for (const comic of comics) {
-              // Loose check for mangaMode (0/1 or true/false)
-              if (comic.mangaMode === true || comic.mangaMode == 1) {
-                manga.push(comic);
-              } else {
-                nonManga.push(comic);
-              }
-            }
-          }
+    
+    if (typeof global.comicIdMap !== 'undefined' && global.comicIdMap.size > 0) {
+      for (const comic of global.comicIdMap.values()) {
+        if (comic.mangaMode === true) {
+          manga.push(comic);
+        } else {
+          nonManga.push(comic);
         }
       }
     }
@@ -92,19 +81,9 @@
 
   function rebuildGuidedComics() {
     const out = [];
-    if (library && typeof library === 'object') {
-      for (const rootFolder of Object.keys(library)) {
-        const publishers = library[rootFolder]?.publishers || {};
-        for (const publisherName of Object.keys(publishers)) {
-          const seriesEntries = publishers[publisherName]?.series || {};
-          for (const seriesName of Object.keys(seriesEntries)) {
-            const comics = seriesEntries[seriesName];
-            if (!Array.isArray(comics)) continue;
-            for (const comic of comics) {
-              if (comic.guidedViewStatus === 'completed') out.push(comic);
-            }
-          }
-        }
+    if (typeof global.comicIdMap !== 'undefined' && global.comicIdMap.size > 0) {
+      for (const comic of global.comicIdMap.values()) {
+        if (comic.guidedViewStatus === 'completed') out.push(comic);
       }
     }
     out.sort((a, b) => {
@@ -122,22 +101,12 @@
     const cutoff = Date.now() - (LATEST_ADDED_DAYS * 24 * 60 * 60 * 1000);
     const recentComics = [];
 
-    if (library && typeof library === 'object') {
-      for (const rootFolder of Object.keys(library)) {
-        const publishers = library[rootFolder]?.publishers || {};
-        for (const publisherName of Object.keys(publishers)) {
-          const seriesEntries = publishers[publisherName]?.series || {};
-          for (const seriesName of Object.keys(seriesEntries)) {
-            const comics = seriesEntries[seriesName];
-            if (!Array.isArray(comics)) continue;
-            for (const comic of comics) {
-              const updatedValue = Number(comic.updatedAt ?? comic.convertedAt ?? 0);
-              if (!Number.isFinite(updatedValue) || updatedValue <= 0) continue;
-              if (updatedValue >= cutoff) {
-                recentComics.push(comic);
-              }
-            }
-          }
+    if (typeof global.comicIdMap !== 'undefined' && global.comicIdMap.size > 0) {
+      for (const comic of global.comicIdMap.values()) {
+        const updatedValue = Number(comic.updatedAt ?? comic.convertedAt ?? 0);
+        if (!Number.isFinite(updatedValue) || updatedValue <= 0) continue;
+        if (updatedValue >= cutoff) {
+          recentComics.push(comic);
         }
       }
     }
@@ -289,23 +258,8 @@
           }
 
           // Sync manga mode from library if available (similar to read status sync)
-          if (typeof global !== 'undefined' && typeof global.library !== 'undefined') {
-            let libraryComic = null;
-            for (const rootFolder of Object.keys(global.library)) {
-              const publishers = global.library[rootFolder]?.publishers || {};
-              for (const publisherName of Object.keys(publishers)) {
-                const seriesEntries = publishers[publisherName]?.series || {};
-                for (const seriesName of Object.keys(seriesEntries)) {
-                  const comics = seriesEntries[seriesName];
-                  if (Array.isArray(comics)) {
-                    libraryComic = comics.find(c => c.id === baseComic.id);
-                    if (libraryComic) break;
-                  }
-                }
-                if (libraryComic) break;
-              }
-              if (libraryComic) break;
-            }
+          if (typeof global.comicIdMap !== 'undefined') {
+            const libraryComic = global.comicIdMap.get(baseComic.id);
 
             // Sync manga mode from library if found
             if (libraryComic && libraryComic.mangaMode !== undefined) {

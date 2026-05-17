@@ -84,7 +84,7 @@ module.exports = function attach(router, deps) {
 
       if (access.length > 0) {
         // Build hierarchy map from comics database
-        const comics = await dbAll('SELECT path, publisher, series FROM comics');
+        const comics = await dbAll('SELECT MIN(path) as path, publisher, series FROM comics GROUP BY publisher, series');
         const rootFolders = getComicsDirectories();
 
         // Map: root_folder -> Set of publishers

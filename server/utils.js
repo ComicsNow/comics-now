@@ -154,6 +154,33 @@ function deepFreeze(obj) {
   return Object.freeze(obj);
 }
 
+/**
+ * Parallel map with concurrency limit
+ */
+async function pMap(items, mapper, concurrency = 5) {
+  const results = new Array(items.length);
+  const activeTasks = new Set();
+  let index = 0;
+
+  for (const item of items) {
+    const currentIndex = index++;
+    const task = (async () => {
+      try {
+        results[currentIndex] = await mapper(item);
+      } finally {
+        activeTasks.delete(task);
+      }
+    })();
+    activeTasks.add(task);
+    if (activeTasks.size >= concurrency) {
+      await Promise.race(activeTasks);
+    }
+  }
+
+  await Promise.all(activeTasks);
+  return results;
+}
+
 module.exports = {
   createId,
   safeDirName,
@@ -166,5 +193,6 @@ module.exports = {
   ms,
   stripHtml,
   sanitizeHtml,
-  deepFreeze
+  deepFreeze,
+  pMap
 };

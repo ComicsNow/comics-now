@@ -5,6 +5,7 @@ const xml2js = require('xml2js');
 const { promisify } = require('util');
 
 const { writeComicInfoToCbz, buildComicInfoXml } = require('../../services/metadata');
+const { safeDirName } = require('../../utils');
 
 /**
  * Admin Library Management Routes
@@ -244,7 +245,7 @@ module.exports = function attach(router, deps) {
             continue;
           }
 
-          const publisher = info.Publisher || 'Unknown Publisher';
+          const publisher = safeDirName(info.Publisher || 'Unknown Publisher');
 
           const destDir = path.join(destBaseDir, publisher);
           if (!fs.existsSync(destDir)) {
@@ -259,7 +260,16 @@ module.exports = function attach(router, deps) {
             continue;
           }
 
-          fs.renameSync(filePath, destPath);
+          try {
+            fs.renameSync(filePath, destPath);
+          } catch (renameErr) {
+            if (renameErr.code === 'EXDEV') {
+              fs.copyFileSync(filePath, destPath);
+              fs.unlinkSync(filePath);
+            } else {
+              throw renameErr;
+            }
+          }
           moved++;
           moveLog(`✓ Moved: ${publisher}/${file}`);
           results.push({ file, success: true, destination: destPath });
@@ -347,11 +357,11 @@ module.exports = function attach(router, deps) {
   // Get library tree structure for access control
   router.get('/api/v1/library-tree', requireAdmin, async (req, res) => {
     try {
-      // Get all comics with their full info
+      // Get unique publisher/series combinations to build the hierarchy
       const comics = await dbAll(`
-        SELECT id, path, publisher, series, name
+        SELECT MIN(path) as path, publisher, series
         FROM comics
-        ORDER BY path
+        GROUP BY publisher, series
       `);
 
       // Get root folders from config

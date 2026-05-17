@@ -184,13 +184,18 @@
 
   function updateOfflineIndicator() {
     const offlineIndicator = document.getElementById('offline-indicator');
+    const isOffline = navigator.onLine === false;
+    
     if (offlineIndicator) {
-      if (navigator.onLine === false) {
+      if (isOffline) {
         offlineIndicator.classList.remove('hidden');
       } else {
         offlineIndicator.classList.add('hidden');
       }
     }
+    
+    // Toggle class on body for CSS-based hiding of UI elements
+    document.body.classList.toggle('is-offline', isOffline);
   }
 
   async function mergeOfflineStatusesIntoLibrary() {
@@ -441,46 +446,49 @@
       req.onerror = () => reject(req.error || new Error('getAll failed'));
     });
 
-    for (const item of unsynced) {
-      await new Promise(resolve => setTimeout(resolve, 0));
+    const CONCURRENCY_LIMIT = 5;
+    for (let i = 0; i < unsynced.length; i += CONCURRENCY_LIMIT) {
+      const chunk = unsynced.slice(i, i + CONCURRENCY_LIMIT);
+      
+      await Promise.all(chunk.map(async (item) => {
+        try {
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
-      try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+          if (item.type === 'series') {
+            await fetch(`${API_BASE_URL}/api/v1/series/status`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                rootFolder: item.rootFolder,
+                publisher: item.publisher,
+                series: item.seriesName,
+                status: item.status,
+              }),
+              signal: controller.signal,
+            });
+          } else {
+            await fetch(`${API_BASE_URL}/api/v1/comics/status`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ comicId: item.comicId, status: item.status }),
+              signal: controller.signal,
+            });
+          }
 
-        if (item.type === 'series') {
-          await fetch(`${API_BASE_URL}/api/v1/series/status`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              rootFolder: item.rootFolder,
-              publisher: item.publisher,
-              series: item.seriesName,
-              status: item.status,
-            }),
-            signal: controller.signal,
+          clearTimeout(timeoutId);
+
+          item.synced = true;
+          await new Promise((resolve, reject) => {
+            const tx2 = global.db.transaction(['statuses'], 'readwrite');
+            tx2.objectStore('statuses').put(item);
+            tx2.oncomplete = () => resolve();
+            tx2.onerror = () => reject(tx2.error || new Error('put failed'));
           });
-        } else {
-          await fetch(`${API_BASE_URL}/api/v1/comics/status`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ comicId: item.comicId, status: item.status }),
-            signal: controller.signal,
-          });
+        } catch (error) {
+          console.error('[OFFLINE] Failed to sync status for item:', item, error);
         }
-
-        clearTimeout(timeoutId);
-
-        item.synced = true;
-        await new Promise((resolve, reject) => {
-          const tx2 = global.db.transaction(['statuses'], 'readwrite');
-          tx2.objectStore('statuses').put(item);
-          tx2.oncomplete = () => resolve();
-          tx2.onerror = () => reject(tx2.error || new Error('put failed'));
-        });
-      } catch (error) {
-        
-      }
+      }));
     }
   }
 

@@ -3,7 +3,7 @@
 
 const SCOPE_URL = new URL(self.registration.scope);
 const BASE_PATH = SCOPE_URL.pathname;
-const CACHE_VERSION = 'v7.6';
+const CACHE_VERSION = 'v8.0';
 const CACHE_NAME = `comics-now-${CACHE_VERSION}-${BASE_PATH}`;
 const DOWNLOADS_CACHE_NAME = 'comics-now-downloads';
 
@@ -17,27 +17,55 @@ const ASSET_PATHS = [
   'manifest.json',
   'icons/icon-192x192.png',
   'icons/icon-512x512.png',
+  'js/router.js',
   'js/globals.js',
   'js/utils/device-detection.js',
-  'js/offline/db.js',
+  'js/offline/db-core.js',
+  'js/offline/db-jwt.js',
+  'js/offline/db-library-cache.js',
+  'js/offline/db-queue.js',
+  'js/offline/db-comics.js',
+  'js/offline/db-namespace.js',
   'js/jwt-capture.js',
   'js/offline/status.js',
   'js/offline/downloads.js',
+  'js/offline/download-progress.js',
+  'js/offline/download-notifications.js',
+  'js/offline/download-actions.js',
+  'js/offline/downloads-namespace.js',
   'js/offline.js',
   'js/library/data.js',
   'js/library/smartlists.js',
+  'js/library/status.js',
+  'js/library/smart-filters.js',
+  'js/library/breadcrumb.js',
+  'js/library/alpha-list.js',
+  'js/library/search.js',
   'js/library/render.js',
+  'js/library/folder-viewer.js',
+  'js/library/device-library.js',
   'js/library.js',
   'js/context-menu/menu-builder.js',
-  'js/context-menu/menu-actions.js',
   'js/manga.js',
   'js/continuous.js',
+  'js/context-menu/actions-shared.js',
+  'js/context-menu/actions-comic.js',
+  'js/context-menu/actions-series.js',
+  'js/context-menu/actions-publisher.js',
+  'js/context-menu/actions-library.js',
+  'js/context-menu/actions-folder.js',
   'js/metadata.js',
   'js/bulk-status.js',
   'js/viewer/fullscreen.js',
   'js/viewer/full-image.js',
-  'js/viewer/navigation.js',
+  'js/viewer/ui-page-jump.js',
+  'js/viewer/ui-orientation.js',
+  'js/viewer/ui-summary.js',
   'js/viewer/ui.js',
+  'js/viewer/ui-init.js',
+  'js/viewer/navigation.js',
+  'js/viewer/viewer-server.js',
+  'js/viewer/viewer-local.js',
   'js/viewer/end-navigation.js',
   'js/viewer/guided/data.js',
   'js/viewer/guided/geometry.js',
@@ -53,6 +81,13 @@ const ASSET_PATHS = [
   'js/viewer/guided/lifecycle.js',
   'js/viewer/guided/buttons.js',
   'js/viewer/guided/index.js',
+  'js/settings/shared.js',
+  'js/settings/continuous-mode.js',
+  'js/settings/devices.js',
+  'js/settings/users.js',
+  'js/settings/user-access.js',
+  'js/settings/comics-defaults.js',
+  'js/settings/comics-management.js',
   'js/settings.js',
   'js/guided-reader.js',
   'js/comictagger.js',
@@ -61,7 +96,8 @@ const ASSET_PATHS = [
   'js/progress.js',
   'js/sync.js',
   'js/auth.js',
-  'js/reading-lists.js'
+  'js/reading-lists.js',
+  'js/routes.js'
 ];
 
 // Build absolute URLs for caching within this scope
@@ -118,11 +154,12 @@ self.addEventListener('fetch', event => {
     return;
   }
 
-  // SPECIAL CACHE: Comic Pages and Thumbnails (DOWNLOADS_CACHE_NAME)
+  // SPECIAL CACHE: Comic Pages, Thumbnails, and Guided View JSON (DOWNLOADS_CACHE_NAME)
   const isComicPage = url.pathname.includes('/api/v1/comics/pages/image');
   const isThumbnail = url.pathname.includes('/thumbnails/');
+  const isGuidedView = url.pathname.match(/\/api\/v1\/comics\/.*\/guided-view/);
 
-  if (isComicPage || isThumbnail) {
+  if (isComicPage || isThumbnail || isGuidedView) {
     event.respondWith((async () => {
       const cache = await caches.open(DOWNLOADS_CACHE_NAME);
       
@@ -259,7 +296,7 @@ function encodePath(str) {
  */
 async function openDownloadDB() {
   return new Promise((resolve, reject) => {
-    // MUST match version in db.js (currently 13)
+    // MUST match version in db-core.js (currently 13)
     const request = indexedDB.open('comics-now-offline', 13);
 
     request.onsuccess = () => {
@@ -619,6 +656,17 @@ async function processDownloadQueue() {
           });
         });
 
+        // Fetch guided view data to cache it
+        try {
+          const guidedViewUrl = `${self.location.origin}${BASE_PATH}api/v1/comics/${encodeURIComponent(item.comic.id)}/guided-view`;
+          const gvRes = await fetch(guidedViewUrl, { headers: headers, credentials: 'include' });
+          if (gvRes.ok) {
+            const cache = await caches.open(DOWNLOADS_CACHE_NAME);
+            await cache.put(guidedViewUrl, gvRes);
+          }
+        } catch (gvErr) {
+          console.error('[SW] Guided view fetch failed:', gvErr);
+        }
 
         // Save to IndexedDB
         await saveComicBlob(db, item.comic, blob);

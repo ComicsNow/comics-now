@@ -6,6 +6,7 @@ const {
   validateScanInterval,
   validateComicId,
   validateApiKey,
+  validateSearchQuery,
 } = require('../server/validation');
 
 describe('validateDeviceName', () => {
@@ -91,5 +92,28 @@ describe('validateApiKey', () => {
 
   test('rejects non-alphanumeric characters', () => {
     expect(validateApiKey('abc-def!').valid).toBe(false);
+  });
+});
+
+describe('validateSearchQuery', () => {
+  test('returns empty string for null/undefined/non-string', () => {
+    expect(validateSearchQuery(null).sanitized).toBe('');
+    expect(validateSearchQuery(undefined).sanitized).toBe('');
+    expect(validateSearchQuery(123).sanitized).toBe('');
+  });
+
+  test('trims whitespace', () => {
+    expect(validateSearchQuery('  batman  ').sanitized).toBe('batman');
+  });
+
+  test('rejects queries longer than 500 characters', () => {
+    const longQuery = 'a'.repeat(501);
+    const result = validateSearchQuery(longQuery);
+    expect(result.valid).toBe(false);
+    expect(result.error).toMatch(/too long/);
+  });
+
+  test('accepts valid queries', () => {
+    expect(validateSearchQuery('Spider-Man').valid).toBe(true);
   });
 });

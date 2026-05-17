@@ -7,6 +7,14 @@
   async function showFolderView(folderPath, options = {}) {
     const force = Boolean(options.force);
     
+    if (!window._isNavigatingFromRouter && window.router && !window._isAppInitializing) {
+       const navPath = `/folder?path=${encodeURIComponent(folderPath)}`;
+       if ((global.getRelativePath() + window.location.search) !== navPath) {
+         window.router.navigate(navPath, true);
+         return;
+       }
+    }
+
     global.currentView = 'folder';
     global.currentRootFolder = global.currentRootFolder || folderPath;
     global.currentFolderPath = folderPath;
@@ -138,11 +146,68 @@
         <h3 class="text-sm font-semibold text-white text-center truncate w-full">${global.escapeHtml(folder.name)}</h3>
       `;
       card.addEventListener('click', () => showFolderView(folder.path));
+
+      // Add context menu support (right-click and long-press)
+      let longPressTimer = null;
+      let contextMenuShown = false;
+      const folderContextData = {
+        folderPath: folder.path,
+        folderName: folder.name
+      };
+
+      card.addEventListener('contextmenu', (e) => {
+        if (typeof global.showFolderContextMenu === 'function') {
+          global.showFolderContextMenu(e, folderContextData);
+        }
+      });
+
+      // Long-press for mobile
+      card.addEventListener('touchstart', (e) => {
+        contextMenuShown = false;
+        longPressTimer = setTimeout(() => {
+          if (typeof global.showFolderContextMenu === 'function') {
+            contextMenuShown = true;
+            global.showFolderContextMenu(e, folderContextData);
+          }
+        }, 500); // 500ms long press
+      }, { passive: true });
+
+      card.addEventListener('touchend', (e) => {
+        if (longPressTimer) {
+          clearTimeout(longPressTimer);
+          longPressTimer = null;
+        }
+        // Prevent click if context menu was just shown
+        if (contextMenuShown) {
+          e.preventDefault();
+          e.stopPropagation();
+          contextMenuShown = false;
+        }
+      });
+
+      card.addEventListener('touchmove', () => {
+        if (longPressTimer) {
+          clearTimeout(longPressTimer);
+          longPressTimer = null;
+        }
+      });
+
       container.appendChild(card);
     });
 
     // Render Comics
     if (comics.length > 0) {
+      // Enrich comics with local metadata (e.g. mangaMode, continuousMode)
+      if (global.comicIdMap) {
+        comics.forEach(c => {
+          const cached = global.comicIdMap.get(c.id);
+          if (cached) {
+            c.mangaMode = cached.mangaMode;
+            c.continuousMode = cached.continuousMode;
+          }
+        });
+      }
+
       const comicContainer = document.createElement('div');
       comicContainer.className = 'col-span-full grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 mt-4';
       container.appendChild(comicContainer);

@@ -133,6 +133,9 @@ function showView(targetView) {
     let path = null;
     if (targetView.id === 'root-folder-list') path = '/';
     else if (targetView.id === 'search-results-view') path = '/search';
+    else if (targetView.id === 'folder-list-view' && window.currentFolderPath) {
+      path = `/folder?path=${encodeURIComponent(window.currentFolderPath)}`;
+    }
     else if (targetView.id === 'publisher-list' && window.currentRootFolder) {
       path = `/library?rootFolder=${encodeURIComponent(window.currentRootFolder)}`;
     }
@@ -217,7 +220,7 @@ function createEmptyMessage(message) {
 }
 
 function createErrorMessage(message) {
-  return `<div class="${CSS_CLASSES.ERROR}">${message}</div>`;
+  return `<div class="${CSS_CLASSES.ERROR}">${escapeHtml(message)}</div>`;
 }
 
 function createCheckmarkIcon() {
@@ -512,6 +515,10 @@ let ctAwaitingMatches = false;
 
 // --- STATE MANAGEMENT ---
 var library = {};
+var lastSearchQuery = '';
+var lastSearchField = 'all';
+var lastSearchResults = null;
+var activeAlphaFilter = 'All';
 var configuredRootFolders = [];
 // Simplified to only support 'all' filter - smart lists removed
 var activeFilter = 'all';
@@ -589,6 +596,10 @@ if (typeof window !== 'undefined') {
   window.viewerReturnContext = viewerReturnContext;
   window.db = db;
   window.library = library;
+  window.lastSearchQuery = lastSearchQuery;
+  window.lastSearchField = lastSearchField;
+  window.lastSearchResults = lastSearchResults;
+  window.activeAlphaFilter = activeAlphaFilter;
   window.configuredRootFolders = configuredRootFolders;
   window.activeFilter = activeFilter;
   window.activeSmartFilter = activeSmartFilter;
@@ -631,6 +642,11 @@ if (typeof window !== 'undefined') {
   window.prevPageBtnBottom = prevPageBtnBottom;
   window.nextPageBtnBottom = nextPageBtnBottom;
   window.viewerTabBtn = viewerTabBtn;
+
+  // Expose Downloads/Offline UI elements
+  window.downloadsInfoDiv = downloadsInfoDiv;
+  window.clearDownloadsBtn = clearDownloadsBtn;
+  window.downloadQueueDiv = downloadQueueDiv;
 
   // Expose viewer navigation buttons
   window.viewerLibrariesBtn = viewerLibrariesBtn;

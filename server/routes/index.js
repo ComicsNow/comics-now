@@ -1,8 +1,9 @@
 const express = require('express');
 const path = require('path');
 const { 
-  formatErrorMessage: _formatErrorMessage,
-  isPathSafe: _isPathSafe
+  formatErrorMessage: sharedFormatErrorMessage,
+  isPathSafe: sharedIsPathSafe,
+  resolveLibraryPath
 } = require('../utils');
 const { 
   validateFingerprint, 
@@ -11,12 +12,16 @@ const {
   validateLastReadPage,
   validateStatus,
   validateScanInterval,
-  validateApiKey
+  validateApiKey,
+  validateSearchQuery,
+  validateComicId
 } = require('../validation');
 const { 
   checkComicAccess, 
-  getAllMangaModePreferences, 
-  setMangaModePreference 
+  getAllReadingPreferences, 
+  setReadingPreference,
+  getReadingPrefMaps,
+  resolveReadingModes
 } = require('../db');
 
 function createApiRouter(deps) {
@@ -29,16 +34,15 @@ function createApiRouter(deps) {
   
   // Create the shared helpers
   const formatErrorMessage = (error, req, fallbackMessage) => 
-    require('../utils').formatErrorMessage(log, error, req, fallbackMessage);
+    sharedFormatErrorMessage(log, error, req, fallbackMessage);
     
   const isPathSafe = (requestedPath) => {
-    const { resolveLibraryPath, isPathSafe: _isPathSafe } = require('../utils');
     const resolved = resolveLibraryPath(requestedPath, getPathFromLibraryId);
-    return _isPathSafe(log, getComicsDirectories, resolved);
+    return sharedIsPathSafe(log, getComicsDirectories, resolved);
   };
 
   const resolvePath = (requestedPath) =>
-    require('../utils').resolveLibraryPath(requestedPath, getPathFromLibraryId);
+    resolveLibraryPath(requestedPath, getPathFromLibraryId);
 
   // Merge extra deps for new sub-routers
   const extendedDeps = {
@@ -53,9 +57,13 @@ function createApiRouter(deps) {
     validateStatus,
     validateScanInterval,
     validateApiKey,
+    validateSearchQuery,
+    validateComicId,
     checkComicAccess,
-    getAllMangaModePreferences,
-    setMangaModePreference
+    getAllReadingPreferences,
+    setReadingPreference,
+    getReadingPrefMaps,
+    resolveReadingModes
   };
 
   // Middleware wrappers to prevent blocking static SPA routes that fall through
@@ -98,6 +106,7 @@ function createApiRouter(deps) {
   require('./admin/guided')(adminRouter, extendedDeps);
   require('./admin/settings')(adminRouter, extendedDeps);
   require('./admin/library-mgmt')(adminRouter, extendedDeps);
+  require('./admin/rename')(adminRouter, extendedDeps);
   
   // Register extracted routes
   router.use(userRouter);

@@ -24,7 +24,14 @@
 
     // Determine if desktop based on screen width
     const screenWidth = window.innerWidth || document.documentElement.clientWidth || document.body.clientWidth;
-    cachedIsDesktop = screenWidth >= DESKTOP_WIDTH_THRESHOLD;
+    const isWideScreen = screenWidth >= DESKTOP_WIDTH_THRESHOLD;
+
+    // Check for touch capability (coarse pointer)
+    // Devices with touch as primary input (tablets/phones) are not considered desktop
+    const isTouchDevice = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
+
+    // Desktop is a wide screen that is NOT primarily a touch device
+    cachedIsDesktop = isWideScreen && !isTouchDevice;
 
     return cachedIsDesktop;
   }

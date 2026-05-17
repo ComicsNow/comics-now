@@ -78,100 +78,131 @@ function updateLibraryStatusBadge() {
 }
 
 // --- INITIAL LOAD ---
+
+/**
+ * Phase 1: Environment and configuration setup
+ */
+function initEnvironment() {
+  const config = resolveAppConfig() || { baseUrl: '/', libraries: [] };
+  window.APP_CONFIG = config;
+
+  // 1) Work out the base URL the server mounted us at (no trailing slash)
+  API_BASE_URL = (config.baseUrl || '').replace(/\/$/, '');
+  
+  // Store library names for display mapping
+  window.LIBRARY_NAMES = {};
+  configuredRootFolders = [];
+
+  if (Array.isArray(config.libraries)) {
+    config.libraries.forEach(lib => {
+      if (typeof lib === 'object' && lib.id && lib.name) {
+        window.LIBRARY_NAMES[lib.id] = lib.name;
+        configuredRootFolders.push(lib.id);
+      }
+    });
+  }
+
+  // 2) Keep <base> tag in sync (with trailing slash)
+  const baseEl = document.querySelector('base');
+  if (baseEl) baseEl.href = `${API_BASE_URL}/`;
+
+  return config;
+}
+
+/**
+ * Phase 2: Service worker registration
+ */
+async function registerServiceWorker(config) {
+  // 3) Register the service worker for this mount
+  if ('serviceWorker' in navigator) {
+    if (['localhost', '127.0.0.1'].includes(location.hostname)) {
+      const regs = await navigator.serviceWorker.getRegistrations();
+      regs.forEach(reg => reg.unregister());
+    } else {
+      try {
+        const registration = await navigator.serviceWorker.register(`${API_BASE_URL}/service-worker.js`, {
+          scope: `${API_BASE_URL}/`,
+          updateViaCache: 'none'
+        });
+        registration.update();
+        registration.addEventListener('updatefound', () => {
+          const newWorker = registration.installing;
+          newWorker.addEventListener('statechange', () => {});
+        });
+      } catch (error) {
+        // Silently fail
+      }
+    }
+  }
+}
+
+/**
+ * Phase 3: Storage and database initialization
+ */
+async function initAppStorage() {
+  // 4) App init - prioritize offline data
+  await openOfflineDB();
+
+  // Initialize download queue and resume any pending downloads
+  if (typeof initializeDownloadQueue === 'function') {
+    try {
+      await initializeDownloadQueue();
+    } catch (error) {
+      console.error('[APP] Failed to initialize download queue:', error);
+    }
+  }
+
+  // Initialize JWT token capture for Cloudflare Access authentication
+  // This enables background downloads to work with authentication enabled
+  if (typeof initializeJWTCapture === 'function') {
+    try {
+      await initializeJWTCapture(30 * 60 * 1000); // Refresh every 30 minutes
+    } catch (error) {
+      console.error('[APP] Failed to initialize JWT capture:', error);
+    }
+  }
+}
+
+/**
+ * Phase 4: UI controls initialization
+ */
+function initUIControls() {
+  initializeLibraryUIControls();
+  initializeViewerUIControls();
+  initializeProgressTracking();
+}
+
+/**
+ * Phase 5: Initial data loading
+ */
+async function loadInitialData() {
+  // 4.5) Load manga mode preference early
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/v1/manga-mode-preference`);
+    const data = await response.json();
+    if (response.ok && data.ok) {
+      window.mangaModePreference = data.mangaMode;
+    }
+  } catch (error) {
+    console.warn('[initializeApp:mangaModePreference]', error);
+  }
+
+  // 5) Load library from cache first, then sync with server
+  await loadLibraryOfflineFirst();
+}
+
 async function initializeApp() {
   window._isAppInitializing = true;
   try {
-    const config = resolveAppConfig() || { baseUrl: '/', libraries: [] };
-    window.APP_CONFIG = config;
+    const config = initEnvironment();
+    await registerServiceWorker(config);
+    await initAppStorage();
+    initUIControls();
+    await loadInitialData();
 
-    // 1) Work out the base URL the server mounted us at (no trailing slash)
-    API_BASE_URL = (config.baseUrl || '').replace(/\/$/, '');
-    
-    // Store library names for display mapping
-    window.LIBRARY_NAMES = {};
-    configuredRootFolders = [];
-
-    if (Array.isArray(config.libraries)) {
-      config.libraries.forEach(lib => {
-        if (typeof lib === 'object' && lib.id && lib.name) {
-          window.LIBRARY_NAMES[lib.id] = lib.name;
-          configuredRootFolders.push(lib.id);
-        }
-      });
-    }
-
-    // 2) Keep <base> tag in sync (with trailing slash)
-    const baseEl = document.querySelector('base');
-    if (baseEl) baseEl.href = `${API_BASE_URL}/`;
-
-    // 3) Register the service worker for this mount
-    if ('serviceWorker' in navigator) {
-      if (['localhost', '127.0.0.1'].includes(location.hostname)) {
-        navigator.serviceWorker.getRegistrations().then(regs =>
-          regs.forEach(reg => reg.unregister())
-        );
-      } else {
-        navigator.serviceWorker
-          .register(`${API_BASE_URL}/service-worker.js`, {
-            scope: `${API_BASE_URL}/`,
-            updateViaCache: 'none'
-          })
-          .then(registration => {
-            registration.update();
-            registration.addEventListener('updatefound', () => {
-              const newWorker = registration.installing;
-              newWorker.addEventListener('statechange', () => {});
-            });
-          })
-          .catch(() => {});
-      }
-    }
-
-    // 4) App init - prioritize offline data
-    await openOfflineDB();
-
-    // Initialize download queue and resume any pending downloads
-    if (typeof initializeDownloadQueue === 'function') {
-      try {
-        await initializeDownloadQueue();
-      } catch (error) {
-        console.error('[APP] Failed to initialize download queue:', error);
-      }
-    }
-
-    // Initialize JWT token capture for Cloudflare Access authentication
-    // This enables background downloads to work with authentication enabled
-    if (typeof initializeJWTCapture === 'function') {
-      try {
-        await initializeJWTCapture(30 * 60 * 1000); // Refresh every 30 minutes
-      } catch (error) {
-        console.error('[APP] Failed to initialize JWT capture:', error);
-      }
-    }
-
-    initializeLibraryUIControls();
-    initializeViewerUIControls();
-    initializeProgressTracking();
-
-    // 4.5) Load manga mode preference early
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/v1/manga-mode-preference`);
-      const data = await response.json();
-      if (response.ok && data.ok) {
-        window.mangaModePreference = data.mangaMode;
-      }
-    } catch (error) {
-      console.warn('[initializeApp:mangaModePreference]', error);
-    }
-
-    // 5) Load library from cache first, then sync with server
-    await loadLibraryOfflineFirst();
-
-    // Final routing trigger once app is initialized and library is at least cached
     if (window.router) {
       window.router.navigate(getRelativePath() + window.location.search, false);
     }
-
   } catch (e) {
     console.error('[APP INIT ERROR]', e);
     console.error('[APP INIT ERROR] Stack:', e.stack);
@@ -179,7 +210,7 @@ async function initializeApp() {
       `<div class="text-red-400 text-center p-8">
          Could not load app configuration from server. Is it running and accessible?
          <br><br>
-         <div class="text-sm text-gray-400">Error: ${escapeHtml(e.message)}</div>
+         <span class="text-xs text-gray-500">${escapeHtml(e.message)}</span>
        </div>`;
   } finally {
     window._isAppInitializing = false;
@@ -1017,13 +1048,14 @@ async function showReadingListDetail(listId, listName) {
         // Grid view: comic cards with covers
         comicDiv.className = 'comic-card bg-gray-800 rounded-lg overflow-hidden shadow-lg cursor-pointer flex flex-col border border-gray-700/50 hover:border-purple-500/50 transition-all duration-300 group';
 
+        const isLocal = comic.handle || comic.file || (comic.id && String(comic.id).startsWith('device-'));
         const coverUrl = comic.thumbnailPath
           ? `${API_BASE_URL}/thumbnails/${comic.thumbnailPath}`
           : 'https://placehold.co/400x600/1e1e1e/e0e0e0?text=No+Cover';
 
-        const statusBanner = status === 'read'
+        const statusBanner = (status === 'read' && !isLocal)
           ? '<div class="status-banner status-read">Read</div>'
-          : status === 'in-progress'
+          : (status === 'in-progress' && !isLocal)
           ? '<div class="status-banner status-in-progress">In Progress</div>'
           : '';
 
@@ -1042,21 +1074,35 @@ async function showReadingListDetail(listId, listName) {
               </div>
             ` : ''}
             ${statusBanner}
-            ${downloadIndicatorGrid}
-            <div class="aspect-[2/3] w-full bg-gray-700 overflow-hidden">
-              <img src="${coverUrl}" alt="${escapeHtml(title)}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500">
+            ${!isLocal ? downloadIndicatorGrid : ''}
+            <div class="aspect-[2/3] w-full bg-gray-700 overflow-hidden flex items-center justify-center">
+              ${comic.thumbnailPath ? 
+                `<img src="${coverUrl}" alt="${escapeHtml(title)}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500">` :
+                (isLocal ? 
+                  `<div class="text-purple-500">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                    </svg>
+                  </div>` :
+                  `<img src="${coverUrl}" alt="${escapeHtml(title)}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500">`
+                )
+              }
             </div>
             <div class="absolute bottom-0 left-0 right-0 h-1.5 bg-gray-900/50">
               <div class="h-full ${status === 'read' ? 'bg-green-500' : 'bg-purple-600'} transition-all duration-500" style="width: ${progressPercent}%;"></div>
             </div>
             ${!isEditMode ? `
               <div class="absolute top-2 right-2 flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                <button class="mark-read-btn bg-gray-900/80 backdrop-blur p-2 rounded-lg text-gray-400 hover:text-green-400 transition-all shadow-xl" title="${status === 'read' ? 'Mark as unread' : 'Mark as read'}" data-comic-id="${escapeHtml(item.comicId)}" data-status="${status}">
-                  ${status === 'read' ? '↩' : ICONS.READ}
-                </button>
-                <button class="download-comic-btn block sm:hidden bg-gray-900/80 backdrop-blur p-2 rounded-lg text-gray-400 hover:text-blue-400 transition-all shadow-xl" title="Download comic" data-comic-id="${escapeHtml(item.comicId)}">
-                  ${ICONS.DOWNLOAD}
-                </button>
+                ${!isLocal ? `
+                  <button class="mark-read-btn bg-gray-900/80 backdrop-blur p-2 rounded-lg text-gray-400 hover:text-green-400 transition-all shadow-xl" title="${status === 'read' ? 'Mark as unread' : 'Mark as read'}" data-comic-id="${escapeHtml(item.comicId)}" data-status="${status}">
+                    ${status === 'read' ? '↩' : ICONS.READ}
+                  </button>
+                ` : ''}
+                ${!isLocal ? `
+                  <button class="download-comic-btn block sm:hidden bg-gray-900/80 backdrop-blur p-2 rounded-lg text-gray-400 hover:text-blue-400 transition-all shadow-xl" title="Download comic" data-comic-id="${escapeHtml(item.comicId)}">
+                    ${ICONS.DOWNLOAD}
+                  </button>
+                ` : ''}
                 <button class="delete-comic-btn bg-gray-900/80 backdrop-blur p-2 rounded-lg text-red-500 hover:text-red-400 transition-all shadow-xl" title="Remove from list" data-comic-id="${escapeHtml(item.comicId)}">
                   🗑
                 </button>
@@ -1280,171 +1326,7 @@ function hideReadingListDetail() {
 
 // Add event listeners for reading list modal (after DOM loads)
 document.addEventListener('DOMContentLoaded', () => {
-  if (window.router) {
-    // 1. Main views
-    window.router.addRoute('/', () => {
-      window.showView(document.getElementById('root-folder-list'));
-    });
-    window.router.addRoute('/reading-lists', () => {
-      window.openReadingListModal();
-    });
-    window.router.addRoute('/library', (params, query) => {
-      const rootFolder = query.get('rootFolder');
-      if (rootFolder && typeof window.showPublisherList === 'function') {
-        window.showPublisherList(decodeURIComponent(rootFolder));
-      } else {
-        window.showView(document.getElementById('root-folder-list'));
-      }
-    });
-    window.router.addRoute('/series-list', (params, query) => {
-      const publisher = query.get('publisher');
-      window.currentRootFolder = query.get('rootFolder') || null;
-      if (publisher && typeof window.showSeriesList === 'function') {
-        window.showSeriesList(decodeURIComponent(publisher));
-      }
-    });
-    window.router.addRoute('/settings', () => {
-      window.openSettingsModal();
-      const generalTab = document.getElementById('settings-tab-general');
-      if (generalTab) {
-        generalTab.click();
-      } else {
-        // Fallback for non-admins - try to click the first available user tab
-        const downloadsTab = document.getElementById('settings-tab-downloads');
-        if (downloadsTab) {
-          downloadsTab.click();
-        } else {
-          const devicesTab = document.getElementById('settings-tab-devices');
-          if (devicesTab) devicesTab.click();
-        }
-      }
-    });
-    
-    // 2. Specific Settings Tabs
-    window.router.addRoute('/settings/logs', () => {
-      window.openSettingsModal();
-      const logsTab = document.getElementById('settings-tab-logs');
-      if (logsTab) logsTab.click();
-    });
-
-    window.router.addRoute('/settings/downloads', () => {
-      window.openSettingsModal();
-      const downloadsTab = document.getElementById('settings-tab-downloads');
-      if (downloadsTab) downloadsTab.click();
-    });
-
-    window.router.addRoute('/settings/defaults', () => {
-      window.openSettingsModal();
-      const defaultsTab = document.getElementById('settings-tab-comics-defaults');
-      if (defaultsTab) defaultsTab.click();
-    });
-
-    window.router.addRoute('/settings/devices', () => {
-      window.openSettingsModal();
-      const devicesTab = document.getElementById('settings-tab-devices');
-      if (devicesTab) devicesTab.click();
-    });
-
-    window.router.addRoute('/settings/users', () => {
-      window.openSettingsModal();
-      const usersTab = document.getElementById('settings-tab-users');
-      if (usersTab) usersTab.click();
-    });
-
-    window.router.addRoute('/comictagger', () => {
-      if (window.openCTModal) window.openCTModal();
-      if (ctTabSettings) ctTabSettings.click();
-    });
-
-    window.router.addRoute('/comictagger/matches', () => {
-      if (window.openCTModal) window.openCTModal();
-      if (ctTabMatches) ctTabMatches.click();
-    });
-
-    window.router.addRoute('/comictagger/output', () => {
-      if (window.openCTModal) window.openCTModal();
-      if (ctTabOutput) ctTabOutput.click();
-    });
-
-    window.router.addRoute('/comictagger/management', () => {
-      if (window.openCTModal) window.openCTModal();
-      if (ctTabManagement) ctTabManagement.click();
-    });
-
-    window.router.addRoute('/settings/guided-reader', () => {
-      window.openSettingsModal();
-      const guidedTab = document.getElementById('settings-tab-guided-reader');
-      if (guidedTab) guidedTab.click();
-    });
-
-    // Search Route
-    window.router.addRoute('/search', (params, query) => {
-      const q = query.get('q');
-      const field = query.get('field') || 'all';
-      if (q && typeof window.showSearchView === 'function') {
-        window.showSearchView(q, field);
-      } else {
-        const results = document.getElementById('search-results-view');
-        if (results && window.showView) window.showView(results);
-      }
-    });
-
-    // 3. Series, Comic, and Page Views
-    window.router.addRoute('/series/:seriesName', (params, query) => {
-      const seriesName = decodeURIComponent(params.seriesName);
-      window.currentRootFolder = query.get('rootFolder') || null;
-      window.currentPublisher = query.get('publisher') || null;
-
-      // If missing publisher/rootFolder, try to find them in the library
-      if ((!window.currentRootFolder || !window.currentPublisher) && window.library) {
-        for (const rootPath of Object.keys(window.library)) {
-          const rootData = window.library[rootPath];
-          if (!rootData.publishers) continue;
-          for (const pubName of Object.keys(rootData.publishers)) {
-            const pubData = rootData.publishers[pubName];
-            if (pubData.series && pubData.series[seriesName]) {
-              window.currentRootFolder = rootPath;
-              window.currentPublisher = pubName;
-              break;
-            }
-          }
-          if (window.currentPublisher) break;
-        }
-      }
-
-      if (typeof window.showComicList === 'function') {
-        window.showComicList(seriesName);
-      }
-    });
-
-    window.router.addRoute('/comic/:id', (params) => {
-      const result = window.getComicById(params.id, true);
-      if (result && window.openComicViewer) {
-        // Recover context if missing (e.g. on refresh)
-        if (result.rootFolder) window.currentRootFolder = result.rootFolder;
-        if (result.publisher) window.currentPublisher = result.publisher;
-        if (result.series) window.currentSeries = result.series;
-        
-        window.openComicViewer(result.comic);
-      }
-    });
-
-    window.router.addRoute('/comic/:id/page/:pageNumber', (params) => {
-      const result = window.getComicById(params.id, true);
-      if (result && window.openComicViewer) {
-        // Recover context if missing
-        if (result.rootFolder) window.currentRootFolder = result.rootFolder;
-        if (result.publisher) window.currentPublisher = result.publisher;
-        if (result.series) window.currentSeries = result.series;
-
-        window.openComicViewer(result.comic);
-        const pageNum = parseInt(params.pageNumber, 10);
-        setTimeout(() => {
-          if (window.turnToPage) window.turnToPage(pageNum - 1); 
-        }, 300);
-      }
-    });
-  }
+  registerRoutes();
 
   // Close button
   const closeBtn = document.getElementById('reading-list-close-btn');
@@ -1596,4 +1478,15 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 });
 
-initializeApp();
+if (typeof window !== 'undefined' && typeof document !== 'undefined') {
+    initializeApp();
+}
+
+
+// --- EXPORTS FOR TESTING ---
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = {
+        hideAdminUI
+    };
+}
+
