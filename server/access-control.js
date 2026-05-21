@@ -1,3 +1,5 @@
+const path = require('path');
+
 async function checkComicAccess(userId, userRole, comicPath, publisher, series, rootFolders, comicId = null, preFetchedAccessList = null, dbAllFunc) {
   // Admins have access to everything
   if (userRole === 'admin') {
@@ -7,7 +9,7 @@ async function checkComicAccess(userId, userRole, comicPath, publisher, series, 
   // Determine which root folder this comic belongs to
   let rootFolder = 'Unknown';
   for (const folder of rootFolders) {
-    if (comicPath.startsWith(folder)) {
+    if (comicPath === folder || comicPath.startsWith(folder + path.sep)) {
       rootFolder = folder;
       break;
     }
