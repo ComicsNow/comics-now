@@ -28,10 +28,9 @@ function createStaticRouter({ getConfig, getComicsDirectories, getPublicLibrarie
             authEnabled: require('../config').isAuthEnabled(),
             cloudflareTeamDomain: config.authentication?.cloudflare?.teamDomain || null,
             hideSupportForAdmin: config.hideSupportForAdmin || false
-          })}</script>`
+          })}</script>\n  <link rel="manifest" href="${baseHref}manifest.json">`
         )
-        .replace('<base href="/">', `<base href="${baseHref}">`)
-        .replace('rel="manifest" href="manifest.json"', `rel="manifest" href="${baseHref}manifest.json"`);
+        .replace('<base href="/">', `<base href="${baseHref}">`);
 
       res.set('Cache-Control', 'no-store');
       res.send(injectedHtml);

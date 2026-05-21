@@ -2,6 +2,7 @@ import { defineConfig } from 'vite';
 
 export default defineConfig({
   root: 'public',
+  base: './',
   // Disable default publicDir copying since the root itself is the 'public' directory.
   // This avoids recursive directory copies during development and build.
   publicDir: false,
