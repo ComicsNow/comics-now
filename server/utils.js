@@ -1,5 +1,6 @@
 const crypto = require('crypto');
 const path = require('path');
+const fs = require('fs');
 
 function createId(p) {
   return crypto.createHash('sha1').update(p).digest('hex');
@@ -63,12 +64,28 @@ function isPathSafe(log, getComicsDirectories, requestedPath) {
     return false;
   }
 
-  // Resolve to absolute path to eliminate .. and symlinks
+  // Resolve to absolute path and follow symbolic links to prevent bypasses
   let resolvedPath;
   try {
-    resolvedPath = path.resolve(requestedPath);
+    try {
+      resolvedPath = fs.realpathSync(requestedPath);
+    } catch (e) {
+      if (e.code === 'ENOENT') {
+        // If file/directory does not exist on disk yet, resolve the realpath of its parent directory
+        const dir = path.dirname(requestedPath);
+        const base = path.basename(requestedPath);
+        resolvedPath = path.join(fs.realpathSync(dir), base);
+      } else {
+        return false;
+      }
+    }
   } catch {
-    return false;
+    // Fall back to path.resolve if it's completely unresolvable
+    try {
+      resolvedPath = path.resolve(requestedPath);
+    } catch {
+      return false;
+    }
   }
 
   // Get allowed comic directories
@@ -79,14 +96,20 @@ function isPathSafe(log, getComicsDirectories, requestedPath) {
     return false;
   }
 
-  // Check if resolved path starts with any allowed directory
+  // Check if resolved path starts with any allowed directory (using realpaths for validation)
   const isSafe = allowedDirs.some(allowedDir => {
     try {
-      const resolvedAllowedDir = path.resolve(allowedDir);
+      const resolvedAllowedDir = fs.realpathSync(allowedDir);
       return resolvedPath.startsWith(resolvedAllowedDir + path.sep) ||
              resolvedPath === resolvedAllowedDir;
     } catch {
-      return false;
+      try {
+        const resolvedAllowedDir = path.resolve(allowedDir);
+        return resolvedPath.startsWith(resolvedAllowedDir + path.sep) ||
+               resolvedPath === resolvedAllowedDir;
+      } catch {
+        return false;
+      }
     }
   });
 
