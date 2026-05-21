@@ -1342,20 +1342,8 @@
       <symbol id="icon-26" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16" /></symbol>
     </svg>
   </div>
-<script src="js/router.js"></script>
-  <script src="js/globals.js"></script>
-  <script src="js/utils/device-detection.js"></script>
+<script type="module" src="/app.js"></script>
   <script>
-    // Hide download buttons and Downloaded filter on desktop devices
-    if (typeof isDesktopDevice === 'function' && isDesktopDevice()) {
-      const style = document.createElement('style');
-      style.textContent = `
-        .download-btn { display: none !important; }
-        [data-filter="downloaded"] { display: none !important; }
-      `;
-      document.head.appendChild(style);
-    }
-
     // Open downloads panel (shows download queue)
     function openDownloadsPanel() {
       // Wait for download manager to be initialized
@@ -1369,6 +1357,16 @@
     // (handled by the responsive grid). On smaller screens we toggle a class
     // that hides one of the two sections.
     document.addEventListener('DOMContentLoaded', function() {
+      // Hide download buttons and Downloaded filter on desktop devices
+      if (typeof isDesktopDevice === 'function' && isDesktopDevice()) {
+        const style = document.createElement('style');
+        style.textContent = `
+          .download-btn { display: none !important; }
+          [data-filter="downloaded"] { display: none !important; }
+        `;
+        document.head.appendChild(style);
+      }
+
       const cvBtn = document.getElementById('metadata-subtab-cv');
       const formBtn = document.getElementById('metadata-subtab-form');
       const cvSec = document.getElementById('metadata-sub-cv');
@@ -1398,86 +1396,6 @@
       activate('cv');
     });
   </script>
-  <script src="js/offline/db-core.js"></script>
-  <script src="js/offline/db-jwt.js"></script>
-  <script src="js/offline/db-library-cache.js"></script>
-  <script src="js/offline/db-queue.js"></script>
-  <script src="js/offline/db-comics.js"></script>
-  <script src="js/offline/db-namespace.js"></script>
-  <script src="js/jwt-capture.js"></script>
-  <script src="js/offline/status.js"></script>
-  <script src="js/offline/downloads.js"></script>
-  <script src="js/offline/download-progress.js"></script>
-  <script src="js/offline/download-notifications.js"></script>
-  <script src="js/offline/download-actions.js"></script>
-  <script src="js/offline/downloads-namespace.js"></script>
-  <script src="js/offline.js"></script>
-  <script src="js/library/data.js"></script>
-  <script src="js/library/smartlists.js"></script>
-  <script src="js/library/status.js"></script>
-  <script src="js/library/smart-filters.js"></script>
-  <script src="js/library/breadcrumb.js"></script>
-  <script src="js/library/alpha-list.js"></script>
-  <script src="js/library/search.js"></script>
-  <script src="js/library/render.js"></script>
-  <script src="js/library/folder-viewer.js"></script>
-  <script src="js/library/device-library.js"></script>
-  <script src="js/library.js"></script>
-  <!-- Context menu and manga mode modules -->
-  <script src="js/context-menu/menu-builder.js"></script>
-  <script src="js/manga.js"></script>
-  <script src="js/continuous.js"></script>
-  <script src="js/context-menu/actions-shared.js"></script>
-  <script src="js/context-menu/actions-comic.js"></script>
-  <script src="js/context-menu/actions-series.js"></script>
-  <script src="js/context-menu/actions-publisher.js"></script>
-  <script src="js/context-menu/actions-library.js"></script>
-  <script src="js/context-menu/actions-folder.js"></script>
-  <script src="js/metadata.js"></script>
-  <script src="js/bulk-status.js"></script>
-  <script src="js/viewer/fullscreen.js"></script>
-  <script src="js/viewer/full-image.js"></script>
-  <script src="js/viewer/ui-page-jump.js"></script>
-  <script src="js/viewer/ui-orientation.js"></script>
-  <script src="js/viewer/ui-summary.js"></script>
-  <script src="js/viewer/ui.js"></script>
-  <script src="js/viewer/ui-init.js"></script>
-  <script src="js/viewer/navigation.js"></script>
-  <script src="js/viewer/viewer-server.js"></script>
-  <script src="js/viewer/viewer-local.js"></script>
-  <script src="js/viewer/end-navigation.js"></script>
-  <script src="js/viewer/guided/data.js"></script>
-  <script src="js/viewer/guided/geometry.js"></script>
-  <script src="js/viewer/guided/overlay.js"></script>
-  <script src="js/viewer/guided/mode-registry.js"></script>
-  <script src="js/viewer/guided/modes/guided.js"></script>
-  <script src="js/viewer/guided/modes/bubble.js"></script>
-  <script src="js/viewer/guided/modes/western-speech-zoom.js"></script>
-  <script src="js/viewer/guided/modes/manga-panel-zoom.js"></script>
-  <script src="js/viewer/guided/modes/manga-speech-zoom.js"></script>
-  <script src="js/viewer/guided/pan.js"></script>
-  <script src="js/viewer/guided/input.js"></script>
-  <script src="js/viewer/guided/lifecycle.js"></script>
-  <script src="js/viewer/guided/buttons.js"></script>
-  <script src="js/viewer/guided/index.js"></script>
-  <script src="js/settings/shared.js"></script>
-  <script src="js/settings/continuous-mode.js"></script>
-  <script src="js/settings/devices.js"></script>
-  <script src="js/settings/users.js"></script>
-  <script src="js/settings/user-access.js"></script>
-  <script src="js/settings/comics-defaults.js"></script>
-  <script src="js/settings/comics-management.js"></script>
-  <script src="js/settings.js"></script>
-  <script src="js/guided-reader.js"></script>
-  <script src="js/comictagger.js" data-cfasync="false"></script>
-  <script src="js/events.js"></script>
-  <script src="js/comicvine.js"></script>
-  <script src="js/progress.js"></script>
-  <script src="js/sync.js"></script>
-  <script src="js/auth.js"></script>
-  <script src="js/reading-lists.js"></script>
-  <script src="js/routes.js"></script>
-  <script src="app.js"></script>
 </body>
 </html>
 

@@ -2,11 +2,91 @@
 // Navigation, rendering, and fullscreen handling live in viewer.js. This module
 // now focuses on persistence helpers and wiring progress-related UI events.
 
+import {
+  state,
+  ICONS,
+  debugLog,
+  applyDisplayInfoToComic
+} from './globals.js';
+
+// --- Dynamic Wrappers for Transitioning Functions ---
+
+async function callOpenOfflineDB() {
+  const fn = state.openOfflineDB || window.openOfflineDB;
+  if (typeof fn === 'function') return await fn();
+  debugLog('PROGRESS', 'openOfflineDB not available');
+}
+
+function callScheduleOfflineProgressSync(immediate = false) {
+  const fn = state.scheduleOfflineProgressSync || window.scheduleOfflineProgressSync;
+  if (typeof fn === 'function') fn(immediate);
+}
+
+function callInvalidateFolderCache() {
+  const fn = state.invalidateFolderCache || window.invalidateFolderCache;
+  if (typeof fn === 'function') fn();
+}
+
+function callGetComicStatus(comic) {
+  const fn = state.getComicStatus || window.getComicStatus;
+  if (typeof fn === 'function') return fn(comic);
+  return 'unread';
+}
+
+function callUpdateFilterButtonCounts() {
+  const fn = state.updateFilterButtonCounts || window.updateFilterButtonCounts;
+  if (typeof fn === 'function') fn();
+}
+
+function callUpdateDownloadedComicProgressData(comicId, progress) {
+  const fn = state.updateDownloadedComicProgressData || window.updateDownloadedComicProgressData;
+  if (typeof fn === 'function') fn(comicId, progress);
+}
+
+function callRenderDownloadedSmartList() {
+  const fn = state.renderDownloadedSmartList || window.renderDownloadedSmartList;
+  if (typeof fn === 'function') fn();
+}
+
+async function callSaveLibraryCacheToDB(libraryData) {
+  const fn = state.saveLibraryCacheToDB || window.saveLibraryCacheToDB;
+  if (typeof fn === 'function') return await fn(libraryData);
+}
+
+async function callSaveStatusToDB(statusItem) {
+  const fn = state.saveStatusToDB || window.saveStatusToDB;
+  if (typeof fn === 'function') return await fn(statusItem);
+}
+
+async function callGetSeriesComics(rootFolder, publisher, series) {
+  const fn = state.getSeriesComics || window.getSeriesComics;
+  if (typeof fn === 'function') return await fn(rootFolder, publisher, series);
+  return [];
+}
+
+function callUpdateLibraryReadStatus(payload) {
+  const fn = state.updateLibraryReadStatus || window.updateLibraryReadStatus;
+  if (typeof fn === 'function') fn(payload);
+}
+
+function callApplyFilterAndRender() {
+  const fn = state.applyFilterAndRender || window.applyFilterAndRender;
+  if (typeof fn === 'function') fn();
+}
+
+// --- CORE FUNCTIONS ---
+
 // Save progress to IndexedDB (for downloaded comics)
-async function saveProgressToDB(comicId, currentPage, totalPages, comicPath) {
-  if (!window.db) {
+export async function saveProgressToDB(comicId, currentPage, totalPages, comicPath) {
+  const activeDb = state.db || window.db;
+  if (!activeDb) {
     debugLog('PROGRESS', 'IndexedDB not initialized, opening connection...');
-    await openOfflineDB();
+    await callOpenOfflineDB();
+  }
+
+  const dbToUse = state.db || window.db;
+  if (!dbToUse) {
+    throw new Error('IndexedDB connection could not be opened');
   }
 
   const normalizedPage = typeof currentPage === 'number' && !Number.isNaN(currentPage)
@@ -32,7 +112,7 @@ async function saveProgressToDB(comicId, currentPage, totalPages, comicPath) {
 
   return new Promise((resolve, reject) => {
     try {
-      const transaction = window.db.transaction(['progress', 'comics'], 'readwrite');
+      const transaction = dbToUse.transaction(['progress', 'comics'], 'readwrite');
       const progressStore = transaction.objectStore('progress');
       const comicsStore = transaction.objectStore('comics');
 
@@ -60,7 +140,6 @@ async function saveProgressToDB(comicId, currentPage, totalPages, comicPath) {
         try {
           request = comicsStore.get(keysToUpdate[index]);
         } catch (error) {
-          
           updateNextComicRecord(index + 1);
           return;
         }
@@ -81,7 +160,7 @@ async function saveProgressToDB(comicId, currentPage, totalPages, comicPath) {
             try {
               comicsStore.put(comicData);
             } catch (error) {
-              
+              // Ignore inner errors
             }
           } else {
             updateNextComicRecord(index + 1);
@@ -97,26 +176,22 @@ async function saveProgressToDB(comicId, currentPage, totalPages, comicPath) {
 
       transaction.oncomplete = () => {
         debugLog('PROGRESS', `Successfully saved progress to IndexedDB for comic ${comicId}`);
-        if (typeof scheduleOfflineProgressSync === 'function') {
-          scheduleOfflineProgressSync(true);
-        }
+        callScheduleOfflineProgressSync(true);
         resolve();
       };
 
       transaction.onerror = (event) => {
-        
         reject(new Error('IndexedDB transaction failed: ' + event.target.error));
       };
     } catch (error) {
-      
       reject(error);
     }
   });
 }
 
 // Update the in-memory library with new progress data
-function updateLibraryProgress(comicId, progressData, maybeTotalPages) {
-  if (!library) return;
+export function updateLibraryProgress(comicId, progressData, maybeTotalPages) {
+  if (!state.library) return;
 
   const targetId = comicId == null ? null : String(comicId);
   if (!targetId) return;
@@ -152,15 +227,13 @@ function updateLibraryProgress(comicId, progressData, maybeTotalPages) {
   }
 
   // Invalidate folder cache so that folder views reflect the new progress
-  if (typeof window.invalidateFolderCache === 'function') {
-    window.invalidateFolderCache();
-  }
+  callInvalidateFolderCache();
 
   const numericTarget = Number(targetId);
   const hasNumericTarget = !Number.isNaN(numericTarget);
 
-  for (const rootDir in library) {
-    const publishers = library[rootDir]?.publishers;
+  for (const rootDir in state.library) {
+    const publishers = state.library[rootDir]?.publishers;
     if (!publishers) continue;
 
     for (const publisherName in publishers) {
@@ -181,7 +254,7 @@ function updateLibraryProgress(comicId, progressData, maybeTotalPages) {
         });
 
         if (comic) {
-          const previousStatus = getComicStatus(comic);
+          const previousStatus = callGetComicStatus(comic);
           if (!comic.progress) {
             comic.progress = { totalPages: 0, lastReadPage: 0 };
           }
@@ -194,38 +267,29 @@ function updateLibraryProgress(comicId, progressData, maybeTotalPages) {
             comic.progress.totalPages = maybeTotalPages;
           }
 
-          const updatedStatus = getComicStatus(comic);
+          const updatedStatus = callGetComicStatus(comic);
           if (previousStatus !== updatedStatus) {
             // Update filter button counts
-            if (typeof updateLazyLoadingCounts === 'function') {
-              updateLazyLoadingCounts(rootDir, publisherName, seriesName, previousStatus, updatedStatus);
-            }
-
-            if (typeof updateFilterButtonCounts === 'function') {
-              updateFilterButtonCounts();
-            }
+            updateLazyLoadingCounts(rootDir, publisherName, seriesName, previousStatus, updatedStatus);
+            callUpdateFilterButtonCounts();
 
             // Update the card banner
             updateCardBanner(comicId, updatedStatus);
 
             // Re-render the current view to show updated counts
-            // (Remove currentView !== 'comic' restriction so counts update everywhere)
-            if (typeof applyFilterAndRender === 'function') {
-              applyFilterAndRender();
-            }
+            callApplyFilterAndRender();
           }
 
           const updatedName = comic.displayName || (applyDisplayInfoToComic(comic).displayTitle);
           debugLog('PROGRESS', `Updated library progress for ${updatedName}`);
 
-          if (typeof updateDownloadedComicProgressData === 'function') {
-            updateDownloadedComicProgressData(comic.id ?? targetId, {
-              lastReadPage,
-              totalPages: comic.progress.totalPages,
-            });
-            if (typeof renderDownloadedSmartList === 'function' && currentView === 'downloaded') {
-              renderDownloadedSmartList();
-            }
+          callUpdateDownloadedComicProgressData(comic.id ?? targetId, {
+            lastReadPage,
+            totalPages: comic.progress.totalPages,
+          });
+
+          if (state.currentView === 'downloaded') {
+            callRenderDownloadedSmartList();
           }
           return;
         }
@@ -235,28 +299,27 @@ function updateLibraryProgress(comicId, progressData, maybeTotalPages) {
 }
 
 // Set up event listeners for progress tracking
-function initializeProgressTracking() {
-  const prevBtn = document.getElementById('prev-page-btn');
-  const nextBtn = document.getElementById('next-page-btn');
-
-  // Navigation is already handled by viewer.js - no need for duplicate listeners
-  // Keyboard navigation is also handled by viewer.js
-
+export function initializeProgressTracking() {
   debugLog('PROGRESS', 'Progress tracking initialized');
 }
 
 // Helper function to update offline progress data for downloaded comics
-async function updateOfflineProgressForComic(comicId, status) {
-  if (!window.db) await openOfflineDB();
+export async function updateOfflineProgressForComic(comicId, status) {
+  const activeDb = state.db || window.db;
+  if (!activeDb) await callOpenOfflineDB();
+
+  const dbToUse = state.db || window.db;
+  if (!dbToUse) return;
 
   // Get the actual comic to find its real total pages
   let actualTotalPages = 0;
 
   // Find the comic in the library to get its actual page count
-  for (const rootFolder in library) {
-    for (const publisherName in library[rootFolder].publishers) {
-      for (const seriesName in library[rootFolder].publishers[publisherName].series) {
-        const comics = library[rootFolder].publishers[publisherName].series[seriesName];
+  for (const rootFolder in state.library) {
+    if (!state.library[rootFolder] || !state.library[rootFolder].publishers) continue;
+    for (const publisherName in state.library[rootFolder].publishers) {
+      for (const seriesName in state.library[rootFolder].publishers[publisherName].series) {
+        const comics = state.library[rootFolder].publishers[publisherName].series[seriesName];
 
         // Handle both array format (full data) and object format (lazy loading)
         if (Array.isArray(comics)) {
@@ -266,8 +329,6 @@ async function updateOfflineProgressForComic(comicId, status) {
             break;
           }
         }
-        // For lazy loading format, we can't access comics that aren't loaded yet
-        // The function will continue with actualTotalPages = 0 as fallback
       }
     }
   }
@@ -287,28 +348,25 @@ async function updateOfflineProgressForComic(comicId, status) {
   };
 
   return new Promise((resolve) => {
-    const tx = window.db.transaction(['progress'], 'readwrite');
+    const tx = dbToUse.transaction(['progress'], 'readwrite');
     const store = tx.objectStore('progress');
     const request = store.put(progressData);
     request.onsuccess = () => {
-      if (typeof scheduleOfflineProgressSync === 'function') {
-        scheduleOfflineProgressSync(true);
-      }
+      callScheduleOfflineProgressSync(true);
       resolve();
     };
-    request.onerror = (event) => {
-      
+    request.onerror = () => {
       resolve(); // Don't fail the whole operation
     };
   });
 }
 
 // Helper function to update offline progress data for all comics in a series
-async function updateOfflineProgressForSeries(rootFolder, publisher, seriesName, status) {
-  if (!window.db || !library) return;
+export async function updateOfflineProgressForSeries(rootFolder, publisher, seriesName, status) {
+  if (!(state.db || window.db) || !state.library) return;
 
   // Find all comics in the series
-  const seriesComics = library[rootFolder]?.publishers[publisher]?.series[seriesName];
+  const seriesComics = state.library[rootFolder]?.publishers[publisher]?.series[seriesName];
   if (!seriesComics) return;
 
   // Handle both array format (full data) and object format (lazy loading)
@@ -319,10 +377,8 @@ async function updateOfflineProgressForSeries(rootFolder, publisher, seriesName,
     }
   } else if (seriesComics && seriesComics._hasDetails === false) {
     // For lazy loading, we need to load the series first
-    
-
     // Load the series details first
-    const detailedComics = await getSeriesComics(rootFolder, publisher, seriesName);
+    const detailedComics = await callGetSeriesComics(rootFolder, publisher, seriesName);
     if (Array.isArray(detailedComics)) {
       for (const comic of detailedComics) {
         await updateOfflineProgressForComic(comic.id, status);
@@ -332,11 +388,11 @@ async function updateOfflineProgressForSeries(rootFolder, publisher, seriesName,
 }
 
 // Update lazy loading counts when comic status changes
-function updateLazyLoadingCounts(rootFolder, publisher, seriesName, oldStatus, newStatus) {
-  if (!library || !library._isLazyLoaded) return;
+export function updateLazyLoadingCounts(rootFolder, publisher, seriesName, oldStatus, newStatus) {
+  if (!state.library || !state.library._isLazyLoaded) return;
 
-  const seriesData = library[rootFolder]?.publishers?.[publisher]?.series?.[seriesName];
-  const publisherData = library[rootFolder]?.publishers?.[publisher];
+  const seriesData = state.library[rootFolder]?.publishers?.[publisher]?.series?.[seriesName];
+  const publisherData = state.library[rootFolder]?.publishers?.[publisher];
 
   if (seriesData && seriesData._counts) {
     // Update series counts
@@ -360,7 +416,7 @@ function updateLazyLoadingCounts(rootFolder, publisher, seriesName, oldStatus, n
 }
 
 // Helper function to update card banner optimistically
-function updateCardBanner(comicId, newStatus) {
+export function updateCardBanner(comicId, newStatus) {
   const cards = document.querySelectorAll(`.comic-card`);
   cards.forEach(card => {
     const cardButton = card.querySelector(`[data-comic-id="${comicId}"]`);
@@ -392,7 +448,7 @@ function updateCardBanner(comicId, newStatus) {
 }
 
 // Helper function to update series card banner optimistically
-function updateSeriesBanner(seriesName, newStatus) {
+export function updateSeriesBanner(seriesName, newStatus) {
   const cards = document.querySelectorAll(`.series-card`);
   cards.forEach(card => {
     const cardButton = card.querySelector(`[data-series-name="${seriesName}"]`);
@@ -424,7 +480,7 @@ function updateSeriesBanner(seriesName, newStatus) {
 }
 
 // Toggle read/unread status for a comic or entire series
-async function toggleReadStatus(button) {
+export async function toggleReadStatus(button) {
   const comicId = button.dataset.comicId;
   const seriesName = button.dataset.seriesName;
   const rootFolder = button.dataset.rootFolder;
@@ -468,13 +524,13 @@ async function toggleReadStatus(button) {
 
     let response;
     if (seriesName) {
-      response = await fetch(`${API_BASE_URL}/api/v1/series/status`, {
+      response = await fetch(`${state.API_BASE_URL || ''}/api/v1/series/status`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ rootFolder, publisher, series: seriesName, status: newStatus })
       });
     } else {
-      response = await fetch(`${API_BASE_URL}/api/v1/comics/status`, {
+      response = await fetch(`${state.API_BASE_URL || ''}/api/v1/comics/status`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ comicId, status: newStatus })
@@ -492,7 +548,7 @@ async function toggleReadStatus(button) {
       await updateOfflineProgressForComic(comicId, newStatus);
     }
 
-    updateLibraryReadStatus({
+    callUpdateLibraryReadStatus({
       rootFolder,
       publisher,
       seriesName,
@@ -503,7 +559,7 @@ async function toggleReadStatus(button) {
     // Update lazy loading counts if needed
     updateLazyLoadingCounts(rootFolder, publisher, seriesName, currentStatus, newStatus);
 
-    applyFilterAndRender();
+    callApplyFilterAndRender();
 
     // Update banner AFTER re-render completes (need to wait for DOM update)
     requestAnimationFrame(() => {
@@ -515,20 +571,14 @@ async function toggleReadStatus(button) {
     });
 
     // Trigger immediate sync to propagate changes
-    if (typeof scheduleOfflineProgressSync === 'function') {
-      scheduleOfflineProgressSync(true);
-    }
+    callScheduleOfflineProgressSync(true);
 
     // Update library cache in IndexedDB so refresh shows updated status immediately
-    if (typeof saveLibraryCacheToDB === 'function' && typeof library !== 'undefined') {
-      saveLibraryCacheToDB(library).catch(error => {
-        
-      });
+    if (typeof state.library !== 'undefined') {
+      callSaveLibraryCacheToDB(state.library).catch(() => {});
     }
 
   } catch (error) {
-    
-
     // ROLLBACK: Revert optimistic UI update on error
     button.innerHTML = originalIcon;
     button.className = originalColor;
@@ -557,7 +607,7 @@ async function toggleReadStatus(button) {
           comicId,
           status: newStatus
         };
-    await saveStatusToDB(statusItem);
+    await callSaveStatusToDB(statusItem);
 
     // FALLBACK: Update offline progress data
     if (seriesName) {
@@ -566,7 +616,7 @@ async function toggleReadStatus(button) {
       await updateOfflineProgressForComic(comicId, newStatus);
     }
 
-    updateLibraryReadStatus({
+    callUpdateLibraryReadStatus({
       rootFolder,
       publisher,
       seriesName,
@@ -588,7 +638,7 @@ async function toggleReadStatus(button) {
     // Update lazy loading counts if needed
     updateLazyLoadingCounts(rootFolder, publisher, seriesName, currentStatus, newStatus);
 
-    applyFilterAndRender();
+    callApplyFilterAndRender();
 
     // Update banner AFTER re-render completes (need to wait for DOM update)
     requestAnimationFrame(() => {
@@ -604,9 +654,15 @@ async function toggleReadStatus(button) {
   }
 }
 
-// Expose functions globally
+// Expose functions on state and window for backward compatibility
+state.saveProgressToDB = saveProgressToDB;
+state.updateLibraryProgress = updateLibraryProgress;
+state.updateLazyLoadingCounts = updateLazyLoadingCounts;
+state.toggleReadStatus = toggleReadStatus;
+
 if (typeof window !== 'undefined') {
   window.saveProgressToDB = saveProgressToDB;
   window.updateLibraryProgress = updateLibraryProgress;
   window.updateLazyLoadingCounts = updateLazyLoadingCounts;
+  window.toggleReadStatus = toggleReadStatus;
 }

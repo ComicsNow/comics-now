@@ -1,33 +1,103 @@
-(function (global) {
-  'use strict';
+import {
+  state,
+  ICONS,
+  escapeHtml,
+  showView,
+  createEmptyMessage,
+  createErrorMessage,
+  createLoadingMessage,
+  getRelativePath,
+  rootFolderListDiv,
+  rootFolderListContainer,
+  publisherListDiv,
+  publisherListContainer,
+  seriesListDiv,
+  comicListDiv,
+  comicViewerDiv,
+  publisherAlphaFilter,
+  seriesAlphaFilter,
+  comicAlphaFilter,
+  publisherTitleH2,
+  seriesTitleH2,
+  comicListTitleH2,
+  smartListView,
+  smartListContainer,
+  smartListTitle,
+  smartListBackBtn,
+  filterButtonsDiv,
+  smartListButtonsDiv,
+  applyDisplayInfoToComic
+} from '../globals.js';
 
-  const SmartLists = global.LibrarySmartLists || {};
-  const Data = global.LibraryData || {};
+import {
+  getComicStatus,
+  getSeriesStatus,
+  getComicStatusCounts,
+  createEmptyStatusCounts,
+  addStatusCounts,
+  getPublisherStatusCounts,
+  getRootStatusCounts,
+  getLibraryStatusCounts,
+  statusCountsMatchFilter,
+  filterPublishersByActiveFilter,
+  filterSeriesByActiveFilter,
+  updateFilterButtonCounts,
+  updateLibraryReadStatus
+} from './status.js';
 
-function showRootFolderList(options = {}) {
+import { updateBreadcrumb, makeCountChips } from './breadcrumb.js';
+import { DeviceLibrary } from './device-library.js';
+import { showFolderView } from './folder-viewer.js';
+import * as Data from './data.js';
+import * as SmartLists from './smartlists.js';
+import { renderAllComicsAsList, renderAlphaFilter, applyFilterAndRender } from './alpha-list.js';
+import { showSearchView, rerenderSearchResults } from './search.js';
+import {
+  setLatestButtonActive,
+  setDownloadedButtonActive,
+  setGuidedButtonActive,
+  setMangaFilterButtonActive,
+  clearSmartFilterButtons,
+  showLatestAddedSmartList,
+  showDownloadedSmartList,
+  showGuidedSmartList,
+  showMangaSmartList,
+  renderLatestSmartList,
+  renderDownloadedSmartList,
+  renderGuidedSmartList,
+  renderMangaSmartList,
+  syncSmartFilterButtons,
+  mountSmartFilterHostInto,
+  hideSmartFilterHost
+} from './smart-filters.js';
+import { toggleReadStatus } from '../progress.js';
+
+const API_BASE_URL = state.API_BASE_URL || window.API_BASE_URL || '';
+
+export function showRootFolderList(options = {}) {
   const force = Boolean(options.force);
   
-  if (!window._isNavigatingFromRouter && window.router && !window._isAppInitializing) {
+  if (!state._isNavigatingFromRouter && state.router && !state._isAppInitializing) {
      if (getRelativePath() !== '/') {
-       window.router.navigate('/', true);
+       state.router.navigate('/', true);
        return;
      }
   }
 
-  currentView = 'root';
-  currentRootFolder = null;
-  currentPublisher = null;
-  currentSeries = null;
+  state.currentView = 'root';
+  state.currentRootFolder = null;
+  state.currentPublisher = null;
+  state.currentSeries = null;
   if (typeof window !== 'undefined') {
-    window.currentView = currentView;
-    window.currentRootFolder = currentRootFolder;
-    window.currentPublisher = currentPublisher;
-    window.currentSeries = currentSeries;
+    window.currentView = state.currentView;
+    window.currentRootFolder = state.currentRootFolder;
+    window.currentPublisher = state.currentPublisher;
+    window.currentSeries = state.currentSeries;
   }
   syncSmartFilterButtons();
   updateBreadcrumb([]);
 
-  const rootFoldersFromLibrary = library ? Object.keys(library) : [];
+  const rootFoldersFromLibrary = state.library ? Object.keys(state.library) : [];
   const rootFolders = [];
   const seen = new Set();
 
@@ -39,8 +109,8 @@ function showRootFolderList(options = {}) {
     rootFolders.push(folderPath);
   };
 
-  if (Array.isArray(configuredRootFolders) && configuredRootFolders.length > 0) {
-    configuredRootFolders.forEach(addRootFolder);
+  if (Array.isArray(state.configuredRootFolders) && state.configuredRootFolders.length > 0) {
+    state.configuredRootFolders.forEach(addRootFolder);
   }
   rootFoldersFromLibrary.forEach(addRootFolder);
 
@@ -49,7 +119,7 @@ function showRootFolderList(options = {}) {
     const folderName = (window.LIBRARY_NAMES && window.LIBRARY_NAMES[normalizedPath]) || normalizedPath.split(/[\\\/]/).pop() || normalizedPath;
     
     // Use normalization-aware lookup for library data
-    const rootData = library?.[folderPath] || library?.[normalizedPath] || library?.[normalizedPath + '/'];
+    const rootData = state.library?.[folderPath] || state.library?.[normalizedPath] || state.library?.[normalizedPath + '/'];
     
     const publisherCount = rootData?.publishers ? Object.keys(rootData.publishers).length : 0;
     const publisherLabel = publisherCount === 1 ? 'Publisher' : 'Publishers';
@@ -62,15 +132,15 @@ function showRootFolderList(options = {}) {
   if (visibleRootCards.length === 1 && !force) {
     const cardData = visibleRootCards[0];
     const normalizedPath = cardData.folderPath.replace(/[\\\/]+$/, '');
-    const actualKey = library?.[cardData.folderPath] ? cardData.folderPath : (library?.[normalizedPath] ? normalizedPath : (library?.[normalizedPath + '/'] ? normalizedPath + '/' : null));
-    const rootData = actualKey ? library[actualKey] : null;
+    const actualKey = state.library?.[cardData.folderPath] ? cardData.folderPath : (state.library?.[normalizedPath] ? normalizedPath : (state.library?.[normalizedPath + '/'] ? normalizedPath + '/' : null));
+    const rootData = actualKey ? state.library[actualKey] : null;
     const mode = rootData?.hierarchyMode || 'metadata';
     
-    currentRootFolder = actualKey;
-    if (typeof window !== 'undefined') window.currentRootFolder = currentRootFolder;
+    state.currentRootFolder = actualKey;
+    if (typeof window !== 'undefined') window.currentRootFolder = state.currentRootFolder;
     
-    if (mode === 'folder' && typeof global.showFolderView === 'function') {
-      global.showFolderView(cardData.folderPath);
+    if (mode === 'folder') {
+      showFolderView(cardData.folderPath);
     } else {
       showPublisherList(cardData.folderPath);
     }
@@ -78,7 +148,7 @@ function showRootFolderList(options = {}) {
   }
 
   showView(rootFolderListDiv);
-  if (global.activeSmartFilter) {
+  if (state.activeSmartFilter) {
     mountSmartFilterHostInto(rootFolderListDiv);
   } else {
     hideSmartFilterHost();
@@ -89,11 +159,11 @@ function showRootFolderList(options = {}) {
   rootFolderListContainer.innerHTML = '';
 
   if (visibleRootCards.length === 0) {
-    const message = activeFilter === 'in-progress'
+    const message = state.activeFilter === 'in-progress'
       ? 'No comics in progress.'
-      : activeFilter === 'read'
+      : state.activeFilter === 'read'
         ? 'No comics read.'
-        : activeFilter === 'unread'
+        : state.activeFilter === 'unread'
           ? 'No unread comics.'
           : 'No comics found.';
     rootFolderListContainer.innerHTML = createEmptyMessage(message);
@@ -102,7 +172,7 @@ function showRootFolderList(options = {}) {
 
   visibleRootCards.forEach(({ folderPath, folderName, publisherCount, publisherLabel, counts }) => {
     const normalizedPath = folderPath.replace(/[\\\/]+$/, '');
-    const rootData = library?.[folderPath] || library?.[normalizedPath] || library?.[normalizedPath + '/'];
+    const rootData = state.library?.[folderPath] || state.library?.[normalizedPath] || state.library?.[normalizedPath + '/'];
 
     // Get all comics from all publishers and all series under this library
     let allComics = [];
@@ -130,7 +200,7 @@ function showRootFolderList(options = {}) {
     // Check if all comics in the library are downloaded
     let isLibraryDownloaded = false;
     if (allComics.length > 0) {
-      isLibraryDownloaded = allComics.every(comic => downloadedComicIds.has(comic.id));
+      isLibraryDownloaded = allComics.every(comic => state.downloadedComicIds.has(comic.id));
     }
 
     const downloadIcon = isLibraryDownloaded
@@ -177,16 +247,12 @@ function showRootFolderList(options = {}) {
     
     card.addEventListener('click', () => {
       const normalizedPath = folderPath.replace(/[\\\/]+$/, '');
-      const actualKey = library?.[folderPath] ? folderPath : (library?.[normalizedPath] ? normalizedPath : (library?.[normalizedPath + '/'] ? normalizedPath + '/' : null));
-      const rootData = actualKey ? library[actualKey] : null;
+      const actualKey = state.library?.[folderPath] ? folderPath : (state.library?.[normalizedPath] ? normalizedPath : (state.library?.[normalizedPath + '/'] ? normalizedPath + '/' : null));
+      const rootData = actualKey ? state.library[actualKey] : null;
       const mode = rootData?.hierarchyMode || 'metadata';
 
       if (mode === 'folder') {
-        if (typeof global.showFolderView === 'function') {
-          global.showFolderView(folderPath);
-        } else {
-          showPublisherList(folderPath);
-        }
+        showFolderView(folderPath);
       } else {
         showPublisherList(folderPath);
       }
@@ -203,8 +269,8 @@ function showRootFolderList(options = {}) {
           if (confirm(`Delete these ${allComics.length} downloaded comics from your device?`)) {
             downloadBtn.disabled = true;
             for (const comic of allComics) {
-              if (typeof global.deleteOfflineComic === 'function') {
-                await global.deleteOfflineComic(comic.id);
+              if (typeof window.deleteOfflineComic === 'function') {
+                await window.deleteOfflineComic(comic.id);
               }
             }
             if (typeof applyFilterAndRender === 'function') applyFilterAndRender();
@@ -224,8 +290,8 @@ function showRootFolderList(options = {}) {
     };
 
     card.addEventListener('contextmenu', (e) => {
-      if (typeof global.showLibraryContextMenu === 'function') {
-        global.showLibraryContextMenu(e, libraryContextData);
+      if (typeof window.showLibraryContextMenu === 'function') {
+        window.showLibraryContextMenu(e, libraryContextData);
       }
     });
 
@@ -233,9 +299,9 @@ function showRootFolderList(options = {}) {
     card.addEventListener('touchstart', (e) => {
       contextMenuShown = false;
       longPressTimer = setTimeout(() => {
-        if (typeof global.showLibraryContextMenu === 'function') {
+        if (typeof window.showLibraryContextMenu === 'function') {
           contextMenuShown = true;
-          global.showLibraryContextMenu(e, libraryContextData);
+          window.showLibraryContextMenu(e, libraryContextData);
         }
       }, 500); // 500ms long press
     });
@@ -264,7 +330,7 @@ function showRootFolderList(options = {}) {
   });
 
   // Device Library support
-  if (global.DeviceLibrary) {
+  if (DeviceLibrary) {
     // Add "Add Device Library" button
     const addCard = document.createElement('div');
     addCard.className = 'add-device-library-card bg-gray-800/50 rounded-lg overflow-hidden border-2 border-dashed border-gray-700 hover:border-purple-500 transition-all duration-300 cursor-pointer group flex flex-col items-center justify-center p-6 text-center h-full min-h-[200px]';
@@ -277,47 +343,46 @@ function showRootFolderList(options = {}) {
       <div class="text-gray-400 font-bold group-hover:text-white">Add Device Library</div>
       <div class="text-xs text-gray-500 mt-1">Local CBZ/CBR folder</div>
     `;
-    addCard.onclick = () => global.DeviceLibrary.requestDeviceLibrary();
+    addCard.onclick = () => DeviceLibrary.requestDeviceLibrary();
     rootFolderListContainer.appendChild(addCard);
 
     // Render existing device libraries
-    global.DeviceLibrary.appendDeviceLibraryCards(rootFolderListContainer);
+    DeviceLibrary.appendDeviceLibraryCards(rootFolderListContainer);
   }
 }
 
-
-function showPublisherList(rootFolder, options = {}) {
+export function showPublisherList(rootFolder, options = {}) {
   const force = Boolean(options.force);
   
-  if (!window._isNavigatingFromRouter && window.router && !window._isAppInitializing) {
+  if (!state._isNavigatingFromRouter && state.router && !state._isAppInitializing) {
      const navPath = `/library?rootFolder=${encodeURIComponent(rootFolder)}`;
      if ((getRelativePath() + window.location.search) !== navPath) {
-       window.router.navigate(navPath, true);
+       state.router.navigate(navPath, true);
        return;
      }
   }
 
   const normalizedPath = rootFolder ? rootFolder.replace(/[\\\/]+$/, '') : '';
-  const actualKey = library?.[rootFolder] ? rootFolder : (library?.[normalizedPath] ? normalizedPath : (library?.[normalizedPath + '/'] ? normalizedPath + '/' : null));
-  const rootData = actualKey ? library[actualKey] : null;
+  const actualKey = state.library?.[rootFolder] ? rootFolder : (state.library?.[normalizedPath] ? normalizedPath : (state.library?.[normalizedPath + '/'] ? normalizedPath + '/' : null));
+  const rootData = actualKey ? state.library[actualKey] : null;
 
-  if (!library || !rootData) {
+  if (!state.library || !rootData) {
     showRootFolderList({ force: true });
     return;
   }
 
-  if (currentView !== 'publishers') {
-    activeAlphaFilter = 'All';
+  if (state.currentView !== 'publishers') {
+    state.activeAlphaFilter = 'All';
   }
-  currentView = 'publishers';
-  currentRootFolder = actualKey;
-  currentPublisher = null;
-  currentSeries = null;
+  state.currentView = 'publishers';
+  state.currentRootFolder = actualKey;
+  state.currentPublisher = null;
+  state.currentSeries = null;
   if (typeof window !== 'undefined') {
     window.currentView = 'publishers';
-    window.currentRootFolder = currentRootFolder;
-    window.currentPublisher = currentPublisher;
-    window.currentSeries = currentSeries;
+    window.currentRootFolder = state.currentRootFolder;
+    window.currentPublisher = state.currentPublisher;
+    window.currentSeries = state.currentSeries;
   }
   syncSmartFilterButtons();
 
@@ -326,8 +391,8 @@ function showPublisherList(rootFolder, options = {}) {
   const publisherNames = Object.keys(publishersToRender);
 
   if (publisherNames.length === 1 && !force) {
-    currentPublisher = publisherNames[0];
-    if (typeof window !== 'undefined') window.currentPublisher = currentPublisher;
+    state.currentPublisher = publisherNames[0];
+    if (typeof window !== 'undefined') window.currentPublisher = state.currentPublisher;
     showSeriesList(publisherNames[0]);
     return;
   }
@@ -335,7 +400,7 @@ function showPublisherList(rootFolder, options = {}) {
   showView(publisherListDiv);
   mountSmartFilterHostInto(publisherListDiv);
 
-  const folderLabel = (window.LIBRARY_NAMES && (window.LIBRARY_NAMES[currentRootFolder] || window.LIBRARY_NAMES[normalizedPath])) || normalizedPath.split(/[\\\/]/).pop() || currentRootFolder;
+  const folderLabel = (window.LIBRARY_NAMES && (window.LIBRARY_NAMES[state.currentRootFolder] || window.LIBRARY_NAMES[normalizedPath])) || normalizedPath.split(/[\\\/]/).pop() || state.currentRootFolder;
   if (publisherTitleH2) {
     publisherTitleH2.textContent = folderLabel;
   }
@@ -348,15 +413,15 @@ function showPublisherList(rootFolder, options = {}) {
   renderAlphaFilter(publisherAlphaFilter, publishersToRender, renderPublisherCards, 'publishers');
 }
 
-function renderPublisherCards(publishersToShow) {
+export function renderPublisherCards(publishersToShow) {
   publisherListContainer.innerHTML = '';
   const publishers = Object.keys(publishersToShow).sort();
   if (publishers.length === 0) {
-    const msg = activeFilter === 'in-progress'
+    const msg = state.activeFilter === 'in-progress'
       ? 'No publishers in progress.'
-      : activeFilter === 'read'
+      : state.activeFilter === 'read'
         ? 'No publishers read.'
-        : activeFilter === 'unread'
+        : state.activeFilter === 'unread'
           ? 'No unread publishers.'
           : 'No publishers found.';
     publisherListContainer.innerHTML = createEmptyMessage(msg);
@@ -408,7 +473,7 @@ function renderPublisherCards(publishersToShow) {
     const publisherStatusButtonHtml = `
       <button class="status-toggle-btn absolute top-2 left-2 ${isPublisherRead ? 'text-green-400' : 'text-gray-400'} hover:text-white"
               data-publisher-name="${escapeHtml(publisher)}"
-              data-root-folder="${escapeHtml(currentRootFolder)}"
+              data-root-folder="${escapeHtml(state.currentRootFolder)}"
               title="Bulk Read/Unread">
         ${publisherStatusIcon}
       </button>`;
@@ -416,7 +481,7 @@ function renderPublisherCards(publishersToShow) {
     // Check if all comics in the publisher are downloaded
     let isPublisherDownloaded = false;
     if (allComics.length > 0) {
-      isPublisherDownloaded = allComics.every(comic => downloadedComicIds.has(comic.id));
+      isPublisherDownloaded = allComics.every(comic => state.downloadedComicIds.has(comic.id));
     }
 
     const downloadIcon = isPublisherDownloaded
@@ -426,7 +491,7 @@ function renderPublisherCards(publishersToShow) {
     const downloadButtonHtml = `<button class="download-btn absolute top-2 right-2 ${isPublisherDownloaded ? 'text-green-400' : 'text-gray-400 hover:text-white'}"
           title="${isPublisherDownloaded ? 'Delete from device' : 'Download publisher'}"
           data-publisher-name="${escapeHtml(publisher)}"
-          data-root-folder="${escapeHtml(currentRootFolder)}"
+          data-root-folder="${escapeHtml(state.currentRootFolder)}"
           data-is-downloaded="${isPublisherDownloaded}"
         >${downloadIcon}</button>`;
 
@@ -465,8 +530,8 @@ function renderPublisherCards(publishersToShow) {
           if (confirm(`Delete these ${allComics.length} downloaded comics from your device?`)) {
             downloadBtn.disabled = true;
             for (const comic of allComics) {
-              if (typeof global.deleteOfflineComic === 'function') {
-                await global.deleteOfflineComic(comic.id);
+              if (typeof window.deleteOfflineComic === 'function') {
+                await window.deleteOfflineComic(comic.id);
               }
             }
             if (typeof applyFilterAndRender === 'function') applyFilterAndRender();
@@ -477,9 +542,7 @@ function renderPublisherCards(publishersToShow) {
       });
     }
 
-    // Bulk read/unread dialog when the read-status icon is tapped. If only
-    // lazy data is available (no comic objects), fetch each series' comics
-    // first so the dialog can drive per-comic updates.
+    // Bulk read/unread dialog when the read-status icon is tapped.
     const pubStatusBtn = card.querySelector('.status-toggle-btn');
     if (pubStatusBtn) {
       pubStatusBtn.addEventListener('click', async (e) => {
@@ -488,15 +551,15 @@ function renderPublisherCards(publishersToShow) {
         if (publisherData.series && typeof Data?.getSeriesComics === 'function') {
           for (const seriesName of Object.keys(publisherData.series)) {
             try {
-              const sComics = await Data.getSeriesComics(currentRootFolder, publisher, seriesName);
+              const sComics = await Data.getSeriesComics(state.currentRootFolder, publisher, seriesName);
               if (Array.isArray(sComics)) comics.push(...sComics);
             } catch (_) {}
           }
         } else {
           comics = allComics;
         }
-        if (typeof global.openBulkReadStatusDialog === 'function') {
-          global.openBulkReadStatusDialog(comics || [], `publisher "${publisher}"`);
+        if (typeof window.openBulkReadStatusDialog === 'function') {
+          window.openBulkReadStatusDialog(comics || [], `publisher "${publisher}"`);
         }
       });
     }
@@ -507,12 +570,12 @@ function renderPublisherCards(publishersToShow) {
     const publisherContextData = {
       publisherName: publisher,
       publisherInfo: publisherData,
-      rootFolder: currentRootFolder
+      rootFolder: state.currentRootFolder
     };
 
     card.addEventListener('contextmenu', (e) => {
-      if (typeof global.showPublisherContextMenu === 'function') {
-        global.showPublisherContextMenu(e, publisherContextData);
+      if (typeof window.showPublisherContextMenu === 'function') {
+        window.showPublisherContextMenu(e, publisherContextData);
       }
     });
 
@@ -520,9 +583,9 @@ function renderPublisherCards(publishersToShow) {
     card.addEventListener('touchstart', (e) => {
       contextMenuShown = false;
       longPressTimer = setTimeout(() => {
-        if (typeof global.showPublisherContextMenu === 'function') {
+        if (typeof window.showPublisherContextMenu === 'function') {
           contextMenuShown = true;
-          global.showPublisherContextMenu(e, publisherContextData);
+          window.showPublisherContextMenu(e, publisherContextData);
         }
       }, 500); // 500ms long press
     });
@@ -551,38 +614,38 @@ function renderPublisherCards(publishersToShow) {
   }
 }
 
-function showSeriesList(publisherName, options = {}) {
+export function showSeriesList(publisherName, options = {}) {
   const force = Boolean(options.force);
   if (!publisherName) return;
 
-  if (!window._isNavigatingFromRouter && window.router && !window._isAppInitializing) {
+  if (!state._isNavigatingFromRouter && state.router && !state._isAppInitializing) {
      let navPath = `/series-list?publisher=${encodeURIComponent(publisherName)}`;
-     if (currentRootFolder) navPath += `&rootFolder=${encodeURIComponent(currentRootFolder)}`;
+     if (state.currentRootFolder) navPath += `&rootFolder=${encodeURIComponent(state.currentRootFolder)}`;
      if ((getRelativePath() + window.location.search) !== navPath) {
-       window.router.navigate(navPath, true);
+       state.router.navigate(navPath, true);
        return;
      }
   }
 
-  if (currentView !== 'series' || currentPublisher !== publisherName) {
-    activeAlphaFilter = 'All';
+  if (state.currentView !== 'series' || state.currentPublisher !== publisherName) {
+    state.activeAlphaFilter = 'All';
   }
-  currentView = 'series';
-  currentPublisher = publisherName;
-  currentSeries = null;
+  state.currentView = 'series';
+  state.currentPublisher = publisherName;
+  state.currentSeries = null;
   if (typeof window !== 'undefined') {
     window.currentView = 'series';
-    window.currentRootFolder = currentRootFolder;
-    window.currentPublisher = currentPublisher;
-    window.currentSeries = currentSeries;
+    window.currentRootFolder = state.currentRootFolder;
+    window.currentPublisher = state.currentPublisher;
+    window.currentSeries = state.currentSeries;
   }
   syncSmartFilterButtons();
 
-  const normalizedPath = currentRootFolder ? currentRootFolder.replace(/[\\\/]+$/, '') : '';
-  const rootData = library?.[currentRootFolder] || library?.[normalizedPath] || library?.[normalizedPath + '/'];
+  const normalizedPath = state.currentRootFolder ? state.currentRootFolder.replace(/[\\\/]+$/, '') : '';
+  const rootData = state.library?.[state.currentRootFolder] || state.library?.[normalizedPath] || state.library?.[normalizedPath + '/'];
   const publisherData = rootData?.publishers[publisherName];
   if (!publisherData) {
-    showPublisherList(currentRootFolder, { force: true });
+    showPublisherList(state.currentRootFolder, { force: true });
     return;
   }
 
@@ -591,8 +654,8 @@ function showSeriesList(publisherName, options = {}) {
   const seriesNames = Object.keys(filteredSeries);
 
   if (seriesNames.length === 1 && !force) {
-    currentSeries = seriesNames[0];
-    if (typeof window !== 'undefined') window.currentSeries = currentSeries;
+    state.currentSeries = seriesNames[0];
+    if (typeof window !== 'undefined') window.currentSeries = state.currentSeries;
     showComicList(seriesNames[0]);
     return;
   }
@@ -604,25 +667,26 @@ function showSeriesList(publisherName, options = {}) {
     seriesTitleH2.textContent = publisherName;
   }
 
-  const folderLabel = (window.LIBRARY_NAMES && (window.LIBRARY_NAMES[currentRootFolder] || window.LIBRARY_NAMES[normalizedPath])) || normalizedPath.split(/[\\\/]/).pop() || currentRootFolder;
+  const folderLabel = (window.LIBRARY_NAMES && (window.LIBRARY_NAMES[state.currentRootFolder] || window.LIBRARY_NAMES[normalizedPath])) || normalizedPath.split(/[\\\/]/).pop() || state.currentRootFolder;
   updateBreadcrumb([
     { label: 'Libraries', action: () => showRootFolderList({ force: true }) },
-    { label: folderLabel, action: () => showPublisherList(currentRootFolder, { force: true }) },
+    { label: folderLabel, action: () => showPublisherList(state.currentRootFolder, { force: true }) },
     { label: publisherName },
   ]);
 
   renderAlphaFilter(seriesAlphaFilter, filteredSeries, renderSeriesCards, 'series');
 }
-function renderSeriesCards(seriesToRender) {
+
+export function renderSeriesCards(seriesToRender) {
   const container = document.getElementById('series-list-container');
   container.innerHTML = '';
   const sortedSeries = Object.keys(seriesToRender).sort();
   if (sortedSeries.length === 0) {
-    const msg = activeFilter === 'in-progress'
+    const msg = state.activeFilter === 'in-progress'
       ? 'No series in progress.'
-      : activeFilter === 'read'
+      : state.activeFilter === 'read'
         ? 'No series read.'
-        : activeFilter === 'unread'
+        : state.activeFilter === 'unread'
           ? 'No unread series.'
           : 'No series found.';
     container.innerHTML = createEmptyMessage(msg);
@@ -635,7 +699,7 @@ function renderSeriesCards(seriesToRender) {
     const backToPublisherBtn = document.createElement('button');
     backToPublisherBtn.className = 'mt-4 text-purple-400 hover:text-purple-300';
     backToPublisherBtn.textContent = '← Publisher';
-    backToPublisherBtn.addEventListener('click', () => showPublisherList(currentRootFolder));
+    backToPublisherBtn.addEventListener('click', () => showPublisherList(state.currentRootFolder));
     container.appendChild(backToPublisherBtn);
     return;
   }
@@ -692,7 +756,7 @@ function renderSeriesCards(seriesToRender) {
       });
 
       // Determine if all comics in the series are downloaded
-      isSeriesDownloaded = comicsInSeries.every(comic => downloadedComicIds.has(comic.id));
+      isSeriesDownloaded = comicsInSeries.every(comic => state.downloadedComicIds.has(comic.id));
     } else if (comicsInSeries && comicsInSeries._counts) {
       // Lazy loading - use pre-computed counts and thumbnail
       if (comicsInSeries._firstThumbnail) {
@@ -721,8 +785,8 @@ function renderSeriesCards(seriesToRender) {
       <button
         class="status-toggle-btn absolute top-2 left-2 ${isSeriesRead ? 'text-green-400' : 'text-gray-400'} hover:text-white"
         data-series-name="${escapeHtml(seriesName)}"
-        data-publisher="${escapeHtml(currentPublisher)}"
-        data-root-folder="${escapeHtml(currentRootFolder)}"
+        data-publisher="${escapeHtml(state.currentPublisher)}"
+        data-root-folder="${escapeHtml(state.currentRootFolder)}"
         data-current-status="${isSeriesRead ? 'read' : 'unread'}"
         title="Toggle Read Status"
       >
@@ -736,8 +800,8 @@ function renderSeriesCards(seriesToRender) {
     const downloadButtonHtml = `<button class="download-btn absolute top-2 right-2 ${isSeriesDownloaded ? 'text-green-400' : 'text-gray-400 hover:text-white'}"
           title="${isSeriesDownloaded ? 'Delete from device' : 'Download series'}"
           data-series-name="${escapeHtml(seriesName)}"
-          data-publisher="${escapeHtml(currentPublisher)}"
-          data-root-folder="${escapeHtml(currentRootFolder)}"
+          data-publisher="${escapeHtml(state.currentPublisher)}"
+          data-root-folder="${escapeHtml(state.currentRootFolder)}"
           data-is-downloaded="${isSeriesDownloaded}"
         >${downloadIcon}</button>`;
 
@@ -773,7 +837,7 @@ function renderSeriesCards(seriesToRender) {
         let comics = comicsInSeries;
         if (!Array.isArray(comics) && typeof Data?.getSeriesComics === 'function') {
           downloadBtn.disabled = true;
-          comics = await Data.getSeriesComics(currentRootFolder, currentPublisher, seriesName);
+          comics = await Data.getSeriesComics(state.currentRootFolder, state.currentPublisher, seriesName);
           downloadBtn.disabled = false;
         }
 
@@ -782,8 +846,8 @@ function renderSeriesCards(seriesToRender) {
             downloadBtn.disabled = true;
             if (Array.isArray(comics)) {
               for (const comic of comics) {
-                if (typeof global.deleteOfflineComic === 'function') {
-                  await global.deleteOfflineComic(comic.id);
+                if (typeof window.deleteOfflineComic === 'function') {
+                  await window.deleteOfflineComic(comic.id);
                 }
               }
             }
@@ -805,11 +869,11 @@ function renderSeriesCards(seriesToRender) {
         let comics = comicsInSeries;
         if (!Array.isArray(comics) && typeof Data?.getSeriesComics === 'function') {
           try {
-            comics = await Data.getSeriesComics(currentRootFolder, currentPublisher, seriesName);
+            comics = await Data.getSeriesComics(state.currentRootFolder, state.currentPublisher, seriesName);
           } catch (_) { comics = []; }
         }
-        if (typeof global.openBulkReadStatusDialog === 'function') {
-          global.openBulkReadStatusDialog(comics || [], `series "${seriesName}"`);
+        if (typeof window.openBulkReadStatusDialog === 'function') {
+          window.openBulkReadStatusDialog(comics || [], `series "${seriesName}"`);
         }
       });
     }
@@ -820,13 +884,13 @@ function renderSeriesCards(seriesToRender) {
     const seriesContextData = {
       seriesName,
       comicsInSeries,
-      rootFolder: currentRootFolder,
-      publisher: currentPublisher
+      rootFolder: state.currentRootFolder,
+      publisher: state.currentPublisher
     };
 
     card.addEventListener('contextmenu', (e) => {
-      if (typeof global.showSeriesContextMenu === 'function') {
-        global.showSeriesContextMenu(e, seriesContextData);
+      if (typeof window.showSeriesContextMenu === 'function') {
+        window.showSeriesContextMenu(e, seriesContextData);
       }
     });
 
@@ -834,9 +898,9 @@ function renderSeriesCards(seriesToRender) {
     card.addEventListener('touchstart', (e) => {
       contextMenuShown = false;
       longPressTimer = setTimeout(() => {
-        if (typeof global.showSeriesContextMenu === 'function') {
+        if (typeof window.showSeriesContextMenu === 'function') {
           contextMenuShown = true;
-          global.showSeriesContextMenu(e, seriesContextData);
+          window.showSeriesContextMenu(e, seriesContextData);
         }
       }, 500); // 500ms long press
     });
@@ -865,7 +929,7 @@ function renderSeriesCards(seriesToRender) {
   }
 }
 
-function getSeriesStatusBanner(comicsInSeries) {
+export function getSeriesStatusBanner(comicsInSeries) {
   const status = getSeriesStatus(comicsInSeries);
   if (status === 'read') {
     return `<div class="status-banner status-read">Read</div>`;
@@ -876,25 +940,25 @@ function getSeriesStatusBanner(comicsInSeries) {
   return '';
 }
 
-async function showComicList(seriesName) {
-  if (!window._isNavigatingFromRouter && window.router && !window._isAppInitializing) {
+export async function showComicList(seriesName) {
+  if (!state._isNavigatingFromRouter && state.router && !state._isAppInitializing) {
      let navPath = `/series/${encodeURIComponent(seriesName)}`;
-     if (currentPublisher) navPath += `?publisher=${encodeURIComponent(currentPublisher)}`;
-     if (currentRootFolder) navPath += (currentPublisher ? '&' : '?') + `rootFolder=${encodeURIComponent(currentRootFolder)}`;
+     if (state.currentPublisher) navPath += `?publisher=${encodeURIComponent(state.currentPublisher)}`;
+     if (state.currentRootFolder) navPath += (state.currentPublisher ? '&' : '?') + `rootFolder=${encodeURIComponent(state.currentRootFolder)}`;
      if ((getRelativePath() + window.location.search) !== navPath) {
-       window.router.navigate(navPath, true);
+       state.router.navigate(navPath, true);
        return;
      }
   }
 
-  if (currentView !== 'comics' || currentSeries !== seriesName) {
-    activeAlphaFilter = 'All';
+  if (state.currentView !== 'comics' || state.currentSeries !== seriesName) {
+    state.activeAlphaFilter = 'All';
   }
-  currentView = 'comics';
-  currentSeries = seriesName;
+  state.currentView = 'comics';
+  state.currentSeries = seriesName;
   if (typeof window !== 'undefined') {
-    window.currentView = currentView;
-    window.currentSeries = currentSeries;
+    window.currentView = state.currentView;
+    window.currentSeries = state.currentSeries;
   }
   syncSmartFilterButtons();
 
@@ -905,11 +969,11 @@ async function showComicList(seriesName) {
     comicListTitleH2.textContent = seriesName;
   }
 
-  const libLabelComic = (window.LIBRARY_NAMES && (window.LIBRARY_NAMES[currentRootFolder] || (currentRootFolder && window.LIBRARY_NAMES[currentRootFolder.replace(/[\\\/]+$/, '')]))) || (currentRootFolder ? currentRootFolder.replace(/[\\\/]+$/, '').split(/[\\\/]/).pop() : '') || currentRootFolder || '';
+  const libLabelComic = (window.LIBRARY_NAMES && (window.LIBRARY_NAMES[state.currentRootFolder] || (state.currentRootFolder && window.LIBRARY_NAMES[state.currentRootFolder.replace(/[\\\/]+$/, '')]))) || (state.currentRootFolder ? state.currentRootFolder.replace(/[\\\/]+$/, '').split(/[\\\/]/).pop() : '') || state.currentRootFolder || '';
   updateBreadcrumb([
     { label: 'Libraries', action: () => showRootFolderList({ force: true }) },
-    ...(libLabelComic ? [{ label: libLabelComic, action: () => showPublisherList(currentRootFolder, { force: true }) }] : []),
-    { label: currentPublisher, action: () => showSeriesList(currentPublisher, { force: true }) },
+    ...(libLabelComic ? [{ label: libLabelComic, action: () => showPublisherList(state.currentRootFolder, { force: true }) }] : []),
+    { label: state.currentPublisher, action: () => showSeriesList(state.currentPublisher, { force: true }) },
     { label: seriesName },
   ]);
 
@@ -921,51 +985,51 @@ async function showComicList(seriesName) {
 
   try {
     // Use lazy loading to get series comics
-    const comicsData = await Data.getSeriesComics(currentRootFolder, currentPublisher, currentSeries);
+    const comicsData = await Data.getSeriesComics(state.currentRootFolder, state.currentPublisher, state.currentSeries);
 
     const matchesScope = SmartLists.comicMatchesActiveSmartScope || (() => true);
-    const scoped = global.activeSmartFilter ? comicsData.filter(matchesScope) : comicsData;
+    const scoped = state.activeSmartFilter ? comicsData.filter(matchesScope) : comicsData;
 
     let comicsToRender = scoped;
-    if (activeFilter === 'in-progress') {
+    if (state.activeFilter === 'in-progress') {
       comicsToRender = scoped.filter(comic => getComicStatus(comic) === 'in-progress');
-    } else if (activeFilter === 'read') {
+    } else if (state.activeFilter === 'read') {
       comicsToRender = scoped.filter(comic => getComicStatus(comic) === 'read');
-    } else if (activeFilter === 'unread') {
+    } else if (state.activeFilter === 'unread') {
       comicsToRender = scoped.filter(comic => getComicStatus(comic) === 'unread');
     }
 
     renderAlphaFilter(comicAlphaFilter, comicsToRender, renderComicCards, 'comics');
 
   } catch (error) {
-    
     if (container) {
       container.innerHTML = '<div class="bg-gray-800 rounded-lg p-6 text-center text-red-400 col-span-full">Error loading comics. Please try again.</div>';
     }
   }
 }
 
-
-function renderComicCards(comicsToRender, viewType, targetContainer) {
+export function renderComicCards(comicsToRender, viewType, targetContainer) {
   let container;
   if (targetContainer) {
     container = targetContainer;
   } else if (viewType === 'search') {
-    container = searchResultsContainer;
+    container = document.getElementById('search-results-container');
   } else if (viewType === 'smart-list') {
     container = smartListContainer || document.getElementById('smart-list-container');
   } else {
     container = document.getElementById('comic-list-container');
   }
 
+  if (!container) return;
+
   container.innerHTML = '';
   if (comicsToRender.length === 0) {
     let msg;
-    if (!viewType && activeFilter === 'in-progress') {
+    if (!viewType && state.activeFilter === 'in-progress') {
       msg = 'No comics in progress.';
-    } else if (!viewType && activeFilter === 'read') {
+    } else if (!viewType && state.activeFilter === 'read') {
       msg = 'No comics read.';
-    } else if (!viewType && activeFilter === 'unread') {
+    } else if (!viewType && state.activeFilter === 'unread') {
       msg = 'No unread comics.';
     } else {
       msg = 'No comics found.';
@@ -981,13 +1045,13 @@ function renderComicCards(comicsToRender, viewType, targetContainer) {
       const backToPublisherBtn = document.createElement('button');
       backToPublisherBtn.className = 'mt-4 mr-2 text-purple-400 hover:text-purple-300';
       backToPublisherBtn.textContent = '← Publisher';
-      backToPublisherBtn.addEventListener('click', () => showPublisherList(currentRootFolder));
+      backToPublisherBtn.addEventListener('click', () => showPublisherList(state.currentRootFolder));
       container.appendChild(backToPublisherBtn);
 
       const backToSeriesBtn = document.createElement('button');
       backToSeriesBtn.className = 'mt-4 text-purple-400 hover:text-purple-300';
       backToSeriesBtn.textContent = '← Series';
-      backToSeriesBtn.addEventListener('click', () => showSeriesList(currentPublisher, { force: true }));
+      backToSeriesBtn.addEventListener('click', () => showSeriesList(state.currentPublisher, { force: true }));
       container.appendChild(backToSeriesBtn);
     }
     return;
@@ -995,7 +1059,7 @@ function renderComicCards(comicsToRender, viewType, targetContainer) {
   comicsToRender.forEach((comic, index) => {
     const card = document.createElement('div');
     card.className = 'comic-card bg-gray-800 rounded-lg shadow-lg cursor-pointer flex flex-col border border-gray-700/50 hover:border-purple-500/50 transition-all duration-300 group';
-    //... inside renderComicCards function
+    
     const progress = comic.progress || {};
     const trackedTotalPages = Math.max(0, Number(progress.totalPages) || 0);
     const lastRead = Math.max(0, Number(progress.lastReadPage) || 0);
@@ -1018,12 +1082,11 @@ function renderComicCards(comicsToRender, viewType, targetContainer) {
 
     const isLocal = comic.handle || comic.file || (comic.id && String(comic.id).startsWith('device-'));
 
-    // Smart list debugging removed
     let bannerHtml = '';
-    let isRead = false; // NEW: Define isRead here to use it for the button
+    let isRead = false;
 
     if (trackedTotalPages > 0) {
-      isRead = lastRead >= trackedTotalPages - 1; // NEW: Assign the value here
+      isRead = lastRead >= trackedTotalPages - 1;
       const isInProgress = lastRead > 0 && !isRead;
       if (!isLocal) {
         if (isRead) {
@@ -1039,7 +1102,7 @@ function renderComicCards(comicsToRender, viewType, targetContainer) {
 
     const progressPercent = trackedTotalPages > 0 ? (lastRead / trackedTotalPages) * 100 : 0;
 
-    const isComicDownloaded = downloadedComicIds.has(comic.id);
+    const isComicDownloaded = state.downloadedComicIds.has(comic.id);
     const downloadIcon = isComicDownloaded ? ICONS.READ : ICONS.DOWNLOAD;
     
     // Don't show download button for local/device comics
@@ -1050,7 +1113,7 @@ function renderComicCards(comicsToRender, viewType, targetContainer) {
         ${downloadIcon}
       </button>`;
 
-    // NEW: Add the read/unread toggle button HTML
+    // Add the read/unread toggle button HTML
     const toggleStatusIcon = isRead
       ? ICONS.READ
       : ICONS.UNREAD;
@@ -1097,7 +1160,6 @@ function renderComicCards(comicsToRender, viewType, targetContainer) {
       </div>
       <div class="absolute bottom-0 left-0 right-0 h-1.5 bg-gray-700 rounded-b-lg">${progressPercent > 0 ? `<div class="${isRead ? 'bg-green-500' : 'bg-purple-500'} h-full rounded-b-lg transition-all duration-300" style="width: ${progressPercent}%;"></div>` : ''}</div>
     `;
-// ...
 
     // Store comic data on the card element for context menu access
     card._comicData = comic;
@@ -1107,8 +1169,8 @@ function renderComicCards(comicsToRender, viewType, targetContainer) {
     let contextMenuShown = false;
 
     card.addEventListener('contextmenu', (e) => {
-      if (typeof global.showComicContextMenu === 'function') {
-        global.showComicContextMenu(e, comic);
+      if (typeof window.showComicContextMenu === 'function') {
+        window.showComicContextMenu(e, comic);
       }
     });
 
@@ -1116,9 +1178,9 @@ function renderComicCards(comicsToRender, viewType, targetContainer) {
     card.addEventListener('touchstart', (e) => {
       contextMenuShown = false;
       longPressTimer = setTimeout(() => {
-        if (typeof global.showComicContextMenu === 'function') {
+        if (typeof window.showComicContextMenu === 'function') {
           contextMenuShown = true;
-          global.showComicContextMenu(e, comic);
+          window.showComicContextMenu(e, comic);
         }
       }, 500); // 500ms long press
     });
@@ -1145,16 +1207,6 @@ function renderComicCards(comicsToRender, viewType, targetContainer) {
 
     card.addEventListener('click', (event) => {
       const target = event.target;
-      const clickDebugDetails = {
-        comicId: comic?.id,
-        comicPath: comic?.path,
-        currentView,
-        targetTag: target?.tagName,
-        targetClasses: target?.className,
-      };
-
-      
-
       if (target instanceof Element) {
         const interactiveButton = target.closest('button.download-btn, button.status-toggle-btn');
         if (interactiveButton) {
@@ -1175,8 +1227,8 @@ function renderComicCards(comicsToRender, viewType, targetContainer) {
         if (isDownloaded) {
           if (confirm(`Delete "${displayTitle}" from your device?`)) {
             downloadBtn.disabled = true;
-            if (typeof global.deleteOfflineComic === 'function') {
-              await global.deleteOfflineComic(comic.id);
+            if (typeof window.deleteOfflineComic === 'function') {
+              await window.deleteOfflineComic(comic.id);
             }
             if (typeof applyFilterAndRender === 'function') applyFilterAndRender();
           }
@@ -1185,7 +1237,7 @@ function renderComicCards(comicsToRender, viewType, targetContainer) {
         }
       });
     }
-    // NEW: Attach handler for read/unread toggle button on individual comic
+    // Attach handler for read/unread toggle button on individual comic
     const statusBtn = card.querySelector('.status-toggle-btn');
     if (statusBtn) {
       statusBtn.addEventListener('click', (e) => {
@@ -1199,53 +1251,62 @@ function renderComicCards(comicsToRender, viewType, targetContainer) {
   });
 }
 
+export function searchLibraryLocally(query, field) {
+  // Imported dynamically or handled by local search module
+}
 
-const LibraryRender = {
-    setLatestButtonActive,
-    setDownloadedButtonActive,
-    setGuidedButtonActive,
-    setMangaFilterButtonActive,
-    clearSmartFilterButtons,
-    showLatestAddedSmartList,
-    showDownloadedSmartList,
-    showGuidedSmartList,
-    showMangaSmartList,
-    renderLatestSmartList,
-    renderDownloadedSmartList,
-    renderGuidedSmartList,
-    renderMangaSmartList,
-    renderAllComicsAsList,
-    applyFilterAndRender,
-    renderAlphaFilter,
-    getComicStatus,
-    getSeriesStatus,
-    getComicStatusCounts,
-    createEmptyStatusCounts,
-    addStatusCounts,
-    getPublisherStatusCounts,
-    getRootStatusCounts,
-    getLibraryStatusCounts,
-    statusCountsMatchFilter,
-    filterPublishersByActiveFilter,
-    filterSeriesByActiveFilter,
-    updateFilterButtonCounts,
-    showRootFolderList,
-    renderPublisherCards,
-    showPublisherList,
-    renderSeriesCards,
-    showSeriesList,
-    getSeriesStatusBanner,
-    renderComicCards,
-    showComicList,
-    showSearchView,
-    rerenderSearchResults,
-    updateLibraryReadStatus,
-    updateBreadcrumb,
-    syncSmartFilterButtons,
-    mountSmartFilterHostInto,
-    searchLibraryLocally,
-  };
+export const LibraryRender = {
+  setLatestButtonActive,
+  setDownloadedButtonActive,
+  setGuidedButtonActive,
+  setMangaFilterButtonActive,
+  clearSmartFilterButtons,
+  showLatestAddedSmartList,
+  showDownloadedSmartList,
+  showGuidedSmartList,
+  showMangaSmartList,
+  renderLatestSmartList,
+  renderDownloadedSmartList,
+  renderGuidedSmartList,
+  renderMangaSmartList,
+  renderAllComicsAsList,
+  applyFilterAndRender,
+  renderAlphaFilter,
+  getComicStatus,
+  getSeriesStatus,
+  getComicStatusCounts,
+  createEmptyStatusCounts,
+  addStatusCounts,
+  getPublisherStatusCounts,
+  getRootStatusCounts,
+  getLibraryStatusCounts,
+  statusCountsMatchFilter,
+  filterPublishersByActiveFilter,
+  filterSeriesByActiveFilter,
+  updateFilterButtonCounts,
+  showRootFolderList,
+  renderPublisherCards,
+  showPublisherList,
+  renderSeriesCards,
+  showSeriesList,
+  getSeriesStatusBanner,
+  renderComicCards,
+  showComicList,
+  showSearchView,
+  rerenderSearchResults,
+  updateLibraryReadStatus,
+  updateBreadcrumb,
+  syncSmartFilterButtons,
+  mountSmartFilterHostInto,
+  searchLibraryLocally
+};
 
-  global.LibraryRender = LibraryRender;
-  Object.assign(global, LibraryRender);
-})(typeof window !== 'undefined' ? window : globalThis);
+// Register on state & window for compatibility
+state.LibraryRender = LibraryRender;
+Object.assign(state, LibraryRender);
+if (typeof window !== 'undefined') {
+  window.LibraryRender = LibraryRender;
+  Object.assign(window, LibraryRender);
+}
+
+export default LibraryRender;

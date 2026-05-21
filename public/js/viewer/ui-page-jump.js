@@ -1,5 +1,24 @@
-(function (global) {
-  'use strict';
+import { state } from '../globals.js';
+
+const global = new Proxy(typeof window !== 'undefined' ? window : globalThis, {
+  get(target, prop) {
+    if (prop in state) {
+      return state[prop];
+    }
+    const val = target[prop];
+    if (typeof val === 'function') {
+      return val.bind(target);
+    }
+    return val;
+  },
+  set(target, prop, value) {
+    state[prop] = value;
+    try {
+      target[prop] = value;
+    } catch (e) {}
+    return true;
+  }
+});
 
   const PAGE_COUNTER_PLACEHOLDER = '\u2014 / \u2014';
   let isPageJumpInputOpen = false;
@@ -308,4 +327,36 @@
   global.showPageJumpInputBottom = showPageJumpInputBottom;
   global.hidePageJumpInputBottom = hidePageJumpInputBottom;
   global.commitPageJumpBottom = commitPageJumpBottom;
-})(typeof window !== 'undefined' ? window : globalThis);
+
+const isPageJumpInputOpenGetter = () => isPageJumpInputOpen;
+
+export {
+  PAGE_COUNTER_PLACEHOLDER,
+  isPageJumpInputOpenGetter,
+  showPageJumpInput,
+  hidePageJumpInput,
+  commitPageJump,
+  showPageJumpInputBottom,
+  hidePageJumpInputBottom,
+  commitPageJumpBottom
+};
+
+state.isPageJumpInputOpenGetter = isPageJumpInputOpenGetter;
+state.PAGE_COUNTER_PLACEHOLDER = PAGE_COUNTER_PLACEHOLDER;
+state.showPageJumpInput = showPageJumpInput;
+state.hidePageJumpInput = hidePageJumpInput;
+state.commitPageJump = commitPageJump;
+state.showPageJumpInputBottom = showPageJumpInputBottom;
+state.hidePageJumpInputBottom = hidePageJumpInputBottom;
+state.commitPageJumpBottom = commitPageJumpBottom;
+
+if (typeof window !== 'undefined') {
+  window.isPageJumpInputOpenGetter = isPageJumpInputOpenGetter;
+  window.PAGE_COUNTER_PLACEHOLDER = PAGE_COUNTER_PLACEHOLDER;
+  window.showPageJumpInput = showPageJumpInput;
+  window.hidePageJumpInput = hidePageJumpInput;
+  window.commitPageJump = commitPageJump;
+  window.showPageJumpInputBottom = showPageJumpInputBottom;
+  window.hidePageJumpInputBottom = hidePageJumpInputBottom;
+  window.commitPageJumpBottom = commitPageJumpBottom;
+}

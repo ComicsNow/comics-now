@@ -1,7 +1,56 @@
+import {
+  state,
+  escapeHtml,
+  getRelativePath,
+  ctButton,
+  ctModal,
+  ctScheduleInput,
+  ctSaveBtn,
+  ctMatchBody,
+  ctApplyBtn,
+  ctSkipBtn,
+  ctConfirmBar,
+  ctConfirmMessage,
+  ctConfirmYes,
+  ctConfirmNo,
+  ctOutputDiv,
+  ctClearOutputBtn,
+  ctRunBtn,
+  ctTabSettings,
+  ctTabMatches,
+  ctTabOutput,
+  ctTabManagement,
+  ctContentSettings,
+  ctContentMatches,
+  ctContentOutput,
+  ctContentManagement,
+  ctMatchesBadge
+} from './globals.js';
+
+const global = new Proxy(typeof window !== 'undefined' ? window : globalThis, {
+  get(target, prop) {
+    if (prop in state) {
+      return state[prop];
+    }
+    const val = target[prop];
+    if (typeof val === 'function') {
+      return val.bind(target);
+    }
+    return val;
+  },
+  set(target, prop, value) {
+    state[prop] = value;
+    try {
+      target[prop] = value;
+    } catch (e) {}
+    return true;
+  }
+});
+
 // --- COMICTAGGER ---
 async function checkPendingMatch() {
   try {
-    const res = await fetch(`${API_BASE_URL}/api/v1/comictagger/pending`);
+    const res = await fetch(`${global.API_BASE_URL}/api/v1/comictagger/pending`);
 
     // If forbidden (not admin), silently ignore
     if (res.status === 403) {
@@ -124,7 +173,7 @@ function formatCtLogMessage(timestamp, message) {
 
 async function loadCtSavedLogs() {
   try {
-    const res = await fetch(`${API_BASE_URL}/api/v1/comictagger/logs`);
+    const res = await fetch(`${global.API_BASE_URL}/api/v1/comictagger/logs`);
     const logs = await res.json();
     if (Array.isArray(logs) && logs.length > 0) {
       ctOutputDiv.innerHTML = ''; // Clear previous content
@@ -152,17 +201,17 @@ function openCTModal() {
   
   isCtModalInitializing = true;
 
-  if (!window._isNavigatingFromRouter && window.router) {
+  if (!global._isNavigatingFromRouter && global.router) {
     if (!getRelativePath().startsWith('/comictagger')) {
-      window.router.navigate('/comictagger', true);
+      global.router.navigate('/comictagger', true);
     }
   }
   ctModal.classList.remove('hidden');
 
   // Clean up existing resources if they exist
-  if (ctEventSource) {
-    ctEventSource.close();
-    ctEventSource = null;
+  if (global.ctEventSource) {
+    global.ctEventSource.close();
+    global.ctEventSource = null;
   }
 
   fetchCtSettings();
@@ -185,18 +234,18 @@ function openCTModal() {
     isCtModalInitializing = false;
   });
 
-  ctEventSource = new EventSource(`${API_BASE_URL}/api/v1/comictagger/stream`);
+  global.ctEventSource = new EventSource(`${global.API_BASE_URL}/api/v1/comictagger/stream`);
   
-  ctEventSource.onopen = () => {
+  global.ctEventSource.onopen = () => {
     console.log('[CT] SSE stream connected successfully');
   };
 
-  ctEventSource.onerror = (err) => {
+  global.ctEventSource.onerror = (err) => {
     console.error('[CT] SSE stream error:', err);
     // Browser will auto-reconnect, but we should log it
   };
 
-  ctEventSource.onmessage = (e) => {
+  global.ctEventSource.onmessage = (e) => {
     try {
       if (e.data === ':ok' || e.data === ': keepalive') return;
       
@@ -209,12 +258,12 @@ function openCTModal() {
       ctOutputDiv.scrollTop = ctOutputDiv.scrollHeight;
 
       if (/low-confidence match/i.test(msg) || /matches found/i.test(msg) || /Multiple.*matches/i.test(msg) || /Archives with/i.test(msg)) {
-        ctAwaitingMatches = true;
+        global.ctAwaitingMatches = true;
         tempMatches = []; 
-      } else if (ctAwaitingMatches) {
+      } else if (global.ctAwaitingMatches) {
         if (/Choose a match/i.test(msg) || /Enter selection/i.test(msg)) {
           console.log('[CT] Match prompt detected in stream');
-          ctAwaitingMatches = false;
+          global.ctAwaitingMatches = false;
           checkPendingMatch();
           
           if (ctTabMatches && ctTabMatches.classList.contains('active')) {
@@ -233,10 +282,7 @@ function openCTModal() {
   };
 }
 
-/**
- * Fetch a single match cover on demand
- */
-window.fetchSingleMatchCover = async (matchChoice, btn) => {
+async function fetchSingleMatchCover(matchChoice, btn) {
   if (!matchChoice || !btn) return;
   
   const originalHtml = btn.innerHTML;
@@ -257,7 +303,7 @@ window.fetchSingleMatchCover = async (matchChoice, btn) => {
       publisher: btn.dataset.publisher
     };
 
-    const res = await fetch(`${API_BASE_URL}/api/v1/comictagger/match-covers`, {
+    const res = await fetch(`${global.API_BASE_URL}/api/v1/comictagger/match-covers`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ matches: [matchObj] })
@@ -294,7 +340,7 @@ window.fetchSingleMatchCover = async (matchChoice, btn) => {
       btn.appendChild(errSpan);
     }
   }
-};
+}
 
 function clearCtMatches() {
   console.log('[CT] Clearing matches UI');
@@ -320,26 +366,26 @@ function clearCtMatches() {
 function closeCTModal() {
   ctModal.classList.add('hidden');
   ctConfirmBar.classList.add('hidden');
-  if (ctEventSource) {
-    ctEventSource.close();
-    ctEventSource = null;
+  if (global.ctEventSource) {
+    global.ctEventSource.close();
+    global.ctEventSource = null;
   }
   // Reset hash so fresh matches render on next modal open
   lastRenderedMatchesHash = null;
 
-  if (window.router && getRelativePath().startsWith('/comictagger')) {
-    const path = window.getPathForCurrentView ? window.getPathForCurrentView() : '/';
-    window.router.navigate(path, true);
+  if (global.router && getRelativePath().startsWith('/comictagger')) {
+    const path = global.getPathForCurrentView ? global.getPathForCurrentView() : '/';
+    global.router.navigate(path, true);
   }
 
   // Stop management streams if they were running
-  if (typeof window.stopRenameStream === 'function') window.stopRenameStream();
-  if (typeof window.stopMoveStream === 'function') window.stopMoveStream();
+  if (typeof global.stopRenameStream === 'function') global.stopRenameStream();
+  if (typeof global.stopMoveStream === 'function') global.stopMoveStream();
 }
 
 async function fetchCtSettings() {
   try {
-    const res = await fetch(`${API_BASE_URL}/api/v1/comictagger/schedule`);
+    const res = await fetch(`${global.API_BASE_URL}/api/v1/comictagger/schedule`);
     const data = await res.json();
     ctScheduleInput.value = data.minutes || 0;
     const scanDirInput = document.getElementById('ct-scan-dir-input');
@@ -400,17 +446,13 @@ function debouncedFetchPendingMatchDetails() {
   }, 500);
 }
 
-/**
- * Fetch pending match details including images and render UI
- * @param {boolean} isManual - If true, ignore "isFinal" check and render immediately
- */
 async function fetchPendingMatchDetails(isManual = false) {
   if (isFetchingCtDetails && !isManual) return;
   isFetchingCtDetails = true;
 
   try {
     // Get pending match details
-    const detailsRes = await fetch(`${API_BASE_URL}/api/v1/comictagger/pending-details?_t=${Date.now()}`);
+    const detailsRes = await fetch(`${global.API_BASE_URL}/api/v1/comictagger/pending-details?_t=${Date.now()}`);
     if (!detailsRes.ok) {
       throw new Error(`Failed to fetch pending details: ${detailsRes.status}`);
     }
@@ -428,7 +470,7 @@ async function fetchPendingMatchDetails(isManual = false) {
       console.log('[CT] Backend returned 0 matches for:', details.fileName);
       if (details.fileName && details.fileName !== lastRenderedFileName) {
         clearCtMatches();
-        const previewUrl = `${API_BASE_URL}/api/v1/comictagger/preview?_t=${Date.now()}`;
+        const previewUrl = `${global.API_BASE_URL}/api/v1/comictagger/preview?_t=${Date.now()}`;
         renderComicPreview(previewUrl, details.fileName);
         lastRenderedFileName = details.fileName;
       }
@@ -471,7 +513,7 @@ async function fetchPendingMatchDetails(isManual = false) {
     // ATOMIC RENDERING: Only clear and re-render preview if filename changed. 
     if (details.fileName !== lastRenderedFileName) {
       clearCtMatches();
-      const previewUrl = `${API_BASE_URL}/api/v1/comictagger/preview?_t=${Date.now()}`;
+      const previewUrl = `${global.API_BASE_URL}/api/v1/comictagger/preview?_t=${Date.now()}`;
       renderComicPreview(previewUrl, details.fileName);
       lastRenderedFileName = details.fileName;
     }
@@ -580,7 +622,7 @@ async function saveCtSettings() {
   const scanDirInput = document.getElementById('ct-scan-dir-input');
   const comicsLocation = scanDirInput ? scanDirInput.value.trim() : null;
 
-  await fetch(`${API_BASE_URL}/api/v1/comictagger/schedule`, {
+  await fetch(`${global.API_BASE_URL}/api/v1/comictagger/schedule`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ 
@@ -610,14 +652,14 @@ async function handleCtConfirmYes() {
       return;
     }
 
-    await fetch(`${API_BASE_URL}/api/v1/comictagger/apply`, {
+    await fetch(`${global.API_BASE_URL}/api/v1/comictagger/apply`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ selections: [choice] })
     });
   } else {
     // Skip action
-    await fetch(`${API_BASE_URL}/api/v1/comictagger/skip`, {
+    await fetch(`${global.API_BASE_URL}/api/v1/comictagger/skip`, {
       method: 'POST'
     });
   }
@@ -642,7 +684,7 @@ async function updateCtButtonIndicator() {
   if (isUpdatingCtIndicator) return;
   isUpdatingCtIndicator = true;
   try {
-    const res = await fetch(`${API_BASE_URL}/api/v1/comictagger/pending`);
+    const res = await fetch(`${global.API_BASE_URL}/api/v1/comictagger/pending`);
 
     // If forbidden (not admin), silently ignore
     if (res.status === 403) {
@@ -690,4 +732,65 @@ if (typeof ctTabMatches !== 'undefined' && ctTabMatches) {
       fetchPendingMatchDetails();
     }, 50);
   });
+}
+
+export {
+  checkPendingMatch,
+  formatCtLogMessage,
+  loadCtSavedLogs,
+  openCTModal,
+  fetchSingleMatchCover,
+  clearCtMatches,
+  closeCTModal,
+  fetchCtSettings,
+  parseCtSuggestion,
+  debouncedFetchPendingMatchDetails,
+  fetchPendingMatchDetails,
+  getCtMatchHtml,
+  renderComicPreview,
+  saveCtSettings,
+  showCtConfirm,
+  handleCtConfirmYes,
+  handleCtConfirmNo,
+  updateCtButtonIndicator
+};
+
+state.checkPendingMatch = checkPendingMatch;
+state.formatCtLogMessage = formatCtLogMessage;
+state.loadCtSavedLogs = loadCtSavedLogs;
+state.openCTModal = openCTModal;
+state.fetchSingleMatchCover = fetchSingleMatchCover;
+state.clearCtMatches = clearCtMatches;
+state.closeCTModal = closeCTModal;
+state.fetchCtSettings = fetchCtSettings;
+state.parseCtSuggestion = parseCtSuggestion;
+state.debouncedFetchPendingMatchDetails = debouncedFetchPendingMatchDetails;
+state.fetchPendingMatchDetails = fetchPendingMatchDetails;
+state.getCtMatchHtml = getCtMatchHtml;
+state.renderComicPreview = renderComicPreview;
+state.saveCtSettings = saveCtSettings;
+state.showCtConfirm = showCtConfirm;
+state.handleCtConfirmYes = handleCtConfirmYes;
+state.handleCtConfirmNo = handleCtConfirmNo;
+state.updateCtButtonIndicator = updateCtButtonIndicator;
+
+if (typeof window !== 'undefined') {
+  window.checkPendingMatch = checkPendingMatch;
+  window.formatCtLogMessage = formatCtLogMessage;
+  window.loadCtSavedLogs = loadCtSavedLogs;
+  window.openCTModal = openCTModal;
+  window.fetchSingleMatchCover = fetchSingleMatchCover;
+  window.clearCtMatches = clearCtMatches;
+  window.closeCTModal = closeCTModal;
+  window.fetchCtSettings = fetchCtSettings;
+  window.parseCtSuggestion = parseCtSuggestion;
+  window.debouncedFetchPendingMatchDetails = debouncedFetchPendingMatchDetails;
+  window.fetchPendingMatchDetails = fetchPendingMatchDetails;
+  window.getCtMatchHtml = getCtMatchHtml;
+  window.renderComicPreview = renderComicPreview;
+  window.saveCtSettings = saveCtSettings;
+  window.showCtConfirm = showCtConfirm;
+  window.handleCtConfirmYes = handleCtConfirmYes;
+  window.handleCtConfirmNo = handleCtConfirmNo;
+  window.updateCtButtonIndicator = updateCtButtonIndicator;
 }

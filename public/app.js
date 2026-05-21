@@ -1,3 +1,119 @@
+import {
+  state,
+  escapeHtml,
+  createErrorMessage,
+  getRelativePath,
+  ICONS,
+  CSS_CLASSES,
+  rootFolderListContainer,
+  applyDisplayInfoToLibrary
+} from './js/globals.js';
+
+import { registerRoutes } from './js/routes.js';
+
+// Side-effect imports to load and register all other ES Modules in order
+import './js/router.js';
+import './js/utils/device-detection.js';
+import './js/offline/db-core.js';
+import './js/offline/db-jwt.js';
+import './js/offline/db-library-cache.js';
+import './js/offline/db-queue.js';
+import './js/offline/db-comics.js';
+import './js/offline/db-namespace.js';
+import './js/jwt-capture.js';
+import './js/offline/status.js';
+import './js/offline/downloads.js';
+import './js/offline/download-progress.js';
+import './js/offline/download-notifications.js';
+import './js/offline/download-actions.js';
+import './js/offline/downloads-namespace.js';
+import './js/offline.js';
+import './js/library/data.js';
+import './js/library/smartlists.js';
+import './js/library/status.js';
+import './js/library/smart-filters.js';
+import './js/library/breadcrumb.js';
+import './js/library/alpha-list.js';
+import './js/library/search.js';
+import './js/library/render.js';
+import './js/library/folder-viewer.js';
+import './js/library/device-library.js';
+import './js/library.js';
+import './js/context-menu/menu-builder.js';
+import './js/manga.js';
+import './js/continuous.js';
+import './js/context-menu/actions-shared.js';
+import './js/context-menu/actions-comic.js';
+import './js/context-menu/actions-series.js';
+import './js/context-menu/actions-publisher.js';
+import './js/context-menu/actions-library.js';
+import './js/context-menu/actions-folder.js';
+import './js/metadata.js';
+import './js/bulk-status.js';
+import './js/viewer/fullscreen.js';
+import './js/viewer/full-image.js';
+import './js/viewer/ui-page-jump.js';
+import './js/viewer/ui-orientation.js';
+import './js/viewer/ui-summary.js';
+import './js/viewer/ui.js';
+import './js/viewer/ui-init.js';
+import './js/viewer/navigation.js';
+import './js/viewer/viewer-server.js';
+import './js/viewer/viewer-local.js';
+import './js/viewer/end-navigation.js';
+import './js/viewer/guided/data.js';
+import './js/viewer/guided/geometry.js';
+import './js/viewer/guided/overlay.js';
+import './js/viewer/guided/mode-registry.js';
+import './js/viewer/guided/modes/guided.js';
+import './js/viewer/guided/modes/bubble.js';
+import './js/viewer/guided/modes/western-speech-zoom.js';
+import './js/viewer/guided/modes/manga-panel-zoom.js';
+import './js/viewer/guided/modes/manga-speech-zoom.js';
+import './js/viewer/guided/pan.js';
+import './js/viewer/guided/input.js';
+import './js/viewer/guided/lifecycle.js';
+import './js/viewer/guided/buttons.js';
+import './js/viewer/guided/index.js';
+import './js/settings/shared.js';
+import './js/settings/continuous-mode.js';
+import './js/settings/devices.js';
+import './js/settings/users.js';
+import './js/settings/user-access.js';
+import './js/settings/comics-defaults.js';
+import './js/settings/comics-management.js';
+import './js/settings.js';
+import './js/guided-reader.js';
+import './js/comictagger.js';
+import './js/events.js';
+import './js/comicvine.js';
+import './js/progress.js';
+import './js/sync.js';
+import './js/auth.js';
+import './js/reading-lists.js';
+
+
+const global = new Proxy(typeof window !== 'undefined' ? window : globalThis, {
+  get(target, prop) {
+    if (prop === 'state') return state;
+    if (prop in state) {
+      return state[prop];
+    }
+    const val = target[prop];
+    if (typeof val === 'function') {
+      return val.bind(target);
+    }
+    return val;
+  },
+  set(target, prop, value) {
+    state[prop] = value;
+    try {
+      target[prop] = value;
+    } catch (e) {}
+    return true;
+  }
+});
+
 const APP_CONFIG_STORAGE_KEY = 'comics-now-app-config';
 
 function cacheAppConfig(config) {
@@ -26,15 +142,14 @@ function loadCachedAppConfig() {
 }
 
 function resolveAppConfig() {
-  if (window.APP_CONFIG && typeof window.APP_CONFIG === 'object') {
-    cacheAppConfig(window.APP_CONFIG);
-    return window.APP_CONFIG;
+  if (global.APP_CONFIG && typeof global.APP_CONFIG === 'object') {
+    cacheAppConfig(global.APP_CONFIG);
+    return global.APP_CONFIG;
   }
 
   const cached = loadCachedAppConfig();
   if (cached) {
-    
-    window.APP_CONFIG = cached;
+    global.APP_CONFIG = cached;
     return cached;
   }
 
@@ -47,8 +162,8 @@ function showOfflineLibraryUnavailableMessage() {
     ? 'Offline library unavailable. Connect to the server while online at least once to sync your comics for offline use.'
     : 'Unable to load the comics library. Check that the server is running and reachable.';
 
-  if (typeof showRootFolderList === 'function') {
-    showRootFolderList({ force: true });
+  if (typeof global.showRootFolderList === 'function') {
+    global.showRootFolderList({ force: true });
   }
 
   if (rootFolderListContainer) {
@@ -57,16 +172,16 @@ function showOfflineLibraryUnavailableMessage() {
 }
 
 // --- LIBRARY STATUS TRACKING ---
-window.libraryReady = false;
-window.libraryLoadedAt = null;
+global.libraryReady = false;
+global.libraryLoadedAt = null;
 let isListEditMode = false;
 
 function updateLibraryStatusBadge() {
   const badge = document.getElementById('library-status-badge');
   if (!badge) return;
 
-  if (window.libraryReady) {
-    const comicCount = Object.keys(window.library || {}).length;
+  if (global.libraryReady) {
+    const comicCount = Object.keys(global.library || {}).length;
     badge.textContent = comicCount > 0 ? 'Ready' : 'Empty';
     badge.className = comicCount > 0
       ? 'text-xs px-2 py-1 rounded-full bg-green-600'
@@ -84,27 +199,27 @@ function updateLibraryStatusBadge() {
  */
 function initEnvironment() {
   const config = resolveAppConfig() || { baseUrl: '/', libraries: [] };
-  window.APP_CONFIG = config;
+  global.APP_CONFIG = config;
 
   // 1) Work out the base URL the server mounted us at (no trailing slash)
-  API_BASE_URL = (config.baseUrl || '').replace(/\/$/, '');
+  global.API_BASE_URL = (config.baseUrl || '').replace(/\/$/, '');
   
   // Store library names for display mapping
-  window.LIBRARY_NAMES = {};
-  configuredRootFolders = [];
+  global.LIBRARY_NAMES = {};
+  global.configuredRootFolders = [];
 
   if (Array.isArray(config.libraries)) {
     config.libraries.forEach(lib => {
       if (typeof lib === 'object' && lib.id && lib.name) {
-        window.LIBRARY_NAMES[lib.id] = lib.name;
-        configuredRootFolders.push(lib.id);
+        global.LIBRARY_NAMES[lib.id] = lib.name;
+        global.configuredRootFolders.push(lib.id);
       }
     });
   }
 
   // 2) Keep <base> tag in sync (with trailing slash)
   const baseEl = document.querySelector('base');
-  if (baseEl) baseEl.href = `${API_BASE_URL}/`;
+  if (baseEl) baseEl.href = `${global.API_BASE_URL}/`;
 
   return config;
 }
@@ -120,8 +235,8 @@ async function registerServiceWorker(config) {
       regs.forEach(reg => reg.unregister());
     } else {
       try {
-        const registration = await navigator.serviceWorker.register(`${API_BASE_URL}/service-worker.js`, {
-          scope: `${API_BASE_URL}/`,
+        const registration = await navigator.serviceWorker.register(`${global.API_BASE_URL}/service-worker.js`, {
+          scope: `${global.API_BASE_URL}/`,
           updateViaCache: 'none'
         });
         registration.update();
@@ -141,12 +256,14 @@ async function registerServiceWorker(config) {
  */
 async function initAppStorage() {
   // 4) App init - prioritize offline data
-  await openOfflineDB();
+  if (typeof global.openOfflineDB === 'function') {
+    await global.openOfflineDB();
+  }
 
   // Initialize download queue and resume any pending downloads
-  if (typeof initializeDownloadQueue === 'function') {
+  if (typeof global.initializeDownloadQueue === 'function') {
     try {
-      await initializeDownloadQueue();
+      await global.initializeDownloadQueue();
     } catch (error) {
       console.error('[APP] Failed to initialize download queue:', error);
     }
@@ -154,9 +271,9 @@ async function initAppStorage() {
 
   // Initialize JWT token capture for Cloudflare Access authentication
   // This enables background downloads to work with authentication enabled
-  if (typeof initializeJWTCapture === 'function') {
+  if (typeof global.initializeJWTCapture === 'function') {
     try {
-      await initializeJWTCapture(30 * 60 * 1000); // Refresh every 30 minutes
+      await global.initializeJWTCapture(30 * 60 * 1000); // Refresh every 30 minutes
     } catch (error) {
       console.error('[APP] Failed to initialize JWT capture:', error);
     }
@@ -167,9 +284,15 @@ async function initAppStorage() {
  * Phase 4: UI controls initialization
  */
 function initUIControls() {
-  initializeLibraryUIControls();
-  initializeViewerUIControls();
-  initializeProgressTracking();
+  if (typeof global.initializeLibraryUIControls === 'function') {
+    global.initializeLibraryUIControls();
+  }
+  if (typeof global.initializeViewerUIControls === 'function') {
+    global.initializeViewerUIControls();
+  }
+  if (typeof global.initializeProgressTracking === 'function') {
+    global.initializeProgressTracking();
+  }
 }
 
 /**
@@ -178,10 +301,10 @@ function initUIControls() {
 async function loadInitialData() {
   // 4.5) Load manga mode preference early
   try {
-    const response = await fetch(`${API_BASE_URL}/api/v1/manga-mode-preference`);
+    const response = await fetch(`${global.API_BASE_URL}/api/v1/manga-mode-preference`);
     const data = await response.json();
     if (response.ok && data.ok) {
-      window.mangaModePreference = data.mangaMode;
+      global.mangaModePreference = data.mangaMode;
     }
   } catch (error) {
     console.warn('[initializeApp:mangaModePreference]', error);
@@ -192,7 +315,7 @@ async function loadInitialData() {
 }
 
 async function initializeApp() {
-  window._isAppInitializing = true;
+  global._isAppInitializing = true;
   try {
     const config = initEnvironment();
     await registerServiceWorker(config);
@@ -200,8 +323,8 @@ async function initializeApp() {
     initUIControls();
     await loadInitialData();
 
-    if (window.router) {
-      window.router.navigate(getRelativePath() + window.location.search, false);
+    if (global.router) {
+      global.router.navigate(getRelativePath() + global.location.search, false);
     }
   } catch (e) {
     console.error('[APP INIT ERROR]', e);
@@ -213,7 +336,7 @@ async function initializeApp() {
          <span class="text-xs text-gray-500">${escapeHtml(e.message)}</span>
        </div>`;
   } finally {
-    window._isAppInitializing = false;
+    global._isAppInitializing = false;
   }
 }
 
@@ -226,8 +349,8 @@ async function loadLibraryOfflineFirst() {
 
     try {
       const cacheStartTime = performance.now();
-      if (typeof loadLibraryCacheFromDB === 'function') {
-        const cachedRecord = await loadLibraryCacheFromDB();
+      if (typeof global.loadLibraryCacheFromDB === 'function') {
+        const cachedRecord = await global.loadLibraryCacheFromDB();
         if (cachedRecord && cachedRecord.data) {
           cachedLibrary = cachedRecord.data;
           cacheTimestamp = cachedRecord.timestamp;
@@ -246,53 +369,52 @@ async function loadLibraryOfflineFirst() {
     }
 
     // Load downloaded comic IDs early so indicators show immediately
-    if (typeof getAllDownloadedComicIds === 'function') {
+    if (typeof global.getAllDownloadedComicIds === 'function') {
       try {
-        const ids = await getAllDownloadedComicIds();
+        const ids = await global.getAllDownloadedComicIds();
       } catch (error) {
         console.error('[DEBUG] Failed to load downloaded comic IDs:', error);
         // Initialize empty set to prevent errors in UI
-        if (!window.downloadedComicIds) {
-          window.downloadedComicIds = new Set();
+        if (!global.downloadedComicIds) {
+          global.downloadedComicIds = new Set();
         }
       }
-    } else {
     }
 
     if (cachedLibrary) {
-      library = cachedLibrary;
-      applyDisplayInfoToLibrary(library);
+      global.library = cachedLibrary;
+      applyDisplayInfoToLibrary(global.library);
 
       // Show cached data immediately for better UX
-      const librarySize = estimateLibrarySize(library);
+      const librarySize = typeof global.estimateLibrarySize === 'function' ? global.estimateLibrarySize(global.library) : 0;
       if (librarySize > 0) {
         if (librarySize > 1000) {
-          applyFilterAndRender();
+          if (typeof global.applyFilterAndRender === 'function') global.applyFilterAndRender();
           requestAnimationFrame(() => {
-            rebuildLatestComics();
-            if (typeof rebuildMangaSmartLists === 'function') rebuildMangaSmartLists();
+            if (typeof global.rebuildLatestComics === 'function') global.rebuildLatestComics();
+            if (typeof global.rebuildMangaSmartLists === 'function') global.rebuildMangaSmartLists();
             requestAnimationFrame(() => {
-              if (typeof updateFilterButtonCounts === 'function') {
-                updateFilterButtonCounts();
+              if (typeof global.updateFilterButtonCounts === 'function') {
+                global.updateFilterButtonCounts();
               }
             });
           });
         } else {
-          rebuildLatestComics();
-          if (typeof rebuildMangaSmartLists === 'function') rebuildMangaSmartLists();
-          applyFilterAndRender();
+          if (typeof global.rebuildLatestComics === 'function') global.rebuildLatestComics();
+          if (typeof global.rebuildMangaSmartLists === 'function') global.rebuildMangaSmartLists();
+          if (typeof global.applyFilterAndRender === 'function') global.applyFilterAndRender();
         }
 
         // Merge offline progress data
-        if (typeof mergeOfflineStatusesIntoLibrary === 'function') {
-          await mergeOfflineStatusesIntoLibrary();
+        if (typeof global.mergeOfflineStatusesIntoLibrary === 'function') {
+          await global.mergeOfflineStatusesIntoLibrary();
 
           // Re-render UI with updated progress data
-          applyFilterAndRender();
+          if (typeof global.applyFilterAndRender === 'function') global.applyFilterAndRender();
 
           // Update library cache so next refresh shows correct progress immediately
-          if (typeof saveLibraryCacheToDB === 'function') {
-            saveLibraryCacheToDB(library).catch(() => {
+          if (typeof global.saveLibraryCacheToDB === 'function') {
+            global.saveLibraryCacheToDB(global.library).catch(() => {
               // Failed to update library cache
             });
           }
@@ -304,7 +426,6 @@ async function loadLibraryOfflineFirst() {
     let hasLibraryData = Boolean(cachedLibrary);
 
     if (!cachedLibrary && isOffline) {
-      
       showOfflineLibraryUnavailableMessage();
     }
 
@@ -319,83 +440,86 @@ async function loadLibraryOfflineFirst() {
         // Network error - if we have cached data, continue using it silently
         if (!hasLibraryData) {
           showOfflineLibraryUnavailableMessage();
-        } else {
-          // We have cached data, so just log the error and continue
         }
       }
-    } else {
     }
 
     // Run background operations
     if (typeof requestIdleCallback === 'function') {
       requestIdleCallback(() => {
-        backgroundSyncOperations();
+        if (typeof global.backgroundSyncOperations === 'function') {
+          global.backgroundSyncOperations();
+        }
       }, { timeout: 1000 });
     } else {
       setTimeout(() => {
-        backgroundSyncOperations();
+        if (typeof global.backgroundSyncOperations === 'function') {
+          global.backgroundSyncOperations();
+        }
       }, 50);
     }
 
     // Mark library as ready
-    window.libraryReady = true;
-    window.libraryLoadedAt = Date.now();
+    global.libraryReady = true;
+    global.libraryLoadedAt = Date.now();
 
     // Update library status badge
     updateLibraryStatusBadge();
 
   } catch (error) {
-    window.libraryReady = false;
+    global.libraryReady = false;
     console.error('[LIBRARY] Failed to load library:', error);
-    rootFolderListContainer.innerHTML = '<div class="bg-gray-800 rounded-lg p-6 text-center text-red-400 col-span-full">Error loading library. Check network connection.</div>';
+    if (rootFolderListContainer) {
+      rootFolderListContainer.innerHTML = '<div class="bg-gray-800 rounded-lg p-6 text-center text-red-400 col-span-full">Error loading library. Check network connection.</div>';
+    }
   }
 }
 
 // Modified function to fetch from server and cache
 async function fetchLibraryFromServer() {
-
   try {
     // Try lazy loading first, fallback to full loading
-    const useProgressiveLoading = await window.tryProgressiveLoading();
+    const useProgressiveLoading = typeof global.tryProgressiveLoading === 'function' ? await global.tryProgressiveLoading() : false;
 
     if (!useProgressiveLoading) {
       // Fallback to original full loading
-      await window.fetchLibraryFull();
+      if (typeof global.fetchLibraryFull === 'function') {
+        await global.fetchLibraryFull();
+      }
       return;
     }
 
     // Cache the library data
-    if (typeof saveLibraryCacheToDB === 'function') {
+    if (typeof global.saveLibraryCacheToDB === 'function') {
       try {
-        await saveLibraryCacheToDB(library);
+        await global.saveLibraryCacheToDB(global.library);
       } catch (error) {
         console.error('Failed to save library cache to DB:', error);
       }
     }
 
     // Progressive loading succeeded - update UI
-    const librarySize = estimateLibrarySize(library);
+    const librarySize = typeof global.estimateLibrarySize === 'function' ? global.estimateLibrarySize(global.library) : 0;
     if (librarySize > 1000) {
       // For large libraries, show UI first then rebuild in background
-      applyFilterAndRender();
+      if (typeof global.applyFilterAndRender === 'function') global.applyFilterAndRender();
       requestAnimationFrame(() => {
-        rebuildLatestComics();
-        if (typeof rebuildMangaSmartLists === 'function') rebuildMangaSmartLists();
+        if (typeof global.rebuildLatestComics === 'function') global.rebuildLatestComics();
+        if (typeof global.rebuildMangaSmartLists === 'function') global.rebuildMangaSmartLists();
         requestAnimationFrame(() => {
-          if (typeof updateFilterButtonCounts === 'function') {
-            updateFilterButtonCounts();
+          if (typeof global.updateFilterButtonCounts === 'function') {
+            global.updateFilterButtonCounts();
           }
         });
       });
     } else {
       // For smaller libraries, rebuild immediately
-      rebuildLatestComics();
-      if (typeof rebuildMangaSmartLists === 'function') rebuildMangaSmartLists();
-      applyFilterAndRender();
+      if (typeof global.rebuildLatestComics === 'function') global.rebuildLatestComics();
+      if (typeof global.rebuildMangaSmartLists === 'function') global.rebuildMangaSmartLists();
+      if (typeof global.applyFilterAndRender === 'function') global.applyFilterAndRender();
     }
 
   } catch (error) {
-
     throw error;
   }
 }
@@ -403,7 +527,7 @@ async function fetchLibraryFromServer() {
 // --- USER BADGE ---
 function showUserBadge() {
   // Only show badge when auth is enabled
-  if (!window.syncManager || !window.syncManager.authEnabled) {
+  if (!global.syncManager || !global.syncManager.authEnabled) {
     return;
   }
 
@@ -412,8 +536,8 @@ function showUserBadge() {
     return;
   }
 
-  const userEmail = window.syncManager.userEmail || 'Unknown';
-  const userRole = window.syncManager.userRole || 'user';
+  const userEmail = global.syncManager.userEmail || 'Unknown';
+  const userRole = global.syncManager.userRole || 'user';
 
   // Create badge element
   const badge = document.createElement('div');
@@ -422,7 +546,7 @@ function showUserBadge() {
   badge.style.cssText = 'position: fixed; padding: 0.25rem 0.75rem; border-radius: 9999px; display: inline-flex; align-items: center; gap: 0.5rem; white-space: nowrap; width: fit-content; max-width: 250px;';
 
   // Position at bottom left of page for both mobile and desktop
-  if (window.matchMedia('(min-width: 640px)').matches) {
+  if (global.matchMedia('(min-width: 640px)').matches) {
     // Desktop: Position at bottom left
     badge.style.bottom = '1rem';
     badge.style.left = '2rem';
@@ -445,12 +569,12 @@ function showUserBadge() {
 
 // --- HIDE ADMIN UI FOR NON-ADMINS ---
 function hideAdminUI() {
-  if (!window.syncManager || !window.syncManager.authEnabled) {
+  if (!global.syncManager || !global.syncManager.authEnabled) {
     return;
   }
 
-  if (window.syncManager.userRole === "admin") {
-    if (window.APP_CONFIG && window.APP_CONFIG.hideSupportForAdmin) {
+  if (global.syncManager.userRole === "admin") {
+    if (global.APP_CONFIG && global.APP_CONFIG.hideSupportForAdmin) {
       const sl = document.getElementById("support-link");
       if (sl) sl.style.display = "none";
     }
@@ -509,15 +633,6 @@ function hideAdminUI() {
       section.remove();
     }
   });
-
-  // Note: We don't throw errors if elements don't exist - they might not be loaded yet
-  // The UI will gracefully handle missing elements
-}
-
-// Expose functions globally for library/data.js
-if (typeof window !== 'undefined') {
-  window.loadLibraryOfflineFirst = loadLibraryOfflineFirst;
-  window.fetchLibraryFromServer = fetchLibraryFromServer;
 }
 
 // --- READING LIST MODAL ---
@@ -526,9 +641,9 @@ if (typeof window !== 'undefined') {
  * Open the reading list modal and refresh its contents
  */
 function openReadingListModal() {
-  if (!window._isNavigatingFromRouter && window.router) {
+  if (!global._isNavigatingFromRouter && global.router) {
     if (getRelativePath() !== '/reading-lists') {
-      window.router.navigate('/reading-lists', true);
+      global.router.navigate('/reading-lists', true);
     }
   }
   const modal = document.getElementById('reading-list-modal');
@@ -546,14 +661,12 @@ function closeReadingListModal() {
   const modal = document.getElementById('reading-list-modal');
   if (modal) {
     modal.classList.add('hidden');
-    if (window.router && getRelativePath() === '/reading-lists') {
-      const path = window.getPathForCurrentView ? window.getPathForCurrentView() : '/';
-      window.router.navigate(path, true);
+    if (global.router && getRelativePath() === '/reading-lists') {
+      const path = global.getPathForCurrentView ? global.getPathForCurrentView() : '/';
+      global.router.navigate(path, true);
     }
   }
 }
-
-
 
 /**
  * Refresh the reading list modal display
@@ -577,8 +690,8 @@ async function refreshReadingListModal() {
   listsContainer.innerHTML = '<p class="text-sm text-gray-400 text-center py-4">Loading...</p>';
 
   // Fetch lists from API
-  if (typeof window.ReadingLists !== 'undefined' && typeof window.ReadingLists.fetchReadingLists === 'function') {
-    const lists = await window.ReadingLists.fetchReadingLists();
+  if (typeof global.ReadingLists !== 'undefined' && typeof global.ReadingLists.fetchReadingLists === 'function') {
+    const lists = await global.ReadingLists.fetchReadingLists();
 
     if (lists.length === 0) {
       listsContainer.innerHTML = '<p class="text-sm text-gray-400 text-center py-4">No reading lists yet. Create one to get started!</p>';
@@ -723,7 +836,7 @@ async function refreshReadingListModal() {
             const newStatus = !isCurrentlyRead;
 
             try {
-              await window.ReadingLists.markListAsRead(list.id, newStatus);
+              await global.ReadingLists.markListAsRead(list.id, newStatus);
               await refreshReadingListModal();
             } catch (error) {
               alert('Failed to update reading status. Please try again.');
@@ -739,8 +852,8 @@ async function refreshReadingListModal() {
             const listId = downloadBtn.dataset.listId;
             const listName = downloadBtn.dataset.listName || 'Unknown List';
 
-            if (typeof window.downloadReadingList === 'function') {
-              await window.downloadReadingList(listId, listName, downloadBtn);
+            if (typeof global.downloadReadingList === 'function') {
+              await global.downloadReadingList(listId, listName, downloadBtn);
             } else {
               console.error('downloadReadingList function not available');
               alert('Download functionality is not available. Please refresh the page.');
@@ -755,13 +868,13 @@ async function refreshReadingListModal() {
             e.stopPropagation();
 
             // Check if library is loaded
-            if (!window.library || Object.keys(window.library).length === 0) {
+            if (!global.library || Object.keys(global.library).length === 0) {
               alert('Library is still loading. Check the status badge at the top - it will show "Ready" when comics are available. Try again in a moment.');
               return;
             }
 
             try {
-              const details = await window.ReadingLists.getReadingListDetails(list.id);
+              const details = await global.ReadingLists.getReadingListDetails(list.id);
 
               // Find first unread or in-progress comic
               let firstComic = details.items.find(item => {
@@ -777,9 +890,9 @@ async function refreshReadingListModal() {
 
               if (firstComic) {
                 // Find the comic in the library
-                const comic = window.getComicById(firstComic.comicId);
-                if (comic && typeof window.openComicViewer === 'function') {
-                  window.openComicViewer(comic, { readingListId: list.id, readingListName: list.name });
+                const comic = typeof global.getComicById === 'function' ? global.getComicById(firstComic.comicId) : null;
+                if (comic && typeof global.openComicViewer === 'function') {
+                  global.openComicViewer(comic, { readingListId: list.id, readingListName: list.name });
                   closeReadingListModal(); // Close modal after opening comic
                 } else {
                   alert('Could not find comic in library. The comic may have been moved or deleted.');
@@ -809,9 +922,9 @@ async function createReadingList() {
   }
 
   // Use API to create list
-  if (typeof window.ReadingLists !== 'undefined' && typeof window.ReadingLists.createReadingList === 'function') {
+  if (typeof global.ReadingLists !== 'undefined' && typeof global.ReadingLists.createReadingList === 'function') {
     try {
-      await window.ReadingLists.createReadingList(name.trim(), '', []);
+      await global.ReadingLists.createReadingList(name.trim(), '', []);
 
       // Refresh the modal display
       await refreshReadingListModal();
@@ -960,7 +1073,7 @@ async function showReadingListDetail(listId, listName) {
   // Load comics for this list
   async function renderComics() {
     try {
-      const details = await window.ReadingLists.getReadingListDetails(listId);
+      const details = await global.ReadingLists.getReadingListDetails(listId);
       currentDetails = details;
       const comicsContainer = document.getElementById('list-detail-comics-container');
       const countBadge = document.getElementById('list-item-count-badge');
@@ -983,257 +1096,257 @@ async function showReadingListDetail(listId, listName) {
       }
 
       details.items.forEach((item, index) => {
-      const comic = window.getComicById(item.comicId);
-      if (!comic) return; // Skip if comic not found in library
+        const comic = typeof global.getComicById === 'function' ? global.getComicById(item.comicId) : null;
+        if (!comic) return; // Skip if comic not found in library
 
-      const comicDiv = document.createElement('div');
-      comicDiv.dataset.comicId = item.comicId;
-      if (isEditMode) comicDiv.classList.add('is-editing');
+        const comicDiv = document.createElement('div');
+        comicDiv.dataset.comicId = item.comicId;
+        if (isEditMode) comicDiv.classList.add('is-editing');
 
-      // Use display info to get properly formatted comic name (not filename)
-      const displayInfo = window.applyDisplayInfoToComic?.(comic) || {};
-      const title = displayInfo.displayTitle || comic.name || 'Unknown';
-      const total = item.totalPages || 0;
-      const last = item.lastReadPage || 0;
-      const progressPercent = total > 0 ? Math.round((last / total) * 100) : 0;
+        // Use display info to get properly formatted comic name (not filename)
+        const displayInfo = typeof global.applyDisplayInfoToComic === 'function' ? global.applyDisplayInfoToComic(comic) : {};
+        const title = displayInfo.displayTitle || comic.name || 'Unknown';
+        const total = item.totalPages || 0;
+        const last = item.lastReadPage || 0;
+        const progressPercent = total > 0 ? Math.round((last / total) * 100) : 0;
 
-      // Determine status
-      let status = 'unread';
-      if (total > 0) {
-        if (last >= total - 1) status = 'read';
-        else if (last > 0) status = 'in-progress';
-      } else if (last > 0) {
-        status = 'in-progress';
-      }
+        // Determine status
+        let status = 'unread';
+        if (total > 0) {
+          if (last >= total - 1) status = 'read';
+          else if (last > 0) status = 'in-progress';
+        } else if (last > 0) {
+          status = 'in-progress';
+        }
 
-      const isDownloaded = window.downloadedComicIds?.has(comic.id);
-      const downloadIndicator = isDownloaded ? '<span class="text-green-400 flex-shrink-0" title="Downloaded">📥</span>' : '';
+        const isDownloaded = global.downloadedComicIds?.has(comic.id);
+        const downloadIndicator = isDownloaded ? '<span class="text-green-400 flex-shrink-0" title="Downloaded">📥</span>' : '';
 
-      // Render based on view mode
-      if (viewMode === 'compact') {
-        // Compact view: minimal height, no progress bar
-        comicDiv.className = 'bg-gray-800/50 p-3 rounded-lg flex items-center gap-3 hover:bg-gray-700 transition-all border border-gray-700/50 hover:border-purple-500/30 group';
-        comicDiv.innerHTML = `
-          ${isEditMode ? `
-            <div class="flex flex-col gap-1 mr-1">
-              <button class="reorder-up-btn text-gray-500 hover:text-white p-0.5" title="Move Up">▲</button>
-              <button class="reorder-down-btn text-gray-500 hover:text-white p-0.5" title="Move Down">▼</button>
-            </div>
-          ` : ''}
-          <div class="flex-shrink-0 flex items-center justify-center" style="width: 1.5rem; height: 1.5rem;">
-            <span class="${status === 'read' ? 'text-green-500' : status === 'in-progress' ? 'text-purple-400' : 'text-gray-600'} text-lg">
-              ${status === 'read' ? '●' : status === 'in-progress' ? '◐' : '○'}
-            </span>
-          </div>
-          <div class="flex-1 min-w-0 flex items-center gap-2">
-            <p class="text-sm font-medium text-gray-200 truncate group-hover:text-white transition-colors">${escapeHtml(title)}</p>
-            ${isDownloaded ? `<span class="text-green-400 flex-shrink-0 opacity-70" title="Downloaded">${ICONS.READ}</span>` : ''}
-          </div>
-          <div class="flex-shrink-0 text-[10px] font-bold text-gray-500 bg-black/20 px-2 py-0.5 rounded uppercase tracking-tighter">
-            ${progressPercent}%
-          </div>
-          <div class="flex items-center gap-1 ml-2">
-            <button class="mark-read-btn ${isEditMode ? 'hidden' : ''} flex-shrink-0 text-gray-500 hover:text-green-400 transition-colors p-1.5 hover:bg-green-500/10 rounded" title="${status === 'read' ? 'Mark as unread' : 'Mark as read'}" data-comic-id="${escapeHtml(item.comicId)}" data-status="${status}">
-              <span class="text-lg">${status === 'read' ? '↩' : ICONS.READ}</span>
-            </button>
-            <button class="download-comic-btn ${isEditMode ? 'hidden' : ''} block sm:hidden flex-shrink-0 text-gray-500 hover:text-blue-400 transition-colors p-1.5 hover:bg-blue-500/10 rounded" title="Download comic" data-comic-id="${escapeHtml(item.comicId)}">
-              <span class="text-lg">${ICONS.DOWNLOAD}</span>
-            </button>
-            <button class="delete-comic-btn ${isEditMode ? 'hidden' : ''} flex-shrink-0 text-gray-600 hover:text-red-400 transition-colors p-1.5 hover:bg-red-500/10 rounded" title="Remove from list" data-comic-id="${escapeHtml(item.comicId)}">
-              <span class="text-lg">🗑</span>
-            </button>
-          </div>
-        `;
-      } else {
-        // Grid view: comic cards with covers
-        comicDiv.className = 'comic-card bg-gray-800 rounded-lg overflow-hidden shadow-lg cursor-pointer flex flex-col border border-gray-700/50 hover:border-purple-500/50 transition-all duration-300 group';
-
-        const isLocal = comic.handle || comic.file || (comic.id && String(comic.id).startsWith('device-'));
-        const coverUrl = comic.thumbnailPath
-          ? `${API_BASE_URL}/thumbnails/${comic.thumbnailPath}`
-          : 'https://placehold.co/400x600/1e1e1e/e0e0e0?text=No+Cover';
-
-        const statusBanner = (status === 'read' && !isLocal)
-          ? '<div class="status-banner status-read">Read</div>'
-          : (status === 'in-progress' && !isLocal)
-          ? '<div class="status-banner status-in-progress">In Progress</div>'
-          : '';
-
-        const downloadIndicatorGrid = isDownloaded
-          ? `<div class="absolute bottom-2 right-2 bg-gray-900/80 backdrop-blur p-1 rounded text-green-400 z-10" title="Downloaded">${ICONS.READ}</div>`
-          : '';
-
-        comicDiv.innerHTML = `
-          <div class="relative">
+        // Render based on view mode
+        if (viewMode === 'compact') {
+          // Compact view: minimal height, no progress bar
+          comicDiv.className = 'bg-gray-800/50 p-3 rounded-lg flex items-center gap-3 hover:bg-gray-700 transition-all border border-gray-700/50 hover:border-purple-500/30 group';
+          comicDiv.innerHTML = `
             ${isEditMode ? `
-              <div class="absolute top-2 left-2 z-20 flex items-center gap-1 bg-gray-900/80 backdrop-blur p-1.5 rounded-lg shadow-xl">
-                <div class="flex flex-col gap-1">
-                  <button class="reorder-up-btn text-gray-400 hover:text-white p-0.5 transition-colors" title="Move Up">▲</button>
-                  <button class="reorder-down-btn text-gray-400 hover:text-white p-0.5 transition-colors" title="Move Down">▼</button>
+              <div class="flex flex-col gap-1 mr-1">
+                <button class="reorder-up-btn text-gray-500 hover:text-white p-0.5" title="Move Up">▲</button>
+                <button class="reorder-down-btn text-gray-500 hover:text-white p-0.5" title="Move Down">▼</button>
+              </div>
+            ` : ''}
+            <div class="flex-shrink-0 flex items-center justify-center" style="width: 1.5rem; height: 1.5rem;">
+              <span class="${status === 'read' ? 'text-green-500' : status === 'in-progress' ? 'text-purple-400' : 'text-gray-600'} text-lg">
+                ${status === 'read' ? '●' : status === 'in-progress' ? '◐' : '○'}
+              </span>
+            </div>
+            <div class="flex-1 min-w-0 flex items-center gap-2">
+              <p class="text-sm font-medium text-gray-200 truncate group-hover:text-white transition-colors">${escapeHtml(title)}</p>
+              ${isDownloaded ? `<span class="text-green-400 flex-shrink-0 opacity-70" title="Downloaded">${ICONS.READ}</span>` : ''}
+            </div>
+            <div class="flex-shrink-0 text-[10px] font-bold text-gray-500 bg-black/20 px-2 py-0.5 rounded uppercase tracking-tighter">
+              ${progressPercent}%
+            </div>
+            <div class="flex items-center gap-1 ml-2">
+              <button class="mark-read-btn ${isEditMode ? 'hidden' : ''} flex-shrink-0 text-gray-500 hover:text-green-400 transition-colors p-1.5 hover:bg-green-500/10 rounded" title="${status === 'read' ? 'Mark as unread' : 'Mark as read'}" data-comic-id="${escapeHtml(item.comicId)}" data-status="${status}">
+                <span class="text-lg">${status === 'read' ? '↩' : ICONS.READ}</span>
+              </button>
+              <button class="download-comic-btn ${isEditMode ? 'hidden' : ''} block sm:hidden flex-shrink-0 text-gray-500 hover:text-blue-400 transition-colors p-1.5 hover:bg-blue-500/10 rounded" title="Download comic" data-comic-id="${escapeHtml(item.comicId)}">
+                <span class="text-lg">${ICONS.DOWNLOAD}</span>
+              </button>
+              <button class="delete-comic-btn ${isEditMode ? 'hidden' : ''} flex-shrink-0 text-gray-600 hover:text-red-400 transition-colors p-1.5 hover:bg-red-500/10 rounded" title="Remove from list" data-comic-id="${escapeHtml(item.comicId)}">
+                <span class="text-lg">🗑</span>
+              </button>
+            </div>
+          `;
+        } else {
+          // Grid view: comic cards with covers
+          comicDiv.className = 'comic-card bg-gray-800 rounded-lg overflow-hidden shadow-lg cursor-pointer flex flex-col border border-gray-700/50 hover:border-purple-500/50 transition-all duration-300 group';
+
+          const isLocal = comic.handle || comic.file || (comic.id && String(comic.id).startsWith('device-'));
+          const coverUrl = comic.thumbnailPath
+            ? `${global.API_BASE_URL}/thumbnails/${comic.thumbnailPath}`
+            : 'https://placehold.co/400x600/1e1e1e/e0e0e0?text=No+Cover';
+
+          const statusBanner = (status === 'read' && !isLocal)
+            ? '<div class="status-banner status-read">Read</div>'
+            : (status === 'in-progress' && !isLocal)
+            ? '<div class="status-banner status-in-progress">In Progress</div>'
+            : '';
+
+          const downloadIndicatorGrid = isDownloaded
+            ? `<div class="absolute bottom-2 right-2 bg-gray-900/80 backdrop-blur p-1 rounded text-green-400 z-10" title="Downloaded">${ICONS.READ}</div>`
+            : '';
+
+          comicDiv.innerHTML = `
+            <div class="relative">
+              ${isEditMode ? `
+                <div class="absolute top-2 left-2 z-20 flex items-center gap-1 bg-gray-900/80 backdrop-blur p-1.5 rounded-lg shadow-xl">
+                  <div class="flex flex-col gap-1">
+                    <button class="reorder-up-btn text-gray-400 hover:text-white p-0.5 transition-colors" title="Move Up">▲</button>
+                    <button class="reorder-down-btn text-gray-400 hover:text-white p-0.5 transition-colors" title="Move Down">▼</button>
+                  </div>
                 </div>
+              ` : ''}
+              ${statusBanner}
+              ${!isLocal ? downloadIndicatorGrid : ''}
+              <div class="aspect-[2/3] w-full bg-gray-700 overflow-hidden flex items-center justify-center">
+                ${comic.thumbnailPath ? 
+                  `<img src="${coverUrl}" alt="${escapeHtml(title)}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500">` :
+                  (isLocal ? 
+                    `<div class="text-purple-500">
+                      <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                      </svg>
+                    </div>` :
+                    `<img src="${coverUrl}" alt="${escapeHtml(title)}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500">`
+                  )
+                }
               </div>
-            ` : ''}
-            ${statusBanner}
-            ${!isLocal ? downloadIndicatorGrid : ''}
-            <div class="aspect-[2/3] w-full bg-gray-700 overflow-hidden flex items-center justify-center">
-              ${comic.thumbnailPath ? 
-                `<img src="${coverUrl}" alt="${escapeHtml(title)}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500">` :
-                (isLocal ? 
-                  `<div class="text-purple-500">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
-                    </svg>
-                  </div>` :
-                  `<img src="${coverUrl}" alt="${escapeHtml(title)}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500">`
-                )
+              <div class="absolute bottom-0 left-0 right-0 h-1.5 bg-gray-900/50">
+                <div class="h-full ${status === 'read' ? 'bg-green-500' : 'bg-purple-600'} transition-all duration-500" style="width: ${progressPercent}%;"></div>
+              </div>
+              ${!isEditMode ? `
+                <div class="absolute top-2 right-2 flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                  ${!isLocal ? `
+                    <button class="mark-read-btn bg-gray-900/80 backdrop-blur p-2 rounded-lg text-gray-400 hover:text-green-400 transition-all shadow-xl" title="${status === 'read' ? 'Mark as unread' : 'Mark as read'}" data-comic-id="${escapeHtml(item.comicId)}" data-status="${status}">
+                      ${status === 'read' ? '↩' : ICONS.READ}
+                    </button>
+                  ` : ''}
+                  ${!isLocal ? `
+                    <button class="download-comic-btn block sm:hidden bg-gray-900/80 backdrop-blur p-2 rounded-lg text-gray-400 hover:text-blue-400 transition-all shadow-xl" title="Download comic" data-comic-id="${escapeHtml(item.comicId)}">
+                      ${ICONS.DOWNLOAD}
+                    </button>
+                  ` : ''}
+                  <button class="delete-comic-btn bg-gray-900/80 backdrop-blur p-2 rounded-lg text-red-500 hover:text-red-400 transition-all shadow-xl" title="Remove from list" data-comic-id="${escapeHtml(item.comicId)}">
+                    🗑
+                  </button>
+                </div>
+              ` : ''}
+            </div>
+            <div class="p-3 flex-grow flex flex-col justify-center min-w-0">
+              <p class="text-sm font-bold text-white truncate leading-tight">${escapeHtml(title)}</p>
+              <div class="flex items-center gap-1.5 mt-1">
+                 <span class="text-[10px] font-bold uppercase tracking-tighter text-gray-500">${progressPercent}% COMPLETE</span>
+              </div>
+            </div>
+          `;
+        }
+
+        // Click to open comic (only when not in edit mode)
+        if (!isEditMode) {
+          comicDiv.style.cursor = 'pointer';
+          comicDiv.addEventListener('click', () => {
+            if (typeof global.openComicViewer === 'function') {
+              global.openComicViewer(comic, { readingListId: listId, readingListName: listName });
+              closeReadingListModal();
+            }
+          });
+        }
+
+        // Up/Down button handlers (only in edit mode)
+        if (isEditMode) {
+          const upBtn = comicDiv.querySelector('.reorder-up-btn');
+          const downBtn = comicDiv.querySelector('.reorder-down-btn');
+
+          if (upBtn) {
+            upBtn.addEventListener('click', (e) => {
+              e.stopPropagation();
+              const prev = comicDiv.previousElementSibling;
+              if (prev) {
+                comicsContainer.insertBefore(comicDiv, prev);
               }
-            </div>
-            <div class="absolute bottom-0 left-0 right-0 h-1.5 bg-gray-900/50">
-              <div class="h-full ${status === 'read' ? 'bg-green-500' : 'bg-purple-600'} transition-all duration-500" style="width: ${progressPercent}%;"></div>
-            </div>
-            ${!isEditMode ? `
-              <div class="absolute top-2 right-2 flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                ${!isLocal ? `
-                  <button class="mark-read-btn bg-gray-900/80 backdrop-blur p-2 rounded-lg text-gray-400 hover:text-green-400 transition-all shadow-xl" title="${status === 'read' ? 'Mark as unread' : 'Mark as read'}" data-comic-id="${escapeHtml(item.comicId)}" data-status="${status}">
-                    ${status === 'read' ? '↩' : ICONS.READ}
-                  </button>
-                ` : ''}
-                ${!isLocal ? `
-                  <button class="download-comic-btn block sm:hidden bg-gray-900/80 backdrop-blur p-2 rounded-lg text-gray-400 hover:text-blue-400 transition-all shadow-xl" title="Download comic" data-comic-id="${escapeHtml(item.comicId)}">
-                    ${ICONS.DOWNLOAD}
-                  </button>
-                ` : ''}
-                <button class="delete-comic-btn bg-gray-900/80 backdrop-blur p-2 rounded-lg text-red-500 hover:text-red-400 transition-all shadow-xl" title="Remove from list" data-comic-id="${escapeHtml(item.comicId)}">
-                  🗑
-                </button>
-              </div>
-            ` : ''}
-          </div>
-          <div class="p-3 flex-grow flex flex-col justify-center min-w-0">
-            <p class="text-sm font-bold text-white truncate leading-tight">${escapeHtml(title)}</p>
-            <div class="flex items-center gap-1.5 mt-1">
-               <span class="text-[10px] font-bold uppercase tracking-tighter text-gray-500">${progressPercent}% COMPLETE</span>
-            </div>
-          </div>
-        `;
-      }
-
-      // Click to open comic (only when not in edit mode)
-      if (!isEditMode) {
-        comicDiv.style.cursor = 'pointer';
-        comicDiv.addEventListener('click', () => {
-          if (typeof window.openComicViewer === 'function') {
-            window.openComicViewer(comic, { readingListId: listId, readingListName: listName });
-            closeReadingListModal();
-          }
-        });
-      }
-
-      // Up/Down button handlers (only in edit mode)
-      if (isEditMode) {
-        const upBtn = comicDiv.querySelector('.reorder-up-btn');
-        const downBtn = comicDiv.querySelector('.reorder-down-btn');
-
-        if (upBtn) {
-          upBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            const prev = comicDiv.previousElementSibling;
-            if (prev) {
-              comicsContainer.insertBefore(comicDiv, prev);
-            }
-          });
-        }
-
-        if (downBtn) {
-          downBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            const next = comicDiv.nextElementSibling;
-            if (next) {
-              comicsContainer.insertBefore(next, comicDiv);
-            }
-          });
-        }
-      }
-
-      // Mark as read/unread button handler
-      const markReadBtn = comicDiv.querySelector('.mark-read-btn');
-      if (markReadBtn) {
-        markReadBtn.addEventListener('click', async (e) => {
-          e.stopPropagation(); // Prevent opening comic
-
-          const currentStatus = markReadBtn.dataset.status;
-          const newStatus = currentStatus === 'read' ? 'unread' : 'read';
-
-          try {
-            // Call the API to update status
-            const response = await fetch(`${API_BASE_URL}/api/v1/comics/status`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ comicId: item.comicId, status: newStatus })
             });
-
-            if (!response.ok) throw new Error('Failed to update status');
-
-            // Refresh the view to show updated status
-            await renderComics();
-          } catch (error) {
-            console.error('Failed to update comic status:', error);
-            alert('Failed to update comic status. Please try again.');
           }
-        });
-      }
 
-      // Download button handler
-      const downloadBtn = comicDiv.querySelector('.download-comic-btn');
-      if (downloadBtn) {
-        downloadBtn.addEventListener('click', async (e) => {
-          e.stopPropagation(); // Prevent opening comic
-
-          if (typeof window.downloadComic === 'function') {
-            await window.downloadComic(comic, downloadBtn);
-          } else {
-            console.error('downloadComic function not available');
-            alert('Download functionality is not available. Please refresh the page.');
+          if (downBtn) {
+            downBtn.addEventListener('click', (e) => {
+              e.stopPropagation();
+              const next = comicDiv.nextElementSibling;
+              if (next) {
+                comicsContainer.insertBefore(next, comicDiv);
+              }
+            });
           }
-        });
-      }
-
-      // Delete button handler
-      const deleteBtn = comicDiv.querySelector('.delete-comic-btn');
-      if (deleteBtn) {
-        deleteBtn.addEventListener('click', async (e) => {
-        e.stopPropagation(); // Prevent opening comic
-
-        const confirmDelete = confirm(`Remove "${title}" from this reading list?`);
-        if (!confirmDelete) return;
-
-        try {
-          const result = await window.ReadingLists.removeComicsFromList(listId, [item.comicId]);
-          if (result.ok) {
-            // Refresh detail view
-            const comicsContainer = document.getElementById('list-detail-comics-container');
-            comicsContainer.innerHTML = '<p class="text-sm text-gray-400 text-center py-4">Loading comics...</p>';
-
-            const details = await window.ReadingLists.getReadingListDetails(listId);
-            if (!details.items || details.items.length === 0) {
-              comicsContainer.innerHTML = '<p class="text-sm text-gray-400 text-center py-4">No comics in this list.</p>';
-            } else {
-              // Reload the entire detail view to refresh all comics
-              hideReadingListDetail();
-              showReadingListDetail(listId, listName);
-            }
-          } else {
-            alert('Failed to remove comic from list. Please try again.');
-          }
-        } catch (error) {
-          console.error('Failed to delete comic from list:', error);
-          alert('Failed to remove comic from list. Please try again.');
         }
-      });
-      }
 
-      comicsContainer.appendChild(comicDiv);
-    });
+        // Mark as read/unread button handler
+        const markReadBtn = comicDiv.querySelector('.mark-read-btn');
+        if (markReadBtn) {
+          markReadBtn.addEventListener('click', async (e) => {
+            e.stopPropagation(); // Prevent opening comic
+
+            const currentStatus = markReadBtn.dataset.status;
+            const newStatus = currentStatus === 'read' ? 'unread' : 'read';
+
+            try {
+              // Call the API to update status
+              const response = await fetch(`${global.API_BASE_URL}/api/v1/comics/status`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ comicId: item.comicId, status: newStatus })
+              });
+
+              if (!response.ok) throw new Error('Failed to update status');
+
+              // Refresh the view to show updated status
+              await renderComics();
+            } catch (error) {
+              console.error('Failed to update comic status:', error);
+              alert('Failed to update comic status. Please try again.');
+            }
+          });
+        }
+
+        // Download button handler
+        const downloadBtn = comicDiv.querySelector('.download-comic-btn');
+        if (downloadBtn) {
+          downloadBtn.addEventListener('click', async (e) => {
+            e.stopPropagation(); // Prevent opening comic
+
+            if (typeof global.downloadComic === 'function') {
+              await global.downloadComic(comic, downloadBtn);
+            } else {
+              console.error('downloadComic function not available');
+              alert('Download functionality is not available. Please refresh the page.');
+            }
+          });
+        }
+
+        // Delete button handler
+        const deleteBtn = comicDiv.querySelector('.delete-comic-btn');
+        if (deleteBtn) {
+          deleteBtn.addEventListener('click', async (e) => {
+            e.stopPropagation(); // Prevent opening comic
+
+            const confirmDelete = confirm(`Remove "${title}" from this reading list?`);
+            if (!confirmDelete) return;
+
+            try {
+              const result = await global.ReadingLists.removeComicsFromList(listId, [item.comicId]);
+              if (result.ok) {
+                // Refresh detail view
+                const comicsContainer = document.getElementById('list-detail-comics-container');
+                comicsContainer.innerHTML = '<p class="text-sm text-gray-400 text-center py-4">Loading comics...</p>';
+
+                const details = await global.ReadingLists.getReadingListDetails(listId);
+                if (!details.items || details.items.length === 0) {
+                  comicsContainer.innerHTML = '<p class="text-sm text-gray-400 text-center py-4">No comics in this list.</p>';
+                } else {
+                  // Reload the entire detail view to refresh all comics
+                  hideReadingListDetail();
+                  showReadingListDetail(listId, listName);
+                }
+              } else {
+                alert('Failed to remove comic from list. Please try again.');
+              }
+            } catch (error) {
+              console.error('Failed to delete comic from list:', error);
+              alert('Failed to remove comic from list. Please try again.');
+            }
+          });
+        }
+
+        comicsContainer.appendChild(comicDiv);
+      });
     } catch (error) {
       console.error('Failed to load reading list details:', error);
       document.getElementById('list-detail-comics-container').innerHTML = '<p class="text-sm text-red-400 text-center py-4">Failed to load comics.</p>';
@@ -1244,8 +1357,8 @@ async function showReadingListDetail(listId, listName) {
   const downloadAllBtn = document.getElementById('download-all-list-btn');
   if (downloadAllBtn) {
     downloadAllBtn.addEventListener('click', async () => {
-      if (typeof window.downloadReadingList === 'function') {
-        await window.downloadReadingList(listId, listName, downloadAllBtn);
+      if (typeof global.downloadReadingList === 'function') {
+        await global.downloadReadingList(listId, listName, downloadAllBtn);
       } else {
         console.error('downloadReadingList function not available');
         alert('Download functionality is not available. Please refresh the page.');
@@ -1256,7 +1369,7 @@ async function showReadingListDetail(listId, listName) {
   // Export button handler
   document.getElementById('export-list-btn').addEventListener('click', async () => {
     try {
-      await window.ReadingLists.exportSingleList(listId, listName);
+      await global.ReadingLists.exportSingleList(listId, listName);
     } catch (error) {
       console.error('Export error:', error);
       alert('Failed to export list. Please try again.');
@@ -1279,7 +1392,7 @@ async function showReadingListDetail(listId, listName) {
       const comicDivs = comicsContainer.querySelectorAll('[data-comic-id]');
       const newOrder = Array.from(comicDivs).map(div => div.dataset.comicId);
 
-      const result = await window.ReadingLists.reorderComics(listId, newOrder);
+      const result = await global.ReadingLists.reorderComics(listId, newOrder);
       if (result.ok) {
         isEditMode = false;
         document.getElementById('edit-list-btn').classList.remove('hidden');
@@ -1324,6 +1437,25 @@ function hideReadingListDetail() {
   }
 }
 
+// Helper to estimate library size
+function estimateLibrarySize(lib) {
+  if (!lib) return 0;
+  let count = 0;
+  for (const rootKey of Object.keys(lib)) {
+    const publishers = lib[rootKey]?.publishers || {};
+    for (const publisherName of Object.keys(publishers)) {
+      const seriesEntries = publishers[publisherName]?.series || {};
+      for (const seriesName of Object.keys(seriesEntries)) {
+        const comics = seriesEntries[seriesName];
+        if (Array.isArray(comics)) {
+          count += comics.length;
+        }
+      }
+    }
+  }
+  return count;
+}
+
 // Add event listeners for reading list modal (after DOM loads)
 document.addEventListener('DOMContentLoaded', () => {
   registerRoutes();
@@ -1345,7 +1477,7 @@ document.addEventListener('DOMContentLoaded', () => {
   if (exportAllBtn) {
     exportAllBtn.addEventListener('click', async () => {
       try {
-        await window.ReadingLists.exportAllLists();
+        await global.ReadingLists.exportAllLists();
       } catch (error) {
         alert('Failed to export lists. Please try again.');
       }
@@ -1369,7 +1501,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const data = JSON.parse(text);
 
         // Check for duplicate names
-        const existingLists = await window.ReadingLists.fetchReadingLists();
+        const existingLists = await global.ReadingLists.fetchReadingLists();
         const existingNames = new Set(existingLists.map(list => list.name.toLowerCase()));
 
         const listsToImport = Array.isArray(data) ? data : [data];
@@ -1388,7 +1520,6 @@ document.addEventListener('DOMContentLoaded', () => {
               list.name = `${list.name} (imported)`;
               processedLists.push(list);
             }
-            // else skip
           } else {
             processedLists.push(list);
           }
@@ -1400,7 +1531,7 @@ document.addEventListener('DOMContentLoaded', () => {
           return;
         }
 
-        const result = await window.ReadingLists.importLists(processedLists);
+        const result = await global.ReadingLists.importLists(processedLists);
         if (result.ok) {
           alert(`Successfully imported ${processedLists.length} list(s)!`);
           await refreshReadingListModal();
@@ -1479,14 +1610,78 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 if (typeof window !== 'undefined' && typeof document !== 'undefined') {
-    initializeApp();
+  initializeApp();
 }
 
+export {
+  cacheAppConfig,
+  loadCachedAppConfig,
+  resolveAppConfig,
+  showOfflineLibraryUnavailableMessage,
+  updateLibraryStatusBadge,
+  initEnvironment,
+  registerServiceWorker,
+  initAppStorage,
+  initUIControls,
+  loadInitialData,
+  initializeApp,
+  loadLibraryOfflineFirst,
+  fetchLibraryFromServer,
+  showUserBadge,
+  hideAdminUI,
+  openReadingListModal,
+  closeReadingListModal,
+  refreshReadingListModal,
+  createReadingList,
+  deleteReadingList,
+  showReadingListDetail,
+  hideReadingListDetail
+};
 
-// --- EXPORTS FOR TESTING ---
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = {
-        hideAdminUI
-    };
+state.cacheAppConfig = cacheAppConfig;
+state.loadCachedAppConfig = loadCachedAppConfig;
+state.resolveAppConfig = resolveAppConfig;
+state.showOfflineLibraryUnavailableMessage = showOfflineLibraryUnavailableMessage;
+state.updateLibraryStatusBadge = updateLibraryStatusBadge;
+state.initEnvironment = initEnvironment;
+state.registerServiceWorker = registerServiceWorker;
+state.initAppStorage = initAppStorage;
+state.initUIControls = initUIControls;
+state.loadInitialData = loadInitialData;
+state.initializeApp = initializeApp;
+state.loadLibraryOfflineFirst = loadLibraryOfflineFirst;
+state.fetchLibraryFromServer = fetchLibraryFromServer;
+state.showUserBadge = showUserBadge;
+state.hideAdminUI = hideAdminUI;
+state.openReadingListModal = openReadingListModal;
+state.closeReadingListModal = closeReadingListModal;
+state.refreshReadingListModal = refreshReadingListModal;
+state.createReadingList = createReadingList;
+state.deleteReadingList = deleteReadingList;
+state.showReadingListDetail = showReadingListDetail;
+state.hideReadingListDetail = hideReadingListDetail;
+
+if (typeof window !== 'undefined') {
+  window.cacheAppConfig = cacheAppConfig;
+  window.loadCachedAppConfig = loadCachedAppConfig;
+  window.resolveAppConfig = resolveAppConfig;
+  window.showOfflineLibraryUnavailableMessage = showOfflineLibraryUnavailableMessage;
+  window.updateLibraryStatusBadge = updateLibraryStatusBadge;
+  window.initEnvironment = initEnvironment;
+  window.registerServiceWorker = registerServiceWorker;
+  window.initAppStorage = initAppStorage;
+  window.initUIControls = initUIControls;
+  window.loadInitialData = loadInitialData;
+  window.initializeApp = initializeApp;
+  window.loadLibraryOfflineFirst = loadLibraryOfflineFirst;
+  window.fetchLibraryFromServer = fetchLibraryFromServer;
+  window.showUserBadge = showUserBadge;
+  window.hideAdminUI = hideAdminUI;
+  window.openReadingListModal = openReadingListModal;
+  window.closeReadingListModal = closeReadingListModal;
+  window.refreshReadingListModal = refreshReadingListModal;
+  window.createReadingList = createReadingList;
+  window.deleteReadingList = deleteReadingList;
+  window.showReadingListDetail = showReadingListDetail;
+  window.hideReadingListDetail = hideReadingListDetail;
 }
-

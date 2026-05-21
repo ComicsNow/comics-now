@@ -1,8 +1,3 @@
-// --- PWA Service Worker ---
-// --- PWA Service Worker ---
-// (We register it after we know the base URL in initializeApp)
-
-
 // Save original console methods before any modifications
 const rawConsole = {
   log: console.log.bind(console),
@@ -11,35 +6,23 @@ const rawConsole = {
 };
 
 // Shared HTML escaper to prevent stored XSS from author-controlled comic metadata.
-function escapeHtml(value) {
+export function escapeHtml(value) {
   if (value === null || value === undefined) return '';
   return String(value).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 
-function safeDirName(str) {
+export function safeDirName(str) {
   return String(str).trim().replace(/[\\/]+/g, '_').replace(/\s+/g, ' ');
 }
 
-function getRelativePath() {
-  const baseUrl = (window.APP_CONFIG?.baseUrl || '').replace(/\/$/, '');
+export function getRelativePath() {
+  const baseUrl = (state.APP_CONFIG?.baseUrl || '').replace(/\/$/, '');
   let path = window.location.pathname;
   if (baseUrl && path.startsWith(baseUrl)) {
     path = path.substring(baseUrl.length);
   }
   return path || '/';
 }
-
-if (typeof window !== 'undefined') {
-  window.escapeHtml = escapeHtml;
-  window.safeDirName = safeDirName;
-  window.getRelativePath = getRelativePath;
-}
-
-/* // Silence all non-error console output
-console.log = function() {};
-console.info = function() {};
-console.debug = function() {}; */
-
 
 const DEBUG_LOG_STATE = {
   enabled: false,
@@ -73,7 +56,7 @@ function isDebugCategoryEnabled(category) {
   return DEBUG_LOG_STATE.categories.has(category);
 }
 
-function debugLog(category, ...args) {
+export function debugLog(category, ...args) {
   const normalizedCategory = typeof category === 'string' ? category.toUpperCase() : '';
   if (!isDebugCategoryEnabled(normalizedCategory)) {
     return;
@@ -81,43 +64,33 @@ function debugLog(category, ...args) {
   rawConsole.log(`[${normalizedCategory || 'DEBUG'}]`, ...args);
 }
 
-function enableComicsNowDebug(...categories) {
+export function enableComicsNowDebug(...categories) {
   const normalized = normalizeDebugCategories(categories);
   DEBUG_LOG_STATE.enabled = true;
   DEBUG_LOG_STATE.categories = new Set(normalized);
   rawConsole.log('[DEBUG]', 'Debug logging enabled', normalized.length ? `for categories: ${normalized.join(', ')}` : 'for all categories');
 }
 
-function disableComicsNowDebug() {
+export function disableComicsNowDebug() {
   DEBUG_LOG_STATE.enabled = false;
   DEBUG_LOG_STATE.categories.clear();
   rawConsole.log('[DEBUG]', 'Debug logging disabled');
 }
 
-function isComicsNowDebugEnabled(category) {
+export function isComicsNowDebugEnabled(category) {
   const normalizedCategory = typeof category === 'string' ? category.toUpperCase() : '';
   return isDebugCategoryEnabled(normalizedCategory);
 }
 
-if (typeof window !== 'undefined') {
-  window.debugLog = debugLog;
-  window.enableComicsNowDebug = enableComicsNowDebug;
-  window.disableComicsNowDebug = disableComicsNowDebug;
-  window.isComicsNowDebugEnabled = isComicsNowDebugEnabled;
-}
-
-
-var API_BASE_URL = ''; // Will be set on initial load
-
 // Standardized icons for the application
-const ICONS = {
+export const ICONS = {
   READ: `<svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" /></svg>`,
   UNREAD: `<svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>`,
   DOWNLOAD: `<svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"/></svg>`,
 };
 
 // CSS class constants to eliminate duplication
-const CSS_CLASSES = {
+export const CSS_CLASSES = {
   CARD: 'bg-gray-800 rounded-lg shadow-lg cursor-pointer',
   INPUT: 'bg-gray-700 text-white p-2 rounded-lg',
   BUTTON_PRIMARY: 'bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-full',
@@ -128,28 +101,28 @@ const CSS_CLASSES = {
 };
 
 // View management utility to eliminate duplication
-function showView(targetView) {
-  if (!window._isNavigatingFromRouter && window.router && !window._isAppInitializing) {
+export function showView(targetView) {
+  if (!state._isNavigatingFromRouter && state.router && !state._isAppInitializing) {
     let path = null;
     if (targetView.id === 'root-folder-list') path = '/';
     else if (targetView.id === 'search-results-view') path = '/search';
-    else if (targetView.id === 'folder-list-view' && window.currentFolderPath) {
-      path = `/folder?path=${encodeURIComponent(window.currentFolderPath)}`;
+    else if (targetView.id === 'folder-list-view' && state.currentFolderPath) {
+      path = `/folder?path=${encodeURIComponent(state.currentFolderPath)}`;
     }
-    else if (targetView.id === 'publisher-list' && window.currentRootFolder) {
-      path = `/library?rootFolder=${encodeURIComponent(window.currentRootFolder)}`;
+    else if (targetView.id === 'publisher-list' && state.currentRootFolder) {
+      path = `/library?rootFolder=${encodeURIComponent(state.currentRootFolder)}`;
     }
-    else if (targetView.id === 'series-list' && window.currentPublisher) {
-      path = `/series-list?publisher=${encodeURIComponent(window.currentPublisher)}`;
-      if (window.currentRootFolder) path += `&rootFolder=${encodeURIComponent(window.currentRootFolder)}`;
+    else if (targetView.id === 'series-list' && state.currentPublisher) {
+      path = `/series-list?publisher=${encodeURIComponent(state.currentPublisher)}`;
+      if (state.currentRootFolder) path += `&rootFolder=${encodeURIComponent(state.currentRootFolder)}`;
     }
-    else if (targetView.id === 'comic-list' && window.currentSeries) {
-      path = `/series/${encodeURIComponent(window.currentSeries)}`;
-      if (window.currentPublisher) path += `?publisher=${encodeURIComponent(window.currentPublisher)}`;
-      if (window.currentRootFolder) path += `&rootFolder=${encodeURIComponent(window.currentRootFolder)}`;
+    else if (targetView.id === 'comic-list' && state.currentSeries) {
+      path = `/series/${encodeURIComponent(state.currentSeries)}`;
+      if (state.currentPublisher) path += `?publisher=${encodeURIComponent(state.currentPublisher)}`;
+      if (state.currentRootFolder) path += `&rootFolder=${encodeURIComponent(state.currentRootFolder)}`;
     }
-    else if (targetView.id === 'comic-viewer' && window.currentComic) {
-      path = `/comic/${window.currentComic.id}`;
+    else if (targetView.id === 'comic-viewer' && state.currentComic) {
+      path = `/comic/${state.currentComic.id}`;
     }
 
     const settingsModal = document.getElementById('settings-modal');
@@ -158,7 +131,7 @@ function showView(targetView) {
     const isReadingListOpen = readingListModal && !readingListModal.classList.contains('hidden');
 
     if (path && (getRelativePath() + window.location.search) !== path && !isSettingsOpen && !isReadingListOpen) {
-      window.router.navigate(path, true);
+      state.router.navigate(path, true);
     }
   }
 
@@ -197,7 +170,7 @@ function showView(targetView) {
 }
 
 // Template functions for common HTML patterns
-function createLoadingMessage(message = 'Loading...', count = 8) {
+export function createLoadingMessage(message = 'Loading...', count = 8) {
   const card = `
     <div class="skeleton-card">
       <div class="skeleton-img"></div>
@@ -209,7 +182,7 @@ function createLoadingMessage(message = 'Loading...', count = 8) {
   return card.repeat(count);
 }
 
-function createEmptyMessage(message) {
+export function createEmptyMessage(message) {
   return `
     <div class="empty-state">
       <svg class="empty-state-icon" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
@@ -219,11 +192,11 @@ function createEmptyMessage(message) {
     </div>`;
 }
 
-function createErrorMessage(message) {
+export function createErrorMessage(message) {
   return `<div class="${CSS_CLASSES.ERROR}">${escapeHtml(message)}</div>`;
 }
 
-function createCheckmarkIcon() {
+export function createCheckmarkIcon() {
   const check = document.createElement('div');
   check.className = CSS_CLASSES.DOWNLOAD_BTN;
   check.innerHTML = ICONS.READ;
@@ -231,9 +204,9 @@ function createCheckmarkIcon() {
 }
 
 // API client wrapper to standardize fetch calls
-async function apiCall(endpoint, options = {}) {
+export async function apiCall(endpoint, options = {}) {
   try {
-    const response = await fetch(`${API_BASE_URL}/api/v1/${endpoint}`, {
+    const response = await fetch(`${state.API_BASE_URL}/api/v1/${endpoint}`, {
       headers: {
         'Content-Type': 'application/json',
         ...options.headers
@@ -247,12 +220,11 @@ async function apiCall(endpoint, options = {}) {
     
     return await response.json();
   } catch (error) {
-    
     throw error;
   }
 }
 
-function encodePath(str) {
+export function encodePath(str) {
   const utf8 = new TextEncoder().encode(str);
   let binary = '';
   for (const byte of utf8) {
@@ -261,15 +233,15 @@ function encodePath(str) {
   return btoa(binary);
 }
 
-function toTrimmedString(value) {
+export function toTrimmedString(value) {
   if (value == null) return '';
   return String(value).trim();
 }
 
-window.getComicById = function(id, includeContext = false) {
-  if (!window.library) return null;
-  for (const rootPath of Object.keys(window.library)) {
-    const root = window.library[rootPath];
+export function getComicById(id, includeContext = false) {
+  if (!state.library) return null;
+  for (const rootPath of Object.keys(state.library)) {
+    const root = state.library[rootPath];
     if (!root.publishers) continue;
     for (const pubName of Object.keys(root.publishers)) {
       const pub = root.publishers[pubName];
@@ -293,16 +265,16 @@ window.getComicById = function(id, includeContext = false) {
     }
   }
   return null;
-};
+}
 
-window.turnToPage = function(index) {
-  window.currentPageIndex = index;
-  if (typeof window.renderPage === 'function') {
-    window.renderPage();
+export function turnToPage(index) {
+  state.currentPageIndex = index;
+  if (typeof state.renderPage === 'function') {
+    state.renderPage();
   }
-};
+}
 
-function pickMetadataValue(metadata = {}, keys = []) {
+export function pickMetadataValue(metadata = {}, keys = []) {
   for (const key of keys) {
     if (Object.prototype.hasOwnProperty.call(metadata, key)) {
       const candidate = toTrimmedString(metadata[key]);
@@ -312,7 +284,7 @@ function pickMetadataValue(metadata = {}, keys = []) {
   return '';
 }
 
-function buildComicDisplayInfo(comic = {}) {
+export function buildComicDisplayInfo(comic = {}) {
   const metadata = comic.metadata || {};
 
   const issueNumber = pickMetadataValue(metadata, ['Number', 'Issue', 'IssueNumber', 'SortNumber', 'AlternateNumber']);
@@ -366,7 +338,7 @@ function buildComicDisplayInfo(comic = {}) {
   };
 }
 
-function applyDisplayInfoToComic(comic) {
+export function applyDisplayInfoToComic(comic) {
   if (!comic || typeof comic !== 'object') return buildComicDisplayInfo();
   const info = buildComicDisplayInfo(comic);
   comic.displayName = info.displayTitle;
@@ -375,7 +347,7 @@ function applyDisplayInfoToComic(comic) {
   return info;
 }
 
-function applyDisplayInfoToLibrary(libraryData) {
+export function applyDisplayInfoToLibrary(libraryData) {
   if (!libraryData || typeof libraryData !== 'object') return;
   for (const rootKey of Object.keys(libraryData)) {
     const publishers = libraryData[rootKey]?.publishers || {};
@@ -391,163 +363,206 @@ function applyDisplayInfoToLibrary(libraryData) {
   }
 }
 
+export function getPathForCurrentView() {
+  if (state.currentView === 'root') return '/';
+  if (state.currentView === 'search') {
+    return `/search?q=${encodeURIComponent(state.lastSearchQuery || '')}&field=${encodeURIComponent(state.lastSearchField || 'all')}`;
+  }
+  if (state.currentView === 'publishers' && state.currentRootFolder) {
+    return `/library?rootFolder=${encodeURIComponent(state.currentRootFolder)}`;
+  }
+  if (state.currentView === 'series' && state.currentPublisher) {
+    let path = `/series-list?publisher=${encodeURIComponent(state.currentPublisher)}`;
+    if (state.currentRootFolder) path += `&rootFolder=${encodeURIComponent(state.currentRootFolder)}`;
+    return path;
+  }
+  if (state.currentView === 'comics' && state.currentSeries) {
+    let path = `/series/${encodeURIComponent(state.currentSeries)}`;
+    if (state.currentPublisher) path += `?publisher=${encodeURIComponent(state.currentPublisher)}`;
+    if (state.currentRootFolder) path += `&rootFolder=${encodeURIComponent(state.currentRootFolder)}`;
+    return path;
+  }
+  if (state.currentView === 'comic' && state.currentComic) {
+    return `/comic/${state.currentComic.id}/page/${(state.currentPageIndex || 0) + 1}`;
+  }
+  return '/';
+}
+
 // --- UI ELEMENT SELECTORS ---
-const rootFolderListDiv = document.getElementById('root-folder-list');
-const rootFolderListContainer = document.getElementById('root-folder-list-container');
-const folderListViewDiv = document.getElementById('folder-list-view');
-const folderListContainer = document.getElementById('folder-list-container');
-const searchResultsView = document.getElementById('search-results-view');
-const searchResultsTitle = document.getElementById('search-results-title');
-const searchResultsContainer = document.getElementById('search-results-container');
-const publisherListDiv = document.getElementById('publisher-list');
-const publisherListContainer = document.getElementById('publisher-list-container');
-const seriesListDiv = document.getElementById('series-list');
-const smartListView = document.getElementById('smart-list-view');
-const smartListContainer = document.getElementById('smart-list-container');
-const smartListTitle = document.getElementById('smart-list-title');
-const smartListBackBtn = document.getElementById('smart-list-back-btn');
-const filterButtonsDiv = document.getElementById('filter-buttons');
-const smartListButtonsDiv = document.getElementById('smart-list-buttons');
-const latestAddedButton = document.getElementById('latest-added-btn');
-const latestAddedCountSpan = document.getElementById('latest-added-count');
-const downloadedButton = document.getElementById('downloaded-btn');
-const downloadedCountSpan = document.getElementById('downloaded-count');
-const comicListDiv = document.getElementById('comic-list');
-const comicViewerDiv = document.getElementById('comic-viewer');
-const viewerLibrariesBtn = document.getElementById('viewer-libraries-btn');
-const viewerPublisherBtn = document.getElementById('viewer-publisher-btn');
-const viewerSeriesBtn = document.getElementById('viewer-series-btn');
-const publisherAlphaFilter = document.getElementById('publisher-alpha-filter');
-const seriesAlphaFilter = document.getElementById('series-alpha-filter');
-const comicAlphaFilter = document.getElementById('comic-alpha-filter');
-const publisherTitleH2 = document.getElementById('publisher-title');
-const seriesTitleH2 = document.getElementById('series-title');
-const comicListTitleH2 = document.getElementById('comic-list-title');
-const comicTitleH2 = document.getElementById('comic-title');
-const comicSubtitleP = document.getElementById('comic-subtitle');
-const comicSummarySection = document.getElementById('comic-summary-section');
-const comicSummaryToggle = document.getElementById('comic-summary-toggle');
-const comicSummaryContent = document.getElementById('comic-summary');
-const pageCounterSpan = document.getElementById('page-counter');
-const pageJumpInput = document.getElementById('page-jump-input');
-const pageCounterSpanBottom = document.getElementById('page-counter-bottom');
-const pageJumpInputBottom = document.getElementById('page-jump-input-bottom');
-const viewerPagesDiv = document.getElementById('viewer-pages');
-const pageLoader = document.getElementById('page-loader');
-const prevPageBtn = document.getElementById('prev-page-btn');
-const nextPageBtn = document.getElementById('next-page-btn');
-const prevPageBtnBottom = document.getElementById('prev-page-btn-bottom');
-const nextPageBtnBottom = document.getElementById('next-page-btn-bottom');
-const fullscreenBtn = document.getElementById('fullscreen-btn');
-const viewerTabBtn = document.getElementById('viewer-tab');
-const metadataTabBtn = document.getElementById('metadata-tab');
-const viewerContent = document.getElementById('viewer-content');
-const fitHeightBtn = document.getElementById('fit-height-btn');
-const orientationToggleBtn = document.getElementById('orientation-toggle-btn');
-const metadataContent = document.getElementById('metadata-content');
-const metadataForm = document.getElementById('metadata-form');
-const saveStatusDiv = document.getElementById('save-status');
-const searchForm = document.getElementById('search-form');
-const searchQueryInput = document.getElementById('search-query');
-const searchStatusDiv = document.getElementById('search-status');
-const searchResultsUl = document.getElementById('search-results');
-const librarySearchForm = document.getElementById('library-search-form');
-const librarySearchQuery = document.getElementById('library-search-query');
-const librarySearchField = document.getElementById('library-search-field');
-const clearSearchBtn = document.getElementById('clear-search-btn');
-const fullscreenViewer = document.getElementById('fullscreen-viewer');
-const fullscreenInfoBar = document.getElementById('fullscreen-info-bar');
-const fullscreenProgressIndicator = document.getElementById('fullscreen-progress-indicator');
-const fullscreenPageCounter = document.getElementById('fullscreen-page-counter');
-const fullscreenPageJumpInput = document.getElementById('fullscreen-page-jump-input');
-const fullscreenPrevPageBtn = document.getElementById('fullscreen-prev-page-btn');
-const fullscreenNextPageBtn = document.getElementById('fullscreen-next-page-btn');
-const fullscreenImage = document.getElementById('fullscreen-image');
-const fullscreenCloseBtn = document.getElementById('fullscreen-close-btn');
-const fullscreenCloseBtnBottom = document.getElementById('fullscreen-close-btn-bottom');
-const fullscreenTitle = document.getElementById('fullscreen-title');
-const fullscreenControls = document.getElementById('fullscreen-controls');
-const fullscreenOrientationBtn = document.getElementById('fullscreen-orientation-btn');
-const fullscreenNavLeft = document.getElementById('fullscreen-nav-left');
-const fullscreenNavRight = document.getElementById('fullscreen-nav-right');
-const settingsModal = document.getElementById('settings-modal');
-const settingsForm = document.getElementById('settings-form');
-const scanIntervalInput = document.getElementById('scan-interval-input');
-const apiKeyInput = document.getElementById('api-key-input');
-const settingsStatusDiv = document.getElementById('settings-status');
-const scanButton = document.getElementById('scan-button');
-const fullScanButton = document.getElementById('full-scan-button');
-const logsContainer = document.getElementById('logs-container');
-const downloadsInfoDiv = document.getElementById('downloads-info');
-const clearDownloadsBtn = document.getElementById('clear-downloads-btn');
-const downloadQueueDiv = document.getElementById('download-queue');
-const settingsTabDevices = document.getElementById('settings-tab-devices');
-const settingsContentDevices = document.getElementById('settings-content-devices');
-const devicesStatusDiv = document.getElementById('devices-status');
-const devicesListDiv = document.getElementById('devices-list');
-const refreshDevicesBtn = document.getElementById('refresh-devices-btn');
-const ctButton = document.getElementById('ct-button');
-const ctModal = document.getElementById('ct-modal');
-const ctScheduleInput = document.getElementById('ct-schedule-input');
-const ctSaveBtn = document.getElementById('ct-save-btn');
-const ctMatchBody = document.getElementById('ct-match-body');
-const ctApplyBtn = document.getElementById('ct-apply-btn');
-const ctSkipBtn = document.getElementById('ct-skip-btn');
-const ctConfirmBar = document.getElementById('ct-confirm-bar');
-const ctConfirmMessage = document.getElementById('ct-confirm-message');
-const ctConfirmYes = document.getElementById('ct-confirm-yes');
-const ctConfirmNo = document.getElementById('ct-confirm-no');
-const ctOutputDiv = document.getElementById('ct-output');
-const ctClearOutputBtn = document.getElementById('ct-clear-output');
-const ctRunBtn = document.getElementById('ct-run-btn');
-const ctTabSettings = document.getElementById('ct-tab-settings');
-const ctTabMatches = document.getElementById('ct-tab-matches');
-const ctTabOutput = document.getElementById('ct-tab-output');
-const ctTabManagement = document.getElementById('ct-tab-management');
-const ctContentSettings = document.getElementById('ct-content-settings');
-const ctContentMatches = document.getElementById('ct-content-matches');
-const ctContentOutput = document.getElementById('ct-content-output');
-const ctContentManagement = document.getElementById('ct-content-management');
-const ctMatchesBadge = document.getElementById('ct-matches-badge');
-let logInterval = null;
-let ctEventSource = null;
-let ctAwaitingMatches = false;
+export const rootFolderListDiv = document.getElementById('root-folder-list');
+export const rootFolderListContainer = document.getElementById('root-folder-list-container');
+export const folderListViewDiv = document.getElementById('folder-list-view');
+export const folderListContainer = document.getElementById('folder-list-container');
+export const searchResultsView = document.getElementById('search-results-view');
+export const searchResultsTitle = document.getElementById('search-results-title');
+export const searchResultsContainer = document.getElementById('search-results-container');
+export const publisherListDiv = document.getElementById('publisher-list');
+export const publisherListContainer = document.getElementById('publisher-list-container');
+export const seriesListDiv = document.getElementById('series-list');
+export const smartListView = document.getElementById('smart-list-view');
+export const smartListContainer = document.getElementById('smart-list-container');
+export const smartListTitle = document.getElementById('smart-list-title');
+export const smartListBackBtn = document.getElementById('smart-list-back-btn');
+export const filterButtonsDiv = document.getElementById('filter-buttons');
+export const smartListButtonsDiv = document.getElementById('smart-list-buttons');
+export const latestAddedButton = document.getElementById('latest-added-btn');
+export const latestAddedCountSpan = document.getElementById('latest-added-count');
+export const downloadedButton = document.getElementById('downloaded-btn');
+export const downloadedCountSpan = document.getElementById('downloaded-count');
+export const comicListDiv = document.getElementById('comic-list');
+export const comicViewerDiv = document.getElementById('comic-viewer');
+export const viewerLibrariesBtn = document.getElementById('viewer-libraries-btn');
+export const viewerPublisherBtn = document.getElementById('viewer-publisher-btn');
+export const viewerSeriesBtn = document.getElementById('viewer-series-btn');
+export const publisherAlphaFilter = document.getElementById('publisher-alpha-filter');
+export const seriesAlphaFilter = document.getElementById('series-alpha-filter');
+export const comicAlphaFilter = document.getElementById('comic-alpha-filter');
+export const publisherTitleH2 = document.getElementById('publisher-title');
+export const seriesTitleH2 = document.getElementById('series-title');
+export const comicListTitleH2 = document.getElementById('comic-list-title');
+export const comicTitleH2 = document.getElementById('comic-title');
+export const comicSubtitleP = document.getElementById('comic-subtitle');
+export const comicSummarySection = document.getElementById('comic-summary-section');
+export const comicSummaryToggle = document.getElementById('comic-summary-toggle');
+export const comicSummaryContent = document.getElementById('comic-summary');
+export const pageCounterSpan = document.getElementById('page-counter');
+export const pageJumpInput = document.getElementById('page-jump-input');
+export const pageCounterSpanBottom = document.getElementById('page-counter-bottom');
+export const pageJumpInputBottom = document.getElementById('page-jump-input-bottom');
+export const viewerPagesDiv = document.getElementById('viewer-pages');
+export const pageLoader = document.getElementById('page-loader');
+export const prevPageBtn = document.getElementById('prev-page-btn');
+export const nextPageBtn = document.getElementById('next-page-btn');
+export const prevPageBtnBottom = document.getElementById('prev-page-btn-bottom');
+export const nextPageBtnBottom = document.getElementById('next-page-btn-bottom');
+export const fullscreenBtn = document.getElementById('fullscreen-btn');
+export const viewerTabBtn = document.getElementById('viewer-tab');
+export const metadataTabBtn = document.getElementById('metadata-tab');
+export const viewerContent = document.getElementById('viewer-content');
+export const fitHeightBtn = document.getElementById('fit-height-btn');
+export const orientationToggleBtn = document.getElementById('orientation-toggle-btn');
+export const metadataContent = document.getElementById('metadata-content');
+export const metadataForm = document.getElementById('metadata-form');
+export const saveStatusDiv = document.getElementById('save-status');
+export const searchForm = document.getElementById('search-form');
+export const searchQueryInput = document.getElementById('search-query');
+export const searchStatusDiv = document.getElementById('search-status');
+export const searchResultsUl = document.getElementById('search-results');
+export const librarySearchForm = document.getElementById('library-search-form');
+export const librarySearchQuery = document.getElementById('library-search-query');
+export const librarySearchField = document.getElementById('library-search-field');
+export const clearSearchBtn = document.getElementById('clear-search-btn');
+export const fullscreenViewer = document.getElementById('fullscreen-viewer');
+export const fullscreenInfoBar = document.getElementById('fullscreen-info-bar');
+export const fullscreenProgressIndicator = document.getElementById('fullscreen-progress-indicator');
+export const fullscreenPageCounter = document.getElementById('fullscreen-page-counter');
+export const fullscreenPageJumpInput = document.getElementById('fullscreen-page-jump-input');
+export const fullscreenPrevPageBtn = document.getElementById('fullscreen-prev-page-btn');
+export const fullscreenNextPageBtn = document.getElementById('fullscreen-next-page-btn');
+export const fullscreenImage = document.getElementById('fullscreen-image');
+export const fullscreenCloseBtn = document.getElementById('fullscreen-close-btn');
+export const fullscreenCloseBtnBottom = document.getElementById('fullscreen-close-btn-bottom');
+export const fullscreenTitle = document.getElementById('fullscreen-title');
+export const fullscreenControls = document.getElementById('fullscreen-controls');
+export const fullscreenOrientationBtn = document.getElementById('fullscreen-orientation-btn');
+export const fullscreenNavLeft = document.getElementById('fullscreen-nav-left');
+export const fullscreenNavRight = document.getElementById('fullscreen-nav-right');
+export const settingsModal = document.getElementById('settings-modal');
+export const settingsForm = document.getElementById('settings-form');
+export const scanIntervalInput = document.getElementById('scan-interval-input');
+export const apiKeyInput = document.getElementById('api-key-input');
+export const settingsStatusDiv = document.getElementById('settings-status');
+export const scanButton = document.getElementById('scan-button');
+export const fullScanButton = document.getElementById('full-scan-button');
+export const logsContainer = document.getElementById('logs-container');
+export const downloadsInfoDiv = document.getElementById('downloads-info');
+export const clearDownloadsBtn = document.getElementById('clear-downloads-btn');
+export const downloadQueueDiv = document.getElementById('download-queue');
+export const settingsTabDevices = document.getElementById('settings-tab-devices');
+export const settingsContentDevices = document.getElementById('settings-content-devices');
+export const devicesStatusDiv = document.getElementById('devices-status');
+export const devicesListDiv = document.getElementById('devices-list');
+export const refreshDevicesBtn = document.getElementById('refresh-devices-btn');
+export const ctButton = document.getElementById('ct-button');
+export const ctModal = document.getElementById('ct-modal');
+export const ctScheduleInput = document.getElementById('ct-schedule-input');
+export const ctSaveBtn = document.getElementById('ct-save-btn');
+export const ctMatchBody = document.getElementById('ct-match-body');
+export const ctApplyBtn = document.getElementById('ct-apply-btn');
+export const ctSkipBtn = document.getElementById('ct-skip-btn');
+export const ctConfirmBar = document.getElementById('ct-confirm-bar');
+export const ctConfirmMessage = document.getElementById('ct-confirm-message');
+export const ctConfirmYes = document.getElementById('ct-confirm-yes');
+export const ctConfirmNo = document.getElementById('ct-confirm-no');
+export const ctOutputDiv = document.getElementById('ct-output');
+export const ctClearOutputBtn = document.getElementById('ct-clear-output');
+export const ctRunBtn = document.getElementById('ct-run-btn');
+export const ctTabSettings = document.getElementById('ct-tab-settings');
+export const ctTabMatches = document.getElementById('ct-tab-matches');
+export const ctTabOutput = document.getElementById('ct-tab-output');
+export const ctTabManagement = document.getElementById('ct-tab-management');
+export const ctContentSettings = document.getElementById('ct-content-settings');
+export const ctContentMatches = document.getElementById('ct-content-matches');
+export const ctContentOutput = document.getElementById('ct-content-output');
+export const ctContentManagement = document.getElementById('ct-content-management');
+export const ctMatchesBadge = document.getElementById('ct-matches-badge');
 
 // --- STATE MANAGEMENT ---
-var library = {};
-var lastSearchQuery = '';
-var lastSearchField = 'all';
-var lastSearchResults = null;
-var activeAlphaFilter = 'All';
-var configuredRootFolders = [];
-// Simplified to only support 'all' filter - smart lists removed
-var activeFilter = 'all';
-var activeSmartFilter = null; // 'latest', 'downloaded', 'guided'
-var smartListViewMode = 'folders'; // 'list', 'folders'
-var currentPageIndex = 0;
-var currentComic = null;
-var currentMetadata = null;
-var currentRootFolder = null;
-var currentPublisher = null;
-var currentSeries = null;
-var currentFolderPath = null;
-var currentView = 'root';
-var viewerReturnContext = null;
-var db; // IndexedDB handle
-var downloadedComicIds = new Set();
-var preloadedImages = new Map(); // Cache of preloaded Image objects keyed by URL
-var pageUrlCache = new Map(); // Cache of generated page URLs by page name
+export const state = {
+  APP_CONFIG: window.APP_CONFIG || {}, // Dynamically injected app config
+  API_BASE_URL: '',
+  library: {},
+  lastSearchQuery: '',
+  lastSearchField: 'all',
+  lastSearchResults: null,
+  activeAlphaFilter: 'All',
+  configuredRootFolders: [],
+  activeFilter: 'all',
+  activeSmartFilter: null,
+  smartListViewMode: 'folders',
+  currentPageIndex: 0,
+  currentComic: null,
+  currentMetadata: null,
+  currentRootFolder: null,
+  currentPublisher: null,
+  currentSeries: null,
+  currentFolderPath: null,
+  currentView: 'root',
+  viewerReturnContext: null,
+  db: null,
+  downloadedComicIds: new Set(),
+  preloadedImages: new Map(),
+  pageUrlCache: new Map(),
+  PRELOAD_AHEAD_COUNT: 5,
+  downloadQueue: [],
+  isFullscreenZoomed: false,
+  fullscreenZoomScale: 1,
+  fullscreenZoomBaseWidth: 0,
+  fullscreenZoomBaseHeight: 0,
+  isFitToHeight: false,
+  isLandscapeOrientation: false,
+  logInterval: null,
+  ctEventSource: null,
+  ctAwaitingMatches: false,
+  _isNavigatingFromRouter: false,
+  _isAppInitializing: false,
+  router: null,
+  // Dynamic callbacks registered by other modules
+  renderPage: null,
+  applyFilterAndRender: null,
+  showComicList: null,
+  showSeriesList: null,
+  showPublisherList: null,
+  showLatestAddedSmartList: null,
+  showDownloadedSmartList: null,
+  stopRenameStream: null,
+  stopMoveStream: null,
+  syncZoomToggleButton: null,
+  onFullscreenReset: null,
+  applyFullscreenFitMode: null
+};
 
-var PRELOAD_AHEAD_COUNT = 5; // Number of pages to preload ahead of the current one
-var downloadQueue = [];
-var isFullscreenZoomed = false;
-var fullscreenZoomScale = 1;
-var fullscreenZoomBaseWidth = 0;
-var fullscreenZoomBaseHeight = 0;
-var isFitToHeight = false;
-var isLandscapeOrientation = false;
-
-function resetFullscreenZoom() {
+export function resetFullscreenZoom() {
   fullscreenImage.style.transform = '';
   fullscreenImage.style.transformOrigin = '';
   fullscreenImage.style.cursor = 'default';
@@ -561,158 +576,175 @@ function resetFullscreenZoom() {
   fullscreenViewer.scrollLeft = 0;
   fullscreenNavLeft.classList.remove('hidden');
   fullscreenNavRight.classList.remove('hidden');
-  // Update both local variables and window properties for consistency
-  isFullscreenZoomed = false;
-  fullscreenZoomScale = 1;
-  fullscreenZoomBaseWidth = 0;
-  fullscreenZoomBaseHeight = 0;
-  if (typeof window !== 'undefined') {
-    window.isFullscreenZoomed = false;
-    window.fullscreenZoomScale = 1;
-    window.fullscreenZoomBaseWidth = 0;
-    window.fullscreenZoomBaseHeight = 0;
+  
+  state.isFullscreenZoomed = false;
+  state.fullscreenZoomScale = 1;
+  state.fullscreenZoomBaseWidth = 0;
+  state.fullscreenZoomBaseHeight = 0;
+
+  if (typeof state.onFullscreenReset === 'function') {
+    state.onFullscreenReset();
   }
-  if (typeof onFullscreenReset === 'function') {
-    onFullscreenReset();
+  if (typeof state.applyFullscreenFitMode === 'function') {
+    state.applyFullscreenFitMode();
   }
-  if (typeof applyFullscreenFitMode === 'function') {
-    applyFullscreenFitMode();
-  }
-  if (typeof window !== 'undefined' && typeof window.syncZoomToggleButton === 'function') {
-    window.syncZoomToggleButton();
+  if (typeof state.syncZoomToggleButton === 'function') {
+    state.syncZoomToggleButton();
   }
 }
 
-// Make key variables globally accessible
-if (typeof window !== 'undefined') {
-  window.currentPageIndex = currentPageIndex;
-  window.currentComic = currentComic;
-  window.currentMetadata = currentMetadata;
-  window.currentRootFolder = currentRootFolder;
-  window.currentPublisher = currentPublisher;
-  window.currentSeries = currentSeries;
-  window.currentFolderPath = currentFolderPath;
-  window.currentView = currentView;
-  window.viewerReturnContext = viewerReturnContext;
-  window.db = db;
-  window.library = library;
-  window.lastSearchQuery = lastSearchQuery;
-  window.lastSearchField = lastSearchField;
-  window.lastSearchResults = lastSearchResults;
-  window.activeAlphaFilter = activeAlphaFilter;
-  window.configuredRootFolders = configuredRootFolders;
-  window.activeFilter = activeFilter;
-  window.activeSmartFilter = activeSmartFilter;
-  window.smartListViewMode = smartListViewMode;
-  window.downloadedComicIds = downloadedComicIds;
-  window.preloadedImages = preloadedImages;
-  window.pageUrlCache = pageUrlCache;
-  window.PRELOAD_AHEAD_COUNT = PRELOAD_AHEAD_COUNT;
-  window.isFitToHeight = isFitToHeight;
-  window.isLandscapeOrientation = isLandscapeOrientation;
-  window.isFullscreenZoomed = isFullscreenZoomed;
-  window.fullscreenZoomScale = fullscreenZoomScale;
-  window.fullscreenZoomBaseWidth = fullscreenZoomBaseWidth;
-  window.fullscreenZoomBaseHeight = fullscreenZoomBaseHeight;
+// Register all exported functions, constants, and UI selectors on state & window for Proxy accessibility
+const globalsObj = {
+  escapeHtml,
+  safeDirName,
+  getRelativePath,
+  debugLog,
+  enableComicsNowDebug,
+  disableComicsNowDebug,
+  isComicsNowDebugEnabled,
+  showView,
+  createLoadingMessage,
+  createEmptyMessage,
+  createErrorMessage,
+  createCheckmarkIcon,
+  apiCall,
+  encodePath,
+  toTrimmedString,
+  getComicById,
+  turnToPage,
+  pickMetadataValue,
+  buildComicDisplayInfo,
+  applyDisplayInfoToComic,
+  applyDisplayInfoToLibrary,
+  getPathForCurrentView,
+  resetFullscreenZoom,
 
-  // Expose UI elements
-  window.comicViewerDiv = comicViewerDiv;
-  window.comicListDiv = comicListDiv;
-  window.folderListViewDiv = folderListViewDiv;
-  window.folderListContainer = folderListContainer;
-  window.smartListView = smartListView;
-  window.searchResultsView = searchResultsView;
-  window.comicTitleH2 = comicTitleH2;
-  window.comicSubtitleP = comicSubtitleP;
-  window.comicSummarySection = comicSummarySection;
-  window.comicSummaryToggle = comicSummaryToggle;
-  window.comicSummaryContent = comicSummaryContent;
-  window.metadataTabBtn = metadataTabBtn;
-  window.metadataContent = metadataContent;
-  window.metadataForm = metadataForm;
-  window.viewerContent = viewerContent;
-  window.viewerPagesDiv = viewerPagesDiv;
-  window.pageLoader = pageLoader;
-  window.pageCounterSpan = pageCounterSpan;
-  window.pageJumpInput = pageJumpInput;
-  window.pageCounterSpanBottom = pageCounterSpanBottom;
-  window.pageJumpInputBottom = pageJumpInputBottom;
-  window.prevPageBtn = prevPageBtn;
-  window.nextPageBtn = nextPageBtn;
-  window.prevPageBtnBottom = prevPageBtnBottom;
-  window.nextPageBtnBottom = nextPageBtnBottom;
-  window.viewerTabBtn = viewerTabBtn;
+  // Constants
+  ICONS,
+  CSS_CLASSES,
 
-  // Expose Downloads/Offline UI elements
-  window.downloadsInfoDiv = downloadsInfoDiv;
-  window.clearDownloadsBtn = clearDownloadsBtn;
-  window.downloadQueueDiv = downloadQueueDiv;
-
-  // Expose viewer navigation buttons
-  window.viewerLibrariesBtn = viewerLibrariesBtn;
-  window.viewerPublisherBtn = viewerPublisherBtn;
-  window.viewerSeriesBtn = viewerSeriesBtn;
-
-  // Expose viewer control buttons
-  window.fitHeightBtn = fitHeightBtn;
-  window.orientationToggleBtn = orientationToggleBtn;
-  window.fullscreenBtn = fullscreenBtn;
-  window.fullscreenViewer = fullscreenViewer;
-  window.fullscreenImage = fullscreenImage;
-  window.fullscreenOrientationBtn = fullscreenOrientationBtn;
-  window.fullscreenCloseBtn = fullscreenCloseBtn;
-  window.fullscreenCloseBtnBottom = fullscreenCloseBtnBottom;
-  window.fullscreenTitle = fullscreenTitle;
-  window.fullscreenNavLeft = fullscreenNavLeft;
-  window.fullscreenNavRight = fullscreenNavRight;
-  window.fullscreenControls = fullscreenControls;
-  window.fullscreenInfoBar = fullscreenInfoBar;
-  window.fullscreenProgressIndicator = fullscreenProgressIndicator;
-  window.fullscreenPageCounter = fullscreenPageCounter;
-  window.fullscreenPageJumpInput = fullscreenPageJumpInput;
-  window.fullscreenPrevPageBtn = fullscreenPrevPageBtn;
-  window.fullscreenNextPageBtn = fullscreenNextPageBtn;
-}
-
-window.getPathForCurrentView = function() {
-  if (window.currentView === 'root') return '/';
-  if (window.currentView === 'search') {
-    return `/search?q=${encodeURIComponent(window.lastSearchQuery || '')}&field=${encodeURIComponent(window.lastSearchField || 'all')}`;
-  }
-  if (window.currentView === 'publishers' && window.currentRootFolder) {
-    return `/library?rootFolder=${encodeURIComponent(window.currentRootFolder)}`;
-  }
-  if (window.currentView === 'series' && window.currentPublisher) {
-    let path = `/series-list?publisher=${encodeURIComponent(window.currentPublisher)}`;
-    if (window.currentRootFolder) path += `&rootFolder=${encodeURIComponent(window.currentRootFolder)}`;
-    return path;
-  }
-  if (window.currentView === 'comics' && window.currentSeries) {
-    let path = `/series/${encodeURIComponent(window.currentSeries)}`;
-    if (window.currentPublisher) path += `?publisher=${encodeURIComponent(window.currentPublisher)}`;
-    if (window.currentRootFolder) path += `&rootFolder=${encodeURIComponent(window.currentRootFolder)}`;
-    return path;
-  }
-  if (window.currentView === 'comic' && window.currentComic) {
-    return `/comic/${window.currentComic.id}/page/${(window.currentPageIndex || 0) + 1}`;
-  }
-  return '/';
+  // UI Element Selectors
+  rootFolderListDiv,
+  rootFolderListContainer,
+  folderListViewDiv,
+  folderListContainer,
+  searchResultsView,
+  searchResultsTitle,
+  searchResultsContainer,
+  publisherListDiv,
+  publisherListContainer,
+  seriesListDiv,
+  smartListView,
+  smartListContainer,
+  smartListTitle,
+  smartListBackBtn,
+  filterButtonsDiv,
+  smartListButtonsDiv,
+  latestAddedButton,
+  latestAddedCountSpan,
+  downloadedButton,
+  downloadedCountSpan,
+  comicListDiv,
+  comicViewerDiv,
+  viewerLibrariesBtn,
+  viewerPublisherBtn,
+  viewerSeriesBtn,
+  publisherAlphaFilter,
+  seriesAlphaFilter,
+  comicAlphaFilter,
+  publisherTitleH2,
+  seriesTitleH2,
+  comicListTitleH2,
+  comicTitleH2,
+  comicSubtitleP,
+  comicSummarySection,
+  comicSummaryToggle,
+  comicSummaryContent,
+  pageCounterSpan,
+  pageJumpInput,
+  pageCounterSpanBottom,
+  pageJumpInputBottom,
+  viewerPagesDiv,
+  pageLoader,
+  prevPageBtn,
+  nextPageBtn,
+  prevPageBtnBottom,
+  nextPageBtnBottom,
+  fullscreenBtn,
+  viewerTabBtn,
+  metadataTabBtn,
+  viewerContent,
+  fitHeightBtn,
+  orientationToggleBtn,
+  metadataContent,
+  metadataForm,
+  saveStatusDiv,
+  searchForm,
+  searchQueryInput,
+  searchStatusDiv,
+  searchResultsUl,
+  librarySearchForm,
+  librarySearchQuery,
+  librarySearchField,
+  clearSearchBtn,
+  fullscreenViewer,
+  fullscreenInfoBar,
+  fullscreenProgressIndicator,
+  fullscreenPageCounter,
+  fullscreenPageJumpInput,
+  fullscreenPrevPageBtn,
+  fullscreenNextPageBtn,
+  fullscreenImage,
+  fullscreenCloseBtn,
+  fullscreenCloseBtnBottom,
+  fullscreenTitle,
+  fullscreenControls,
+  fullscreenOrientationBtn,
+  fullscreenNavLeft,
+  fullscreenNavRight,
+  settingsModal,
+  settingsForm,
+  scanIntervalInput,
+  apiKeyInput,
+  settingsStatusDiv,
+  scanButton,
+  fullScanButton,
+  logsContainer,
+  downloadsInfoDiv,
+  clearDownloadsBtn,
+  downloadQueueDiv,
+  settingsTabDevices,
+  settingsContentDevices,
+  devicesStatusDiv,
+  devicesListDiv,
+  refreshDevicesBtn,
+  ctButton,
+  ctModal,
+  ctScheduleInput,
+  ctSaveBtn,
+  ctMatchBody,
+  ctApplyBtn,
+  ctSkipBtn,
+  ctConfirmBar,
+  ctConfirmMessage,
+  ctConfirmYes,
+  ctConfirmNo,
+  ctOutputDiv,
+  ctClearOutputBtn,
+  ctRunBtn,
+  ctTabSettings,
+  ctTabMatches,
+  ctTabOutput,
+  ctTabManagement,
+  ctContentSettings,
+  ctContentMatches,
+  ctContentOutput,
+  ctContentManagement,
+  ctMatchesBadge
 };
 
+Object.assign(state, globalsObj);
 if (typeof window !== 'undefined') {
-  window.API_BASE_URL = window.API_BASE_URL || '';
-  window.encodePath = encodePath;
-  window.showView = window.showView || showView;
-  window.applyFilterAndRender = null; // Will be set by render.js
-  window.showComicList = null; // Will be set by render.js
-  window.showSeriesList = null; // Will be set by render.js
-  window.showPublisherList = null; // Will be set by render.js
-  window.showLatestAddedSmartList = null; // Will be set by render.js
-  window.showDownloadedSmartList = null; // Will be set by render.js
-
-  // Expose display formatting functions
-  window.applyDisplayInfoToComic = applyDisplayInfoToComic;
-  window.buildComicDisplayInfo = buildComicDisplayInfo;
-  window.ICONS = ICONS;
+  Object.assign(window, globalsObj);
 }
 

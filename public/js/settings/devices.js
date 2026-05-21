@@ -1,9 +1,10 @@
+import { state, devicesStatusDiv, devicesListDiv, refreshDevicesBtn } from '../globals.js';
+import { escapeHtmlValue } from './shared.js';
+
 // --- DEVICE MANAGEMENT ---
 let devicesStatusTimeout = null;
 
-
-
-function formatDeviceTimestamp(timestamp) {
+export function formatDeviceTimestamp(timestamp) {
   if (!timestamp) return 'Never';
   const numeric = Number(timestamp);
   if (!Number.isFinite(numeric) || numeric <= 0) return 'Never';
@@ -12,13 +13,13 @@ function formatDeviceTimestamp(timestamp) {
   return date.toLocaleString();
 }
 
-function getStoredDeviceInfo() {
+export function getStoredDeviceInfo() {
   const deviceId = (window.syncManager && window.syncManager.deviceId) || localStorage.getItem('comicsNow_deviceId');
   const deviceName = (window.syncManager && window.syncManager.deviceName) || localStorage.getItem('comicsNow_deviceName');
   return { deviceId, deviceName };
 }
 
-function setDevicesStatus(message = '', tone = 'info', autoClear) {
+export function setDevicesStatus(message = '', tone = 'info', autoClear) {
   if (!devicesStatusDiv) return;
 
   if (devicesStatusTimeout) {
@@ -51,7 +52,7 @@ function setDevicesStatus(message = '', tone = 'info', autoClear) {
   }
 }
 
-function renderDeviceList(devices) {
+export function renderDeviceList(devices) {
   if (!devicesListDiv) return;
 
   if (!Array.isArray(devices) || devices.length === 0) {
@@ -115,7 +116,8 @@ function renderDeviceList(devices) {
         btn.disabled = true;
         btn.textContent = 'Removing...';
 
-        const res = await fetch(`${API_BASE_URL}/api/v1/devices/${deviceId}`, {
+        const apiBaseUrl = state.API_BASE_URL || window.API_BASE_URL || '';
+        const res = await fetch(`${apiBaseUrl}/api/v1/devices/${deviceId}`, {
           method: 'DELETE'
         });
 
@@ -128,7 +130,6 @@ function renderDeviceList(devices) {
         setDevicesStatus('Device removed successfully', 'success', true);
         await refreshDeviceList();
       } catch (error) {
-        
         setDevicesStatus(`Failed to remove device: ${error.message}`, 'error', false);
         btn.disabled = false;
         btn.textContent = 'Remove';
@@ -137,9 +138,10 @@ function renderDeviceList(devices) {
   });
 }
 
-async function loadUserList() {
+export async function loadUserList() {
   try {
-    const res = await fetch(`${API_BASE_URL}/api/v1/users`);
+    const apiBaseUrl = state.API_BASE_URL || window.API_BASE_URL || '';
+    const res = await fetch(`${apiBaseUrl}/api/v1/users`);
 
     // If forbidden (not admin), hide the filter
     if (res.status === 403) {
@@ -177,12 +179,11 @@ async function loadUserList() {
       }
     }
   } catch (error) {
-    
     // Silently fail - user filter just won't be available
   }
 }
 
-async function refreshDeviceList() {
+export async function refreshDeviceList() {
   if (!devicesListDiv) return;
 
   if (refreshDevicesBtn && refreshDevicesBtn.disabled) return;
@@ -201,9 +202,10 @@ async function refreshDeviceList() {
     const userSelect = document.getElementById('devices-user-select');
     const selectedUserId = userSelect ? userSelect.value : '';
 
+    const apiBaseUrl = state.API_BASE_URL || window.API_BASE_URL || '';
     const url = selectedUserId
-      ? `${API_BASE_URL}/api/v1/devices?userId=${encodeURIComponent(selectedUserId)}`
-      : `${API_BASE_URL}/api/v1/devices`;
+      ? `${apiBaseUrl}/api/v1/devices?userId=${encodeURIComponent(selectedUserId)}`
+      : `${apiBaseUrl}/api/v1/devices`;
 
     const res = await fetch(url);
     const data = await res.json();
@@ -221,7 +223,6 @@ async function refreshDeviceList() {
       setDevicesStatus('', 'info');
     }
   } catch (error) {
-    
     devicesListDiv.innerHTML = '<div class="bg-gray-700 text-red-400 p-4 rounded-lg">Failed to load devices.</div>';
     setDevicesStatus(`Failed to load devices: ${error.message}`, 'error', false);
   } finally {
@@ -263,7 +264,8 @@ if (devicesListDiv && !devicesListDiv._deviceClickListener) {
     setDevicesStatus('Removing device...', 'info', false);
 
     try {
-      const res = await fetch(`${API_BASE_URL}/api/v1/devices/${deviceId}`, { method: 'DELETE' });
+      const apiBaseUrl = state.API_BASE_URL || window.API_BASE_URL || '';
+      const res = await fetch(`${apiBaseUrl}/api/v1/devices/${deviceId}`, { method: 'DELETE' });
       const data = await res.json().catch(() => ({}));
 
       if (!res.ok) {
@@ -277,7 +279,6 @@ if (devicesListDiv && !devicesListDiv._deviceClickListener) {
       setDevicesStatus('Device removed.', 'success');
       await refreshDeviceList();
     } catch (error) {
-      
       setDevicesStatus(`Failed to remove device: ${error.message}`, 'error', false);
     } finally {
       if (button) {
@@ -288,4 +289,20 @@ if (devicesListDiv && !devicesListDiv._deviceClickListener) {
   };
 
   devicesListDiv.addEventListener('click', devicesListDiv._deviceClickListener);
+}
+
+state.formatDeviceTimestamp = formatDeviceTimestamp;
+state.getStoredDeviceInfo = getStoredDeviceInfo;
+state.setDevicesStatus = setDevicesStatus;
+state.renderDeviceList = renderDeviceList;
+state.loadUserList = loadUserList;
+state.refreshDeviceList = refreshDeviceList;
+
+if (typeof window !== 'undefined') {
+  window.formatDeviceTimestamp = formatDeviceTimestamp;
+  window.getStoredDeviceInfo = getStoredDeviceInfo;
+  window.setDevicesStatus = setDevicesStatus;
+  window.renderDeviceList = renderDeviceList;
+  window.loadUserList = loadUserList;
+  window.refreshDeviceList = refreshDeviceList;
 }

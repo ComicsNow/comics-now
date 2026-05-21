@@ -1,5 +1,7 @@
+import { state } from '../globals.js';
+
 // --- CONTINUOUS MODE SETTINGS ---
-async function loadContinuousModeDefaults() {
+export async function loadContinuousModeDefaults() {
   const toggleCheckbox = document.getElementById('continuous-mode-default-toggle');
   const labelPaginated = document.getElementById('continuous-mode-label-paginated');
   const labelContinuous = document.getElementById('continuous-mode-label-continuous');
@@ -45,9 +47,10 @@ async function loadContinuousModeDefaults() {
   }
 
   try {
+    const apiBaseUrl = state.API_BASE_URL || window.API_BASE_URL || '';
     // Load current continuous mode preference from server
     try {
-      const response = await fetch(`${API_BASE_URL}/api/v1/continuous-mode-preference`);
+      const response = await fetch(`${apiBaseUrl}/api/v1/continuous-mode-preference`);
       const data = await response.json();
 
       if (response.ok) {
@@ -83,7 +86,7 @@ async function loadContinuousModeDefaults() {
 
       try {
         // Call API to set continuous mode for all comics
-        const response = await fetch(`${API_BASE_URL}/api/v1/comics/set-all-continuous-mode`, {
+        const response = await fetch(`${apiBaseUrl}/api/v1/comics/set-all-continuous-mode`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ continuousMode: enabled })
@@ -99,6 +102,8 @@ async function loadContinuousModeDefaults() {
         updateLabels(enabled);
 
         // Force refresh from server to get updated values
+        const fetchLibraryFromServer = state.fetchLibraryFromServer || window.fetchLibraryFromServer;
+        const fetchLibrary = state.fetchLibrary || window.fetchLibrary;
         if (typeof fetchLibraryFromServer === 'function') {
           await fetchLibraryFromServer();
         } else if (typeof fetchLibrary === 'function') {
@@ -161,6 +166,14 @@ async function loadContinuousModeDefaults() {
 }
 
 // Setup continuous mode toggle event listener
-function initContinuousModeSettings() {
+export function initContinuousModeSettings() {
   loadContinuousModeDefaults();
+}
+
+state.loadContinuousModeDefaults = loadContinuousModeDefaults;
+state.initContinuousModeSettings = initContinuousModeSettings;
+
+if (typeof window !== 'undefined') {
+  window.loadContinuousModeDefaults = loadContinuousModeDefaults;
+  window.initContinuousModeSettings = initContinuousModeSettings;
 }

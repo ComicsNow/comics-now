@@ -11,11 +11,13 @@ const { log } = require('../logger');
 
 function createStaticRouter({ getConfig, getComicsDirectories, getPublicLibraries }) {
   const router = express.Router();
+  const distDir = path.join(PUBLIC_DIR, 'dist');
+  const STATIC_DIR = fs.existsSync(path.join(distDir, 'index.html')) ? distDir : PUBLIC_DIR;
 
   const sendAppShell = (req, res) => {
     try {
       const config = getConfig();
-      const indexHtml = fs.readFileSync(path.join(PUBLIC_DIR, 'index.html'), 'utf-8');
+      const indexHtml = fs.readFileSync(path.join(STATIC_DIR, 'index.html'), 'utf-8');
       const baseHref = config.baseUrl.endsWith('/') ? config.baseUrl : (config.baseUrl + '/');
       const injectedHtml = indexHtml
         .replace(
@@ -51,7 +53,10 @@ function createStaticRouter({ getConfig, getComicsDirectories, getPublicLibrarie
 
   router.get('/index.html', sendAppShell);
 
-  router.use(express.static(PUBLIC_DIR, { index: false }));
+  router.use(express.static(STATIC_DIR, { index: false }));
+  if (STATIC_DIR !== PUBLIC_DIR) {
+    router.use(express.static(PUBLIC_DIR, { index: false }));
+  }
   router.use('/thumbnails', express.static(THUMBNAILS_DIRECTORY, { maxAge: '1y', immutable: true }));
   router.use('/icons', express.static(ICONS_DIRECTORY, { maxAge: '1y', immutable: true }));
   router.use('/logos', express.static(LOGOS_DIRECTORY, { maxAge: '1y', immutable: true }));

@@ -1,45 +1,77 @@
-(function (global) {
-  'use strict';
+import { state } from '../globals.js';
+import {
+  LIBRARY_CACHE_STORE,
+  LIBRARY_CACHE_KEY,
+  openOfflineDB,
+  getCurrentUserId,
+  formatBytes
+} from './db-core.js';
+import {
+  saveLibraryCacheToDB,
+  loadLibraryCacheFromDB,
+  clearLibraryCacheFromDB
+} from './db-library-cache.js';
+import {
+  saveComicToDB,
+  getComicFromDB,
+  getAllDownloadedComics,
+  getAllDownloadedComicIds,
+  removeStaleDownloads,
+  clearOfflineData,
+  deleteOfflineComic,
+  deleteFromCache,
+  getStorageInfo,
+  forceStorageCleanup,
+  getOfflineComicRecordById,
+  updateDownloadedComicInfo
+} from './db-comics.js';
+import {
+  saveQueueItemToDB,
+  getQueueFromDB,
+  removeQueueItemFromDB,
+  updateQueuePriorities,
+  clearCompletedQueueItems
+} from './db-queue.js';
+import {
+  saveJWTToken,
+  getJWTToken
+} from './db-jwt.js';
 
-  const OfflineDB = {
-    LIBRARY_CACHE_STORE: global.LIBRARY_CACHE_STORE,
-    LIBRARY_CACHE_KEY: global.LIBRARY_CACHE_KEY,
-    openOfflineDB: global.openOfflineDB,
-    getCurrentUserId: global.getCurrentUserId,
-    formatBytes: global.formatBytes,
-    
-    // Library Cache
-    saveLibraryCacheToDB: global.saveLibraryCacheToDB,
-    loadLibraryCacheFromDB: global.loadLibraryCacheFromDB,
-    clearLibraryCacheFromDB: global.clearLibraryCacheFromDB,
-    
-    // Comics Store
-    saveComicToDB: global.saveComicToDB,
-    getComicFromDB: global.getComicFromDB,
-    getAllDownloadedComics: global.getAllDownloadedComics,
-    getAllDownloadedComicIds: global.getAllDownloadedComicIds,
-    removeStaleDownloads: global.removeStaleDownloads,
-    clearOfflineData: global.clearOfflineData,
-    deleteOfflineComic: global.deleteOfflineComic,
-    deleteFromCache: global.deleteFromCache,
-    getStorageInfo: global.getStorageInfo,
-    forceStorageCleanup: global.forceStorageCleanup,
-    getOfflineComicRecordById: global.getOfflineComicRecordById,
-    updateDownloadedComicInfo: global.updateDownloadedComicInfo,
-    
-    // Download Queue
-    saveQueueItemToDB: global.saveQueueItemToDB,
-    getQueueFromDB: global.getQueueFromDB,
-    removeQueueItemFromDB: global.removeQueueItemFromDB,
-    updateQueuePriorities: global.updateQueuePriorities,
-    clearCompletedQueueItems: global.clearCompletedQueueItems,
-    
-    // JWT Token
-    saveJWTToken: global.saveJWTToken,
-    getJWTToken: global.getJWTToken,
-  };
+export const OfflineDB = {
+  LIBRARY_CACHE_STORE,
+  LIBRARY_CACHE_KEY,
+  openOfflineDB,
+  getCurrentUserId,
+  formatBytes,
+  saveLibraryCacheToDB,
+  loadLibraryCacheFromDB,
+  clearLibraryCacheFromDB,
+  saveComicToDB,
+  getComicFromDB,
+  getAllDownloadedComics,
+  getAllDownloadedComicIds,
+  removeStaleDownloads,
+  clearOfflineData,
+  deleteOfflineComic,
+  deleteFromCache,
+  getStorageInfo,
+  forceStorageCleanup,
+  getOfflineComicRecordById,
+  updateDownloadedComicInfo,
+  saveQueueItemToDB,
+  getQueueFromDB,
+  removeQueueItemFromDB,
+  updateQueuePriorities,
+  clearCompletedQueueItems,
+  saveJWTToken,
+  getJWTToken
+};
 
-  global.OfflineDB = OfflineDB;
-  Object.assign(global, OfflineDB);
+// Export to state and global scope for transition compatibility
+state.OfflineDB = OfflineDB;
+Object.assign(state, OfflineDB);
 
-})(typeof window !== 'undefined' ? window : globalThis);
+if (typeof window !== 'undefined') {
+  window.OfflineDB = OfflineDB;
+  Object.assign(window, OfflineDB);
+}

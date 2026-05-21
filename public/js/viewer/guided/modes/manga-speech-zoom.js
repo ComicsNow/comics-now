@@ -1,91 +1,93 @@
-(function (global) {
-  'use strict';
+import { state } from '../../../globals.js';
 
-  let active = false;
-  let mangaSpeechZoomIdx = -1;
+state.GuidedView = state.GuidedView || {};
+if (typeof window !== 'undefined') {
+  window.GuidedView = window.GuidedView || {};
+}
 
-  const MangaSpeechZoomMode = {
-    async enable() {
-      if (!global.GuidedView.isFullscreenOpen()) return false;
-      const comic = global.currentComic;
-      if (!comic || comic.guidedViewStatus !== 'completed') return false;
-      if (!comic.mangaMode) return false;
-      const data = await global.GuidedView.loadGuidedView(comic.id);
-      if (!data) return false;
+let active = false;
+let mangaSpeechZoomIdx = -1;
 
-      active = true;
-      mangaSpeechZoomIdx = -1;
-      global.GuidedView.refreshRender();
-      this.updateUI();
-      return true;
-    },
+export const MangaSpeechZoomMode = {
+  async enable() {
+    if (!state.GuidedView.isFullscreenOpen()) return false;
+    const comic = state.currentComic || window.currentComic;
+    if (!comic || comic.guidedViewStatus !== 'completed') return false;
+    if (!comic.mangaMode) return false;
+    const data = await state.GuidedView.loadGuidedView(comic.id);
+    if (!data) return false;
 
-    disable() {
-      active = false;
-      mangaSpeechZoomIdx = -1;
-      global.GuidedView.refreshRender();
-      this.updateUI();
-    },
+    active = true;
+    mangaSpeechZoomIdx = -1;
+    state.GuidedView.refreshRender();
+    this.updateUI();
+    return true;
+  },
 
-    toggle() {
-      return global.GuidedView.ModeRegistry.toggle('manga-speech-zoom');
-    },
+  disable() {
+    active = false;
+    mangaSpeechZoomIdx = -1;
+    state.GuidedView.refreshRender();
+    this.updateUI();
+  },
 
-    updateUI() {
-      global.GuidedView.updateMangaSpeechZoomUI(active);
-    },
+  toggle() {
+    return state.GuidedView.ModeRegistry.toggle('manga-speech-zoom');
+  },
 
-    isActive() {
-      return active;
-    },
+  updateUI() {
+    state.GuidedView.updateMangaSpeechZoomUI(active);
+  },
 
-    getRenderState() {
-      if (!active) return { targetBox: null, isPanelZoom: false };
+  isActive() {
+    return active;
+  },
 
-      const bubbles = global.GuidedView.mangaPageBubbles();
-      let targetBox = null;
-      if (mangaSpeechZoomIdx >= 0 && mangaSpeechZoomIdx < bubbles.length) {
-        targetBox = bubbles[mangaSpeechZoomIdx];
-      }
-      return { targetBox, isPanelZoom: false };
-    },
+  getRenderState() {
+    if (!active) return { targetBox: null, isPanelZoom: false };
 
-    tryAdvance(direction) {
-      return false;
-    },
-
-    onPageRendered() {
-      if (active) {
-        mangaSpeechZoomIdx = -1;
-      }
-    },
-
-    handleImageClick(nx, ny) {
-      if (!active) return false;
-
-      const bubbles = global.GuidedView.mangaPageBubbles();
-      let bestIdx = -1, minArea = Infinity;
-      for (let i = 0; i < bubbles.length; i++) {
-        const [bx, by, bw, bh] = bubbles[i];
-        if (nx >= bx && nx <= bx + bw && ny >= by && ny <= by + bh) {
-          const area = bw * bh;
-          if (area < minArea) { minArea = area; bestIdx = i; }
-        }
-      }
-      if (bestIdx !== -1) {
-        mangaSpeechZoomIdx = (mangaSpeechZoomIdx === bestIdx) ? -1 : bestIdx;
-        global.GuidedView.refreshRender();
-        return true;
-      }
-      if (mangaSpeechZoomIdx !== -1) {
-        mangaSpeechZoomIdx = -1;
-        global.GuidedView.refreshRender();
-        return true;
-      }
-      return false;
+    const bubbles = state.GuidedView.mangaPageBubbles();
+    let targetBox = null;
+    if (mangaSpeechZoomIdx >= 0 && mangaSpeechZoomIdx < bubbles.length) {
+      targetBox = bubbles[mangaSpeechZoomIdx];
     }
-  };
+    return { targetBox, isPanelZoom: false };
+  },
 
-  global.GuidedView.ModeRegistry.register('manga-speech-zoom', MangaSpeechZoomMode);
+  tryAdvance(direction) {
+    return false;
+  },
 
-})(typeof window !== 'undefined' ? window : globalThis);
+  onPageRendered() {
+    if (active) {
+      mangaSpeechZoomIdx = -1;
+    }
+  },
+
+  handleImageClick(nx, ny) {
+    if (!active) return false;
+
+    const bubbles = state.GuidedView.mangaPageBubbles();
+    let bestIdx = -1, minArea = Infinity;
+    for (let i = 0; i < bubbles.length; i++) {
+      const [bx, by, bw, bh] = bubbles[i];
+      if (nx >= bx && nx <= bx + bw && ny >= by && ny <= by + bh) {
+        const area = bw * bh;
+        if (area < minArea) { minArea = area; bestIdx = i; }
+      }
+    }
+    if (bestIdx !== -1) {
+      mangaSpeechZoomIdx = (mangaSpeechZoomIdx === bestIdx) ? -1 : bestIdx;
+      state.GuidedView.refreshRender();
+      return true;
+    }
+    if (mangaSpeechZoomIdx !== -1) {
+      mangaSpeechZoomIdx = -1;
+      state.GuidedView.refreshRender();
+      return true;
+    }
+    return false;
+  }
+};
+
+state.GuidedView.ModeRegistry.register('manga-speech-zoom', MangaSpeechZoomMode);

@@ -1,20 +1,40 @@
+import { state } from './globals.js';
+
+const global = new Proxy(typeof window !== 'undefined' ? window : globalThis, {
+  get(target, prop) {
+    if (prop in state) {
+      return state[prop];
+    }
+    const val = target[prop];
+    if (typeof val === 'function') {
+      return val.bind(target);
+    }
+    return val;
+  },
+  set(target, prop, value) {
+    state[prop] = value;
+    try {
+      target[prop] = value;
+    } catch (e) {}
+    return true;
+  }
+});
+
 // Filter library function simplified - status filters are applied during rendering
 function filterLibrary(originalLibrary, filter) {
   return originalLibrary;
 }
-
-// filterLibraryWithDownloaded function removed - no longer needed with smart lists removed
 
 // Reset to the initial libraries view: clears active smart-filter scope, resets the status
 // filter to 'All', restores the status pill highlight, then renders the root folder list.
 // Wired to the "Comics Now!" title click in index.html.
 function goToInitialView() {
   // Clear smart-filter scope
-  activeSmartFilter = null;
+  global.activeSmartFilter = null;
   if (typeof window !== 'undefined') window.activeSmartFilter = null;
 
   // Reset status filter to 'all'
-  activeFilter = 'all';
+  global.activeFilter = 'all';
   if (typeof window !== 'undefined') window.activeFilter = 'all';
 
   // Mirror the visual state of the status filter pills
@@ -35,12 +55,18 @@ function goToInitialView() {
     window.currentSeries = null;
     window.currentFolderPath = null;
   }
+  // Also update via global just to be safe
+  global.currentRootFolder = null;
+  global.currentPublisher = null;
+  global.currentSeries = null;
+  global.currentFolderPath = null;
 
-  if (typeof updateFilterButtonCounts === 'function') updateFilterButtonCounts();
-  if (typeof window.showRootFolderList === 'function') {
-    window.showRootFolderList({ force: true });
+  if (typeof global.updateFilterButtonCounts === 'function') global.updateFilterButtonCounts();
+  if (typeof global.showRootFolderList === 'function') {
+    global.showRootFolderList({ force: true });
   }
 }
+
 if (typeof window !== 'undefined') window.goToInitialView = goToInitialView;
 
 function handleFilterClick(event) {
@@ -57,30 +83,32 @@ function handleFilterClick(event) {
   button.classList.remove('bg-gray-700', 'hover:bg-gray-600');
 
   const filter = button.dataset.filter || 'all';
-  activeFilter = filter;
+  global.activeFilter = filter;
   if (typeof window !== 'undefined') window.activeFilter = filter;
 
   if (filter === 'all') {
-    if (typeof window.goToInitialView === 'function') {
-      return window.goToInitialView();
+    if (typeof global.goToInitialView === 'function') {
+      return global.goToInitialView();
     }
   }
 
-  updateFilterButtonCounts();
+  if (typeof global.updateFilterButtonCounts === 'function') {
+    global.updateFilterButtonCounts();
+  }
   
   // If we have an active smart filter, stay in that scope
-  const currentSmartFilter = (typeof activeSmartFilter !== 'undefined') ? activeSmartFilter : (window.activeSmartFilter || null);
-  if (currentSmartFilter && typeof window._renderForActiveScope === 'function') {
-    window._renderForActiveScope(currentSmartFilter);
-  } else if (typeof applyFilterAndRender === 'function') {
-    applyFilterAndRender();
+  const currentSmartFilter = global.activeSmartFilter || null;
+  if (currentSmartFilter && typeof global._renderForActiveScope === 'function') {
+    global._renderForActiveScope(currentSmartFilter);
+  } else if (typeof global.applyFilterAndRender === 'function') {
+    global.applyFilterAndRender();
   }
 }
 
 function initializeLibraryUIControls() {
-  if (filterButtonsDiv && !filterButtonsDiv._filterListener) {
-    filterButtonsDiv._filterListener = handleFilterClick;
-    filterButtonsDiv.addEventListener('click', filterButtonsDiv._filterListener);
+  if (global.filterButtonsDiv && !global.filterButtonsDiv._filterListener) {
+    global.filterButtonsDiv._filterListener = handleFilterClick;
+    global.filterButtonsDiv.addEventListener('click', global.filterButtonsDiv._filterListener);
   }
 
   // Smart filter is now a *scope*, not a navigation target.
@@ -89,69 +117,72 @@ function initializeLibraryUIControls() {
   // - List mode + active scope: navigate to the flat #smart-list-view for that scope.
   const SMART_LIST_VIEWS = ['latest', 'downloaded', 'guided', 'manga', 'non-manga'];
   const renderForActiveScope = (scope) => {
-    if (scope && smartListViewMode === 'list') {
-      if (scope === 'latest' && typeof showLatestAddedSmartList === 'function') return showLatestAddedSmartList();
-      if (scope === 'downloaded' && typeof showDownloadedSmartList === 'function') return showDownloadedSmartList();
-      if (scope === 'guided' && typeof showGuidedSmartList === 'function') return showGuidedSmartList();
-      if ((scope === 'manga' || scope === 'non-manga') && typeof showMangaSmartList === 'function') return showMangaSmartList();
+    if (scope && global.smartListViewMode === 'list') {
+      if (scope === 'latest' && typeof global.showLatestAddedSmartList === 'function') return global.showLatestAddedSmartList();
+      if (scope === 'downloaded' && typeof global.showDownloadedSmartList === 'function') return global.showDownloadedSmartList();
+      if (scope === 'guided' && typeof global.showGuidedSmartList === 'function') return global.showGuidedSmartList();
+      if ((scope === 'manga' || scope === 'non-manga') && typeof global.showMangaSmartList === 'function') return global.showMangaSmartList();
     }
     
     // Folder mode, or scope cleared: re-render the current drill-in view scoped.
-    if (SMART_LIST_VIEWS.includes(currentView)) {
-      if (currentSeries && typeof showComicList === 'function') return showComicList(currentSeries);
-      if (currentPublisher && typeof showSeriesList === 'function') return showSeriesList(currentPublisher, { force: true });
-      if (currentRootFolder && typeof showPublisherList === 'function') return showPublisherList(currentRootFolder, { force: true });
-      return showRootFolderList({ force: true });
+    if (SMART_LIST_VIEWS.includes(global.currentView)) {
+      if (global.currentSeries && typeof global.showComicList === 'function') return global.showComicList(global.currentSeries);
+      if (global.currentPublisher && typeof global.showSeriesList === 'function') return global.showSeriesList(global.currentPublisher, { force: true });
+      if (global.currentRootFolder && typeof global.showPublisherList === 'function') return global.showPublisherList(global.currentRootFolder, { force: true });
+      return global.showRootFolderList({ force: true });
     }
 
     // Call the exported applyFilterAndRender from LibraryRender to avoid recursion
-    if (window.LibraryRender && typeof window.LibraryRender.applyFilterAndRender === 'function') {
+    if (global.LibraryRender && typeof global.LibraryRender.applyFilterAndRender === 'function') {
         // We use a flag to prevent re-entering renderForActiveScope
-        if (!window._isApplyingFilter) {
-            window._isApplyingFilter = true;
-            window.LibraryRender.applyFilterAndRender();
-            window._isApplyingFilter = false;
+        if (!global._isApplyingFilter) {
+            global._isApplyingFilter = true;
+            global.LibraryRender.applyFilterAndRender();
+            global._isApplyingFilter = false;
             return;
         }
     }
     
-    showRootFolderList({ force: true });
+    if (typeof global.showRootFolderList === 'function') {
+      global.showRootFolderList({ force: true });
+    }
   };
   
   if (typeof window !== 'undefined') {
       window._renderForActiveScope = renderForActiveScope;
   }
+  global._renderForActiveScope = renderForActiveScope;
 
   const setSmartScope = (scope) => {
-    activeSmartFilter = scope;
+    global.activeSmartFilter = scope;
     if (typeof window !== 'undefined') window.activeSmartFilter = scope;
-    if (typeof updateFilterButtonCounts === 'function') updateFilterButtonCounts();
+    if (typeof global.updateFilterButtonCounts === 'function') global.updateFilterButtonCounts();
     renderForActiveScope(scope);
   };
 
   const clearSmartFilter = () => setSmartScope(null);
 
-  if (latestAddedButton && !latestAddedButton._smartListListener) {
-    latestAddedButton._smartListListener = (event) => {
+  if (global.latestAddedButton && !global.latestAddedButton._smartListListener) {
+    global.latestAddedButton._smartListListener = (event) => {
       event.preventDefault();
-      setSmartScope(activeSmartFilter === 'latest' ? null : 'latest');
+      setSmartScope(global.activeSmartFilter === 'latest' ? null : 'latest');
     };
-    latestAddedButton.addEventListener('click', latestAddedButton._smartListListener);
+    global.latestAddedButton.addEventListener('click', global.latestAddedButton._smartListListener);
   }
 
-  if (downloadedButton && !downloadedButton._smartListListener) {
-    downloadedButton._smartListListener = (event) => {
+  if (global.downloadedButton && !global.downloadedButton._smartListListener) {
+    global.downloadedButton._smartListListener = (event) => {
       event.preventDefault();
-      setSmartScope(activeSmartFilter === 'downloaded' ? null : 'downloaded');
+      setSmartScope(global.activeSmartFilter === 'downloaded' ? null : 'downloaded');
     };
-    downloadedButton.addEventListener('click', downloadedButton._smartListListener);
+    global.downloadedButton.addEventListener('click', global.downloadedButton._smartListListener);
   }
 
   const guidedSmartListBtn = document.getElementById('guided-smart-list-btn');
   if (guidedSmartListBtn && !guidedSmartListBtn._smartListListener) {
     guidedSmartListBtn._smartListListener = (event) => {
       event.preventDefault();
-      setSmartScope(activeSmartFilter === 'guided' ? null : 'guided');
+      setSmartScope(global.activeSmartFilter === 'guided' ? null : 'guided');
     };
     guidedSmartListBtn.addEventListener('click', guidedSmartListBtn._smartListListener);
   }
@@ -160,61 +191,65 @@ function initializeLibraryUIControls() {
   if (mangaFilterBtn && !mangaFilterBtn._smartListListener) {
     mangaFilterBtn._smartListListener = (event) => {
       event.preventDefault();
-      const isMangaDefault = !!(window.mangaModePreference === true || window.mangaModePreference == 1);
+      const isMangaDefault = !!(global.mangaModePreference === true || global.mangaModePreference == 1);
       const type = isMangaDefault ? 'non-manga' : 'manga';
-      setSmartScope(activeSmartFilter === type ? null : type);
+      setSmartScope(global.activeSmartFilter === type ? null : type);
     };
     mangaFilterBtn.addEventListener('click', mangaFilterBtn._smartListListener);
   }
 
-  if (smartListBackBtn && !smartListBackBtn._smartListBackListener) {
-    smartListBackBtn._smartListBackListener = (event) => {
+  if (global.smartListBackBtn && !global.smartListBackBtn._smartListBackListener) {
+    global.smartListBackBtn._smartListBackListener = (event) => {
       event.preventDefault();
-      showRootFolderList({ force: true });
+      if (typeof global.showRootFolderList === 'function') {
+        global.showRootFolderList({ force: true });
+      }
     };
-    smartListBackBtn.addEventListener('click', smartListBackBtn._smartListBackListener);
+    global.smartListBackBtn.addEventListener('click', global.smartListBackBtn._smartListBackListener);
   }
 
   const runLibrarySearch = () => {
-    const query = librarySearchQuery?.value?.trim();
+    const query = global.librarySearchQuery?.value?.trim();
     if (!query) return;
-    const field = librarySearchField?.value || 'all';
-    if (typeof showSearchView === 'function') {
-      showSearchView(query, field);
+    const field = global.librarySearchField?.value || 'all';
+    if (typeof global.showSearchView === 'function') {
+      global.showSearchView(query, field);
     } else {
       console.error('[search] showSearchView is not defined');
     }
   };
 
-  if (librarySearchForm && !librarySearchForm._submitListener) {
-    librarySearchForm._submitListener = (event) => {
+  if (global.librarySearchForm && !global.librarySearchForm._submitListener) {
+    global.librarySearchForm._submitListener = (event) => {
       event.preventDefault();
       runLibrarySearch();
     };
-    librarySearchForm.addEventListener('submit', librarySearchForm._submitListener);
+    global.librarySearchForm.addEventListener('submit', global.librarySearchForm._submitListener);
   }
 
   // Belt-and-suspenders: handle Enter directly on the input so mobile keyboards
   // and browsers that skip implicit form submission still trigger the search.
-  if (librarySearchQuery && !librarySearchQuery._enterListener) {
-    librarySearchQuery._enterListener = (event) => {
+  if (global.librarySearchQuery && !global.librarySearchQuery._enterListener) {
+    global.librarySearchQuery._enterListener = (event) => {
       if (event.key === 'Enter' || event.keyCode === 13) {
         event.preventDefault();
         runLibrarySearch();
       }
     };
-    librarySearchQuery.addEventListener('keydown', librarySearchQuery._enterListener);
+    global.librarySearchQuery.addEventListener('keydown', global.librarySearchQuery._enterListener);
   }
 
-  if (clearSearchBtn && !clearSearchBtn._clickListener) {
-    clearSearchBtn._clickListener = (event) => {
+  if (global.clearSearchBtn && !global.clearSearchBtn._clickListener) {
+    global.clearSearchBtn._clickListener = (event) => {
       event.preventDefault();
-      if (librarySearchQuery) {
-        librarySearchQuery.value = '';
+      if (global.librarySearchQuery) {
+        global.librarySearchQuery.value = '';
       }
-      showRootFolderList({ force: true });
+      if (typeof global.showRootFolderList === 'function') {
+        global.showRootFolderList({ force: true });
+      }
     };
-    clearSearchBtn.addEventListener('click', clearSearchBtn._clickListener);
+    global.clearSearchBtn.addEventListener('click', global.clearSearchBtn._clickListener);
   }
 
   // The list/folder mode buttons exist near the smart pill row (visible whenever a scope
@@ -228,7 +263,7 @@ function initializeLibraryUIControls() {
       const activeClass = 'bg-purple-600';
       const inactiveClass = 'bg-gray-700';
       modeButtonPairs.forEach(([listBtn, foldersBtn]) => {
-        if (smartListViewMode === 'list') {
+        if (global.smartListViewMode === 'list') {
           listBtn.classList.add(activeClass);
           listBtn.classList.remove(inactiveClass);
           foldersBtn.classList.remove(activeClass);
@@ -243,13 +278,13 @@ function initializeLibraryUIControls() {
     };
 
     const setMode = (mode) => {
-      smartListViewMode = mode;
+      global.smartListViewMode = mode;
       if (typeof window !== 'undefined') window.smartListViewMode = mode;
       updateModeButtons();
       
       // Always re-render the current view to respect the new mode
       if (typeof renderForActiveScope === 'function') {
-        renderForActiveScope(activeSmartFilter);
+        renderForActiveScope(global.activeSmartFilter);
       }
     };
 
@@ -308,19 +343,39 @@ function initializeLibraryUIControls() {
         lastDayKey = k;
         // Only refresh if we're showing the libraries grid; other views
         // (publisher / series / comic / search) don't show library cards.
-        const onLibraries = !rootFolderListDiv?.classList.contains('hidden');
-        if (onLibraries && typeof showRootFolderList === 'function') {
-          showRootFolderList({ force: true });
+        const onLibraries = !global.rootFolderListDiv?.classList.contains('hidden');
+        if (onLibraries && typeof global.showRootFolderList === 'function') {
+          global.showRootFolderList({ force: true });
         }
       }
     };
     document.addEventListener('visibilitychange', () => {
       if (!document.hidden) checkDayRollover();
     });
-    window.addEventListener('focus', checkDayRollover);
+    global.addEventListener('focus', checkDayRollover);
   }
 
-  debugLog('UI', 'Library controls initialized');
+  global.debugLog?.('UI', 'Library controls initialized');
 }
+
+export {
+  filterLibrary,
+  goToInitialView,
+  handleFilterClick,
+  initializeLibraryUIControls
+};
+
+state.filterLibrary = filterLibrary;
+state.goToInitialView = goToInitialView;
+state.handleFilterClick = handleFilterClick;
+state.initializeLibraryUIControls = initializeLibraryUIControls;
+
+if (typeof window !== 'undefined') {
+  window.filterLibrary = filterLibrary;
+  window.goToInitialView = goToInitialView;
+  window.handleFilterClick = handleFilterClick;
+  window.initializeLibraryUIControls = initializeLibraryUIControls;
+}
+
 
 

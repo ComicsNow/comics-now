@@ -2,8 +2,27 @@
  * End of Comic Navigation
  * Handles navigation to next comic in series or reading list when reaching the end
  */
-(function(global) {
-  'use strict';
+import { state } from '../globals.js';
+
+const global = new Proxy(typeof window !== 'undefined' ? window : globalThis, {
+  get(target, prop) {
+    if (prop in state) {
+      return state[prop];
+    }
+    const val = target[prop];
+    if (typeof val === 'function') {
+      return val.bind(target);
+    }
+    return val;
+  },
+  set(target, prop, value) {
+    state[prop] = value;
+    try {
+      target[prop] = value;
+    } catch (e) {}
+    return true;
+  }
+});
 
   /**
    * Find which library/publisher/series a comic lives under, by scanning the in-memory library.
@@ -224,4 +243,24 @@
     updateEndOfComicNavigation
   });
 
-})(typeof window !== 'undefined' ? window : globalThis);
+export {
+  locateComicInLibrary,
+  getNextComicInSeries,
+  getNextComicInReadingList,
+  navigateToNextComic,
+  updateEndOfComicNavigation
+};
+
+state.EndNavigation = global.EndNavigation;
+state.getNextComicInSeries = getNextComicInSeries;
+state.getNextComicInReadingList = getNextComicInReadingList;
+state.navigateToNextComic = navigateToNextComic;
+state.updateEndOfComicNavigation = updateEndOfComicNavigation;
+
+if (typeof window !== 'undefined') {
+  window.EndNavigation = global.EndNavigation;
+  window.getNextComicInSeries = getNextComicInSeries;
+  window.getNextComicInReadingList = getNextComicInReadingList;
+  window.navigateToNextComic = navigateToNextComic;
+  window.updateEndOfComicNavigation = updateEndOfComicNavigation;
+}

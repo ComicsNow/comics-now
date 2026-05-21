@@ -1,32 +1,54 @@
+import { state } from './globals.js';
+
+const global = new Proxy(typeof window !== 'undefined' ? window : globalThis, {
+  get(target, prop) {
+    if (prop in state) {
+      return state[prop];
+    }
+    const val = target[prop];
+    if (typeof val === 'function') {
+      return val.bind(target);
+    }
+    return val;
+  },
+  set(target, prop, value) {
+    state[prop] = value;
+    try {
+      target[prop] = value;
+    } catch (e) {}
+    return true;
+  }
+});
+
 // --- METADATA ---
 
 async function loadMetadata() {
   // Security check: only admins can view metadata
-  const isAdmin = window.syncManager && window.syncManager.userRole === 'admin';
+  const isAdmin = global.syncManager && global.syncManager.userRole === 'admin';
   if (!isAdmin) return;
 
   // Local/device comics don't have editable metadata on the server
-  const comic = window.currentComic;
+  const comic = global.currentComic;
   const isLocal = comic && (comic.handle || comic.file || (comic.id && String(comic.id).startsWith('device-')));
   if (isLocal) {
-    window.metadataForm.innerHTML = `<p class="text-gray-400 text-center italic">Metadata management is only available for library comics.</p>`;
+    global.metadataForm.innerHTML = `<p class="text-gray-400 text-center italic">Metadata management is only available for library comics.</p>`;
     return;
   }
 
   try {
-    if (!window.currentComic) {
+    if (!global.currentComic) {
       throw new Error('No comic loaded');
     }
-    if (!window.currentMetadata) {
+    if (!global.currentMetadata) {
       const response = await fetch(
-        `${API_BASE_URL}/api/v1/comics/info?path=${encodeURIComponent(encodePath(window.currentComic.path))}`
+        `${global.API_BASE_URL}/api/v1/comics/info?path=${encodeURIComponent(global.encodePath(global.currentComic.path))}`
       );
       if (!response.ok) throw new Error('Metadata not found.');
-      window.currentMetadata = await response.json();
+      global.currentMetadata = await response.json();
     }
-    renderMetadataDisplay(window.currentMetadata, true); // true = clear and render fresh
+    renderMetadataDisplay(global.currentMetadata, true); // true = clear and render fresh
   } catch (error) {
-    window.metadataForm.innerHTML = `<p class="text-red-400 text-center">${escapeHtml(error.message)}</p>`;
+    global.metadataForm.innerHTML = `<p class="text-red-400 text-center">${global.escapeHtml(error.message)}</p>`;
   }
 }
 
@@ -116,7 +138,7 @@ function createChipInputRow(name, initialCSV = '') {
     chips.push(t);
     const chip = document.createElement('span');
     chip.className = 'px-2 py-1 rounded-full bg-gray-600 text-sm flex items-center gap-1';
-    chip.innerHTML = `<span>${escapeHtml(t)}</span>`;
+    chip.innerHTML = `<span>${global.escapeHtml(t)}</span>`;
     const x = document.createElement('button');
     x.type = 'button';
     x.className = 'ml-1 rounded-full w-4 h-4 text-xs bg-gray-500 hover:bg-red-600';
@@ -167,10 +189,10 @@ function createDisplayField() {
 
 /** Render the entire metadata form — editable if admin, read-only otherwise */
 function renderMetadataDisplay(metadata, clearForm = true) {
-  if (clearForm) window.metadataForm.innerHTML = '';
+  if (clearForm) global.metadataForm.innerHTML = '';
 
   // Check if user is admin
-  const isAdmin = window.syncManager && window.syncManager.userRole === 'admin';
+  const isAdmin = global.syncManager && global.syncManager.userRole === 'admin';
 
   // For admins: show all default fields
   // For non-admins: only show fields that have values
@@ -194,7 +216,7 @@ function renderMetadataDisplay(metadata, clearForm = true) {
     // For non-admins: skip empty fields
     if (!isAdmin && (!val || val === '')) continue;
     // If an element already exists (e.g., re-render), update it
-    const existing = window.metadataForm.querySelector(`[name="${CSS.escape(key)}"]`);
+    const existing = global.metadataForm.querySelector(`[name="${CSS.escape(key)}"]`);
     if (existing) {
       if (chipFields.has(key) && isAdmin) {
         // replace existing chip row if needed to reflect fresh values
@@ -212,10 +234,10 @@ function renderMetadataDisplay(metadata, clearForm = true) {
     // Create fresh - editable if admin, read-only otherwise
     if (isAdmin) {
       if (chipFields.has(key)) {
-        window.metadataForm.appendChild(createChipInputRow(key, String(val || '')));
+        global.metadataForm.appendChild(createChipInputRow(key, String(val || '')));
       } else {
         const type = key === 'Summary' ? 'textarea' : 'text';
-        window.metadataForm.appendChild(createFormRow(key, val ?? '', type));
+        global.metadataForm.appendChild(createFormRow(key, val ?? '', type));
       }
     } else {
       // Non-admin: show read-only fields
@@ -229,12 +251,12 @@ function renderMetadataDisplay(metadata, clearForm = true) {
       value.textContent = val || '—';
       div.appendChild(label);
       div.appendChild(value);
-      window.metadataForm.appendChild(div);
+      global.metadataForm.appendChild(div);
     }
   }
 
   // --- Add "Add custom field" controls (only for admins, only once) ---
-  if (isAdmin && !window.metadataForm.querySelector('#add-custom-field')) {
+  if (isAdmin && !global.metadataForm.querySelector('#add-custom-field')) {
     const controls = document.createElement('div');
     controls.className = 'flex flex-wrap items-center gap-2 mt-2';
 
@@ -255,16 +277,20 @@ function renderMetadataDisplay(metadata, clearForm = true) {
       <option>PageCount</option>
       <option>Format</option>
     `;
+    
+    // We will find the submitButton to insert controls before it if necessary
+    const submitButton = global.metadataForm.querySelector('button[type="submit"]');
+
     commonSelect.addEventListener('change', () => {
       const key = commonSelect.value;
       if (!key) return;
-      if (window.metadataForm.querySelector(`[name="${CSS.escape(key)}"]`)) {
+      if (global.metadataForm.querySelector(`[name="${CSS.escape(key)}"]`)) {
         alert('That field already exists.');
       } else {
         if (['Genre'].includes(key)) {
-          window.metadataForm.insertBefore(createChipInputRow(key, ''), submitButton);
+          global.metadataForm.insertBefore(createChipInputRow(key, ''), submitButton);
         } else {
-          window.metadataForm.insertBefore(createFormRow(key, ''), submitButton);
+          global.metadataForm.insertBefore(createFormRow(key, ''), submitButton);
         }
       }
       commonSelect.value = '';
@@ -278,27 +304,50 @@ function renderMetadataDisplay(metadata, clearForm = true) {
     addBtn.addEventListener('click', () => {
       const key = prompt('Enter new field name (e.g., Translator, CoverArtist, Arc, Imprint):');
       if (!key) return;
-      if (window.metadataForm.querySelector(`[name="${CSS.escape(key)}"]`)) {
+      if (global.metadataForm.querySelector(`[name="${CSS.escape(key)}"]`)) {
         return alert('That field already exists.');
       }
       // Default to text input; user can still store comma-separated values if desired
-      window.metadataForm.insertBefore(createFormRow(key, ''), submitButton);
+      global.metadataForm.insertBefore(createFormRow(key, ''), submitButton);
     });
 
     controls.appendChild(commonSelect);
     controls.appendChild(addBtn);
-    window.metadataForm.appendChild(controls);
+    global.metadataForm.appendChild(controls);
   }
 
   // --- Submit button (only for admins, only once) ---
   if (isAdmin) {
-    let submitButton = window.metadataForm.querySelector('button[type="submit"]');
+    let submitButton = global.metadataForm.querySelector('button[type="submit"]');
     if (!submitButton) {
       submitButton = document.createElement('button');
       submitButton.type = 'submit';
       submitButton.className = 'w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-full transition-colors mt-4';
       submitButton.textContent = 'Save Changes';
-      window.metadataForm.appendChild(submitButton);
+      global.metadataForm.appendChild(submitButton);
     }
   }
 }
+
+export {
+  loadMetadata,
+  createFormRow,
+  createChipInputRow,
+  createDisplayField,
+  renderMetadataDisplay
+};
+
+state.loadMetadata = loadMetadata;
+state.createFormRow = createFormRow;
+state.createChipInputRow = createChipInputRow;
+state.createDisplayField = createDisplayField;
+state.renderMetadataDisplay = renderMetadataDisplay;
+
+if (typeof window !== 'undefined') {
+  window.loadMetadata = loadMetadata;
+  window.createFormRow = createFormRow;
+  window.createChipInputRow = createChipInputRow;
+  window.createDisplayField = createDisplayField;
+  window.renderMetadataDisplay = renderMetadataDisplay;
+}
+

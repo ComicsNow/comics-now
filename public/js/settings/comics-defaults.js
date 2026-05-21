@@ -1,5 +1,7 @@
+import { state } from '../globals.js';
+
 // --- COMICS DEFAULTS ---
-async function loadComicsDefaults() {
+export async function loadComicsDefaults() {
   const libraryContainer = document.getElementById('library-preferences-container');
   const allowedFormatsSelect = document.getElementById('allowed-formats-select');
   const metadataStorageSelect = document.getElementById('metadata-storage-select');
@@ -12,11 +14,14 @@ async function loadComicsDefaults() {
   const masterMangaToggle = document.getElementById('master-manga-toggle');
   const masterContinuousToggle = document.getElementById('master-continuous-toggle');
 
+  const apiBaseUrl = state.API_BASE_URL || window.API_BASE_URL || '';
+  const showSettingsMsg = state.showSettingsMessage || window.showSettingsMessage || (() => {});
+
   // --- MASTER TOGGLE LOGIC ---
   async function loadMasterDefaults() {
     try {
-      const mangaRes = await fetch(`${API_BASE_URL}/api/v1/manga-mode-preference`);
-      const contRes = await fetch(`${API_BASE_URL}/api/v1/continuous-mode-preference`);
+      const mangaRes = await fetch(`${apiBaseUrl}/api/v1/manga-mode-preference`);
+      const contRes = await fetch(`${apiBaseUrl}/api/v1/continuous-mode-preference`);
       
       const mangaData = await mangaRes.json();
       const contData = await contRes.json();
@@ -37,19 +42,19 @@ async function loadComicsDefaults() {
       }
       
       try {
-        const res = await fetch(`${API_BASE_URL}/api/v1/comics/set-all-manga-mode`, {
+        const res = await fetch(`${apiBaseUrl}/api/v1/comics/set-all-manga-mode`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ mangaMode: enabled })
         });
         if (res.ok) {
-          showSettingsMessage(`All libraries set to ${enabled ? 'Manga' : 'Standard'}`, 'success');
+          showSettingsMsg(`All libraries set to ${enabled ? 'Manga' : 'Standard'}`, 'success');
           loadLibraryPreferences();
         } else {
           throw new Error('Update failed');
         }
       } catch (e) {
-        showSettingsMessage('Failed to apply changes', 'error');
+        showSettingsMsg('Failed to apply changes', 'error');
         masterMangaToggle.checked = !enabled;
       }
     });
@@ -64,19 +69,19 @@ async function loadComicsDefaults() {
       }
       
       try {
-        const res = await fetch(`${API_BASE_URL}/api/v1/comics/set-all-continuous-mode`, {
+        const res = await fetch(`${apiBaseUrl}/api/v1/comics/set-all-continuous-mode`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ continuousMode: enabled })
         });
         if (res.ok) {
-          showSettingsMessage(`All libraries set to ${enabled ? 'Continuous' : 'Paginated'}`, 'success');
+          showSettingsMsg(`All libraries set to ${enabled ? 'Continuous' : 'Paginated'}`, 'success');
           loadLibraryPreferences();
         } else {
           throw new Error('Update failed');
         }
       } catch (e) {
-        showSettingsMessage('Failed to apply changes', 'error');
+        showSettingsMsg('Failed to apply changes', 'error');
         masterContinuousToggle.checked = !enabled;
       }
     });
@@ -98,7 +103,7 @@ async function loadComicsDefaults() {
     `;
 
     try {
-      const response = await fetch(`${API_BASE_URL}/api/v1/user/library-preferences`);
+      const response = await fetch(`${apiBaseUrl}/api/v1/user/library-preferences`);
       const data = await response.json();
       if (!response.ok || !data.ok) throw new Error(data.message || 'Failed to load');
       renderLibraryPreferences(data.preferences);
@@ -174,17 +179,20 @@ async function loadComicsDefaults() {
 
   async function updateLibraryPreference(path, mangaMode, continuousMode) {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/v1/user/library-preferences`, {
+      const response = await fetch(`${apiBaseUrl}/api/v1/user/library-preferences`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ path, mangaMode, continuousMode })
       });
       if (response.ok) {
-        showSettingsMessage('Saved', 'success');
-        if (window.fetchLibraryFromServer) window.fetchLibraryFromServer();
+        showSettingsMsg('Saved', 'success');
+        const fetchLibraryFromServer = state.fetchLibraryFromServer || window.fetchLibraryFromServer;
+        if (typeof fetchLibraryFromServer === 'function') {
+          fetchLibraryFromServer();
+        }
       }
     } catch (error) {
-      showSettingsMessage('Save failed', 'error');
+      showSettingsMsg('Save failed', 'error');
       loadLibraryPreferences();
     }
   }
@@ -206,14 +214,14 @@ async function loadComicsDefaults() {
       }
       migrateBtn.disabled = true;
       try {
-        const res = await fetch(`${API_BASE_URL}/api/v1/admin/metadata/migrate`, {
+        const res = await fetch(`${apiBaseUrl}/api/v1/admin/metadata/migrate`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ mode: metadataStorageSelect.value, applyToExisting: true })
         });
-        if (res.ok) showSettingsMessage('Migration complete', 'success');
+        if (res.ok) showSettingsMsg('Migration complete', 'success');
       } catch (e) {
-        showSettingsMessage('Migration failed', 'error');
+        showSettingsMsg('Migration failed', 'error');
       } finally { migrateBtn.disabled = false; }
     });
   }
@@ -221,17 +229,23 @@ async function loadComicsDefaults() {
   if (allowedFormatsSelect) {
     allowedFormatsSelect.addEventListener('change', async () => {
       try {
-        const res = await fetch(`${API_BASE_URL}/api/v1/settings`, {
+        const res = await fetch(`${apiBaseUrl}/api/v1/settings`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ allowedFormats: allowedFormatsSelect.value })
         });
-        if (res.ok) showSettingsMessage('Saved', 'success');
-      } catch (e) { showSettingsMessage('Failed', 'error'); }
+        if (res.ok) showSettingsMsg('Saved', 'success');
+      } catch (e) { showSettingsMsg('Failed', 'error'); }
     });
   }
 
   // Initial load
   loadMasterDefaults();
   loadLibraryPreferences();
+}
+
+state.loadComicsDefaults = loadComicsDefaults;
+
+if (typeof window !== 'undefined') {
+  window.loadComicsDefaults = loadComicsDefaults;
 }

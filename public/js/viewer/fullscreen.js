@@ -1,5 +1,24 @@
-(function (global) {
-  'use strict';
+import { state } from '../globals.js';
+
+const global = new Proxy(typeof window !== 'undefined' ? window : globalThis, {
+  get(target, prop) {
+    if (prop in state) {
+      return state[prop];
+    }
+    const val = target[prop];
+    if (typeof val === 'function') {
+      return val.bind(target);
+    }
+    return val;
+  },
+  set(target, prop, value) {
+    state[prop] = value;
+    try {
+      target[prop] = value;
+    } catch (e) {}
+    return true;
+  }
+});
 
   const FULLSCREEN_CONTROLS_AUTOHIDE_DELAY = 2000;
   const FULLSCREEN_MIN_ZOOM_SCALE = 1;
@@ -1242,4 +1261,100 @@
 
   // Initialize on load
   initFullscreenNavigation();
-})(typeof window !== 'undefined' ? window : globalThis);
+
+export {
+  FULLSCREEN_CONTROLS_AUTOHIDE_DELAY,
+  FULLSCREEN_MIN_ZOOM_SCALE,
+  FULLSCREEN_MAX_ZOOM_SCALE,
+  showFullscreenControls,
+  hideFullscreenControls,
+  openFullscreen,
+  closeFullscreen,
+  handleFullscreenImageClick,
+  clamp,
+  ensureFullscreenZoomBaseSize,
+  updateFullscreenScrollFromRatios,
+  applyFullscreenZoom,
+  beginFullscreenPan,
+  updateFullscreenPanPosition,
+  endFullscreenPan,
+  getDistanceBetweenPoints,
+  handleFullscreenPointerDown,
+  handleFullscreenPointerMove,
+  handleFullscreenPointerUp,
+  onFullscreenReset,
+  updateFullscreenPageStatus,
+  updateFullscreenViewerCentering,
+  applyFullscreenFitMode,
+  showFullscreenPageJumpInput,
+  hideFullscreenPageJumpInput,
+  commitFullscreenPageJump,
+  ViewerFullscreen,
+  applyLandscapeTransform,
+  resetLandscapePan,
+  initFullscreenNavigation
+};
+
+state.FULLSCREEN_CONTROLS_AUTOHIDE_DELAY = FULLSCREEN_CONTROLS_AUTOHIDE_DELAY;
+state.FULLSCREEN_MIN_ZOOM_SCALE = FULLSCREEN_MIN_ZOOM_SCALE;
+state.FULLSCREEN_MAX_ZOOM_SCALE = FULLSCREEN_MAX_ZOOM_SCALE;
+state.showFullscreenControls = showFullscreenControls;
+state.hideFullscreenControls = hideFullscreenControls;
+state.openFullscreen = openFullscreen;
+state.closeFullscreen = closeFullscreen;
+state.handleFullscreenImageClick = handleFullscreenImageClick;
+state.clamp = clamp;
+state.ensureFullscreenZoomBaseSize = ensureFullscreenZoomBaseSize;
+state.updateFullscreenScrollFromRatios = updateFullscreenScrollFromRatios;
+state.applyFullscreenZoom = applyFullscreenZoom;
+state.beginFullscreenPan = beginFullscreenPan;
+state.updateFullscreenPanPosition = updateFullscreenPanPosition;
+state.endFullscreenPan = endFullscreenPan;
+state.getDistanceBetweenPoints = getDistanceBetweenPoints;
+state.handleFullscreenPointerDown = handleFullscreenPointerDown;
+state.handleFullscreenPointerMove = handleFullscreenPointerMove;
+state.handleFullscreenPointerUp = handleFullscreenPointerUp;
+state.onFullscreenReset = onFullscreenReset;
+state.updateFullscreenPageStatus = updateFullscreenPageStatus;
+state.updateFullscreenViewerCentering = updateFullscreenViewerCentering;
+state.applyFullscreenFitMode = applyFullscreenFitMode;
+state.showFullscreenPageJumpInput = showFullscreenPageJumpInput;
+state.hideFullscreenPageJumpInput = hideFullscreenPageJumpInput;
+state.commitFullscreenPageJump = commitFullscreenPageJump;
+state.ViewerFullscreen = ViewerFullscreen;
+state.applyLandscapeTransform = applyLandscapeTransform;
+state.resetLandscapePan = resetLandscapePan;
+state.initFullscreenNavigation = initFullscreenNavigation;
+
+if (typeof window !== 'undefined') {
+  window.FULLSCREEN_CONTROLS_AUTOHIDE_DELAY = FULLSCREEN_CONTROLS_AUTOHIDE_DELAY;
+  window.FULLSCREEN_MIN_ZOOM_SCALE = FULLSCREEN_MIN_ZOOM_SCALE;
+  window.FULLSCREEN_MAX_ZOOM_SCALE = FULLSCREEN_MAX_ZOOM_SCALE;
+  window.showFullscreenControls = showFullscreenControls;
+  window.hideFullscreenControls = hideFullscreenControls;
+  window.openFullscreen = openFullscreen;
+  window.closeFullscreen = closeFullscreen;
+  window.handleFullscreenImageClick = handleFullscreenImageClick;
+  window.clamp = clamp;
+  window.ensureFullscreenZoomBaseSize = ensureFullscreenZoomBaseSize;
+  window.updateFullscreenScrollFromRatios = updateFullscreenScrollFromRatios;
+  window.applyFullscreenZoom = applyFullscreenZoom;
+  window.beginFullscreenPan = beginFullscreenPan;
+  window.updateFullscreenPanPosition = updateFullscreenPanPosition;
+  window.endFullscreenPan = endFullscreenPan;
+  window.getDistanceBetweenPoints = getDistanceBetweenPoints;
+  window.handleFullscreenPointerDown = handleFullscreenPointerDown;
+  window.handleFullscreenPointerMove = handleFullscreenPointerMove;
+  window.handleFullscreenPointerUp = handleFullscreenPointerUp;
+  window.onFullscreenReset = onFullscreenReset;
+  window.updateFullscreenPageStatus = updateFullscreenPageStatus;
+  window.updateFullscreenViewerCentering = updateFullscreenViewerCentering;
+  window.applyFullscreenFitMode = applyFullscreenFitMode;
+  window.showFullscreenPageJumpInput = showFullscreenPageJumpInput;
+  window.hideFullscreenPageJumpInput = hideFullscreenPageJumpInput;
+  window.commitFullscreenPageJump = commitFullscreenPageJump;
+  window.ViewerFullscreen = ViewerFullscreen;
+  window.applyLandscapeTransform = applyLandscapeTransform;
+  window.resetLandscapePan = resetLandscapePan;
+  window.initFullscreenNavigation = initFullscreenNavigation;
+}

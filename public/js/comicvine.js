@@ -1,5 +1,14 @@
+import {
+  state,
+  escapeHtml,
+  searchStatusDiv,
+  searchResultsUl,
+  searchForm,
+  searchQueryInput
+} from './globals.js';
+
 // --- ComicVine Search State & Elements ---
-const cvState = {
+export const cvState = {
   page: 1,
   limit: 20,      // results per page
   total: 0,
@@ -13,13 +22,26 @@ const cvPrevBtn   = document.getElementById('cv-prev');
 const cvNextBtn   = document.getElementById('cv-next');
 const cvPageInfo  = document.getElementById('cv-page-info');
 
+// Helper to call renderMetadataDisplay dynamically from either state or window
+function renderMetadataDisplay(metadata, clearForm = true) {
+  if (typeof state.renderMetadataDisplay === 'function') {
+    state.renderMetadataDisplay(metadata, clearForm);
+  } else if (typeof window.renderMetadataDisplay === 'function') {
+    window.renderMetadataDisplay(metadata, clearForm);
+  } else {
+    console.warn('renderMetadataDisplay not registered yet.');
+  }
+}
+
 // Performs the search and renders paged results with ISSUE/VOLUME badge + publisher + cover preview
-async function performCvSearch() {
+export async function performCvSearch() {
   // Disable search for local/device comics
-  const comic = window.currentComic;
+  const comic = state.currentComic || window.currentComic;
   const isLocal = comic && (comic.handle || comic.file || (comic.id && String(comic.id).startsWith('device-')));
   if (isLocal) {
-    searchStatusDiv.textContent = 'ComicVine search is only available for library comics.';
+    if (searchStatusDiv) {
+      searchStatusDiv.textContent = 'ComicVine search is only available for library comics.';
+    }
     return;
   }
 
@@ -30,8 +52,8 @@ async function performCvSearch() {
 
   if (!query) return;
 
-  searchStatusDiv.textContent = 'Searching...';
-  searchResultsUl.innerHTML = '';
+  if (searchStatusDiv) searchStatusDiv.textContent = 'Searching...';
+  if (searchResultsUl) searchResultsUl.innerHTML = '';
 
   const params = new URLSearchParams({
     query,
@@ -43,7 +65,7 @@ async function performCvSearch() {
   if (field === 'title') params.set('filter', `name:${query}`);
 
   try {
-    const response = await fetch(`${API_BASE_URL}/api/v1/search/comicvine?${params.toString()}`);
+    const response = await fetch(`${state.API_BASE_URL || ''}/api/v1/search/comicvine?${params.toString()}`);
     const payload  = await response.json();
     if (!response.ok) throw new Error(payload.message || 'Search failed');
 
@@ -56,10 +78,14 @@ async function performCvSearch() {
     // update pager text
     const first = (cvState.page - 1) * cvState.limit + 1;
     const last  = Math.min(cvState.page * cvState.limit, total);
-    searchStatusDiv.textContent = `${total} results found.`;
-    cvPageInfo.textContent = total
-      ? `Showing ${first}-${last} • Page ${cvState.page} of ${Math.max(1, Math.ceil(total / cvState.limit))}`
-      : 'No results';
+    if (searchStatusDiv) {
+      searchStatusDiv.textContent = `${total} results found.`;
+    }
+    if (cvPageInfo) {
+      cvPageInfo.textContent = total
+        ? `Showing ${first}-${last} • Page ${cvState.page} of ${Math.max(1, Math.ceil(total / cvState.limit))}`
+        : 'No results';
+    }
 
     // Enable/disable prev/next buttons
     if (cvPrevBtn) cvPrevBtn.disabled = cvState.page <= 1;
@@ -156,31 +182,37 @@ async function performCvSearch() {
         li.appendChild(issueList);
       }
 
-      searchResultsUl.appendChild(li);
+      if (searchResultsUl) {
+        searchResultsUl.appendChild(li);
+      }
     }
   } catch (err) {
-    
-    searchStatusDiv.textContent = `Search failed: ${err.message || err}`;
-    cvPageInfo.textContent = '';
+    if (searchStatusDiv) {
+      searchStatusDiv.textContent = `Search failed: ${err.message || err}`;
+    }
+    if (cvPageInfo) cvPageInfo.textContent = '';
     if (cvPrevBtn) cvPrevBtn.disabled = true;
     if (cvNextBtn) cvNextBtn.disabled = true;
   } 
-}// <-- closes performCvSearch() properly
-
+}
 
 // --- ComicVine Search Form Handler ---
-searchForm.addEventListener('submit', async (e) => {
-  e.preventDefault();
-  cvState.lastQuery     = searchQueryInput.value || '';
-  const fieldEl         = document.getElementById('cv-field');
-  const resourcesEl     = document.getElementById('cv-resources');
-  const sortEl          = document.getElementById('cv-sort');
-  cvState.lastField     = fieldEl?.value || 'all';
-  cvState.lastResources = resourcesEl?.value || 'volume';
-  cvState.lastSort      = sortEl?.value || '';
-  cvState.page          = 1;
-  await performCvSearch();
-});
+if (searchForm) {
+  searchForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    if (searchQueryInput) {
+      cvState.lastQuery = searchQueryInput.value || '';
+    }
+    const fieldEl         = document.getElementById('cv-field');
+    const resourcesEl     = document.getElementById('cv-resources');
+    const sortEl          = document.getElementById('cv-sort');
+    cvState.lastField     = fieldEl?.value || 'all';
+    cvState.lastResources = resourcesEl?.value || 'volume';
+    cvState.lastSort      = sortEl?.value || '';
+    cvState.page          = 1;
+    await performCvSearch();
+  });
+}
 
 // --- Pager Buttons ---
 cvPrevBtn?.addEventListener('click', async () => {
@@ -198,43 +230,41 @@ cvNextBtn?.addEventListener('click', async () => {
   }
 });
 
-async function applyMetadataFromSearch(volumeId) {
+export async function applyMetadataFromSearch(volumeId) {
   // Disable for local/device comics
-  const comic = window.currentComic;
+  const comic = state.currentComic || window.currentComic;
   const isLocal = comic && (comic.handle || comic.file || (comic.id && String(comic.id).startsWith('device-')));
   if (isLocal) return;
 
-  const prevStatus = searchStatusDiv.textContent;
-  searchStatusDiv.textContent = 'Fetching details...';
+  const prevStatus = searchStatusDiv ? searchStatusDiv.textContent : '';
+  if (searchStatusDiv) searchStatusDiv.textContent = 'Fetching details...';
   try {
-    const response = await fetch(`${API_BASE_URL}/api/v1/comicvine/volume/${volumeId}`);
+    const response = await fetch(`${state.API_BASE_URL || ''}/api/v1/comicvine/volume/${volumeId}`);
     if (!response.ok) throw new Error('Could not fetch details.');
     const detailedMetadata = await response.json();
     renderMetadataDisplay(detailedMetadata, true);
-    searchStatusDiv.textContent = prevStatus;
+    if (searchStatusDiv) searchStatusDiv.textContent = prevStatus;
   } catch (error) {
-    searchStatusDiv.textContent = `Error: ${error.message}`;
+    if (searchStatusDiv) searchStatusDiv.textContent = `Error: ${error.message}`;
   }
 }
 
 // Apply ISSUE metadata from ComicVine to the Edit form
-async function applyIssueMetadataFromSearch(issueId) {
+export async function applyIssueMetadataFromSearch(issueId) {
   // Disable for local/device comics
-  const comic = window.currentComic;
+  const comic = state.currentComic || window.currentComic;
   const isLocal = comic && (comic.handle || comic.file || (comic.id && String(comic.id).startsWith('device-')));
   if (isLocal) return;
 
-  const prevStatus = searchStatusDiv.textContent;
-  searchStatusDiv.textContent = 'Fetching issue details...';
+  const prevStatus = searchStatusDiv ? searchStatusDiv.textContent : '';
+  if (searchStatusDiv) searchStatusDiv.textContent = 'Fetching issue details...';
   try {
-    const response = await fetch(`${API_BASE_URL}/api/v1/comicvine/issue/${issueId}`);
+    const response = await fetch(`${state.API_BASE_URL || ''}/api/v1/comicvine/issue/${issueId}`);
     if (!response.ok) throw new Error('Could not fetch issue details.');
     const detailedMetadata = await response.json();
     renderMetadataDisplay(detailedMetadata, true);
-    searchStatusDiv.textContent = prevStatus;
+    if (searchStatusDiv) searchStatusDiv.textContent = prevStatus;
   } catch (error) {
-    searchStatusDiv.textContent = `Error: ${error.message}`;
+    if (searchStatusDiv) searchStatusDiv.textContent = `Error: ${error.message}`;
   }
 }
-
-

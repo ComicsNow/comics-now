@@ -1,110 +1,106 @@
-(function (global) {
-  'use strict';
+import { state } from '../../../globals.js';
 
-  let active = false;
-  let panelIndex = -1;
+state.GuidedView = state.GuidedView || {};
+if (typeof window !== 'undefined') {
+  window.GuidedView = window.GuidedView || {};
+}
 
-  const GuidedMode = {
-    async enable() {
-      if (!global.GuidedView.isFullscreenOpen()) return false;
-      const comic = global.currentComic;
-      if (!comic || comic.guidedViewStatus !== 'completed') return false;
-      const data = await global.GuidedView.loadGuidedView(comic.id);
-      if (!data) return false;
+let active = false;
+let panelIndex = -1;
 
-      active = true;
-      panelIndex = -1;
-      global.GuidedView.refreshRender();
-      this.updateUI();
-      return true;
-    },
+export const GuidedMode = {
+  async enable() {
+    if (!state.GuidedView.isFullscreenOpen()) return false;
+    const comic = state.currentComic || window.currentComic;
+    if (!comic || comic.guidedViewStatus !== 'completed') return false;
+    const data = await state.GuidedView.loadGuidedView(comic.id);
+    if (!data) return false;
 
-    disable() {
-      active = false;
-      panelIndex = -1;
-      global.GuidedView.refreshRender();
-      this.updateUI();
-    },
+    active = true;
+    panelIndex = -1;
+    state.GuidedView.refreshRender();
+    this.updateUI();
+    return true;
+  },
 
-    toggle() {
-      return global.GuidedView.ModeRegistry.toggle('guided');
-    },
+  disable() {
+    active = false;
+    panelIndex = -1;
+    state.GuidedView.refreshRender();
+    this.updateUI();
+  },
 
-    updateUI() {
-      global.GuidedView.updateToggleUI(active);
-    },
+  toggle() {
+    return state.GuidedView.ModeRegistry.toggle('guided');
+  },
 
-    isActive() {
-      return active;
-    },
+  updateUI() {
+    state.GuidedView.updateToggleUI(active);
+  },
 
-    getRenderState() {
-      if (!active) return { targetBox: null, isPanelZoom: false };
+  isActive() {
+    return active;
+  },
 
-      let targetBox = null;
-      let isPanelZoom = false;
+  getRenderState() {
+    if (!active) return { targetBox: null, isPanelZoom: false };
 
-      if (!global.GuidedView.isMangaComic()) {
-        const sequence = global.GuidedView.currentPagePanels();
-        if (panelIndex >= 0 && panelIndex < sequence.length) {
-          targetBox = sequence[panelIndex];
-        }
+    let targetBox = null;
+    let isPanelZoom = false;
+
+    if (!state.GuidedView.isMangaComic()) {
+      const sequence = state.GuidedView.currentPagePanels();
+      if (panelIndex >= 0 && panelIndex < sequence.length) {
+        targetBox = sequence[panelIndex];
       }
-      // For Manga, the target box is handled by applyTransform in refreshRender,
-      // but we still need to know if we are in a panel zoom state for some UI/overlay logic if needed.
-      // Actually, looking at index.js:
-      // if (needsMangaLayout) {
-      //   const panels = global.GuidedView.currentPagePanels();
-      //   const currentTarget = (panelIndex >= 0 && panelIndex < panels.length) ? panels[panelIndex] : null;
-      //   global.GuidedView.applyTransform(currentTarget, isManga);
-      // }
-      
-      return { targetBox, isPanelZoom };
-    },
+    }
+    // For Manga, the target box is handled by applyTransform in refreshRender,
+    // but we still need to know if we are in a panel zoom state for some UI/overlay logic if needed.
+    
+    return { targetBox, isPanelZoom };
+  },
 
-    getPanelIndex() {
-      return panelIndex;
-    },
+  getPanelIndex() {
+    return panelIndex;
+  },
 
-    tryAdvance(direction) {
-      if (!active) return false;
-      if (!global.GuidedView.isFullscreenOpen()) {
-        this.disable();
-        return false;
-      }
-
-      const panels = global.GuidedView.currentPagePanels();
-      if (panels.length === 0) return false;
-
-      if (direction > 0) {
-        if (panelIndex >= panels.length - 1) return false;
-        panelIndex += 1;
-        global.GuidedView.refreshRender();
-        return true;
-      }
-      if (direction < 0) {
-        if (panelIndex <= -1) return false;
-        panelIndex -= 1;
-        global.GuidedView.refreshRender();
-        return true;
-      }
-      return false;
-    },
-
-    onPageRendered() {
-      if (active) {
-        panelIndex = -1;
-      }
-    },
-
-    handleImageClick(nx, ny) {
-      // Navigation is owned by the dedicated side-nav hotspots
-      // (#fullscreen-nav-left / -right), which route through tryGuidedAdvance.
-      // Image clicks should not navigate — return false so the menu surfaces.
+  tryAdvance(direction) {
+    if (!active) return false;
+    if (!state.GuidedView.isFullscreenOpen()) {
+      this.disable();
       return false;
     }
-  };
 
-  global.GuidedView.ModeRegistry.register('guided', GuidedMode);
+    const panels = state.GuidedView.currentPagePanels();
+    if (panels.length === 0) return false;
 
-})(typeof window !== 'undefined' ? window : globalThis);
+    if (direction > 0) {
+      if (panelIndex >= panels.length - 1) return false;
+      panelIndex += 1;
+      state.GuidedView.refreshRender();
+      return true;
+    }
+    if (direction < 0) {
+      if (panelIndex <= -1) return false;
+      panelIndex -= 1;
+      state.GuidedView.refreshRender();
+      return true;
+    }
+    return false;
+  },
+
+  onPageRendered() {
+    if (active) {
+      panelIndex = -1;
+    }
+  },
+
+  handleImageClick(nx, ny) {
+    // Navigation is owned by the dedicated side-nav hotspots
+    // (#fullscreen-nav-left / -right), which route through tryGuidedAdvance.
+    // Image clicks should not navigate — return false so the menu surfaces.
+    return false;
+  }
+};
+
+state.GuidedView.ModeRegistry.register('guided', GuidedMode);

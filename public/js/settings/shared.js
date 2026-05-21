@@ -1,4 +1,6 @@
-const escapeHtmlValue = window.escapeHtml || function(value) {
+import { state } from '../globals.js';
+
+export const escapeHtmlValue = window.escapeHtml || function(value) {
   if (value === undefined || value === null) return '';
   return String(value)
     .replace(/&/g, '&amp;')
@@ -8,7 +10,7 @@ const escapeHtmlValue = window.escapeHtml || function(value) {
     .replace(/'/g, '&#39;');
 };
 
-function formatTimestamp(timestamp) {
+export function formatTimestamp(timestamp) {
   if (!timestamp) return 'Never';
   const date = new Date(timestamp);
   const now = new Date();
@@ -29,7 +31,7 @@ function formatTimestamp(timestamp) {
   });
 }
 
-function showSettingsMessage(message, type) {
+export function showSettingsMessage(message, type) {
   const statusDiv = document.getElementById('settings-status');
   if (statusDiv) {
     statusDiv.textContent = message;
@@ -38,4 +40,14 @@ function showSettingsMessage(message, type) {
       statusDiv.textContent = '';
     }, 3000);
   }
+}
+
+state.escapeHtmlValue = escapeHtmlValue;
+state.formatTimestamp = formatTimestamp;
+state.showSettingsMessage = showSettingsMessage;
+
+if (typeof window !== 'undefined') {
+  window.escapeHtmlValue = escapeHtmlValue;
+  window.formatTimestamp = formatTimestamp;
+  window.showSettingsMessage = showSettingsMessage;
 }

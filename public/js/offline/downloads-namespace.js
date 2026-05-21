@@ -1,53 +1,52 @@
-(function (global) {
-  'use strict';
+import { state } from '../globals.js';
+import { fetchWithProgress, refreshDownloadsInfo } from './download-progress.js';
+import { downloadComic, downloadSeries, downloadReadingList } from './download-actions.js';
+import { downloadManager, renderDownloadQueue } from './downloads.js';
 
-  /**
-   * Rebuilds and exposes the OfflineDownloads namespace from globally available functions.
-   * This file must load after all other download-*.js files.
-   */
-
-  const downloadManager = global.downloadManager;
-
-  const OfflineDownloads = {
-    renderDownloadQueue: global.renderDownloadQueue,
-    fetchWithProgress: global.fetchWithProgress,
-    refreshDownloadsInfo: global.refreshDownloadsInfo,
-    downloadComic: global.downloadComic,
-    downloadSeries: global.downloadSeries,
-    downloadReadingList: global.downloadReadingList,
-    downloadManager: global.downloadManager,
-    initializeDownloadQueue: async () => {
-      if (!downloadManager) {
-        console.error('[OFFLINE DOWNLOADS] Cannot initialize: downloadManager not found');
-        return;
-      }
-      await downloadManager.loadQueue();
-      // If items exist in queue, resume processing
-      if (downloadManager.persistentQueue.length > 0) {
-        if (downloadManager.useServiceWorker) {
-          await downloadManager.registerBackgroundSync();
-          // Explicitly trigger SW to resume
-          if (navigator.serviceWorker && navigator.serviceWorker.controller) {
-            navigator.serviceWorker.controller.postMessage({ type: 'start-downloads' });
-          }
-        } else {
-          downloadManager.processQueue();
+export const OfflineDownloads = {
+  renderDownloadQueue,
+  fetchWithProgress,
+  refreshDownloadsInfo,
+  downloadComic,
+  downloadSeries,
+  downloadReadingList,
+  downloadManager,
+  initializeDownloadQueue: async () => {
+    if (!downloadManager) {
+      console.error('[OFFLINE DOWNLOADS] Cannot initialize: downloadManager not found');
+      return;
+    }
+    await downloadManager.loadQueue();
+    // If items exist in queue, resume processing
+    if (downloadManager.persistentQueue.length > 0) {
+      if (downloadManager.useServiceWorker) {
+        await downloadManager.registerBackgroundSync();
+        // Explicitly trigger SW to resume
+        if (navigator.serviceWorker && navigator.serviceWorker.controller) {
+          navigator.serviceWorker.controller.postMessage({ type: 'start-downloads' });
         }
+      } else {
+        downloadManager.processQueue();
       }
-    },
-    cancelDownload: (comicId) => downloadManager ? downloadManager.cancelDownload(comicId) : null,
-    restartDownload: (comicId) => downloadManager ? downloadManager.restartDownload(comicId) : null,
-    pauseDownload: (comicId) => downloadManager ? downloadManager.pauseDownload(comicId) : null,
-    resumeDownload: (comicId) => downloadManager ? downloadManager.resumeDownload(comicId) : null,
-    clearCompletedDownloads: () => downloadManager ? downloadManager.clearCompleted() : null,
-    deleteOfflineComic: (comicId) => {
-      const db = global.OfflineDB || {};
-      const fn = db.deleteOfflineComic || global.deleteOfflineComic;
-      return fn ? fn(comicId) : null;
-    },
-  };
+    }
+  },
+  cancelDownload: (comicId) => downloadManager ? downloadManager.cancelDownload(comicId) : null,
+  restartDownload: (comicId) => downloadManager ? downloadManager.restartDownload(comicId) : null,
+  pauseDownload: (comicId) => downloadManager ? downloadManager.pauseDownload(comicId) : null,
+  resumeDownload: (comicId) => downloadManager ? downloadManager.resumeDownload(comicId) : null,
+  clearCompletedDownloads: () => downloadManager ? downloadManager.clearCompleted() : null,
+  deleteOfflineComic: (comicId) => {
+    const db = state.OfflineDB || window.OfflineDB || {};
+    const fn = db.deleteOfflineComic || state.deleteOfflineComic || window.deleteOfflineComic;
+    return fn ? fn(comicId) : null;
+  },
+};
 
-  global.OfflineDownloads = OfflineDownloads;
-  Object.assign(global, OfflineDownloads);
+// Expose on state & window for transitional compatibility
+state.OfflineDownloads = OfflineDownloads;
+Object.assign(state, OfflineDownloads);
 
-})(typeof window !== 'undefined' ? window : globalThis);
+if (typeof window !== 'undefined') {
+  window.OfflineDownloads = OfflineDownloads;
+  Object.assign(window, OfflineDownloads);
+}

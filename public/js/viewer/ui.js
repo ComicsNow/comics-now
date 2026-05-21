@@ -1,5 +1,24 @@
-(function (global) {
-  'use strict';
+import { state } from '../globals.js';
+
+const global = new Proxy(typeof window !== 'undefined' ? window : globalThis, {
+  get(target, prop) {
+    if (prop in state) {
+      return state[prop];
+    }
+    const val = target[prop];
+    if (typeof val === 'function') {
+      return val.bind(target);
+    }
+    return val;
+  },
+  set(target, prop, value) {
+    state[prop] = value;
+    try {
+      target[prop] = value;
+    } catch (e) {}
+    return true;
+  }
+});
 
   function getViewerPages() {
     if (!global.viewerPagesDiv) return [];
@@ -191,4 +210,28 @@
 
   global.ViewerUI = ViewerUI;
   Object.assign(global, ViewerUI);
-})(typeof window !== 'undefined' ? window : globalThis);
+
+export {
+  getViewerPages,
+  getPageCounterTotal,
+  updateFullscreenPageStatusProxy,
+  updateViewerPageCounter,
+  updateNavigationButtons,
+  ViewerUI
+};
+
+state.getViewerPages = getViewerPages;
+state.getPageCounterTotal = getPageCounterTotal;
+state.updateFullscreenPageStatusProxy = updateFullscreenPageStatusProxy;
+state.updateViewerPageCounter = updateViewerPageCounter;
+state.updateNavigationButtons = updateNavigationButtons;
+state.ViewerUI = ViewerUI;
+
+if (typeof window !== 'undefined') {
+  window.getViewerPages = getViewerPages;
+  window.getPageCounterTotal = getPageCounterTotal;
+  window.updateFullscreenPageStatusProxy = updateFullscreenPageStatusProxy;
+  window.updateViewerPageCounter = updateViewerPageCounter;
+  window.updateNavigationButtons = updateNavigationButtons;
+  window.ViewerUI = ViewerUI;
+}

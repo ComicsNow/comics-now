@@ -1,36 +1,77 @@
+import {
+  state,
+  getRelativePath,
+  settingsModal,
+  settingsTabDevices,
+  settingsForm,
+  scanIntervalInput,
+  apiKeyInput,
+  settingsStatusDiv,
+  scanButton,
+  fullScanButton,
+  logsContainer
+} from './globals.js';
+
+import { triggerScan } from './events.js';
+
+const global = new Proxy(typeof window !== 'undefined' ? window : globalThis, {
+  get(target, prop) {
+    if (prop in state) {
+      return state[prop];
+    }
+    const val = target[prop];
+    if (typeof val === 'function') {
+      return val.bind(target);
+    }
+    return val;
+  },
+  set(target, prop, value) {
+    state[prop] = value;
+    try {
+      target[prop] = value;
+    } catch (e) {}
+    return true;
+  }
+});
+
 // --- SETTINGS & LOGS ---
 function openSettingsModal() {
   // Always ensure admin UI is hidden for non-admins when opening settings
-  if (typeof window.hideAdminUI === 'function') {
-    window.hideAdminUI();
+  if (typeof global.hideAdminUI === 'function') {
+    global.hideAdminUI();
   }
 
-  if (!window._isNavigatingFromRouter && window.router) {
+  if (!global._isNavigatingFromRouter && global.router) {
     if (!getRelativePath().startsWith('/settings')) {
-      window.router.navigate('/settings', true);
+      global.router.navigate('/settings', true);
     }
   }
   settingsModal.classList.remove('hidden');
   fetchSettings();
   refreshLibraryFolders();
   if (settingsTabDevices && settingsTabDevices.classList.contains('active')) {
-    refreshDeviceList();
+    if (typeof global.refreshDeviceList === 'function') {
+      global.refreshDeviceList();
+    }
   }
   // If the Guided Reader tab is the active one when re-opening settings,
   // re-arm its live polling/SSE — closeSettingsModal tears it down.
   const guidedPane = document.getElementById('settings-content-guided-reader');
   if (guidedPane && !guidedPane.classList.contains('hidden')
-      && typeof window.openGuidedReaderTab === 'function') {
-    window.openGuidedReaderTab();
+      && typeof global.openGuidedReaderTab === 'function') {
+    global.openGuidedReaderTab();
   }
 }
 
 function closeSettingsModal() {
   settingsModal.classList.add('hidden');
-  if (logInterval) clearInterval(logInterval);
-  if (window.router && getRelativePath().startsWith('/settings')) {
-    const path = window.getPathForCurrentView ? window.getPathForCurrentView() : '/';
-    window.router.navigate(path, true);
+  if (global.logInterval) {
+    clearInterval(global.logInterval);
+    global.logInterval = null;
+  }
+  if (global.router && getRelativePath().startsWith('/settings')) {
+    const path = global.getPathForCurrentView ? global.getPathForCurrentView() : '/';
+    global.router.navigate(path, true);
   }
 }
 
@@ -38,7 +79,7 @@ let initialMetadataStorage = 'archive';
 
 async function fetchSettings() {
   try {
-    const response = await fetch(`${API_BASE_URL}/api/v1/settings`);
+    const response = await fetch(`${global.API_BASE_URL}/api/v1/settings`);
     const data = await response.json();
     if (scanIntervalInput) {
       scanIntervalInput.value = data.scanInterval || 5;
@@ -88,7 +129,7 @@ async function refreshLibraryFolders() {
   if (!list) return;
 
   try {
-    const res = await fetch(`${API_BASE_URL}/api/v1/admin/libraries`);
+    const res = await fetch(`${global.API_BASE_URL}/api/v1/admin/libraries`);
 
     if (res.status === 403) {
       if (adminSection) adminSection.classList.add('hidden');
@@ -102,12 +143,12 @@ async function refreshLibraryFolders() {
 
     // Update global state so the main UI knows about these folders
     if (Array.isArray(data.libraries)) {
-      window.configuredRootFolders = data.libraries.map((lib, index) => `lib_${index}`);
-      window.LIBRARY_NAMES = window.LIBRARY_NAMES || {};
+      global.configuredRootFolders = data.libraries.map((lib, index) => `lib_${index}`);
+      global.LIBRARY_NAMES = global.LIBRARY_NAMES || {};
       data.libraries.forEach((lib, index) => {
         const id = `lib_${index}`;
         const name = lib.path.split(/[\\\/]/).filter(Boolean).pop() || `Library ${index + 1}`;
-        window.LIBRARY_NAMES[id] = name;
+        global.LIBRARY_NAMES[id] = name;
       });
     }
 
@@ -143,7 +184,7 @@ async function refreshLibraryFolders() {
 
 async function removeLibraryFolder(path) {
   try {
-    const res = await fetch(`${API_BASE_URL}/api/v1/admin/libraries`, {
+    const res = await fetch(`${global.API_BASE_URL}/api/v1/admin/libraries`, {
       method: 'DELETE',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ path })
@@ -152,14 +193,18 @@ async function removeLibraryFolder(path) {
     if (!res.ok) throw new Error(data.message || 'Failed to remove library');
 
     await refreshLibraryFolders();
-    if (typeof fetchLibraryFromServer === 'function') {
-        await fetchLibraryFromServer();
-    } else if (typeof fetchLibrary === 'function') {
-        await fetchLibrary();
+    if (typeof global.fetchLibraryFromServer === 'function') {
+      await global.fetchLibraryFromServer();
+    } else if (typeof global.fetchLibrary === 'function') {
+      await global.fetchLibrary();
     }
-    showSettingsMessage('Library removed successfully', 'success');
+    if (typeof global.showSettingsMessage === 'function') {
+      global.showSettingsMessage('Library removed successfully', 'success');
+    }
   } catch (err) {
-    showSettingsMessage(`Error: ${err.message}`, 'error');
+    if (typeof global.showSettingsMessage === 'function') {
+      global.showSettingsMessage(`Error: ${err.message}`, 'error');
+    }
   }
 }
 
@@ -176,7 +221,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
       try {
         addBtn.disabled = true;
-        const res = await fetch(`${API_BASE_URL}/api/v1/admin/libraries`, {
+        const res = await fetch(`${global.API_BASE_URL}/api/v1/admin/libraries`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ path, hierarchyMode: mode })
@@ -186,19 +231,25 @@ document.addEventListener('DOMContentLoaded', () => {
 
         pathInput.value = '';
         await refreshLibraryFolders();
-        if (typeof fetchLibraryFromServer === 'function') {
-            await fetchLibraryFromServer();
-        } else if (typeof fetchLibrary === 'function') {
-            await fetchLibrary();
+        if (typeof global.fetchLibraryFromServer === 'function') {
+          await global.fetchLibraryFromServer();
+        } else if (typeof global.fetchLibrary === 'function') {
+          await global.fetchLibrary();
         }
-        showSettingsMessage('Library added successfully', 'success');      } catch (err) {
-        showSettingsMessage(`Error: ${err.message}`, 'error');
+        if (typeof global.showSettingsMessage === 'function') {
+          global.showSettingsMessage('Library added successfully', 'success');
+        }
+      } catch (err) {
+        if (typeof global.showSettingsMessage === 'function') {
+          global.showSettingsMessage(`Error: ${err.message}`, 'error');
+        }
       } finally {
         addBtn.disabled = false;
       }
     });
   }
 });
+
 if (settingsForm) {
   settingsForm.addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -210,7 +261,7 @@ if (settingsForm) {
     const metadataStorage = document.getElementById('metadata-storage-select')?.value || 'archive';
 
     try {
-      const res = await fetch(`${API_BASE_URL}/api/v1/settings`, {
+      const res = await fetch(`${global.API_BASE_URL}/api/v1/settings`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ interval, apiKey, allowedFormats, metadataStorage })
@@ -222,11 +273,19 @@ if (settingsForm) {
       }
 
       if (settingsStatusDiv) {
-        showSettingsMessage('Settings saved!', 'success');
+        if (typeof global.showSettingsMessage === 'function') {
+          global.showSettingsMessage('Settings saved!', 'success');
+        }
       }
-      fetchLibrary(); // Refresh library after saving settings
+      if (typeof global.fetchLibrary === 'function') {
+        global.fetchLibrary(); // Refresh library after saving settings
+      }
     } catch (error) {
-      if (settingsStatusDiv) showSettingsMessage(`Error: ${error.message}`, 'error');
+      if (settingsStatusDiv) {
+        if (typeof global.showSettingsMessage === 'function') {
+          global.showSettingsMessage(`Error: ${error.message}`, 'error');
+        }
+      }
     }
   });
 }
@@ -237,14 +296,20 @@ if (scanButton) {
     scanButton.disabled = true;
     try {
       await triggerScan();
-      showSettingsMessage('Scan initiated successfully.', 'success');
+      if (typeof global.showSettingsMessage === 'function') {
+        global.showSettingsMessage('Scan initiated successfully.', 'success');
+      }
     } catch (e) {
-      showSettingsMessage('Failed to start scan.', 'error');
+      if (typeof global.showSettingsMessage === 'function') {
+        global.showSettingsMessage('Failed to start scan.', 'error');
+      }
     } finally {
       setTimeout(async () => {
         scanButton.textContent = 'Scan Now';
         scanButton.disabled = false;
-        await fetchLibrary();
+        if (typeof global.fetchLibrary === 'function') {
+          await global.fetchLibrary();
+        }
       }, 3000);
     }
   });
@@ -256,14 +321,20 @@ if (fullScanButton) {
     fullScanButton.disabled = true;
     try {
       await triggerScan(null, true);
-      showSettingsMessage('Full scan initiated successfully.', 'success');
+      if (typeof global.showSettingsMessage === 'function') {
+        global.showSettingsMessage('Full scan initiated successfully.', 'success');
+      }
     } catch (e) {
-      showSettingsMessage('Failed to start full scan.', 'error');
+      if (typeof global.showSettingsMessage === 'function') {
+        global.showSettingsMessage('Failed to start full scan.', 'error');
+      }
     } finally {
       setTimeout(async () => {
         fullScanButton.textContent = 'Full Scan';
         fullScanButton.disabled = false;
-        await fetchLibrary();
+        if (typeof global.fetchLibrary === 'function') {
+          await global.fetchLibrary();
+        }
       }, 3000);
     }
   });
@@ -277,7 +348,7 @@ async function fetchLogs() {
   const level = levelFilter.value;
   const category = categoryFilter.value;
   try {
-    const res = await fetch(`${API_BASE_URL}/api/v1/logs?level=${level}&category=${category}`);
+    const res = await fetch(`${global.API_BASE_URL}/api/v1/logs?level=${level}&category=${category}`);
     if (!res.ok) throw new Error('Server returned an error');
     const logs = await res.json();
     logsContainer.innerHTML = logs.reverse().map(log =>
@@ -288,6 +359,27 @@ async function fetchLogs() {
   }
 }
 
+export {
+  openSettingsModal,
+  closeSettingsModal,
+  fetchSettings,
+  refreshLibraryFolders,
+  removeLibraryFolder,
+  fetchLogs
+};
 
+state.openSettingsModal = openSettingsModal;
+state.closeSettingsModal = closeSettingsModal;
+state.fetchSettings = fetchSettings;
+state.refreshLibraryFolders = refreshLibraryFolders;
+state.removeLibraryFolder = removeLibraryFolder;
+state.fetchLogs = fetchLogs;
 
-
+if (typeof window !== 'undefined') {
+  window.openSettingsModal = openSettingsModal;
+  window.closeSettingsModal = closeSettingsModal;
+  window.fetchSettings = fetchSettings;
+  window.refreshLibraryFolders = refreshLibraryFolders;
+  window.removeLibraryFolder = removeLibraryFolder;
+  window.fetchLogs = fetchLogs;
+}

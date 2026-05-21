@@ -1,90 +1,92 @@
-(function (global) {
-  'use strict';
+import { state } from '../../../globals.js';
 
-  let active = false;
-  let hotZoomIndex = -1;
+state.GuidedView = state.GuidedView || {};
+if (typeof window !== 'undefined') {
+  window.GuidedView = window.GuidedView || {};
+}
 
-  const WesternSpeechZoomMode = {
-    async enable() {
-      if (!global.GuidedView.isFullscreenOpen()) return false;
-      const comic = global.currentComic;
-      if (!comic || comic.guidedViewStatus !== 'completed' || !!comic.mangaMode) return false;
-      const data = await global.GuidedView.loadGuidedView(comic.id);
-      if (!data) return false;
+let active = false;
+let hotZoomIndex = -1;
 
-      active = true;
-      hotZoomIndex = -1;
-      global.GuidedView.refreshRender();
-      this.updateUI();
-      return true;
-    },
+export const WesternSpeechZoomMode = {
+  async enable() {
+    if (!state.GuidedView.isFullscreenOpen()) return false;
+    const comic = state.currentComic || window.currentComic;
+    if (!comic || comic.guidedViewStatus !== 'completed' || !!comic.mangaMode) return false;
+    const data = await state.GuidedView.loadGuidedView(comic.id);
+    if (!data) return false;
 
-    disable() {
-      active = false;
-      hotZoomIndex = -1;
-      global.GuidedView.refreshRender();
-      this.updateUI();
-    },
+    active = true;
+    hotZoomIndex = -1;
+    state.GuidedView.refreshRender();
+    this.updateUI();
+    return true;
+  },
 
-    toggle() {
-      return global.GuidedView.ModeRegistry.toggle('western-speech-zoom');
-    },
+  disable() {
+    active = false;
+    hotZoomIndex = -1;
+    state.GuidedView.refreshRender();
+    this.updateUI();
+  },
 
-    updateUI() {
-      global.GuidedView.updateWesternSpeechZoomUI(active);
-    },
+  toggle() {
+    return state.GuidedView.ModeRegistry.toggle('western-speech-zoom');
+  },
 
-    isActive() {
-      return active;
-    },
+  updateUI() {
+    state.GuidedView.updateWesternSpeechZoomUI(active);
+  },
 
-    getRenderState() {
-      if (!active) return { targetBox: null, isPanelZoom: false };
+  isActive() {
+    return active;
+  },
 
-      const bubbles = global.GuidedView.currentPageBubbles();
-      let targetBox = null;
-      if (hotZoomIndex >= 0 && hotZoomIndex < bubbles.length) {
-        targetBox = bubbles[hotZoomIndex];
-      }
+  getRenderState() {
+    if (!active) return { targetBox: null, isPanelZoom: false };
 
-      return { targetBox, isPanelZoom: false };
-    },
-
-    tryAdvance(direction) {
-      return false;
-    },
-
-    onPageRendered() {
-      if (active) {
-        hotZoomIndex = -1;
-      }
-    },
-
-    handleImageClick(nx, ny) {
-      if (!active) return false;
-
-      const bubbles = global.GuidedView.currentPageBubbles();
-      let bestIndex = -1, minArea = Infinity;
-      for (let i = 0; i < bubbles.length; i++) {
-        const [bx, by, bw, bh] = bubbles[i];
-        if (nx >= bx && nx <= bx + bw && ny >= by && ny <= by + bh) {
-          const area = bw * bh;
-          if (area < minArea) { minArea = area; bestIndex = i; }
-        }
-      }
-      if (bestIndex !== -1) {
-        hotZoomIndex = (hotZoomIndex === bestIndex) ? -1 : bestIndex;
-        global.GuidedView.refreshRender();
-        return true;
-      } else if (hotZoomIndex !== -1) {
-        hotZoomIndex = -1;
-        global.GuidedView.refreshRender();
-        return true;
-      }
-      return false;
+    const bubbles = state.GuidedView.currentPageBubbles();
+    let targetBox = null;
+    if (hotZoomIndex >= 0 && hotZoomIndex < bubbles.length) {
+      targetBox = bubbles[hotZoomIndex];
     }
-  };
 
-  global.GuidedView.ModeRegistry.register('western-speech-zoom', WesternSpeechZoomMode);
+    return { targetBox, isPanelZoom: false };
+  },
 
-})(typeof window !== 'undefined' ? window : globalThis);
+  tryAdvance(direction) {
+    return false;
+  },
+
+  onPageRendered() {
+    if (active) {
+      hotZoomIndex = -1;
+    }
+  },
+
+  handleImageClick(nx, ny) {
+    if (!active) return false;
+
+    const bubbles = state.GuidedView.currentPageBubbles();
+    let bestIndex = -1, minArea = Infinity;
+    for (let i = 0; i < bubbles.length; i++) {
+      const [bx, by, bw, bh] = bubbles[i];
+      if (nx >= bx && nx <= bx + bw && ny >= by && ny <= by + bh) {
+        const area = bw * bh;
+        if (area < minArea) { minArea = area; bestIndex = i; }
+      }
+    }
+    if (bestIndex !== -1) {
+      hotZoomIndex = (hotZoomIndex === bestIndex) ? -1 : bestIndex;
+      state.GuidedView.refreshRender();
+      return true;
+    } else if (hotZoomIndex !== -1) {
+      hotZoomIndex = -1;
+      state.GuidedView.refreshRender();
+      return true;
+    }
+    return false;
+  }
+};
+
+state.GuidedView.ModeRegistry.register('western-speech-zoom', WesternSpeechZoomMode);

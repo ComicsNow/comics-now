@@ -1,59 +1,56 @@
-(function (global) {
-  'use strict';
+import { state } from '../globals.js';
+import { positionContextMenu, attachCloseHandler, closeContextMenu } from './menu-builder.js';
+import {
+  createDownloadItem,
+  createBulkReadItem,
+  createMangaToggleItem,
+  createContinuousToggleItem,
+  createGuidedDetectionItem,
+  createReadingListItem
+} from './actions-shared.js';
 
-  // Get references from already-loaded modules
-  const { positionContextMenu, attachCloseHandler, closeContextMenu } = global.ContextMenuBuilder;
+/**
+ * Create and show context menu for series cards
+ */
+function showSeriesContextMenu(event, seriesData) {
+  event.preventDefault();
+  event.stopPropagation();
+  closeContextMenu();
 
-  // Destructure shared factories from global (provided by actions-shared.js)
-  const {
-    createDownloadItem,
-    createBulkReadItem,
-    createMangaToggleItem,
-    createContinuousToggleItem,
-    createGuidedDetectionItem,
-    createReadingListItem
-  } = global;
+  const menu = document.createElement('div');
+  menu.className = 'comic-context-menu';
 
-  /**
-   * Create and show context menu for series cards
-   */
-  function showSeriesContextMenu(event, seriesData) {
-    event.preventDefault();
-    event.stopPropagation();
-    closeContextMenu();
+  const { seriesName, comicsInSeries, rootFolder, publisher } = seriesData;
 
-    const menu = document.createElement('div');
-    menu.className = 'comic-context-menu';
+  // 0. Bulk Read
+  const bulkItem = createBulkReadItem(comicsInSeries, `series "${seriesName}"`);
+  if (bulkItem) menu.appendChild(bulkItem);
 
-    const { seriesName, comicsInSeries, rootFolder, publisher } = seriesData;
+  // 1. Download (mobile only)
 
-    // 0. Bulk Read
-    const bulkItem = createBulkReadItem(comicsInSeries, `series "${seriesName}"`);
-    if (bulkItem) menu.appendChild(bulkItem);
+  // 3. Manga Mode
+  const mangaItem = createMangaToggleItem(comicsInSeries, 'Series');
+  if (mangaItem) menu.appendChild(mangaItem);
 
-    // 1. Download (mobile only)
+  // 4. Continuous Mode
+  const continuousItem = createContinuousToggleItem(comicsInSeries, 'Series');
+  if (continuousItem) menu.appendChild(continuousItem);
 
-    // 3. Manga Mode
-    const mangaItem = createMangaToggleItem(comicsInSeries, 'Series');
-    if (mangaItem) menu.appendChild(mangaItem);
+  // 5. Guided Detection
+  const guidedItem = createGuidedDetectionItem('series', seriesName, `series '${seriesName}'`, comicsInSeries);
+  if (guidedItem) menu.appendChild(guidedItem);
 
-    // 4. Continuous Mode
-    const continuousItem = createContinuousToggleItem(comicsInSeries, 'Series');
-    if (continuousItem) menu.appendChild(continuousItem);
+  // 6. Reading List
+  const readingItem = createReadingListItem(comicsInSeries);
+  if (readingItem) menu.appendChild(readingItem);
 
-    // 5. Guided Detection
-    const guidedItem = createGuidedDetectionItem('series', seriesName, `series '${seriesName}'`, comicsInSeries);
-    if (guidedItem) menu.appendChild(guidedItem);
+  positionContextMenu(menu, event);
+  attachCloseHandler(menu);
+}
 
-    // 6. Reading List
-    const readingItem = createReadingListItem(comicsInSeries);
-    if (readingItem) menu.appendChild(readingItem);
-
-    positionContextMenu(menu, event);
-    attachCloseHandler(menu);
-  }
-
-  // Expose function to global scope
-  global.showSeriesContextMenu = showSeriesContextMenu;
-
-})(typeof window !== 'undefined' ? window : globalThis);
+// Expose function to global scope
+export { showSeriesContextMenu };
+state.showSeriesContextMenu = showSeriesContextMenu;
+if (typeof window !== 'undefined') {
+  window.showSeriesContextMenu = showSeriesContextMenu;
+}

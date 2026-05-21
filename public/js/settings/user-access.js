@@ -1,9 +1,11 @@
+import { state, escapeHtml } from '../globals.js';
+
 // --- USER LIBRARY ACCESS MANAGEMENT ---
 let currentAccessUser = null;
 let libraryTreeData = null;
 let userAccessData = null;
 
-async function showUserAccessView(userId, userEmail, userRole) {
+export async function showUserAccessView(userId, userEmail, userRole) {
   if (userRole === 'admin') {
     alert('Admin users have full access to all libraries automatically.');
     return;
@@ -12,8 +14,15 @@ async function showUserAccessView(userId, userEmail, userRole) {
   currentAccessUser = { userId, userEmail, userRole };
 
   // Hide users list, show access view
-  usersListDiv.classList.add('hidden');
-  setUsersStatus('', 'info', false);
+  const usersListDiv = state.usersListDiv || window.usersListDiv;
+  const setUsersStatus = state.setUsersStatus || window.setUsersStatus;
+
+  if (usersListDiv) {
+    usersListDiv.classList.add('hidden');
+  }
+  if (typeof setUsersStatus === 'function') {
+    setUsersStatus('', 'info', false);
+  }
 
   // Create access view UI
   const accessView = document.createElement('div');
@@ -129,7 +138,9 @@ async function showUserAccessView(userId, userEmail, userRole) {
     </div>
   `;
 
-  usersListDiv.parentElement.appendChild(accessView);
+  if (usersListDiv && usersListDiv.parentElement) {
+    usersListDiv.parentElement.appendChild(accessView);
+  }
 
   // Add event listeners
   document.getElementById('back-to-users-btn').addEventListener('click', hideUserAccessView);
@@ -161,18 +172,21 @@ async function showUserAccessView(userId, userEmail, userRole) {
   await loadLibraryTreeAndUserAccess(userId);
 }
 
-function hideUserAccessView() {
+export function hideUserAccessView() {
   const accessView = document.getElementById('user-access-view');
   if (accessView) {
     accessView.remove();
   }
-  usersListDiv.classList.remove('hidden');
+  const usersListDiv = state.usersListDiv || window.usersListDiv;
+  if (usersListDiv) {
+    usersListDiv.classList.remove('hidden');
+  }
   currentAccessUser = null;
   libraryTreeData = null;
   userAccessData = null;
 }
 
-async function loadLibraryTreeAndUserAccess(userId) {
+export async function loadLibraryTreeAndUserAccess(userId) {
   const statusDiv = document.getElementById('access-status');
   const treeContainer = document.getElementById('access-tree-container');
 
@@ -180,9 +194,10 @@ async function loadLibraryTreeAndUserAccess(userId) {
     statusDiv.textContent = 'Loading library structure and user access...';
 
     // Load library tree and user access in parallel
+    const apiBaseUrl = state.API_BASE_URL || window.API_BASE_URL || '';
     const [treeResponse, accessResponse] = await Promise.all([
-      fetch(`${API_BASE_URL}/api/v1/library-tree`),
-      fetch(`${API_BASE_URL}/api/v1/users/${userId}/access`)
+      fetch(`${apiBaseUrl}/api/v1/library-tree`),
+      fetch(`${apiBaseUrl}/api/v1/users/${userId}/access`)
     ]);
 
     const treeData = await treeResponse.json();
@@ -220,7 +235,7 @@ async function loadLibraryTreeAndUserAccess(userId) {
   }
 }
 
-function renderLibraryAccessTree(tree, accessMap, container) {
+export function renderLibraryAccessTree(tree, accessMap, container) {
   container.innerHTML = '';
 
   const rootFolders = Object.keys(tree).sort();
@@ -238,7 +253,7 @@ function renderLibraryAccessTree(tree, accessMap, container) {
   });
 }
 
-function bubbleUncheck(nodeDiv) {
+export function bubbleUncheck(nodeDiv) {
   if (!nodeDiv) return;
   const parentNode = nodeDiv.parentElement.closest('.border');
   if (parentNode) {
@@ -250,7 +265,7 @@ function bubbleUncheck(nodeDiv) {
   }
 }
 
-function createTreeNode(type, value, children, accessMap, parentNodeDiv, hasParentChildAccess = false) {
+export function createTreeNode(type, value, children, accessMap, parentNodeDiv, hasParentChildAccess = false) {
   const key = `${type}:${value}`;
   const access = accessMap.get(key) || { direct: false, child: false };
   const hasChildren = children && ((Array.isArray(children) && children.length > 0) || (typeof children === 'object' && Object.keys(children).length > 0));
@@ -488,7 +503,7 @@ function createTreeNode(type, value, children, accessMap, parentNodeDiv, hasPare
   return nodeDiv;
 }
 
-function toggleAllAccess(selectAll) {
+export function toggleAllAccess(selectAll) {
   const treeContainer = document.getElementById('access-tree-container');
   if (!treeContainer) return;
 
@@ -497,7 +512,7 @@ function toggleAllAccess(selectAll) {
   });
 }
 
-async function saveUserAccess() {
+export async function saveUserAccess() {
   const statusDiv = document.getElementById('access-status');
   const saveBtn = document.getElementById('save-access-btn');
 
@@ -551,7 +566,8 @@ async function saveUserAccess() {
       item.direct_access || item.child_access
     );
 
-    const response = await fetch(`${API_BASE_URL}/api/v1/users/${currentAccessUser.userId}/access`, {
+    const apiBaseUrl = state.API_BASE_URL || window.API_BASE_URL || '';
+    const response = await fetch(`${apiBaseUrl}/api/v1/users/${currentAccessUser.userId}/access`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ access })
@@ -568,7 +584,10 @@ async function saveUserAccess() {
 
     setTimeout(() => {
       hideUserAccessView();
-      refreshUsersList();
+      const refreshUsersList = state.refreshUsersList || window.refreshUsersList;
+      if (typeof refreshUsersList === 'function') {
+        refreshUsersList();
+      }
     }, 1500);
 
   } catch (error) {
@@ -577,4 +596,24 @@ async function saveUserAccess() {
     saveBtn.disabled = false;
     saveBtn.textContent = 'Save Access';
   }
+}
+
+state.showUserAccessView = showUserAccessView;
+state.hideUserAccessView = hideUserAccessView;
+state.loadLibraryTreeAndUserAccess = loadLibraryTreeAndUserAccess;
+state.renderLibraryAccessTree = renderLibraryAccessTree;
+state.bubbleUncheck = bubbleUncheck;
+state.createTreeNode = createTreeNode;
+state.toggleAllAccess = toggleAllAccess;
+state.saveUserAccess = saveUserAccess;
+
+if (typeof window !== 'undefined') {
+  window.showUserAccessView = showUserAccessView;
+  window.hideUserAccessView = hideUserAccessView;
+  window.loadLibraryTreeAndUserAccess = loadLibraryTreeAndUserAccess;
+  window.renderLibraryAccessTree = renderLibraryAccessTree;
+  window.bubbleUncheck = bubbleUncheck;
+  window.createTreeNode = createTreeNode;
+  window.toggleAllAccess = toggleAllAccess;
+  window.saveUserAccess = saveUserAccess;
 }

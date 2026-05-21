@@ -1,5 +1,24 @@
-(function (global) {
-  'use strict';
+import { state } from '../globals.js';
+
+const global = new Proxy(typeof window !== 'undefined' ? window : globalThis, {
+  get(target, prop) {
+    if (prop in state) {
+      return state[prop];
+    }
+    const val = target[prop];
+    if (typeof val === 'function') {
+      return val.bind(target);
+    }
+    return val;
+  },
+  set(target, prop, value) {
+    state[prop] = value;
+    try {
+      target[prop] = value;
+    } catch (e) {}
+    return true;
+  }
+});
 
   let isNavigating = false;
 
@@ -252,4 +271,30 @@
 
   global.initLocalViewer = initLocalViewer;
 
-})(typeof window !== 'undefined' ? window : globalThis);
+export {
+  getPageUrl,
+  preloadPages,
+  prunePreloadedImages,
+  renderPage,
+  navigatePage,
+  saveProgress,
+  initLocalViewer
+};
+
+state.getPageUrl = getPageUrl;
+state.preloadPages = preloadPages;
+state.prunePreloadedImages = prunePreloadedImages;
+state.renderPage = renderPage;
+state.navigatePage = navigatePage;
+state.saveProgress = saveProgress;
+state.initLocalViewer = initLocalViewer;
+
+if (typeof window !== 'undefined') {
+  window.getPageUrl = getPageUrl;
+  window.preloadPages = preloadPages;
+  window.prunePreloadedImages = prunePreloadedImages;
+  window.renderPage = renderPage;
+  window.navigatePage = navigatePage;
+  window.saveProgress = saveProgress;
+  window.initLocalViewer = initLocalViewer;
+}

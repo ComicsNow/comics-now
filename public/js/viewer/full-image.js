@@ -2,8 +2,27 @@
 // Reuses the same scroll-based pan path as the dblclick zoom so the
 // boundaries clamp correctly. Continuous, double-tap zoom, page nav are
 // disabled while active. Composes with landscape (rotation).
-(function (global) {
-  'use strict';
+import { state } from '../globals.js';
+
+const global = new Proxy(typeof window !== 'undefined' ? window : globalThis, {
+  get(target, prop) {
+    if (prop in state) {
+      return state[prop];
+    }
+    const val = target[prop];
+    if (typeof val === 'function') {
+      return val.bind(target);
+    }
+    return val;
+  },
+  set(target, prop, value) {
+    state[prop] = value;
+    try {
+      target[prop] = value;
+    } catch (e) {}
+    return true;
+  }
+});
 
   function getImage() {
     return global.fullscreenImage || document.getElementById('fullscreen-image');
@@ -143,4 +162,26 @@
   } else {
     init();
   }
-})(window);
+
+export {
+  getImage,
+  getViewer,
+  applyLayout as applyFullImageLayout,
+  clearLayout,
+  setFullImageMode,
+  toggleFullImageMode,
+  bindButton,
+  init
+};
+
+state.isFullImageMode = false;
+state.setFullImageMode = setFullImageMode;
+state.toggleFullImageMode = toggleFullImageMode;
+state.applyFullImageLayout = applyLayout;
+
+if (typeof window !== 'undefined') {
+  window.isFullImageMode = false;
+  window.setFullImageMode = setFullImageMode;
+  window.toggleFullImageMode = toggleFullImageMode;
+  window.applyFullImageLayout = applyLayout;
+}

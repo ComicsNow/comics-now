@@ -1,5 +1,24 @@
-(function (global) {
-  'use strict';
+import { state } from '../globals.js';
+
+const global = new Proxy(typeof window !== 'undefined' ? window : globalThis, {
+  get(target, prop) {
+    if (prop in state) {
+      return state[prop];
+    }
+    const val = target[prop];
+    if (typeof val === 'function') {
+      return val.bind(target);
+    }
+    return val;
+  },
+  set(target, prop, value) {
+    state[prop] = value;
+    try {
+      target[prop] = value;
+    } catch (e) {}
+    return true;
+  }
+});
 
   function initializeViewerUIControls() {
     // Check if required functions are available, if not retry later
@@ -217,4 +236,13 @@
   }
 
   global.initializeViewerUIControls = initializeViewerUIControls;
-})(typeof window !== 'undefined' ? window : globalThis);
+
+export {
+  initializeViewerUIControls
+};
+
+state.initializeViewerUIControls = initializeViewerUIControls;
+
+if (typeof window !== 'undefined') {
+  window.initializeViewerUIControls = initializeViewerUIControls;
+}

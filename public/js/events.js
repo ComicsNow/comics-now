@@ -1,5 +1,34 @@
 // --- EVENT LISTENERS ---
 
+import {
+  state,
+  apiCall,
+  encodePath,
+  ctButton,
+  ctModal,
+  ctScheduleInput,
+  ctSaveBtn,
+  ctApplyBtn,
+  ctSkipBtn,
+  ctConfirmYes,
+  ctConfirmNo,
+  ctClearOutputBtn,
+  ctOutputDiv,
+  ctRunBtn,
+  ctTabSettings,
+  ctTabMatches,
+  ctTabOutput,
+  ctTabManagement,
+  ctContentSettings,
+  ctContentMatches,
+  ctContentOutput,
+  ctContentManagement,
+  ctMatchesBadge,
+  metadataForm,
+  saveStatusDiv,
+  clearDownloadsBtn
+} from './globals.js';
+
 // Helper to switch settings tabs and update UI
 function switchSettingsTab(tabName) {
   const tabs = ['general', 'logs', 'downloads', 'comics-defaults', 'devices', 'users', 'guided-reader'];
@@ -25,73 +54,99 @@ function switchSettingsTab(tabName) {
     }
   });
 
-  if (logInterval) clearInterval(logInterval);
+  if (state.logInterval) {
+    clearInterval(state.logInterval);
+    state.logInterval = null;
+  }
 }
 
 document.getElementById('settings-tab-general')?.addEventListener('click', () => {
-  if (!window._isNavigatingFromRouter && window.router) {
-    window.router.navigate('/settings', true);
+  if (!state._isNavigatingFromRouter && state.router) {
+    state.router.navigate('/settings', true);
   }
   switchSettingsTab('general');
-  if (typeof fetchSettings === 'function') fetchSettings();
-  if (typeof refreshLibraryFolders === 'function') refreshLibraryFolders();
+  if (typeof state.fetchSettings === 'function') state.fetchSettings();
+  else if (typeof window.fetchSettings === 'function') window.fetchSettings();
+  
+  if (typeof state.refreshLibraryFolders === 'function') state.refreshLibraryFolders();
+  else if (typeof window.refreshLibraryFolders === 'function') window.refreshLibraryFolders();
 });
 
 document.getElementById('settings-tab-logs')?.addEventListener('click', () => {
-  if (!window._isNavigatingFromRouter && window.router) {
-    window.router.navigate('/settings/logs', true);
+  if (!state._isNavigatingFromRouter && state.router) {
+    state.router.navigate('/settings/logs', true);
   }
   switchSettingsTab('logs');
-  fetchLogs();
-  logInterval = setInterval(fetchLogs, 3000);
+  
+  const fetchLogsFn = state.fetchLogs || window.fetchLogs;
+  if (typeof fetchLogsFn === 'function') {
+    fetchLogsFn();
+    state.logInterval = setInterval(fetchLogsFn, 3000);
+  }
 });
 
-document.getElementById('settings-tab-downloads').addEventListener('click', async () => {
-  if (!window._isNavigatingFromRouter && window.router) {
-    window.router.navigate('/settings/downloads', true);
+document.getElementById('settings-tab-downloads')?.addEventListener('click', async () => {
+  if (!state._isNavigatingFromRouter && state.router) {
+    state.router.navigate('/settings/downloads', true);
   }
   switchSettingsTab('downloads');
-  await refreshDownloadsInfo();
+  
+  const refreshFn = state.refreshDownloadsInfo || window.refreshDownloadsInfo;
+  if (typeof refreshFn === 'function') {
+    await refreshFn();
+  }
 });
 
 document.getElementById('settings-tab-comics-defaults')?.addEventListener('click', async () => {
-  if (!window._isNavigatingFromRouter && window.router) {
-    window.router.navigate('/settings/defaults', true);
+  if (!state._isNavigatingFromRouter && state.router) {
+    state.router.navigate('/settings/defaults', true);
   }
   switchSettingsTab('comics-defaults');
 
   // Load user's manga mode preferences when tab is opened
-  await loadComicsDefaults();
+  const loadDefaultsFn = state.loadComicsDefaults || window.loadComicsDefaults;
+  if (typeof loadDefaultsFn === 'function') {
+    await loadDefaultsFn();
+  }
 
   // Initialize continuous mode settings
-  if (typeof initContinuousModeSettings === 'function') {
-    initContinuousModeSettings();
+  const initContinuousFn = state.initContinuousModeSettings || window.initContinuousModeSettings;
+  if (typeof initContinuousFn === 'function') {
+    initContinuousFn();
   }
 });
 
-document.getElementById('settings-tab-devices').addEventListener('click', async () => {
-  if (!window._isNavigatingFromRouter && window.router) {
-    window.router.navigate('/settings/devices', true);
+document.getElementById('settings-tab-devices')?.addEventListener('click', async () => {
+  if (!state._isNavigatingFromRouter && state.router) {
+    state.router.navigate('/settings/devices', true);
   }
   switchSettingsTab('devices');
 
   // Load user list for admin filter (if admin)
-  await loadUserList();
-  await refreshDeviceList();
+  const loadUserListFn = state.loadUserList || window.loadUserList;
+  if (typeof loadUserListFn === 'function') {
+    await loadUserListFn();
+  }
+  
+  const refreshDevicesFn = state.refreshDeviceList || window.refreshDeviceList;
+  if (typeof refreshDevicesFn === 'function') {
+    await refreshDevicesFn();
+  }
 });
 
 // Users tab - only exists for admin users
 const settingsTabUsersEl = document.getElementById('settings-tab-users');
 if (settingsTabUsersEl) {
   settingsTabUsersEl.addEventListener('click', async () => {
-    if (!window._isNavigatingFromRouter && window.router) {
-      window.router.navigate('/settings/users', true);
+    if (!state._isNavigatingFromRouter && state.router) {
+      state.router.navigate('/settings/users', true);
     }
     switchSettingsTab('users');
 
     // Load users list
-    if (typeof refreshUsersList === 'function') {
-      await refreshUsersList();
+    const refreshUsersFn = state.refreshUsersList || window.refreshUsersList;
+    if (typeof refreshUsersFn === 'function') {
+      await refreshUsersFn();
     }
   });
 }
@@ -103,43 +158,82 @@ if (clearDownloadsBtn && !clearDownloadsBtn._clearListener) {
       return;
     }
 
-    await clearOfflineData();
-    await forceStorageCleanup();
+    const clearOfflineFn = state.clearOfflineData || window.clearOfflineData;
+    const forceCleanupFn = state.forceStorageCleanup || window.forceStorageCleanup;
+    const fetchLibFn = state.fetchLibrary || window.fetchLibrary;
+    const refreshDownFn = state.refreshDownloadsInfo || window.refreshDownloadsInfo;
+
+    if (typeof clearOfflineFn === 'function') await clearOfflineFn();
+    if (typeof forceCleanupFn === 'function') await forceCleanupFn();
     alert('All offline data has been cleared.');
-    await fetchLibrary();
-    await refreshDownloadsInfo();
+    if (typeof fetchLibFn === 'function') await fetchLibFn();
+    if (typeof refreshDownFn === 'function') await refreshDownFn();
   };
   clearDownloadsBtn.addEventListener('click', clearDownloadsBtn._clearListener);
 }
 
-
 document.getElementById('settings-tab-guided-reader')?.addEventListener('click', () => {
-  if (!window._isNavigatingFromRouter && window.router) {
-    window.router.navigate('/settings/guided-reader', true);
+  if (!state._isNavigatingFromRouter && state.router) {
+    state.router.navigate('/settings/guided-reader', true);
   }
   switchSettingsTab('guided-reader');
-  if (typeof openGuidedReaderTab === 'function') openGuidedReaderTab();
+  
+  const openGuidedFn = state.openGuidedReaderTab || window.openGuidedReaderTab;
+  if (typeof openGuidedFn === 'function') {
+    openGuidedFn();
+  }
 });
 
-document.getElementById('log-level-filter').addEventListener('change', fetchLogs);
-document.getElementById('log-category-filter').addEventListener('change', fetchLogs);
+document.getElementById('log-level-filter')?.addEventListener('change', () => {
+  const fetchLogsFn = state.fetchLogs || window.fetchLogs;
+  if (typeof fetchLogsFn === 'function') fetchLogsFn();
+});
+document.getElementById('log-category-filter')?.addEventListener('change', () => {
+  const fetchLogsFn = state.fetchLogs || window.fetchLogs;
+  if (typeof fetchLogsFn === 'function') fetchLogsFn();
+});
 
-ctButton.addEventListener('click', openCTModal);
-document.getElementById('ct-close-btn').addEventListener('click', closeCTModal);
-ctSaveBtn.addEventListener('click', saveCtSettings);
-ctApplyBtn.addEventListener('click', () => showCtConfirm('apply'));
-ctSkipBtn.addEventListener('click', () => showCtConfirm('skip'));
-ctConfirmYes.addEventListener('click', handleCtConfirmYes);
-ctConfirmNo.addEventListener('click', handleCtConfirmNo);
-ctClearOutputBtn.addEventListener('click', () => { ctOutputDiv.innerHTML = ''; });
+ctButton?.addEventListener('click', () => {
+  const openCTFn = state.openCTModal || window.openCTModal;
+  if (typeof openCTFn === 'function') openCTFn();
+});
+document.getElementById('ct-close-btn')?.addEventListener('click', () => {
+  const closeCTFn = state.closeCTModal || window.closeCTModal;
+  if (typeof closeCTFn === 'function') closeCTFn();
+});
+ctSaveBtn?.addEventListener('click', () => {
+  const saveCtFn = state.saveCtSettings || window.saveCtSettings;
+  if (typeof saveCtFn === 'function') saveCtFn();
+});
+ctApplyBtn?.addEventListener('click', () => {
+  const showCtConfirmFn = state.showCtConfirm || window.showCtConfirm;
+  if (typeof showCtConfirmFn === 'function') showCtConfirmFn('apply');
+});
+ctSkipBtn?.addEventListener('click', () => {
+  const showCtConfirmFn = state.showCtConfirm || window.showCtConfirm;
+  if (typeof showCtConfirmFn === 'function') showCtConfirmFn('skip');
+});
+ctConfirmYes?.addEventListener('click', () => {
+  const handleCtConfirmYesFn = state.handleCtConfirmYes || window.handleCtConfirmYes;
+  if (typeof handleCtConfirmYesFn === 'function') handleCtConfirmYesFn();
+});
+ctConfirmNo?.addEventListener('click', () => {
+  const handleCtConfirmNoFn = state.handleCtConfirmNo || window.handleCtConfirmNo;
+  if (typeof handleCtConfirmNoFn === 'function') handleCtConfirmNoFn();
+});
+ctClearOutputBtn?.addEventListener('click', () => { 
+  if (ctOutputDiv) ctOutputDiv.innerHTML = ''; 
+});
+
 document.getElementById('ct-grab-btn')?.addEventListener('click', function() {
   const btn = this;
   const icon = btn.querySelector('svg');
   if (icon) icon.classList.add('animate-spin');
   btn.classList.add('opacity-50', 'pointer-events-none');
   
-  if (typeof fetchPendingMatchDetails === 'function') {
-    fetchPendingMatchDetails().finally(() => {
+  const fetchPendingFn = state.fetchPendingMatchDetails || window.fetchPendingMatchDetails;
+  if (typeof fetchPendingFn === 'function') {
+    fetchPendingFn().finally(() => {
       setTimeout(() => {
         if (icon) icon.classList.remove('animate-spin');
         btn.classList.remove('opacity-50', 'pointer-events-none');
@@ -147,13 +241,15 @@ document.getElementById('ct-grab-btn')?.addEventListener('click', function() {
     });
   }
 });
-ctRunBtn.addEventListener('click', async () => {
-  await fetch(`${API_BASE_URL}/api/v1/comictagger/run`, { method: 'POST' });
+
+ctRunBtn?.addEventListener('click', async () => {
+  await fetch(`${state.API_BASE_URL}/api/v1/comictagger/run`, { method: 'POST' });
 });
-ctTabSettings.addEventListener('click', () => {
+
+ctTabSettings?.addEventListener('click', () => {
   if (ctTabSettings.classList.contains('active')) return;
-  if (!window._isNavigatingFromRouter && window.router) {
-    window.router.navigate('/comictagger', true);
+  if (!state._isNavigatingFromRouter && state.router) {
+    state.router.navigate('/comictagger', true);
   }
   ctTabSettings.classList.add('active');
   ctTabMatches.classList.remove('active');
@@ -164,13 +260,16 @@ ctTabSettings.addEventListener('click', () => {
   ctContentOutput.classList.add('hidden');
   ctContentManagement.classList.add('hidden');
 
-  if (typeof window.stopRenameStream === 'function') window.stopRenameStream();
-  if (typeof window.stopMoveStream === 'function') window.stopMoveStream();
+  const stopRenameFn = state.stopRenameStream || window.stopRenameStream;
+  const stopMoveFn = state.stopMoveStream || window.stopMoveStream;
+  if (typeof stopRenameFn === 'function') stopRenameFn();
+  if (typeof stopMoveFn === 'function') stopMoveFn();
 });
-ctTabMatches.addEventListener('click', () => {
+
+ctTabMatches?.addEventListener('click', () => {
   if (ctTabMatches.classList.contains('active')) return;
-  if (!window._isNavigatingFromRouter && window.router) {
-    window.router.navigate('/comictagger/matches', true);
+  if (!state._isNavigatingFromRouter && state.router) {
+    state.router.navigate('/comictagger/matches', true);
   }
   ctTabMatches.classList.add('active');
   ctTabSettings.classList.remove('active');
@@ -183,13 +282,16 @@ ctTabMatches.addEventListener('click', () => {
   // Clear badge when viewing matches
   if (ctMatchesBadge) ctMatchesBadge.classList.add('hidden');
 
-  if (typeof window.stopRenameStream === 'function') window.stopRenameStream();
-  if (typeof window.stopMoveStream === 'function') window.stopMoveStream();
+  const stopRenameFn = state.stopRenameStream || window.stopRenameStream;
+  const stopMoveFn = state.stopMoveStream || window.stopMoveStream;
+  if (typeof stopRenameFn === 'function') stopRenameFn();
+  if (typeof stopMoveFn === 'function') stopMoveFn();
 });
-ctTabOutput.addEventListener('click', () => {
+
+ctTabOutput?.addEventListener('click', () => {
   if (ctTabOutput.classList.contains('active')) return;
-  if (!window._isNavigatingFromRouter && window.router) {
-    window.router.navigate('/comictagger/output', true);
+  if (!state._isNavigatingFromRouter && state.router) {
+    state.router.navigate('/comictagger/output', true);
   }
   ctTabOutput.classList.add('active');
   ctTabSettings.classList.remove('active');
@@ -200,13 +302,16 @@ ctTabOutput.addEventListener('click', () => {
   ctContentMatches.classList.add('hidden');
   ctContentManagement.classList.add('hidden');
 
-  if (typeof window.stopRenameStream === 'function') window.stopRenameStream();
-  if (typeof window.stopMoveStream === 'function') window.stopMoveStream();
+  const stopRenameFn = state.stopRenameStream || window.stopRenameStream;
+  const stopMoveFn = state.stopMoveStream || window.stopMoveStream;
+  if (typeof stopRenameFn === 'function') stopRenameFn();
+  if (typeof stopMoveFn === 'function') stopMoveFn();
 });
-ctTabManagement.addEventListener('click', () => {
+
+ctTabManagement?.addEventListener('click', () => {
   if (ctTabManagement.classList.contains('active')) return;
-  if (!window._isNavigatingFromRouter && window.router) {
-    window.router.navigate('/comictagger/management', true);
+  if (!state._isNavigatingFromRouter && state.router) {
+    state.router.navigate('/comictagger/management', true);
   }
   ctTabManagement.classList.add('active');
   ctTabSettings.classList.remove('active');
@@ -217,19 +322,26 @@ ctTabManagement.addEventListener('click', () => {
   ctContentMatches.classList.add('hidden');
   ctContentOutput.classList.add('hidden');
 
-  if (typeof startRenameStream === 'function') startRenameStream();
-  if (typeof startMoveStream === 'function') startMoveStream();
+  const startRenameFn = state.startRenameStream || window.startRenameStream;
+  const startMoveFn = state.startMoveStream || window.startMoveStream;
+  if (typeof startRenameFn === 'function') startRenameFn();
+  if (typeof startMoveFn === 'function') startMoveFn();
 });
-ctModal.addEventListener('keydown', (e) => {
-  if (!ctConfirmBar.classList.contains('hidden')) {
-    if (e.key === 'Enter') handleCtConfirmYes();
-    if (e.key === 'Escape' || e.key === ' ') handleCtConfirmNo();
+
+ctModal?.addEventListener('keydown', (e) => {
+  if (ctConfirmBar && !ctConfirmBar.classList.contains('hidden')) {
+    if (e.key === 'Enter') {
+      const handleCtConfirmYesFn = state.handleCtConfirmYes || window.handleCtConfirmYes;
+      if (typeof handleCtConfirmYesFn === 'function') handleCtConfirmYesFn();
+    }
+    if (e.key === ' ') {
+      const handleCtConfirmNoFn = state.handleCtConfirmNo || window.handleCtConfirmNo;
+      if (typeof handleCtConfirmNoFn === 'function') handleCtConfirmNoFn();
+    }
   }
 });
 
-
-
-async function triggerScan(button = null, full = false) {
+export async function triggerScan(button = null, full = false) {
   if (button) button.disabled = true;
   try {
     const options = { method: 'POST' };
@@ -237,46 +349,56 @@ async function triggerScan(button = null, full = false) {
       options.headers = { 'Content-Type': 'application/json' };
       options.body = JSON.stringify({ full: true });
     }
-    await fetch(`${API_BASE_URL}/api/v1/scan`, options);
+    await fetch(`${state.API_BASE_URL}/api/v1/scan`, options);
   } catch (e) {
-    
     throw e;
   } finally {
     if (button) button.disabled = false;
   }
 }
+state.triggerScan = triggerScan;
+if (typeof window !== 'undefined') {
+  window.triggerScan = triggerScan;
+}
 
-metadataForm.addEventListener('submit', async (e) => {
+metadataForm?.addEventListener('submit', async (e) => {
   e.preventDefault();
-  saveStatusDiv.textContent = 'Saving...';
+  if (saveStatusDiv) saveStatusDiv.textContent = 'Saving...';
   const formData = new FormData(metadataForm);
-  if (!window.currentMetadata) {
-    window.currentMetadata = await (await fetch(`${API_BASE_URL}/api/v1/comics/info?path=${encodeURIComponent(encodePath(window.currentComic.path))}`)).json();
+  if (!state.currentMetadata) {
+    state.currentMetadata = await (await fetch(`${state.API_BASE_URL}/api/v1/comics/info?path=${encodeURIComponent(encodePath(state.currentComic.path))}`)).json();
   }
 
   for (const [key, value] of formData.entries()) {
-    window.currentMetadata[key] = value;
+    state.currentMetadata[key] = value;
   }
 
   try {
-    const response = await fetch(`${API_BASE_URL}/api/v1/comics/info?path=${encodeURIComponent(encodePath(window.currentComic.path))}`, {
+    const response = await fetch(`${state.API_BASE_URL}/api/v1/comics/info?path=${encodeURIComponent(encodePath(state.currentComic.path))}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(window.currentMetadata)
+      body: JSON.stringify(state.currentMetadata)
     });
     const result = await response.json();
     if (!response.ok) throw new Error(result.message || 'Failed to save metadata.');
     
-    if (result.writeBack === 'skipped') {
-      saveStatusDiv.textContent = 'Changes saved to database (CBZ write-back skipped for Folder Mode)';
-    } else {
-      saveStatusDiv.textContent = 'Changes saved successfully!';
+    if (saveStatusDiv) {
+      if (result.writeBack === 'skipped') {
+        saveStatusDiv.textContent = 'Changes saved to database (CBZ write-back skipped for Folder Mode)';
+      } else {
+        saveStatusDiv.textContent = 'Changes saved successfully!';
+      }
     }
     
-    setComicSummary(window.currentMetadata.Summary, { preserveExpansion: true });
-    setTimeout(() => { saveStatusDiv.textContent = ''; }, 5000);
+    const setComicSummaryFn = state.setComicSummary || window.setComicSummary;
+    if (typeof setComicSummaryFn === 'function') {
+      setComicSummaryFn(state.currentMetadata.Summary, { preserveExpansion: true });
+    }
+    
+    setTimeout(() => { 
+      if (saveStatusDiv) saveStatusDiv.textContent = ''; 
+    }, 5000);
   } catch (error) {
-    saveStatusDiv.textContent = `Save failed: ${error.message}`;
+    if (saveStatusDiv) saveStatusDiv.textContent = `Save failed: ${error.message}`;
   }
 });
-

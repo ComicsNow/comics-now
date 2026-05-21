@@ -1,5 +1,24 @@
-(function (global) {
-  'use strict';
+import { state } from '../globals.js';
+
+const global = new Proxy(typeof window !== 'undefined' ? window : globalThis, {
+  get(target, prop) {
+    if (prop in state) {
+      return state[prop];
+    }
+    const val = target[prop];
+    if (typeof val === 'function') {
+      return val.bind(target);
+    }
+    return val;
+  },
+  set(target, prop, value) {
+    state[prop] = value;
+    try {
+      target[prop] = value;
+    } catch (e) {}
+    return true;
+  }
+});
 
   const IMAGE_FILE_REGEX = /\.(jpg|jpeg|png|gif|webp)$/i;
   const MAC_OS_RESOURCE_PREFIX = '__MACOSX';
@@ -620,4 +639,37 @@
 
   global.ViewerNavigation = ViewerNavigation;
   Object.assign(global, ViewerNavigation);
-})(typeof window !== 'undefined' ? window : globalThis);
+
+export {
+  IMAGE_FILE_REGEX,
+  MAC_OS_RESOURCE_PREFIX,
+  setLibraryControlsVisibility,
+  normalizePagesResponse,
+  loadOfflineComicPages,
+  navigateBackFromViewer,
+  rebindViewerEvents,
+  openComicViewer,
+  ViewerNavigation
+};
+
+state.IMAGE_FILE_REGEX = IMAGE_FILE_REGEX;
+state.MAC_OS_RESOURCE_PREFIX = MAC_OS_RESOURCE_PREFIX;
+state.setLibraryControlsVisibility = setLibraryControlsVisibility;
+state.normalizePagesResponse = normalizePagesResponse;
+state.loadOfflineComicPages = loadOfflineComicPages;
+state.navigateBackFromViewer = navigateBackFromViewer;
+state.rebindViewerEvents = rebindViewerEvents;
+state.openComicViewer = openComicViewer;
+state.ViewerNavigation = ViewerNavigation;
+
+if (typeof window !== 'undefined') {
+  window.IMAGE_FILE_REGEX = IMAGE_FILE_REGEX;
+  window.MAC_OS_RESOURCE_PREFIX = MAC_OS_RESOURCE_PREFIX;
+  window.setLibraryControlsVisibility = setLibraryControlsVisibility;
+  window.normalizePagesResponse = normalizePagesResponse;
+  window.loadOfflineComicPages = loadOfflineComicPages;
+  window.navigateBackFromViewer = navigateBackFromViewer;
+  window.rebindViewerEvents = rebindViewerEvents;
+  window.openComicViewer = openComicViewer;
+  window.ViewerNavigation = ViewerNavigation;
+}

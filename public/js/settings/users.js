@@ -1,22 +1,26 @@
-// --- USER MANAGEMENT ---
-const settingsTabUsers = document.getElementById('settings-tab-users');
-const refreshUsersBtn = document.getElementById('refresh-users-btn');
-const usersStatusDiv = document.getElementById('users-status');
-const usersListDiv = document.getElementById('users-list');
+import { state, escapeHtml } from '../globals.js';
+import { formatTimestamp } from './shared.js';
 
-function setUsersStatus(message, type = 'info', showSpinner = false) {
+// --- USER MANAGEMENT ---
+export const settingsTabUsers = document.getElementById('settings-tab-users');
+export const refreshUsersBtn = document.getElementById('refresh-users-btn');
+export const usersStatusDiv = document.getElementById('users-status');
+export const usersListDiv = document.getElementById('users-list');
+
+export function setUsersStatus(message, type = 'info', showSpinner = false) {
   if (!usersStatusDiv) return;
   usersStatusDiv.textContent = message;
   usersStatusDiv.className = `text-sm mb-3 ${type === 'error' ? 'text-red-400' : 'text-gray-400'}`;
 }
 
-async function refreshUsersList() {
+export async function refreshUsersList() {
   if (!usersListDiv) return;
 
   try {
     setUsersStatus('Loading users...', 'info', true);
 
-    const response = await fetch(`${API_BASE_URL}/api/v1/users`);
+    const apiBaseUrl = state.API_BASE_URL || window.API_BASE_URL || '';
+    const response = await fetch(`${apiBaseUrl}/api/v1/users`);
     const data = await response.json();
 
     if (!response.ok || !data.ok) {
@@ -75,7 +79,10 @@ async function refreshUsersList() {
         const userId = card.dataset.userId;
         const userEmail = card.dataset.userEmail;
         const userRole = card.dataset.userRole;
-        showUserAccessView(userId, userEmail, userRole);
+        const showUserAccess = state.showUserAccessView || window.showUserAccessView;
+        if (typeof showUserAccess === 'function') {
+          showUserAccess(userId, userEmail, userRole);
+        }
       });
     });
 
@@ -97,4 +104,20 @@ if (refreshUsersBtn) {
   refreshUsersBtn.addEventListener('click', () => {
     refreshUsersList();
   });
+}
+
+state.settingsTabUsers = settingsTabUsers;
+state.refreshUsersBtn = refreshUsersBtn;
+state.usersStatusDiv = usersStatusDiv;
+state.usersListDiv = usersListDiv;
+state.setUsersStatus = setUsersStatus;
+state.refreshUsersList = refreshUsersList;
+
+if (typeof window !== 'undefined') {
+  window.settingsTabUsers = settingsTabUsers;
+  window.refreshUsersBtn = refreshUsersBtn;
+  window.usersStatusDiv = usersStatusDiv;
+  window.usersListDiv = usersListDiv;
+  window.setUsersStatus = setUsersStatus;
+  window.refreshUsersList = refreshUsersList;
 }

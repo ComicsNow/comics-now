@@ -1,3 +1,74 @@
+import { state } from '../globals.js';
+
+let renameEventSource = null;
+let moveEventSource = null;
+
+// Setup rename output streaming
+export function startRenameStream() {
+  if (renameEventSource) return;
+
+  const renameOutputDiv = document.getElementById('rename-output');
+  if (renameOutputDiv) {
+    renameOutputDiv.classList.remove('hidden');
+  }
+  const apiBaseUrl = state.API_BASE_URL || window.API_BASE_URL || '';
+  renameEventSource = new EventSource(`${apiBaseUrl}/api/v1/rename/stream`);
+
+  renameEventSource.onmessage = (event) => {
+    const entry = JSON.parse(event.data);
+    const line = document.createElement('div');
+    line.textContent = entry.message;
+    if (renameOutputDiv) {
+      renameOutputDiv.appendChild(line);
+      renameOutputDiv.scrollTop = renameOutputDiv.scrollHeight;
+    }
+  };
+
+  renameEventSource.onerror = () => {
+    
+  };
+}
+
+export function stopRenameStream() {
+  if (renameEventSource) {
+    renameEventSource.close();
+    renameEventSource = null;
+  }
+}
+
+// Setup move output streaming
+export function startMoveStream() {
+  if (moveEventSource) return;
+
+  const moveOutputDiv = document.getElementById('move-output');
+  if (moveOutputDiv) {
+    moveOutputDiv.classList.remove('hidden');
+  }
+  const apiBaseUrl = state.API_BASE_URL || window.API_BASE_URL || '';
+  moveEventSource = new EventSource(`${apiBaseUrl}/api/v1/move/stream`);
+
+  moveEventSource.onmessage = (event) => {
+    const entry = JSON.parse(event.data);
+    const line = document.createElement('div');
+    line.textContent = entry.message;
+    if (moveOutputDiv) {
+      moveOutputDiv.appendChild(line);
+      moveOutputDiv.scrollTop = moveOutputDiv.scrollHeight;
+    }
+  };
+
+  moveEventSource.onerror = () => {
+    
+  };
+}
+
+export function stopMoveStream() {
+  if (moveEventSource) {
+    moveEventSource.close();
+    moveEventSource = null;
+  }
+}
+
 // --- COMICS MANAGEMENT ---
 document.addEventListener('DOMContentLoaded', () => {
   const renameCbzBtn = document.getElementById('rename-cbz-btn');
@@ -9,62 +80,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const moveOutputDiv = document.getElementById('move-output');
   const moveClearBtn = document.getElementById('move-clear-output');
 
-  let renameEventSource = null;
-  let moveEventSource = null;
-
-  // Setup rename output streaming
-  window.startRenameStream = function() {
-    if (renameEventSource) return;
-
-    renameOutputDiv.classList.remove('hidden');
-    renameEventSource = new EventSource(`${API_BASE_URL}/api/v1/rename/stream`);
-
-    renameEventSource.onmessage = (event) => {
-      const entry = JSON.parse(event.data);
-      const line = document.createElement('div');
-      line.textContent = entry.message;
-      renameOutputDiv.appendChild(line);
-      renameOutputDiv.scrollTop = renameOutputDiv.scrollHeight;
-    };
-
-    renameEventSource.onerror = () => {
-      
-    };
-  };
-
-  window.stopRenameStream = function() {
-    if (renameEventSource) {
-      renameEventSource.close();
-      renameEventSource = null;
-    }
-  };
-
-  // Setup move output streaming
-  window.startMoveStream = function() {
-    if (moveEventSource) return;
-
-    moveOutputDiv.classList.remove('hidden');
-    moveEventSource = new EventSource(`${API_BASE_URL}/api/v1/move/stream`);
-
-    moveEventSource.onmessage = (event) => {
-      const entry = JSON.parse(event.data);
-      const line = document.createElement('div');
-      line.textContent = entry.message;
-      moveOutputDiv.appendChild(line);
-      moveOutputDiv.scrollTop = moveOutputDiv.scrollHeight;
-    };
-
-    moveEventSource.onerror = () => {
-      
-    };
-  };
-
-  window.stopMoveStream = function() {
-    if (moveEventSource) {
-      moveEventSource.close();
-      moveEventSource = null;
-    }
-  };
+  const apiBaseUrl = state.API_BASE_URL || window.API_BASE_URL || '';
 
   // Clear rename output
   if (renameClearBtn) {
@@ -72,7 +88,7 @@ document.addEventListener('DOMContentLoaded', () => {
       renameOutputDiv.innerHTML = '';
       renameOutputDiv.classList.add('hidden');
       try {
-        await fetch(`${API_BASE_URL}/api/v1/rename/clear`, { method: 'POST' });
+        await fetch(`${apiBaseUrl}/api/v1/rename/clear`, { method: 'POST' });
       } catch (error) {
         
       }
@@ -85,7 +101,7 @@ document.addEventListener('DOMContentLoaded', () => {
       moveOutputDiv.innerHTML = '';
       moveOutputDiv.classList.add('hidden');
       try {
-        await fetch(`${API_BASE_URL}/api/v1/move/clear`, { method: 'POST' });
+        await fetch(`${apiBaseUrl}/api/v1/move/clear`, { method: 'POST' });
       } catch (error) {
         
       }
@@ -104,7 +120,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!errorsList) return;
     errorsList.innerHTML = '<p class="text-sm text-gray-500 animate-pulse">Loading errors...</p>';
     try {
-      const res = await fetch(`${API_BASE_URL}/api/v1/operation-errors`);
+      const res = await fetch(`${apiBaseUrl}/api/v1/operation-errors`);
       const data = await res.json();
       if (!data.ok || data.errors.length === 0) {
         errorsList.innerHTML = '<p class="text-sm text-gray-500">No errors recorded this session.</p>';
@@ -158,7 +174,7 @@ document.addEventListener('DOMContentLoaded', () => {
       renameStatusDiv.textContent = 'Starting rename operation...';
 
       try {
-        const res = await fetch(`${API_BASE_URL}/api/v1/rename-cbz`, {
+        const res = await fetch(`${apiBaseUrl}/api/v1/rename-cbz`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' }
         });
@@ -231,7 +247,7 @@ document.addEventListener('DOMContentLoaded', () => {
     moveComicsBtn.addEventListener('click', async () => {
       try {
         // First, get available directories
-        const dirRes = await fetch(`${API_BASE_URL}/api/v1/comics-directories`);
+        const dirRes = await fetch(`${apiBaseUrl}/api/v1/comics-directories`);
         const dirData = await dirRes.json();
 
         if (!dirRes.ok) {
@@ -271,7 +287,7 @@ document.addEventListener('DOMContentLoaded', () => {
       moveStatusDiv.textContent = 'Starting move operation...';
 
       try {
-        const res = await fetch(`${API_BASE_URL}/api/v1/move-comics`, {
+        const res = await fetch(`${apiBaseUrl}/api/v1/move-comics`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ targetDirectory })
@@ -381,3 +397,15 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 });
+
+state.startRenameStream = startRenameStream;
+state.stopRenameStream = stopRenameStream;
+state.startMoveStream = startMoveStream;
+state.stopMoveStream = stopMoveStream;
+
+if (typeof window !== 'undefined') {
+  window.startRenameStream = startRenameStream;
+  window.stopRenameStream = stopRenameStream;
+  window.startMoveStream = startMoveStream;
+  window.stopMoveStream = stopMoveStream;
+}

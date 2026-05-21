@@ -1,6 +1,12 @@
 // --- SYNC FUNCTIONALITY ---
 
-class SyncManager {
+import {
+  state,
+  escapeHtml,
+  debugLog
+} from './globals.js';
+
+export class SyncManager {
   constructor() {
     this.deviceId = null;
     this.deviceName = null;
@@ -85,7 +91,7 @@ class SyncManager {
   async initialize() {
     try {
       // Fetch current user info
-      const userResponse = await fetch(`${API_BASE_URL}/api/v1/user/me`);
+      const userResponse = await fetch(`${state.API_BASE_URL}/api/v1/user/me`);
       if (userResponse.ok) {
         const userData = await userResponse.json();
         this.userId = userData.userId;
@@ -155,7 +161,7 @@ class SyncManager {
       if (savedDeviceId && savedDeviceName) {
         // Verify the device still exists on the server
         try {
-          const verifyResponse = await fetch(`${API_BASE_URL}/api/v1/devices`);
+          const verifyResponse = await fetch(`${state.API_BASE_URL}/api/v1/devices`);
           if (verifyResponse.ok) {
             const devicesData = await verifyResponse.json();
             const deviceExists = devicesData.devices?.some(d => d.deviceId === savedDeviceId);
@@ -184,7 +190,7 @@ class SyncManager {
 
       // Register new device
       const fingerprint = this.generateFingerprint();
-      const response = await fetch(`${API_BASE_URL}/api/v1/device/register`, {
+      const response = await fetch(`${state.API_BASE_URL}/api/v1/device/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -290,7 +296,7 @@ class SyncManager {
 
     try {
       const response = await fetch(
-        `${API_BASE_URL}/api/v1/sync/check/${comicId}?deviceId=${this.deviceId}&lastKnownPage=${currentPage}&lastKnownTimestamp=${this.lastKnownTimestamp}`
+        `${state.API_BASE_URL}/api/v1/sync/check/${comicId}?deviceId=${this.deviceId}&lastKnownPage=${currentPage}&lastKnownTimestamp=${this.lastKnownTimestamp}`
       );
 
       const data = await response.json();
@@ -332,7 +338,7 @@ class SyncManager {
     try {
       // Fetch all devices that have read this comic
       const response = await fetch(
-        `${API_BASE_URL}/api/v1/sync/devices/${comicId}?currentDeviceId=${this.deviceId}`
+        `${state.API_BASE_URL}/api/v1/sync/devices/${comicId}?currentDeviceId=${this.deviceId}`
       );
 
       if (!response.ok) {
@@ -411,24 +417,25 @@ class SyncManager {
       document.body.removeChild(modal);
 
       // Navigate to the synced page and update local state
-      if (typeof window.currentComic !== 'undefined' && window.currentComic) {
-        window.currentPageIndex = serverProgress.lastReadPage;
+      if (typeof state.currentComic !== 'undefined' && state.currentComic) {
+        state.currentPageIndex = serverProgress.lastReadPage;
 
         // Update the current comic's progress
-        if (!window.currentComic.progress) {
-          window.currentComic.progress = {};
+        if (!state.currentComic.progress) {
+          state.currentComic.progress = {};
         }
-        window.currentComic.progress.lastReadPage = serverProgress.lastReadPage;
+        state.currentComic.progress.lastReadPage = serverProgress.lastReadPage;
 
         // Re-render the page to show the synced position
-        if (typeof window.renderPage === 'function') {
-          await window.renderPage();
+        if (typeof state.renderPage === 'function') {
+          await state.renderPage();
         }
 
         // Update local library data
-        if (typeof window.updateLibraryProgress === 'function') {
-          window.updateLibraryProgress(
-            window.currentComic.id,
+        const updateLibProgressFn = state.updateLibraryProgress || window.updateLibraryProgress;
+        if (typeof updateLibProgressFn === 'function') {
+          updateLibProgressFn(
+            state.currentComic.id,
             serverProgress.lastReadPage,
             serverProgress.totalPages
           );
@@ -532,24 +539,25 @@ class SyncManager {
         this.clearIgnoredSyncPoint(comic.id);
 
         // Navigate to the synced page and update local state
-        if (typeof window.currentComic !== 'undefined' && window.currentComic) {
-          window.currentPageIndex = syncToPage;
+        if (typeof state.currentComic !== 'undefined' && state.currentComic) {
+          state.currentPageIndex = syncToPage;
 
           // Update the current comic's progress
-          if (!window.currentComic.progress) {
-            window.currentComic.progress = {};
+          if (!state.currentComic.progress) {
+            state.currentComic.progress = {};
           }
-          window.currentComic.progress.lastReadPage = syncToPage;
+          state.currentComic.progress.lastReadPage = syncToPage;
 
           // Re-render the page to show the synced position
-          if (typeof window.renderPage === 'function') {
-            await window.renderPage();
+          if (typeof state.renderPage === 'function') {
+            await state.renderPage();
           }
 
           // Update local library data
-          if (typeof window.updateLibraryProgress === 'function') {
-            window.updateLibraryProgress(
-              window.currentComic.id,
+          const updateLibProgressFn = state.updateLibraryProgress || window.updateLibraryProgress;
+          if (typeof updateLibProgressFn === 'function') {
+            updateLibProgressFn(
+              state.currentComic.id,
               syncToPage,
               comic.totalPages
             );
@@ -557,7 +565,7 @@ class SyncManager {
 
           // Update sync timestamp on server
           try {
-            await this.updateProgress(window.currentComic.id, syncToPage);
+            await this.updateProgress(state.currentComic.id, syncToPage);
           } catch (error) {
             // Failed to update sync progress
           }
@@ -605,7 +613,7 @@ class SyncManager {
     if (!this.deviceId) return;
 
     try {
-      const response = await fetch(`${API_BASE_URL}/api/v1/sync/update`, {
+      const response = await fetch(`${state.API_BASE_URL}/api/v1/sync/update`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -626,18 +634,18 @@ class SyncManager {
         this.clearIgnoredSyncPoint(comicId);
 
         // Update local library data and lazy loading counts
-        if (typeof updateLocalProgressAndCounts === 'function') {
-          updateLocalProgressAndCounts(comicId, page);
-        }
+        updateLocalProgressAndCounts(comicId, page);
 
         // Update library object in memory if it exists
-        if (typeof library !== 'undefined' && typeof updateLibraryProgress === 'function') {
-          updateLibraryProgress(comicId, page);
+        const updateLibProgressFn = state.updateLibraryProgress || window.updateLibraryProgress;
+        if (typeof state.library !== 'undefined' && typeof updateLibProgressFn === 'function') {
+          updateLibProgressFn(comicId, page);
         }
 
         // Update library cache in IndexedDB so refresh shows correct progress immediately
-        if (typeof saveLibraryCacheToDB === 'function' && typeof library !== 'undefined') {
-          saveLibraryCacheToDB(library).catch(() => {
+        const saveLibCacheFn = state.saveLibraryCacheToDB || window.saveLibraryCacheToDB;
+        if (typeof saveLibCacheFn === 'function' && typeof state.library !== 'undefined') {
+          saveLibCacheFn(state.library).catch(() => {
             // Failed to update library cache
           });
         }
@@ -753,11 +761,15 @@ class SyncManager {
 }
 
 // Global sync manager instance
-window.syncManager = new SyncManager();
+export const syncManager = new SyncManager();
+state.syncManager = syncManager;
+if (typeof window !== 'undefined') {
+  window.syncManager = syncManager;
+}
 
 // Update local library data and lazy loading counts when progress changes
-function updateLocalProgressAndCounts(comicId, page) {
-  if (!library) return;
+export function updateLocalProgressAndCounts(comicId, page) {
+  if (!state.library) return;
 
   // Find the comic in the library and update its progress
   let comic = null;
@@ -768,10 +780,10 @@ function updateLocalProgressAndCounts(comicId, page) {
   let newStatus = null;
 
   // Find the comic in the library structure
-  for (const rootFolderKey of Object.keys(library)) {
-    for (const publisherKey of Object.keys(library[rootFolderKey].publishers || {})) {
-      for (const seriesKey of Object.keys(library[rootFolderKey].publishers[publisherKey].series || {})) {
-        const seriesData = library[rootFolderKey].publishers[publisherKey].series[seriesKey];
+  for (const rootFolderKey of Object.keys(state.library)) {
+    for (const publisherKey of Object.keys(state.library[rootFolderKey].publishers || {})) {
+      for (const seriesKey of Object.keys(state.library[rootFolderKey].publishers[publisherKey].series || {})) {
+        const seriesData = state.library[rootFolderKey].publishers[publisherKey].series[seriesKey];
 
         if (Array.isArray(seriesData)) {
           // Full data format
@@ -791,19 +803,24 @@ function updateLocalProgressAndCounts(comicId, page) {
   }
 
   if (comic && comic.progress) {
+    const getComicStatusFn = state.getComicStatus || window.getComicStatus;
     // Calculate old and new status
-    oldStatus = getComicStatus(comic);
+    if (typeof getComicStatusFn === 'function') {
+      oldStatus = getComicStatusFn(comic);
+    }
 
     // Update the comic's progress
     comic.progress.lastReadPage = page;
 
     // Calculate new status
-    newStatus = getComicStatus(comic);
+    if (typeof getComicStatusFn === 'function') {
+      newStatus = getComicStatusFn(comic);
+    }
 
     // Update lazy loading counts if status changed
-    if (oldStatus !== newStatus && library._isLazyLoaded && rootFolder && publisher && seriesName) {
-      const seriesData = library[rootFolder]?.publishers?.[publisher]?.series?.[seriesName];
-      const publisherData = library[rootFolder]?.publishers?.[publisher];
+    if (oldStatus !== newStatus && state.library._isLazyLoaded && rootFolder && publisher && seriesName) {
+      const seriesData = state.library[rootFolder]?.publishers?.[publisher]?.series?.[seriesName];
+      const publisherData = state.library[rootFolder]?.publishers?.[publisher];
 
       if (seriesData && seriesData._counts) {
         // Update series counts
@@ -835,17 +852,19 @@ document.addEventListener('DOMContentLoaded', () => {
   // Use setTimeout to defer initialization until after UI is rendered
   setTimeout(async () => {
     try {
-      await window.syncManager.initialize();
+      await syncManager.initialize();
       debugLog('SYNC', 'Sync manager initialization completed in background');
 
       // Show user badge if auth is enabled
-      if (typeof showUserBadge === 'function') {
-        showUserBadge();
+      const showBadgeFn = state.showUserBadge || window.showUserBadge;
+      if (typeof showBadgeFn === 'function') {
+        showBadgeFn();
       }
 
       // Hide admin UI for non-admin users
-      if (typeof hideAdminUI === 'function') {
-        hideAdminUI();
+      const hideAdminUIFn = state.hideAdminUI || window.hideAdminUI;
+      if (typeof hideAdminUIFn === 'function') {
+        hideAdminUIFn();
       }
     } catch (error) {
       // Don't throw - allow app to continue working without sync
