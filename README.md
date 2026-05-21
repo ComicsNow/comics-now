@@ -89,11 +89,14 @@ The app will be available at `http://localhost:3000`. Persistent data (database,
 3. **Install app dependencies:**
    `npm install`
 
-4. **Configure:**
+4. **Compile production assets:**
+   `npm run build`
+
+5. **Configure:**
    Copy the example config: `cp config.example.json config.json`
    Edit `config.json` to add your comic folders.
 
-5. **Start:**
+6. **Start:**
    `npm start`
 
 Access the app in your browser at `http://localhost:3000`.

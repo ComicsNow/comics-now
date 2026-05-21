@@ -12,10 +12,17 @@ RUN apt-get update && apt-get install -y \
 
 WORKDIR /app
 
-# Install Node.js dependencies
+# Install Node.js dependencies (including devDependencies for Vite)
 COPY package*.json ./
 COPY scripts/check-dependencies.js ./scripts/
-RUN npm ci --omit=dev
+RUN npm ci
+
+# Copy the application source code and compile Vite assets
+COPY . .
+RUN npm run build
+
+# Prune development dependencies to keep the image lightweight
+RUN npm prune --omit=dev
 
 # Install ComicTagger in a virtual environment
 RUN python3 -m venv /opt/venv
@@ -35,10 +42,11 @@ RUN apt-get update && apt-get install -y \
 
 WORKDIR /app
 
-# Copy production node_modules and built assets
+# Copy application source, compiled Vite assets, production node_modules, and venv
+COPY --chown=node:node . .
+COPY --from=builder --chown=node:node /app/public/dist ./public/dist
 COPY --from=builder --chown=node:node /app/node_modules ./node_modules
 COPY --from=builder --chown=node:node /opt/venv /opt/venv
-COPY --chown=node:node . .
 
 # Setup environment
 ENV PATH="/opt/venv/bin:$PATH"
