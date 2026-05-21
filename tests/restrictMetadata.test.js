@@ -7,8 +7,32 @@ global.openOfflineDB = jest.fn().mockResolvedValue(null);
 global.escapeHtml = jest.fn(str => str);
 global.initializeApp = jest.fn();
 
+const fs = require('fs');
+const path = require('path');
+const vm = require('vm');
+
+const adminUiPath = path.resolve(__dirname, '../public/js/utils/admin-ui.js');
+const fileContent = fs.readFileSync(adminUiPath, 'utf8');
+const cleanContent = fileContent
+  .replace(/import\s+[\s\S]*?from\s+['"][^'"]+['"];?/g, '')
+  .replace(/\bexport\s+/g, '');
+
+const script = new vm.Script(cleanContent);
+
+// Run in a fully isolated sandbox to prevent global scope pollution
+const sandbox = {
+  window: window,
+  state: {},
+  document: document
+};
+sandbox.globalThis = window;
+
+vm.createContext(sandbox);
+script.runInContext(sandbox);
+
+const hideAdminUI = window.hideAdminUI;
+
 describe('Metadata Restriction', () => {
-    const { hideAdminUI } = require('../public/app.js');
 
     test('hideAdminUI removes metadata-tab and metadata-content for non-admin users', () => {
         document.body.innerHTML = `
