@@ -510,7 +510,7 @@ export const ctMatchesBadge = document.getElementById('ct-matches-badge');
 // --- STATE MANAGEMENT ---
 export const state = {
   APP_CONFIG: window.APP_CONFIG || {}, // Dynamically injected app config
-  API_BASE_URL: '',
+  API_BASE_URL: (window.APP_CONFIG && window.APP_CONFIG.baseUrl) ? window.APP_CONFIG.baseUrl.replace(/\/$/, '') : '',
   library: {},
   lastSearchQuery: '',
   lastSearchField: 'all',
@@ -746,5 +746,6 @@ const globalsObj = {
 Object.assign(state, globalsObj);
 if (typeof window !== 'undefined') {
   Object.assign(window, globalsObj);
+  window.API_BASE_URL = state.API_BASE_URL;
 }
 
