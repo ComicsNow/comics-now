@@ -28,7 +28,7 @@ export function bindToggleButton() {
       const comic = state.currentComic || window.currentComic;
       if (!comic || comic.guidedViewStatus !== 'completed' || !!comic.mangaMode || !state.GuidedView.isFullscreenOpen()) return;
       const willActivate = registry.getActiveModeName() !== 'bubble';
-      if (willActivate) await state.GuidedView.enableBubble(); else state.GuidedView.disable('bubble');
+      if (willActivate) await state.GuidedView.enableBubble(); else state.GuidedView.disableBubble();
     });
   }
 
@@ -40,7 +40,7 @@ export function bindToggleButton() {
       const comic = state.currentComic || window.currentComic;
       if (!comic || comic.guidedViewStatus !== 'completed' || !comic.mangaMode || !state.GuidedView.isFullscreenOpen()) return;
       const willActivate = registry.getActiveModeName() !== 'manga-speech-zoom';
-      if (willActivate) await state.GuidedView.enableMangaSpeechZoom(); else state.GuidedView.disable('manga-speech-zoom');
+      if (willActivate) await state.GuidedView.enableMangaSpeechZoom(); else state.GuidedView.disableMangaSpeechZoom();
     });
   }
 
@@ -52,7 +52,7 @@ export function bindToggleButton() {
       const comic = state.currentComic || window.currentComic;
       if (!comic || comic.guidedViewStatus !== 'completed' || !!comic.mangaMode || !state.GuidedView.isFullscreenOpen()) return;
       const willActivate = registry.getActiveModeName() !== 'western-speech-zoom';
-      if (willActivate) await state.GuidedView.enableWesternSpeechZoom(); else state.GuidedView.disable('western-speech-zoom');
+      if (willActivate) await state.GuidedView.enableWesternSpeechZoom(); else state.GuidedView.disableWesternSpeechZoom();
     });
   }
 
@@ -64,7 +64,7 @@ export function bindToggleButton() {
       const comic = state.currentComic || window.currentComic;
       if (!comic || comic.guidedViewStatus !== 'completed' || !comic.mangaMode || !state.GuidedView.isFullscreenOpen()) return;
       const willActivate = registry.getActiveModeName() !== 'manga-panel-zoom';
-      if (willActivate) await state.GuidedView.enableMangaPanelZoom(); else state.GuidedView.disable('manga-panel-zoom');
+      if (willActivate) await state.GuidedView.enableMangaPanelZoom(); else state.GuidedView.disableMangaPanelZoom();
     });
   }
 }
