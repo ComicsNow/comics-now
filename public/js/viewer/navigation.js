@@ -422,9 +422,9 @@ const global = new Proxy(typeof window !== 'undefined' ? window : globalThis, {
       global.comicViewerDiv.style.display = '';
     }
 
-    // Toggle Metadata tab visibility based on comic source (Hide for local/device comics)
+    // Toggle Metadata tab visibility based on comic source (Hide for local/device comics or folder mode library comics)
     if (global.metadataTabBtn) {
-      if (isLocal) {
+      if (isLocal || comic.libraryMode === 'folder') {
         global.metadataTabBtn.classList.add('hidden');
       } else {
         const isAdmin = window.syncManager && window.syncManager.userRole === 'admin';

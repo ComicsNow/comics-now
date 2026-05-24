@@ -417,6 +417,7 @@ export const viewerSeriesBtn = document.getElementById('viewer-series-btn');
 export const publisherAlphaFilter = document.getElementById('publisher-alpha-filter');
 export const seriesAlphaFilter = document.getElementById('series-alpha-filter');
 export const comicAlphaFilter = document.getElementById('comic-alpha-filter');
+export const folderAlphaFilter = document.getElementById('folder-alpha-filter');
 export const publisherTitleH2 = document.getElementById('publisher-title');
 export const seriesTitleH2 = document.getElementById('series-title');
 export const comicListTitleH2 = document.getElementById('comic-list-title');
@@ -652,6 +653,7 @@ const globalsObj = {
   publisherAlphaFilter,
   seriesAlphaFilter,
   comicAlphaFilter,
+  folderAlphaFilter,
   publisherTitleH2,
   seriesTitleH2,
   comicListTitleH2,

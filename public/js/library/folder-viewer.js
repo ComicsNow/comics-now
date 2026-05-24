@@ -1,4 +1,5 @@
-import { state, getRelativePath, escapeHtml } from '../globals.js';
+import { state, getRelativePath, escapeHtml, folderAlphaFilter } from '../globals.js';
+import { renderAlphaFilter } from './alpha-list.js';
 
 let lastFolderData = null;
 let lastFolderPath = null;
@@ -17,6 +18,12 @@ export async function showFolderView(folderPath, options = {}) {
      }
   }
 
+  if (state.currentView !== 'folder') {
+    state.activeAlphaFilter = 'All';
+    if (typeof window !== 'undefined') {
+      window.activeAlphaFilter = 'All';
+    }
+  }
   state.currentView = 'folder';
   state.currentRootFolder = state.currentRootFolder || folderPath;
   state.currentFolderPath = folderPath;
@@ -90,7 +97,11 @@ export async function showFolderView(folderPath, options = {}) {
 
   // Use cache if path is the same and not forcing
   if (lastFolderPath === folderPath && lastFolderData && !force) {
-    renderFolderView(lastFolderData);
+    if (folderAlphaFilter) {
+      renderAlphaFilter(folderAlphaFilter, lastFolderData, renderFolderView, 'folder');
+    } else {
+      renderFolderView(lastFolderData);
+    }
     return;
   }
 
@@ -131,7 +142,11 @@ export async function showFolderView(folderPath, options = {}) {
     if (data && data.ok) {
        lastFolderData = data;
        lastFolderPath = folderPath;
-       renderFolderView(data);
+       if (folderAlphaFilter) {
+         renderAlphaFilter(folderAlphaFilter, data, renderFolderView, 'folder');
+       } else {
+         renderFolderView(data);
+       }
     } else {
        if (container) {
          container.innerHTML = typeof createErrorMessage === 'function' ? createErrorMessage(data.message || 'Error loading folder.') : (data.message || 'Error loading folder.');

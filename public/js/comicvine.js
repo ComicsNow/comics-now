@@ -38,9 +38,9 @@ export async function performCvSearch() {
   // Disable search for local/device comics
   const comic = state.currentComic || window.currentComic;
   const isLocal = comic && (comic.handle || comic.file || (comic.id && String(comic.id).startsWith('device-')));
-  if (isLocal) {
+  if (isLocal || (comic && comic.libraryMode === 'folder')) {
     if (searchStatusDiv) {
-      searchStatusDiv.textContent = 'ComicVine search is only available for library comics.';
+      searchStatusDiv.textContent = 'ComicVine search is disabled for folder mode library comics.';
     }
     return;
   }
@@ -231,10 +231,7 @@ cvNextBtn?.addEventListener('click', async () => {
 });
 
 export async function applyMetadataFromSearch(volumeId) {
-  // Disable for local/device comics
-  const comic = state.currentComic || window.currentComic;
-  const isLocal = comic && (comic.handle || comic.file || (comic.id && String(comic.id).startsWith('device-')));
-  if (isLocal) return;
+  if (isLocal || (comic && comic.libraryMode === 'folder')) return;
 
   const prevStatus = searchStatusDiv ? searchStatusDiv.textContent : '';
   if (searchStatusDiv) searchStatusDiv.textContent = 'Fetching details...';
@@ -251,10 +248,7 @@ export async function applyMetadataFromSearch(volumeId) {
 
 // Apply ISSUE metadata from ComicVine to the Edit form
 export async function applyIssueMetadataFromSearch(issueId) {
-  // Disable for local/device comics
-  const comic = state.currentComic || window.currentComic;
-  const isLocal = comic && (comic.handle || comic.file || (comic.id && String(comic.id).startsWith('device-')));
-  if (isLocal) return;
+  if (isLocal || (comic && comic.libraryMode === 'folder')) return;
 
   const prevStatus = searchStatusDiv ? searchStatusDiv.textContent : '';
   if (searchStatusDiv) searchStatusDiv.textContent = 'Fetching issue details...';

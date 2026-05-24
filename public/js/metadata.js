@@ -30,8 +30,8 @@ async function loadMetadata() {
   // Local/device comics don't have editable metadata on the server
   const comic = global.currentComic;
   const isLocal = comic && (comic.handle || comic.file || (comic.id && String(comic.id).startsWith('device-')));
-  if (isLocal) {
-    global.metadataForm.innerHTML = `<p class="text-gray-400 text-center italic">Metadata management is only available for library comics.</p>`;
+  if (isLocal || (comic && comic.libraryMode === 'folder')) {
+    global.metadataForm.innerHTML = `<p class="text-gray-400 text-center italic">Metadata management is disabled for folder mode library comics.</p>`;
     return;
   }
 

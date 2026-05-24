@@ -205,6 +205,19 @@ export function renderAlphaFilter(targetDiv, data, renderFn, type) {
           return (char === '#' && !isNaN(parseInt(firstChar))) || (char === firstChar);
         });
         renderFn(filteredData);
+      } else if (type === 'folder' || type === 'folders') {
+        const filteredFolders = (data.folders || []).filter(item => {
+          const label = item.name || '';
+          const firstChar = label.charAt(0).toUpperCase();
+          return (char === '#' && !isNaN(parseInt(firstChar))) || (char === firstChar);
+        });
+        const filteredComics = (data.comics || []).filter(item => {
+          const info = typeof applyDisplayInfoToComic === 'function' ? applyDisplayInfoToComic(item) : item;
+          const label = info.displayTitle || item.name || '';
+          const firstChar = label.charAt(0).toUpperCase();
+          return (char === '#' && !isNaN(parseInt(firstChar))) || (char === firstChar);
+        });
+        renderFn({ ...data, folders: filteredFolders, comics: filteredComics });
       } else { // publishers, series
         const filteredData = {};
         for (const key in data) {
@@ -231,6 +244,19 @@ export function renderAlphaFilter(targetDiv, data, renderFn, type) {
         return (state.activeAlphaFilter === '#' && !isNaN(parseInt(firstChar))) || (state.activeAlphaFilter === firstChar);
       });
       renderFn(filteredData);
+    } else if (type === 'folder' || type === 'folders') {
+      const filteredFolders = (data.folders || []).filter(item => {
+        const label = item.name || '';
+        const firstChar = label.charAt(0).toUpperCase();
+        return (state.activeAlphaFilter === '#' && !isNaN(parseInt(firstChar))) || (state.activeAlphaFilter === firstChar);
+      });
+      const filteredComics = (data.comics || []).filter(item => {
+        const info = typeof applyDisplayInfoToComic === 'function' ? applyDisplayInfoToComic(item) : item;
+        const label = info.displayTitle || item.name || '';
+        const firstChar = label.charAt(0).toUpperCase();
+        return (state.activeAlphaFilter === '#' && !isNaN(parseInt(firstChar))) || (state.activeAlphaFilter === firstChar);
+      });
+      renderFn({ ...data, folders: filteredFolders, comics: filteredComics });
     } else {
       const filteredData = {};
       for (const key in data) {
