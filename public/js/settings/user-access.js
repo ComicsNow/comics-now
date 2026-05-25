@@ -245,10 +245,9 @@ export function renderLibraryAccessTree(tree, accessMap, container) {
     return;
   }
 
-  // Hierarchy: root_folder → publisher → series → comic
   rootFolders.forEach(rootFolder => {
-    const publishers = tree[rootFolder];
-    const rootDiv = createTreeNode('root_folder', rootFolder, publishers, accessMap, null);
+    const nodeInfo = tree[rootFolder];
+    const rootDiv = createTreeNode('root_folder', rootFolder, nodeInfo, accessMap, null);
     container.appendChild(rootDiv);
   });
 }
@@ -265,11 +264,22 @@ export function bubbleUncheck(nodeDiv) {
   }
 }
 
-export function createTreeNode(type, value, children, accessMap, parentNodeDiv, hasParentChildAccess = false) {
+export function createTreeNode(type, value, nodeInfo, accessMap, parentNodeDiv, hasParentChildAccess = false) {
   const key = `${type}:${value}`;
   const access = accessMap.get(key) || { direct: false, child: false };
-  const hasChildren = children && ((Array.isArray(children) && children.length > 0) || (typeof children === 'object' && Object.keys(children).length > 0));
   const isLeaf = type === 'comic'; // Comics are leaf nodes
+
+  // Determine if this node has children
+  let hasChildren = false;
+  if (type === 'root_folder') {
+    const children = nodeInfo?.children || {};
+    hasChildren = Object.keys(children).length > 0;
+  } else if (type === 'publisher' || type === 'folder') {
+    const children = nodeInfo?.children || nodeInfo || {};
+    hasChildren = Object.keys(children).length > 0;
+  } else if (type === 'series') {
+    hasChildren = Array.isArray(nodeInfo) && nodeInfo.length > 0;
+  }
 
   // Effective state based on database + parent inheritance
   const isDirectChecked = hasParentChildAccess || access.direct;
@@ -299,10 +309,10 @@ export function createTreeNode(type, value, children, accessMap, parentNodeDiv, 
     directCheckbox.dataset.accessMode = 'direct';
     directCheckbox.title = 'Direct access (this item only)';
 
-    // Add event listener to direct checkbox to check children if it's a series
+    // Add event listener to direct checkbox to check children if it's a series or folder
     directCheckbox.addEventListener('change', (e) => {
       e.stopPropagation();
-      if (directCheckbox.checked && type === 'series') {
+      if (directCheckbox.checked && (type === 'series' || type === 'folder')) {
         const childrenContainer = nodeDiv.querySelector('.children-container');
         if (childrenContainer) {
           childrenContainer.querySelectorAll('input[type="checkbox"]').forEach(checkbox => {
@@ -310,7 +320,7 @@ export function createTreeNode(type, value, children, accessMap, parentNodeDiv, 
           });
         }
       } else if (!directCheckbox.checked) {
-        if (type === 'series') {
+        if (type === 'series' || type === 'folder') {
           const childrenContainer = nodeDiv.querySelector('.children-container');
           if (childrenContainer) {
             childrenContainer.querySelectorAll('input[type="checkbox"]').forEach(checkbox => {
@@ -368,7 +378,6 @@ export function createTreeNode(type, value, children, accessMap, parentNodeDiv, 
             }
 
             // If checking siblings, we should also auto-check their internal children
-            // to match the visual expectation of "all siblings AND their content"
             if (recursiveCheckbox.checked) {
                const siblingInternalContainer = siblingNode.querySelector('.children-container');
                if (siblingInternalContainer) {
@@ -387,7 +396,7 @@ export function createTreeNode(type, value, children, accessMap, parentNodeDiv, 
       e.stopPropagation();
 
       if (childCheckbox.checked) {
-        // Auto-check Direct on this same node (need direct access if you have child access)
+        // Auto-check Direct on this same node
         directCheckbox.checked = true;
 
         // Recursively check all D and C on all descendants
@@ -395,19 +404,17 @@ export function createTreeNode(type, value, children, accessMap, parentNodeDiv, 
         if (childrenContainer) {
           childrenContainer.querySelectorAll('input[type="checkbox"]').forEach(checkbox => {
             const mode = checkbox.dataset.accessMode;
-            // Check all Direct and Child checkboxes, skip Recursive (UI helper)
             if (mode === 'direct' || mode === 'child' || mode === 'both') {
               checkbox.checked = true;
             }
           });
         }
       } else {
-        // Uncheck C: optionally uncheck all descendant D and C
+        // Uncheck C: uncheck all descendant D and C
         const childrenContainer = nodeDiv.querySelector('.children-container');
         if (childrenContainer) {
           childrenContainer.querySelectorAll('input[type="checkbox"]').forEach(checkbox => {
             const mode = checkbox.dataset.accessMode;
-            // Uncheck all Direct and Child checkboxes
             if (mode === 'direct' || mode === 'child' || mode === 'both') {
               checkbox.checked = false;
             }
@@ -444,7 +451,15 @@ export function createTreeNode(type, value, children, accessMap, parentNodeDiv, 
   // Label
   const label = document.createElement('label');
   label.className = 'flex-1 text-white cursor-pointer text-sm';
-  label.textContent = type === 'comic' ? value.name || value : value;
+  if (type === 'root_folder') {
+    label.textContent = value;
+  } else if (type === 'publisher' || type === 'series') {
+    label.textContent = value;
+  } else if (type === 'folder') {
+    label.textContent = value.replace(/\\/g, '/').split('/').pop();
+  } else if (type === 'comic') {
+    label.textContent = nodeInfo?.name || value;
+  }
   header.appendChild(label);
 
   // Expand icon (only for non-leaf nodes with children)
@@ -474,27 +489,51 @@ export function createTreeNode(type, value, children, accessMap, parentNodeDiv, 
     childrenContainer.className = 'children-container pl-6 pr-3 pb-2 bg-gray-900 hidden';
 
     if (type === 'root_folder') {
-      // Children are publishers (object with series objects)
-      Object.keys(children).sort().forEach(publisher => {
-        const series = children[publisher];
-        const publisherNode = createTreeNode('publisher', publisher, series, accessMap, nodeDiv, isChildChecked);
-        childrenContainer.appendChild(publisherNode);
-      });
+      const mode = nodeInfo.mode;
+      const children = nodeInfo.children || {};
+      if (mode === 'metadata') {
+        Object.keys(children).sort().forEach(publisher => {
+          const series = children[publisher];
+          const publisherNode = createTreeNode('publisher', publisher, series, accessMap, nodeDiv, isChildChecked);
+          childrenContainer.appendChild(publisherNode);
+        });
+      } else if (mode === 'folder') {
+        Object.keys(children).sort().forEach(key => {
+          const childNodeInfo = children[key];
+          if (childNodeInfo.type === 'folder') {
+            const folderNode = createTreeNode('folder', childNodeInfo.path, childNodeInfo, accessMap, nodeDiv, isChildChecked);
+            childrenContainer.appendChild(folderNode);
+          } else if (childNodeInfo.type === 'comic') {
+            const comicNode = createTreeNode('comic', childNodeInfo.id, childNodeInfo, accessMap, nodeDiv, isChildChecked);
+            childrenContainer.appendChild(comicNode);
+          }
+        });
+      }
     } else if (type === 'publisher') {
-      // Children are series (object with comics arrays)
-      Object.keys(children).sort().forEach(seriesName => {
-        const comics = children[seriesName];
+      Object.keys(nodeInfo).sort().forEach(seriesName => {
+        const comics = nodeInfo[seriesName];
         const seriesNode = createTreeNode('series', seriesName, comics, accessMap, nodeDiv, isChildChecked);
         childrenContainer.appendChild(seriesNode);
       });
     } else if (type === 'series') {
-      // Children are comics (array of comic objects)
-      if (Array.isArray(children)) {
-        children.forEach(comic => {
+      if (Array.isArray(nodeInfo)) {
+        nodeInfo.forEach(comic => {
           const comicNode = createTreeNode('comic', comic, null, accessMap, nodeDiv, isChildChecked);
           childrenContainer.appendChild(comicNode);
         });
       }
+    } else if (type === 'folder') {
+      const children = nodeInfo.children || {};
+      Object.keys(children).sort().forEach(key => {
+        const childNodeInfo = children[key];
+        if (childNodeInfo.type === 'folder') {
+          const folderNode = createTreeNode('folder', childNodeInfo.path, childNodeInfo, accessMap, nodeDiv, isChildChecked);
+          childrenContainer.appendChild(folderNode);
+        } else if (childNodeInfo.type === 'comic') {
+          const comicNode = createTreeNode('comic', childNodeInfo.id, childNodeInfo, accessMap, nodeDiv, isChildChecked);
+          childrenContainer.appendChild(comicNode);
+        }
+      });
     }
 
     nodeDiv.appendChild(childrenContainer);

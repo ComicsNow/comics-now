@@ -391,15 +391,26 @@ module.exports = function attach(router, deps) {
   // Get library tree structure for access control
   router.get('/api/v1/library-tree', requireAdmin, async (req, res) => {
     try {
-      // Get unique publisher/series combinations to build the hierarchy
-      const comics = await dbAll(`
-        SELECT MIN(path) as path, publisher, series
-        FROM comics
-        GROUP BY publisher, series
-      `);
+      // Get all comics to build dynamic folder or metadata hierarchies
+      const comics = await dbAll('SELECT id, path, name, publisher, series FROM comics');
 
       // Get root folders from config
       const rootFolders = getComicsDirectories();
+
+      // Retrieve configured libraries to know hierarchy mode
+      const config = getConfig();
+      const libraries = Array.isArray(config.libraries) ? [...config.libraries] : [];
+      if (config.comicsLocation && !libraries.some(l => l.path === config.comicsLocation)) {
+        libraries.push({
+          path: config.comicsLocation,
+          hierarchyMode: 'metadata'
+        });
+      }
+
+      const getLibraryMode = (rootFolder) => {
+        const lib = libraries.find(l => l.path === rootFolder);
+        return lib?.hierarchyMode || 'metadata';
+      };
 
       // Helper: determine which root folder a comic belongs to
       const getRootFolder = (comicPath) => {
@@ -411,24 +422,66 @@ module.exports = function attach(router, deps) {
         return 'Unknown';
       };
 
-      // Build hierarchical tree: root_folder -> publisher -> series
-      // Series is the lowest level for access control (comics not included)
+      // Build dynamic tree structure
       const tree = {};
+
+      // Pre-initialize root folders to handle empty libraries gracefully
+      for (const folder of rootFolders) {
+        const mode = getLibraryMode(folder);
+        tree[folder] = {
+          mode,
+          children: {}
+        };
+      }
 
       for (const comic of comics) {
         const rootFolder = getRootFolder(comic.path);
-        const pub = comic.publisher || 'Unknown Publisher';
-        const ser = comic.series || 'Unknown Series';
+        if (rootFolder === 'Unknown') continue;
 
-        // Initialize structure
-        if (!tree[rootFolder]) {
-          tree[rootFolder] = {};
-        }
-        if (!tree[rootFolder][pub]) {
-          tree[rootFolder][pub] = {};
-        }
-        if (!tree[rootFolder][pub][ser]) {
-          tree[rootFolder][pub][ser] = true; // Just mark that series exists, don't store comics
+        const mode = tree[rootFolder].mode;
+
+        if (mode === 'metadata') {
+          // Metadata Mode structure: root_folder -> publisher -> series
+          const pub = comic.publisher || 'Unknown Publisher';
+          const ser = comic.series || 'Unknown Series';
+
+          if (!tree[rootFolder].children[pub]) {
+            tree[rootFolder].children[pub] = {};
+          }
+          if (!tree[rootFolder].children[pub][ser]) {
+            tree[rootFolder].children[pub][ser] = true;
+          }
+        } else {
+          // Folder Mode structure: physical hierarchy relative to root folder
+          const relPath = path.relative(rootFolder, comic.path);
+          const parts = relPath.split(path.sep);
+
+          let current = tree[rootFolder].children;
+          let currentPath = rootFolder;
+
+          for (let i = 0; i < parts.length; i++) {
+            const part = parts[i];
+            currentPath = path.join(currentPath, part);
+
+            if (i === parts.length - 1) {
+              // It's the comic file itself (leaf node)
+              current[part] = {
+                type: 'comic',
+                id: comic.id,
+                name: part
+              };
+            } else {
+              // It's a directory node
+              if (!current[part]) {
+                current[part] = {
+                  type: 'folder',
+                  path: currentPath,
+                  children: {}
+                };
+              }
+              current = current[part].children;
+            }
+          }
         }
       }
 

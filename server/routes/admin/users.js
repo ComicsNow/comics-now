@@ -78,18 +78,19 @@ module.exports = function attach(router, deps) {
       // Clear existing access for this user
       await dbRun('DELETE FROM user_library_access WHERE userId = ?', [userId]);
 
-      // Smart normalization: If a parent has child_access but some children are missing,
-      // convert to direct_access on parent + direct_access on each present child
+      // Separate folder-mode access from metadata-mode access
+      const folderComicAccess = access.filter(item => item.accessType === 'folder' || item.accessType === 'comic');
+      const metadataAccess = access.filter(item => item.accessType === 'root_folder' || item.accessType === 'publisher' || item.accessType === 'series');
+
       let normalizedAccess = [];
 
-      if (access.length > 0) {
+      if (metadataAccess.length > 0) {
         // Build hierarchy map from comics database
         const comics = await dbAll('SELECT MIN(path) as path, publisher, series FROM comics GROUP BY publisher, series');
         const rootFolders = getComicsDirectories();
 
         // Map: root_folder -> Set of publishers
         // Map: publisher -> Set of series
-        // No need to map series -> comics since series is the lowest level for access control
         const rootToPublishers = new Map();
         const publisherToSeries = new Map();
 
@@ -124,13 +125,13 @@ module.exports = function attach(router, deps) {
 
         // Build set of what children are present in access list
         const accessSet = new Map();
-        for (const item of access) {
+        for (const item of metadataAccess) {
           const key = `${item.accessType}:${item.accessValue}`;
           accessSet.set(key, item);
         }
 
         // Process each access item
-        for (const item of access) {
+        for (const item of metadataAccess) {
           let shouldNormalize = false;
           let allChildren = [];
 
@@ -144,16 +145,11 @@ module.exports = function attach(router, deps) {
               );
 
               // Only normalize if SOME (but not all) children are present
-              // If ALL children are present, keep child_access and remove redundant children
-              // If NO children or SOME children, convert child_access to direct_access only
               if (presentChildren.length === allChildren.length && allChildren.length > 0) {
-                // All children present - keep child_access, will remove redundant children later
                 shouldNormalize = false;
               } else if (presentChildren.length > 0) {
-                // Some children present - remove child_access (selective access)
                 shouldNormalize = true;
               } else {
-                // No children present - this is fine, child_access covers everything
                 shouldNormalize = false;
               }
 
@@ -163,7 +159,6 @@ module.exports = function attach(router, deps) {
               const presentChildren = allChildren.filter(series =>
                 accessSet.has(`series:${series}`)
               );
-              // Same logic as root_folder
               if (presentChildren.length === allChildren.length && allChildren.length > 0) {
                 shouldNormalize = false;
               } else if (presentChildren.length > 0) {
@@ -173,9 +168,6 @@ module.exports = function attach(router, deps) {
               }
 
             } else if (item.accessType === 'series') {
-              // Series is the lowest level for access control
-              // Series doesn't support child_access (it automatically grants access to all comics)
-              // If somehow child_access was set, we should normalize it away
               if (item.child_access) {
                 shouldNormalize = true;
                 allChildren = ['dummy']; // Set to non-empty to trigger normalization
@@ -202,8 +194,6 @@ module.exports = function attach(router, deps) {
         }
 
         // Remove redundant child entries when parent has child_access
-        // If root_folder has child_access, remove all publisher/series under it
-        // If publisher has child_access, remove all series under it
         const finalAccess = [];
         const rootFoldersWithChildAccess = new Set();
         const publishersWithChildAccess = new Set();
@@ -251,7 +241,6 @@ module.exports = function attach(router, deps) {
           if (item.accessType === 'publisher') {
             const rootFolder = publisherToRootFolder.get(item.accessValue);
             if (rootFolder && rootFoldersWithChildAccess.has(rootFolder)) {
-              // This publisher is covered by root folder's child_access, skip it
               continue;
             }
           }
@@ -260,14 +249,12 @@ module.exports = function attach(router, deps) {
           if (item.accessType === 'series') {
             const publisher = seriesToPublisher.get(item.accessValue);
             if (publisher) {
-              // Check if publisher has child_access
               if (publishersWithChildAccess.has(publisher)) {
-                continue; // Skip - covered by publisher's child_access
+                continue;
               }
-              // Check if root folder has child_access
               const rootFolder = publisherToRootFolder.get(publisher);
               if (rootFolder && rootFoldersWithChildAccess.has(rootFolder)) {
-                continue; // Skip - covered by root folder's child_access
+                continue;
               }
             }
           }
@@ -278,19 +265,40 @@ module.exports = function attach(router, deps) {
         normalizedAccess = finalAccess;
       }
 
-      // Insert normalized access permissions
-      if (normalizedAccess.length > 0) {
-        for (const item of normalizedAccess) {
+      // Combine back with folder mode access
+      const allFinalAccess = [...normalizedAccess, ...folderComicAccess];
+
+      // Insert access permissions
+      if (allFinalAccess.length > 0) {
+        for (const item of allFinalAccess) {
           if (!item.accessType || !item.accessValue) continue;
 
-          // Skip comic-level access (series is the lowest level)
+          // For folder and comic types, save them directly
           if (item.accessType === 'comic') {
-            log('WARN', 'ACCESS', `Skipping comic-level access for user ${userId} - series is the lowest level`);
+            const directAccess = item.direct_access === true || item.direct_access === 1 ? 1 : 0;
+            if (directAccess) {
+              await dbRun(
+                'INSERT INTO user_library_access (userId, accessType, accessValue, direct_access, child_access) VALUES (?, ?, ?, ?, 0)',
+                [userId, 'comic', item.accessValue, directAccess]
+              );
+            }
             continue;
           }
 
+          if (item.accessType === 'folder') {
+            const directAccess = item.direct_access === true || item.direct_access === 1 ? 1 : 0;
+            const childAccess = item.child_access === true || item.child_access === 1 ? 1 : 0;
+            if (directAccess || childAccess) {
+              await dbRun(
+                'INSERT INTO user_library_access (userId, accessType, accessValue, direct_access, child_access) VALUES (?, ?, ?, ?, ?)',
+                [userId, 'folder', item.accessValue, directAccess, childAccess]
+              );
+            }
+            continue;
+          }
+
+          // Metadata mode entries (root_folder, publisher, series)
           const directAccess = item.direct_access === true ? 1 : 0;
-          // Series doesn't support child_access (it grants access to all comics by default)
           let childAccess = (item.accessType === 'series') ? 0 : (item.child_access === true ? 1 : 0);
 
           // Can't have child_access without direct_access
@@ -308,7 +316,7 @@ module.exports = function attach(router, deps) {
         }
       }
 
-      log('INFO', 'ACCESS', `Updated access permissions for user ${userId}: ${normalizedAccess.length} entries`);
+      log('INFO', 'ACCESS', `Updated access permissions for user ${userId}: ${allFinalAccess.length} entries`);
       res.json({ ok: true, message: 'Access permissions updated successfully' });
     } catch (error) {
       log('ERROR', 'ACCESS', `Failed to update user access: ${error.message}`);

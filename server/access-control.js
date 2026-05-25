@@ -37,11 +37,54 @@ async function checkComicAccess(userId, userRole, comicPath, publisher, series, 
     [userId]
   );
 
-  // Hierarchical access control: Check from top to bottom
-  // User MUST have access at root folder level first, then publisher, then series
-  // Child access at any parent level grants access to all descendants
+  // Retrieve library mode from config
+  const libraries = require('./config').getLibraries();
+  const library = libraries.find(l => l.path === rootFolder);
+  const isFolderMode = library?.hierarchyMode === 'folder';
 
-  // Check if any parent has child_access that would grant access to this comic
+  // Verify Root Folder Access (Mandatory for both modes)
+  const hasRootAccess = accessList.some(a =>
+    a.accessType === 'root_folder' &&
+    a.accessValue === rootFolder &&
+    (a.direct_access === 1 || a.child_access === 1)
+  );
+  if (!hasRootAccess) return false;
+
+  // Folder Mode Access Resolution
+  if (isFolderMode) {
+    // Check direct comic file permission
+    const hasDirectComic = accessList.some(a => 
+      a.accessType === 'comic' && 
+      a.accessValue === comicId && 
+      a.direct_access === 1
+    );
+    if (hasDirectComic) return true;
+
+    // Check recursive parent directory permission
+    const normalizedPath = path.normalize(comicPath);
+    for (const perm of accessList) {
+      if (perm.accessType === 'folder' && perm.child_access === 1) {
+        const normalizedFolder = path.normalize(perm.accessValue);
+        if (normalizedPath === normalizedFolder || normalizedPath.startsWith(normalizedFolder + path.sep)) {
+          return true; // Inherited recursive access granted
+        }
+      }
+    }
+
+    // Check direct parent directory permission
+    const parentFolder = path.dirname(normalizedPath);
+    const hasDirectParent = accessList.some(a =>
+      a.accessType === 'folder' &&
+      path.normalize(a.accessValue) === parentFolder &&
+      a.direct_access === 1
+    );
+    if (hasDirectParent) return true;
+
+    return false; // Access Denied in Folder Mode
+  }
+
+  // --- METADATA MODE RESOLUTION (Existing logic kept intact) ---
+
   // Check root folder child_access
   const rootChildAccess = accessList.find(a =>
     a.accessType === 'root_folder' &&
