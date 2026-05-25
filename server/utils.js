@@ -36,6 +36,17 @@ function resolveLibraryPath(requestedPath, getPathFromLibraryId) {
   // Normalize separators to forward slashes for matching
   const normalizedPath = requestedPath.replace(/\\/g, '/');
 
+  // Handle Smart Inbox virtual path
+  if (normalizedPath.startsWith('Smart Inbox/')) {
+    const config = require('./config').getConfig();
+    const relativePart = normalizedPath.slice('Smart Inbox/'.length);
+    return path.join(config.comicsLocation, relativePart.replace(/\//g, path.sep));
+  }
+  if (normalizedPath === 'Smart Inbox') {
+    const config = require('./config').getConfig();
+    return config.comicsLocation;
+  }
+
   // Check if it starts with lib_X
   const libMatch = /^lib_(\d+)([\\/].*)?$/.exec(normalizedPath);
   if (libMatch) {
@@ -204,6 +215,18 @@ async function pMap(items, mapper, concurrency = 5) {
   return results;
 }
 
+function trimObjectStrings(obj) {
+  if (!obj || typeof obj !== 'object') return obj;
+  for (const key of Object.keys(obj)) {
+    if (typeof obj[key] === 'string') {
+      obj[key] = obj[key].trim();
+    } else if (typeof obj[key] === 'object') {
+      trimObjectStrings(obj[key]);
+    }
+  }
+  return obj;
+}
+
 module.exports = {
   createId,
   safeDirName,
@@ -217,5 +240,6 @@ module.exports = {
   stripHtml,
   sanitizeHtml,
   deepFreeze,
-  pMap
+  pMap,
+  trimObjectStrings
 };

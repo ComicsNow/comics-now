@@ -196,7 +196,11 @@ function getConfig() {
 }
 
 function getComicsDirectories() {
-  return (config.libraries || []).map(lib => lib.path);
+  const dirs = (config.libraries || []).map(lib => lib.path);
+  if (config.comicsLocation && !dirs.includes(config.comicsLocation)) {
+    dirs.push(config.comicsLocation);
+  }
+  return dirs;
 }
 
 function getLibraries() {

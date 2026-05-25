@@ -389,6 +389,29 @@ metadataForm?.addEventListener('submit', async (e) => {
         saveStatusDiv.textContent = 'Changes saved successfully!';
       }
     }
+
+    if (state.currentComic) {
+      state.currentComic.metadata = JSON.stringify(state.currentMetadata);
+      const hasSeries = (state.currentMetadata.Series || '').toString().trim().length > 0;
+      const hasPublisher = (state.currentMetadata.Publisher || '').toString().trim().length > 0;
+      const hasDate = (state.currentMetadata.Year || state.currentMetadata.CoverDate || state.currentMetadata.StoreDate || state.currentMetadata['Cover Date'] || state.currentMetadata['Store Date'] || '').toString().trim().length > 0;
+      const newTag = (hasSeries && hasPublisher && hasDate) ? 'successful' : 'failed';
+      state.currentComic.tagStatus = newTag;
+
+      const comicMap = state.comicIdMap || window.comicIdMap;
+      if (comicMap) {
+        const mapped = comicMap.get(state.currentComic.id);
+        if (mapped) {
+          mapped.metadata = state.currentComic.metadata;
+          mapped.tagStatus = newTag;
+        }
+      }
+
+      const updateFilterCountsFn = state.updateFilterButtonCounts || window.updateFilterButtonCounts;
+      if (typeof updateFilterCountsFn === 'function') {
+        updateFilterCountsFn();
+      }
+    }
     
     const setComicSummaryFn = state.setComicSummary || window.setComicSummary;
     if (typeof setComicSummaryFn === 'function') {

@@ -1,11 +1,6 @@
 const path = require('path');
 
 async function checkComicAccess(userId, userRole, comicPath, publisher, series, rootFolders, comicId = null, preFetchedAccessList = null, dbAllFunc) {
-  // Admins have access to everything
-  if (userRole === 'admin') {
-    return true;
-  }
-
   // Determine which root folder this comic belongs to
   let rootFolder = 'Unknown';
   for (const folder of rootFolders) {
@@ -13,6 +8,25 @@ async function checkComicAccess(userId, userRole, comicPath, publisher, series, 
       rootFolder = folder;
       break;
     }
+  }
+
+  // Always grant access to files in the inbox / comicsLocation
+  const config = require('./config').getConfig();
+  if (config.comicsLocation) {
+    const normLocation = config.comicsLocation.replace(/\\/g, '/');
+    const normPath = comicPath.replace(/\\/g, '/');
+    const isInboxPath = normPath === normLocation || normPath.startsWith(normLocation + '/');
+    if (isInboxPath) {
+      const normRootFolder = rootFolder.replace(/\\/g, '/');
+      if (normRootFolder === 'Unknown' || normRootFolder === normLocation) {
+        return true;
+      }
+    }
+  }
+
+  // Admins have access to everything
+  if (userRole === 'admin') {
+    return true;
   }
 
   // Get user's access permissions (all at once for efficiency)

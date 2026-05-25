@@ -13,7 +13,7 @@ export const cvState = {
   limit: 20,      // results per page
   total: 0,
   lastQuery: '',
-  lastResources: 'volume',
+  lastResources: 'issue',
   lastSort: '',
   lastField: 'all'
 };
@@ -46,7 +46,7 @@ export async function performCvSearch() {
   }
 
   const query     = cvState.lastQuery;
-  const resources = cvState.lastResources || 'volume';
+  const resources = cvState.lastResources || 'issue';
   const sort      = cvState.lastSort || '';
   const field     = cvState.lastField || 'all';
 
@@ -62,7 +62,7 @@ export async function performCvSearch() {
     limit: String(cvState.limit)
   });
   if (sort) params.set('sort', sort);
-  if (field === 'title') params.set('filter', `name:${query}`);
+  if (field === 'series') params.set('filter', `name:${query}`);
 
   try {
     const response = await fetch(`${state.API_BASE_URL || ''}/api/v1/search/comicvine?${params.toString()}`);
@@ -207,7 +207,7 @@ if (searchForm) {
     const resourcesEl     = document.getElementById('cv-resources');
     const sortEl          = document.getElementById('cv-sort');
     cvState.lastField     = fieldEl?.value || 'all';
-    cvState.lastResources = resourcesEl?.value || 'volume';
+    cvState.lastResources = resourcesEl?.value || 'issue';
     cvState.lastSort      = sortEl?.value || '';
     cvState.page          = 1;
     await performCvSearch();
@@ -231,6 +231,8 @@ cvNextBtn?.addEventListener('click', async () => {
 });
 
 export async function applyMetadataFromSearch(volumeId) {
+  const comic = state.currentComic || window.currentComic;
+  const isLocal = comic && (comic.handle || comic.file || (comic.id && String(comic.id).startsWith('device-')));
   if (isLocal || (comic && comic.libraryMode === 'folder')) return;
 
   const prevStatus = searchStatusDiv ? searchStatusDiv.textContent : '';
@@ -248,6 +250,8 @@ export async function applyMetadataFromSearch(volumeId) {
 
 // Apply ISSUE metadata from ComicVine to the Edit form
 export async function applyIssueMetadataFromSearch(issueId) {
+  const comic = state.currentComic || window.currentComic;
+  const isLocal = comic && (comic.handle || comic.file || (comic.id && String(comic.id).startsWith('device-')));
   if (isLocal || (comic && comic.libraryMode === 'folder')) return;
 
   const prevStatus = searchStatusDiv ? searchStatusDiv.textContent : '';

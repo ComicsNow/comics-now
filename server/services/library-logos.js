@@ -29,18 +29,46 @@ async function logoNeedsBackground(fullPath) {
   try {
     const image = sharp(fullPath);
     const metadata = await image.metadata();
-    if (!metadata || (metadata.format || '').toLowerCase() !== 'png') {
+    if (!metadata) {
+      return false;
+    }
+    const format = (metadata.format || '').toLowerCase();
+    if (format !== 'png' && format !== 'svg' && format !== 'webp') {
       return false;
     }
     if (!metadata.hasAlpha) {
       return false;
     }
-    const stats = await image.clone().stats();
-    const alphaChannel = Array.isArray(stats?.channels) ? stats.channels[stats.channels.length - 1] : null;
-    if (!alphaChannel) {
+    
+    // Get raw pixel data
+    const { data } = await image.raw().toBuffer({ resolveWithObject: true });
+    
+    let totalBrightness = 0;
+    let visiblePixelCount = 0;
+    
+    // Every pixel is 4 bytes (RGBA) in raw format
+    for (let i = 0; i < data.length; i += 4) {
+      const r = data[i];
+      const g = data[i + 1];
+      const b = data[i + 2];
+      const a = data[i + 3];
+      
+      if (a > 15) { // Only count pixels that are not fully transparent
+        // Standard perceived brightness formula:
+        const brightness = 0.299 * r + 0.587 * g + 0.114 * b;
+        totalBrightness += brightness;
+        visiblePixelCount++;
+      }
+    }
+    
+    if (visiblePixelCount === 0) {
       return false;
     }
-    return alphaChannel.min < 255;
+    
+    const avgBrightness = totalBrightness / visiblePixelCount;
+    // If the average brightness of the visible pixels is dark (less than 120 out of 255),
+    // it needs a light background to be visible on our dark theme.
+    return avgBrightness < 120;
   } catch (err) {
     log('ERROR', 'LOGOS', `Failed to inspect logo ${fullPath}: ${err.message}`);
     return false;

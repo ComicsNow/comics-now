@@ -70,13 +70,17 @@ async function buildLibrary(userId = 'default-user') {
 
     // User has access to this comic, include it in the library
     const absoluteRootDir = directories.find(d => r.path.startsWith(d));
-    const rootDirKey = require('../config').getLibraryIdFromPath(absoluteRootDir) || 'Library';
+    const configObj = require('../config').getConfig();
+    const comicsLocation = configObj.comicsLocation;
+    const isInboxComic = comicsLocation && r.path.startsWith(comicsLocation);
+
+    const rootDirKey = isInboxComic ? 'Smart Inbox' : (require('../config').getLibraryIdFromPath(absoluteRootDir) || 'Library');
 
     if (!lib[rootDirKey]) {
       const config = libraryConfigs.find(c => c.path === absoluteRootDir);
       lib[rootDirKey] = { 
         publishers: {},
-        hierarchyMode: config ? config.hierarchyMode : 'metadata'
+        hierarchyMode: isInboxComic ? 'metadata' : (config ? config.hierarchyMode : 'metadata')
       };
     }
     if (!lib[rootDirKey].publishers[r.publisher]) {
@@ -108,7 +112,7 @@ async function buildLibrary(userId = 'default-user') {
     const { mangaMode, continuousMode } = resolveReadingModes(r.id, r.series, r.publisher, r.path, prefMaps, directories);
 
     // Redact absolute path: Replace absolute root with library ID
-    const relativePath = path.relative(absoluteRootDir, r.path);
+    const relativePath = path.relative(isInboxComic ? comicsLocation : absoluteRootDir, r.path);
     const redactedPath = path.join(rootDirKey, relativePath);
 
     lib[rootDirKey].publishers[r.publisher].series[r.series].push({
@@ -125,7 +129,8 @@ async function buildLibrary(userId = 'default-user') {
       mangaMode: mangaMode,
       continuousMode: continuousMode,
       guidedViewStatus: r.guidedViewStatus || 'pending',
-      libraryMode: r.libraryMode
+      libraryMode: isInboxComic ? 'metadata' : r.libraryMode,
+      tagStatus: r.tagStatus || 'pending'
     });
   }
 

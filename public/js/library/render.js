@@ -385,6 +385,7 @@ export function showPublisherList(rootFolder, options = {}) {
     window.currentSeries = state.currentSeries;
   }
   syncSmartFilterButtons();
+  if (typeof updateFilterButtonCounts === 'function') updateFilterButtonCounts();
 
   const publishers = rootData ? rootData.publishers : {};
   const publishersToRender = filterPublishersByActiveFilter(publishers);
@@ -501,7 +502,7 @@ export function renderPublisherCards(publishersToShow) {
     const needsLightBackground = Boolean(publisherData.logoNeedsBackground);
     const logoWrapperClasses = ['flex', 'items-center', 'justify-center', 'h-full', 'w-full'];
     if (needsLightBackground) {
-      logoWrapperClasses.push('bg-gray-900', 'rounded-md', 'p-4');
+      logoWrapperClasses.push('bg-white/95', 'rounded-lg', 'p-4', 'shadow-inner');
     }
     const logoContent = hasLogo
       ? `<div class="${logoWrapperClasses.join(' ')}"><img src="${API_BASE_URL}/${publisherData.logoUrl}" alt="${escapeHtml(publisher)}" class="h-full w-full object-contain"></div>`
@@ -640,6 +641,7 @@ export function showSeriesList(publisherName, options = {}) {
     window.currentSeries = state.currentSeries;
   }
   syncSmartFilterButtons();
+  if (typeof updateFilterButtonCounts === 'function') updateFilterButtonCounts();
 
   const normalizedPath = state.currentRootFolder ? state.currentRootFolder.replace(/[\\\/]+$/, '') : '';
   const rootData = state.library?.[state.currentRootFolder] || state.library?.[normalizedPath] || state.library?.[normalizedPath + '/'];
@@ -961,6 +963,7 @@ export async function showComicList(seriesName) {
     window.currentSeries = state.currentSeries;
   }
   syncSmartFilterButtons();
+  if (typeof updateFilterButtonCounts === 'function') updateFilterButtonCounts();
 
   showView(comicListDiv);
   mountSmartFilterHostInto(comicListDiv);
@@ -991,12 +994,23 @@ export async function showComicList(seriesName) {
     const scoped = state.activeSmartFilter ? comicsData.filter(matchesScope) : comicsData;
 
     let comicsToRender = scoped;
-    if (state.activeFilter === 'in-progress') {
-      comicsToRender = scoped.filter(comic => getComicStatus(comic) === 'in-progress');
-    } else if (state.activeFilter === 'read') {
-      comicsToRender = scoped.filter(comic => getComicStatus(comic) === 'read');
-    } else if (state.activeFilter === 'unread') {
-      comicsToRender = scoped.filter(comic => getComicStatus(comic) === 'unread');
+    const isInbox = state.currentRootFolder === 'Smart Inbox';
+    if (isInbox) {
+      if (state.activeFilter === 'unread') {
+        comicsToRender = scoped.filter(comic => (comic.tagStatus || 'pending') === 'successful');
+      } else if (state.activeFilter === 'in-progress') {
+        comicsToRender = scoped.filter(comic => (comic.tagStatus || 'pending') === 'failed');
+      } else if (state.activeFilter === 'read') {
+        comicsToRender = scoped.filter(comic => (comic.tagStatus || 'pending') === 'pending');
+      }
+    } else {
+      if (state.activeFilter === 'in-progress') {
+        comicsToRender = scoped.filter(comic => getComicStatus(comic) === 'in-progress');
+      } else if (state.activeFilter === 'read') {
+        comicsToRender = scoped.filter(comic => getComicStatus(comic) === 'read');
+      } else if (state.activeFilter === 'unread') {
+        comicsToRender = scoped.filter(comic => getComicStatus(comic) === 'unread');
+      }
     }
 
     renderAlphaFilter(comicAlphaFilter, comicsToRender, renderComicCards, 'comics');
@@ -1102,11 +1116,12 @@ export function renderComicCards(comicsToRender, viewType, targetContainer) {
 
     const progressPercent = trackedTotalPages > 0 ? (lastRead / trackedTotalPages) * 100 : 0;
 
+    const isInbox = state.currentRootFolder === 'Smart Inbox';
     const isComicDownloaded = state.downloadedComicIds.has(comic.id);
     const downloadIcon = isComicDownloaded ? ICONS.READ : ICONS.DOWNLOAD;
     
-    // Don't show download button for local/device comics
-    const downloadButtonHtml = isLocal ? '' : `<button class="download-btn absolute top-2 right-2 ${isComicDownloaded ? 'text-green-400' : 'text-gray-400 hover:text-white'}" 
+    // Don't show download button for local/device or inbox comics
+    const downloadButtonHtml = (isLocal || isInbox) ? '' : `<button class="download-btn absolute top-2 right-2 ${isComicDownloaded ? 'text-green-400' : 'text-gray-400 hover:text-white'}" 
           data-comic-id="${comic.id}" 
           data-is-downloaded="${isComicDownloaded}"
           title="${isComicDownloaded ? 'Delete from device' : 'Download comic'}">
@@ -1118,7 +1133,7 @@ export function renderComicCards(comicsToRender, viewType, targetContainer) {
       ? ICONS.READ
       : ICONS.UNREAD;
 
-    const toggleStatusButtonHtml = isLocal ? '' : `
+    const toggleStatusButtonHtml = (isLocal || isInbox) ? '' : `
       <button class="status-toggle-btn absolute top-2 left-2 ${isRead ? 'text-green-400' : 'text-gray-400'} hover:text-white" title="Toggle Read Status" data-comic-id="${comic.id}" data-current-status="${isRead ? 'read' : 'unread'}">
         ${toggleStatusIcon}
       </button>
@@ -1168,42 +1183,44 @@ export function renderComicCards(comicsToRender, viewType, targetContainer) {
     let longPressTimer = null;
     let contextMenuShown = false;
 
-    card.addEventListener('contextmenu', (e) => {
-      if (typeof window.showComicContextMenu === 'function') {
-        window.showComicContextMenu(e, comic);
-      }
-    });
-
-    // Long-press for mobile
-    card.addEventListener('touchstart', (e) => {
-      contextMenuShown = false;
-      longPressTimer = setTimeout(() => {
+    if (!isInbox) {
+      card.addEventListener('contextmenu', (e) => {
         if (typeof window.showComicContextMenu === 'function') {
-          contextMenuShown = true;
           window.showComicContextMenu(e, comic);
         }
-      }, 500); // 500ms long press
-    });
+      });
 
-    card.addEventListener('touchend', (e) => {
-      if (longPressTimer) {
-        clearTimeout(longPressTimer);
-        longPressTimer = null;
-      }
-      // Prevent click if context menu was just shown
-      if (contextMenuShown) {
-        e.preventDefault();
-        e.stopPropagation();
+      // Long-press for mobile
+      card.addEventListener('touchstart', (e) => {
         contextMenuShown = false;
-      }
-    });
+        longPressTimer = setTimeout(() => {
+          if (typeof window.showComicContextMenu === 'function') {
+            contextMenuShown = true;
+            window.showComicContextMenu(e, comic);
+          }
+        }, 500); // 500ms long press
+      });
 
-    card.addEventListener('touchmove', () => {
-      if (longPressTimer) {
-        clearTimeout(longPressTimer);
-        longPressTimer = null;
-      }
-    });
+      card.addEventListener('touchend', (e) => {
+        if (longPressTimer) {
+          clearTimeout(longPressTimer);
+          longPressTimer = null;
+        }
+        // Prevent click if context menu was just shown
+        if (contextMenuShown) {
+          e.preventDefault();
+          e.stopPropagation();
+          contextMenuShown = false;
+        }
+      });
+
+      card.addEventListener('touchmove', () => {
+        if (longPressTimer) {
+          clearTimeout(longPressTimer);
+          longPressTimer = null;
+        }
+      });
+    }
 
     card.addEventListener('click', (event) => {
       const target = event.target;

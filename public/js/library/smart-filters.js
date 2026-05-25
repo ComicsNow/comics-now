@@ -57,10 +57,19 @@ export function clearSmartFilterButtons() {
 
 export function syncSmartFilterButtons() {
   const scope = state.activeSmartFilter || window.activeSmartFilter || null;
-  setLatestButtonActive(scope === 'latest');
-  setDownloadedButtonActive(scope === 'downloaded');
-  setGuidedButtonActive(scope === 'guided');
-  setMangaFilterButtonActive(scope === 'manga' || scope === 'non-manga');
+  const isInbox = (state.currentRootFolder || window.currentRootFolder) === 'Smart Inbox';
+
+  if (isInbox) {
+    setLatestButtonActive(scope === 'successful');
+    setDownloadedButtonActive(scope === 'failed');
+    setGuidedButtonActive(false);
+    setMangaFilterButtonActive(false);
+  } else {
+    setLatestButtonActive(scope === 'latest');
+    setDownloadedButtonActive(scope === 'downloaded');
+    setGuidedButtonActive(scope === 'guided');
+    setMangaFilterButtonActive(scope === 'manga' || scope === 'non-manga');
+  }
   const modeToggle = document.getElementById('smart-scope-mode-toggle');
   if (modeToggle) {
     const activeFilter = state.activeFilter || window.activeFilter;

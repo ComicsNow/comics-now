@@ -55,9 +55,11 @@ export function getComicStatusCounts(comicsInSeries) {
   const scope = state.activeSmartFilter || window.activeSmartFilter || null;
   const matchesScope = SmartLists.comicMatchesActiveSmartScope || (() => true);
 
+  const isInbox = state.currentRootFolder === 'Smart Inbox';
+
   // Pre-computed counts from lazy loading don't know about smart scope; bypass them
-  // when a smart scope is active so we recompute against the actual comic list.
-  if (!scope && comicsInSeries && typeof comicsInSeries === 'object' && !Array.isArray(comicsInSeries) && comicsInSeries._counts) {
+  // when a smart scope or inbox is active so we recompute against the actual comic list.
+  if (!scope && !isInbox && comicsInSeries && typeof comicsInSeries === 'object' && !Array.isArray(comicsInSeries) && comicsInSeries._counts) {
     return comicsInSeries._counts;
   }
 
@@ -71,13 +73,24 @@ export function getComicStatusCounts(comicsInSeries) {
   };
 
   for (const comic of comics) {
-    const status = getComicStatus(comic);
-    if (status === 'read') {
-      counts.read += 1;
-    } else if (status === 'in-progress') {
-      counts.inProgress += 1;
+    if (isInbox) {
+      const tag = comic.tagStatus || 'pending';
+      if (tag === 'successful') {
+        counts.unread += 1;
+      } else if (tag === 'failed') {
+        counts.inProgress += 1;
+      } else {
+        counts.read += 1;
+      }
     } else {
-      counts.unread += 1;
+      const status = getComicStatus(comic);
+      if (status === 'read') {
+        counts.read += 1;
+      } else if (status === 'in-progress') {
+        counts.inProgress += 1;
+      } else {
+        counts.unread += 1;
+      }
     }
   }
 
@@ -214,20 +227,86 @@ export function updateFilterButtonCounts() {
     unreadCountElement = document.getElementById('unread-count');
   }
 
+  const unreadBtn = document.querySelector('.filter-btn[data-filter="unread"]');
+  const inProgressBtn = document.querySelector('.filter-btn[data-filter="in-progress"]');
+  const readBtn = document.querySelector('.filter-btn[data-filter="read"]');
+
+  const isInbox = state.currentRootFolder === 'Smart Inbox';
+
+  if (isInbox) {
+    if (unreadBtn) {
+      const lbl = unreadBtn.querySelector('.pill-label');
+      if (lbl) lbl.textContent = 'Successful';
+    }
+    if (inProgressBtn) {
+      const lbl = inProgressBtn.querySelector('.pill-label');
+      if (lbl) lbl.textContent = 'Failed';
+    }
+    if (readBtn) {
+      const lbl = readBtn.querySelector('.pill-label');
+      if (lbl) lbl.textContent = 'Pending';
+    }
+  } else {
+    if (unreadBtn) {
+      const lbl = unreadBtn.querySelector('.pill-label');
+      if (lbl) lbl.textContent = 'Unread';
+    }
+    if (inProgressBtn) {
+      const lbl = inProgressBtn.querySelector('.pill-label');
+      if (lbl) lbl.textContent = 'In Progress';
+    }
+    if (readBtn) {
+      const lbl = readBtn.querySelector('.pill-label');
+      if (lbl) lbl.textContent = 'Read';
+    }
+  }
+
   if (!inProgressCountElement && !readCountElement && !unreadCountElement) {
     return;
   }
 
   const library = state.library || window.library;
-  const counts = getLibraryStatusCounts(library);
-  if (inProgressCountElement) {
-    inProgressCountElement.textContent = counts.inProgress || 0;
+
+  if (isInbox) {
+    const counts = { successful: 0, failed: 0, pending: 0 };
+    const rootData = library?.['Smart Inbox'];
+    if (rootData && rootData.publishers) {
+      for (const publisherName in rootData.publishers) {
+        const publisherData = rootData.publishers[publisherName];
+        if (publisherData && publisherData.series) {
+          for (const seriesName in publisherData.series) {
+            const comics = publisherData.series[seriesName];
+            if (Array.isArray(comics)) {
+              for (const comic of comics) {
+                const tag = comic.tagStatus || 'pending';
+                if (tag === 'successful') counts.successful++;
+                else if (tag === 'failed') counts.failed++;
+                else counts.pending++;
+              }
+            }
+          }
+        }
+      }
+    }
+    if (unreadCountElement) unreadCountElement.textContent = counts.successful;
+    if (inProgressCountElement) inProgressCountElement.textContent = counts.failed;
+    if (readCountElement) readCountElement.textContent = counts.pending;
+  } else {
+    const counts = getLibraryStatusCounts(library);
+    if (inProgressCountElement) {
+      inProgressCountElement.textContent = counts.inProgress || 0;
+    }
+    if (readCountElement) {
+      readCountElement.textContent = counts.read || 0;
+    }
+    if (unreadCountElement) {
+      unreadCountElement.textContent = counts.unread || 0;
+    }
   }
-  if (readCountElement) {
-    readCountElement.textContent = counts.read || 0;
-  }
-  if (unreadCountElement) {
-    unreadCountElement.textContent = counts.unread || 0;
+
+  const updateLatest = state.updateLatestButtonCount || window.updateLatestButtonCount;
+  if (typeof updateLatest === 'function') {
+    updateLatest();
   }
 }
 

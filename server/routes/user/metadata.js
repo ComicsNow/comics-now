@@ -69,7 +69,7 @@ module.exports = function attach(router, deps) {
 
       const {
         query = '',
-        resources = 'volume',
+        resources = 'issue',
         page = 1,
         limit = 20,
         sort,

@@ -5,7 +5,7 @@ const xml2js = require('xml2js');
 const { promisify } = require('util');
 
 const { writeComicInfoToCbz, buildComicInfoXml } = require('../../services/metadata');
-const { safeDirName } = require('../../utils');
+const { safeDirName, trimObjectStrings } = require('../../utils');
 
 /**
  * Admin Library Management Routes
@@ -123,7 +123,7 @@ module.exports = function attach(router, deps) {
         return res.status(403).json({ ok: false, message: 'Access denied' });
       }
 
-      const metadata = req.body || {};
+      const metadata = trimObjectStrings(req.body || {});
       const id = createId(cbzPath);
 
       log('INFO', 'META', `📥 Save metadata request for: ${cbzPath} (id=${id})`);
@@ -135,6 +135,13 @@ module.exports = function attach(router, deps) {
 
       await dbRun('UPDATE comics SET metadata = ? WHERE id = ?', [JSON.stringify(metadata), id]);
       log('INFO', 'META', `💾 DB updated for ${path.basename(cbzPath)}`);
+
+      // Evaluate tagStatus
+      const hasSeries = (metadata.Series || '').toString().trim().length > 0;
+      const hasPublisher = (metadata.Publisher || '').toString().trim().length > 0;
+      const hasDate = (metadata.Year || metadata.CoverDate || metadata.StoreDate || metadata['Cover Date'] || metadata['Store Date'] || '').toString().trim().length > 0;
+
+      let tagStatus = (hasSeries && hasPublisher && hasDate) ? 'successful' : 'failed';      await dbRun('UPDATE comics SET tagStatus = ? WHERE id = ?', [tagStatus, id]);
 
       if (!fs.existsSync(cbzPath)) {
         log('ERROR', 'META', `❌ CBZ not found on disk: ${cbzPath}`);
@@ -185,10 +192,10 @@ module.exports = function attach(router, deps) {
   router.post('/api/v1/move-comics', requireAdmin, async (req, res) => {
     try {
       const config = getConfig();
-      const yesDir = path.join(config.comicsLocation, 'yes');
+      const comicsLocation = config.comicsLocation;
 
-      if (!fs.existsSync(yesDir)) {
-        return res.status(404).json({ ok: false, message: 'Yes directory not found' });
+      if (!fs.existsSync(comicsLocation)) {
+        return res.status(404).json({ ok: false, message: 'Inbox directory not found' });
       }
 
       const directories = getComicsDirectories();
@@ -206,37 +213,54 @@ module.exports = function attach(router, deps) {
         destBaseDir = directories[0];
       }
 
-      log('INFO', 'MOVE', `Starting comic move operation from ${yesDir} to ${destBaseDir}`);
+      log('INFO', 'MOVE', `Starting comic move operation from ${comicsLocation} to ${destBaseDir}`);
       moveLog(`Starting move operation to ${destBaseDir}`);
 
       const allowedFormats = deps.getAllowedFormats ? deps.getAllowedFormats() : 'cbz';
-      const files = (await fs.promises.readdir(yesDir)).filter(file => {
-        const ext = file.toLowerCase();
+      
+      const comics = await dbAll(
+        `SELECT id, path, name, metadata FROM comics WHERE tagStatus = 'successful' AND path LIKE ?`,
+        [`${comicsLocation}%`]
+      );
+
+      const files = comics.filter(c => {
+        if (!fs.existsSync(c.path)) return false;
+        const ext = c.name.toLowerCase();
         if (ext.endsWith('.cbz')) return allowedFormats === 'cbz' || allowedFormats === 'both';
         if (ext.endsWith('.cbr')) return allowedFormats === 'cbr' || allowedFormats === 'both';
         return false;
       });
 
       if (files.length === 0) {
-        moveLog('No files found to move');
-        return res.json({ ok: true, message: 'No files found to move', processed: 0, moved: 0 });
+        moveLog('No successful matches found to move');
+        return res.json({ ok: true, message: 'No successful matches found to move', processed: 0, moved: 0 });
       }
 
-      moveLog(`Found ${files.length} file(s) to process`);
+      moveLog(`Found ${files.length} successful comic(s) to process`);
 
       let processed = 0;
       let moved = 0;
       let errors = 0;
       const results = [];
 
-      for (const file of files) {
+      for (const comicRecord of files) {
+        const file = comicRecord.name;
         try {
-          const filePath = path.join(yesDir, file);
+          const filePath = comicRecord.path;
           processed++;
           moveLog(`[${processed}/${files.length}] Processing: ${file}`);
 
-          const { getComicInfoFromArchive } = deps;
-          const info = await getComicInfoFromArchive(filePath);
+          let info = {};
+          try {
+            info = JSON.parse(comicRecord.metadata || '{}');
+          } catch (e) {
+            info = {};
+          }
+
+          if (!info || Object.keys(info).length === 0) {
+            const { getComicInfoFromArchive } = deps;
+            info = await getComicInfoFromArchive(filePath);
+          }
 
           if (!info || Object.keys(info).length === 0) {
             moveLog(`✗ Error: ${file} - No valid ComicInfo.xml metadata found`);

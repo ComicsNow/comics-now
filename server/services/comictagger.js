@@ -373,16 +373,28 @@ async function runComicTagger() {
               }
             }
 
-            const destDir = path.join(dir, 'yes');
+            const id = require('../utils').createId(filePath);
+            const tagStatus = isSuccessful ? 'successful' : 'failed';
             try {
-              await fs.promises.mkdir(destDir, { recursive: true });
-              await fs.promises.rename(filePath, path.join(destDir, entry.name));
-              ctLog(`✓ SUCCESS → Moved to /yes/ folder: ${entry.name}`);
+              await dbRun(
+                `INSERT OR IGNORE INTO comics (id, path, name, publisher, series, libraryMode, tagStatus) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+                [id, filePath, entry.name, 'Unknown Publisher', 'Unknown Series', 'metadata', 'pending']
+              );
+              await dbRun(`UPDATE comics SET tagStatus = ? WHERE id = ?`, [tagStatus, id]);
+              ctLog(`✓ SUCCESS → Tagged in database as successful: ${entry.name}`);
               hasChanges = true;
             } catch (err) {
-              ctLog(`✗ Failed to move file to ${destDir}: ${err.message}`);
+              ctLog(`✗ Failed to update tagStatus in database for ${entry.name}: ${err.message}`);
             }
           } else {
+            const id = require('../utils').createId(filePath);
+            try {
+              await dbRun(
+                `INSERT OR IGNORE INTO comics (id, path, name, publisher, series, libraryMode, tagStatus) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+                [id, filePath, entry.name, 'Unknown Publisher', 'Unknown Series', 'metadata', 'pending']
+              );
+              await dbRun(`UPDATE comics SET tagStatus = ? WHERE id = ?`, ['failed', id]);
+            } catch (err) {}
             ctLog(`➜ KEPT in place (not a confirmed match): ${entry.name}`);
           }
           ctLog('');

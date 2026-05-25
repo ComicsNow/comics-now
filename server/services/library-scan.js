@@ -4,7 +4,7 @@ const { dbGet, dbRun, dbAll } = require('../db');
 const { log } = require('../logger');
 const { getConfig, getScanIntervalMs, getLibraries } = require('../config');
 const { getComicInfoFromArchive } = require('./metadata');
-const { createId, t0, ms, pMap } = require('../utils');
+const { createId, t0, ms, pMap, trimObjectStrings } = require('../utils');
 const {
   THUMBNAILS_DIRECTORY,
   METADATA_MARKER_FILE,
@@ -36,8 +36,14 @@ async function scanLibrary() {
   let totalSeen = 0, totalInsertedOrUpdated = 0, totalConverted = 0, thumbOk = 0, thumbFail = 0, errors = 0;
   scanProgress = { totalFiles: 0, scannedFiles: 0, status: 'Starting' };
 
-  const libraries = getLibraries();
   const config = getConfig();
+  const libraries = [...getLibraries()];
+  if (config.comicsLocation && !libraries.some(l => l.path === config.comicsLocation)) {
+    libraries.push({
+      path: config.comicsLocation,
+      hierarchyMode: 'metadata'
+    });
+  }
   const allowedFormats = config.allowed_formats || 'cbz';
   log('INFO', 'SCAN', `Starting scan… Libraries: ${libraries.length > 0 ? libraries.map(l => `${l.path} (${l.hierarchyMode})`).join(', ') : '(none set)'} | Allowed Formats: ${allowedFormats}`);
   const fileSystemComics = new Set();
@@ -146,7 +152,7 @@ async function scanLibrary() {
         log('INFO', 'SCAN', `📄 Processing: ${path.basename(filePath)} (${libraryMode} mode)`);
         fileSystemComics.add(filePath);
         const id = createId(filePath);
-        const existing = await dbGet('SELECT metadata, lastReadPage, totalPages, convertedAt, guidedViewStatus, guidedViewPath, guidedViewError FROM comics WHERE id = ?', [id]);
+        const existing = await dbGet('SELECT metadata, lastReadPage, totalPages, convertedAt, guidedViewStatus, guidedViewPath, guidedViewError, tagStatus FROM comics WHERE id = ?', [id]);
         const lastReadPage = existing?.lastReadPage || 0;
         let totalPages = existing?.totalPages || 0;
         const convertedAt = wasConverted ? Date.now() : (existing?.convertedAt || null);
@@ -178,9 +184,14 @@ async function scanLibrary() {
           throw e;
         }
 
+        const configObj = getConfig();
+        const comicsLocation = configObj.comicsLocation;
+        const isInboxFile = comicsLocation && filePath.startsWith(comicsLocation);
+        const effectiveLibraryMode = isInboxFile ? 'metadata' : libraryMode;
+
         // Get metadata: either from Zip or from folder structure
         let info;
-        if (libraryMode === 'folder') {
+        if (effectiveLibraryMode === 'folder') {
           info = generateVirtualMetadata(filePath, libraryRootPath);
         } else {
           info = await getComicInfoFromArchive(filePath);
@@ -198,8 +209,9 @@ async function scanLibrary() {
           }
         }
 
-        const publisher = info.Publisher || 'Unknown Publisher';
-        const series = info.Series || 'Unknown Series';
+        info = trimObjectStrings(info || {});
+        const publisher = (info.Publisher || 'Unknown Publisher').trim();
+        const series = (info.Series || 'Unknown Series').trim();
         const newStats = await fs.promises.stat(filePath);
 
         try {
@@ -207,9 +219,22 @@ async function scanLibrary() {
           if (pages.length > 0) totalPages = pages.length;
         } catch {}
 
+        let tagStatus = existing?.tagStatus || 'pending';
+        if (effectiveLibraryMode !== 'folder') {
+          const hasSeries = (info.Series || '').toString().trim().length > 0;
+          const hasPublisher = (info.Publisher || '').toString().trim().length > 0;
+          const hasDate = (info.Year || info.CoverDate || info.StoreDate || info['Cover Date'] || info['Store Date'] || '').toString().trim().length > 0;
+
+          if (hasSeries && hasPublisher && hasDate) {
+            tagStatus = 'successful';
+          } else if (tagStatus === 'successful') {
+            tagStatus = 'failed';
+          }
+        }
+
         await dbRun(
-          `INSERT OR REPLACE INTO comics (id, path, thumbnailPath, updatedAt, name, series, publisher, metadata, lastReadPage, totalPages, convertedAt, guidedViewStatus, guidedViewPath, guidedViewError, libraryMode)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          `INSERT OR REPLACE INTO comics (id, path, thumbnailPath, updatedAt, name, series, publisher, metadata, lastReadPage, totalPages, convertedAt, guidedViewStatus, guidedViewPath, guidedViewError, libraryMode, tagStatus)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           [
             id,
             filePath,
@@ -225,7 +250,8 @@ async function scanLibrary() {
             guidedViewStatus,
             guidedViewPath,
             guidedViewError,
-            libraryMode
+            effectiveLibraryMode,
+            tagStatus
           ]
         );
         totalInsertedOrUpdated++;

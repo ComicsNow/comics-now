@@ -15,17 +15,83 @@ let mangaComics = [];
 let nonMangaComics = [];
 
 export function updateLatestButtonCount() {
-  if (latestAddedCountSpan) {
-    latestAddedCountSpan.textContent = latestComics.length.toString();
+  const isInbox = state.currentRootFolder === 'Smart Inbox';
+  const latestBtn = document.getElementById('latest-added-btn');
+  const downloadedBtn = document.getElementById('downloaded-btn');
+
+  if (isInbox) {
+    const rootData = (state.library || window.library)?.[state.currentRootFolder];
+    let successfulCount = 0;
+    let failedCount = 0;
+    if (rootData && rootData.publishers) {
+      for (const pubName of Object.keys(rootData.publishers)) {
+        const pub = rootData.publishers[pubName];
+        if (pub && pub.series) {
+          for (const seriesName of Object.keys(pub.series)) {
+            const seriesComics = pub.series[seriesName];
+            if (Array.isArray(seriesComics)) {
+              for (const comic of seriesComics) {
+                if (comic.tagStatus === 'successful') {
+                  successfulCount++;
+                } else if (comic.tagStatus === 'failed') {
+                  failedCount++;
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+
+    if (latestAddedCountSpan) {
+      latestAddedCountSpan.textContent = successfulCount.toString();
+    }
+    if (downloadedCountSpan) {
+      downloadedCountSpan.textContent = failedCount.toString();
+    }
+
+    if (latestBtn) {
+      const lbl = latestBtn.querySelector('.pill-label');
+      if (lbl) lbl.textContent = 'Successful';
+    }
+    if (downloadedBtn) {
+      const lbl = downloadedBtn.querySelector('.pill-label');
+      if (lbl) lbl.textContent = 'Failed';
+    }
+
+    const guidedBtn = document.getElementById('guided-smart-list-btn');
+    if (guidedBtn) guidedBtn.classList.add('hidden');
+
+    const mangaBtn = document.getElementById('dynamic-manga-filter-btn');
+    if (mangaBtn) mangaBtn.classList.add('hidden');
+  } else {
+    if (latestBtn) {
+      const lbl = latestBtn.querySelector('.pill-label');
+      if (lbl) lbl.textContent = 'New';
+    }
+    if (downloadedBtn) {
+      const lbl = downloadedBtn.querySelector('.pill-label');
+      if (lbl) lbl.textContent = 'Down';
+    }
+
+    const guidedBtn = document.getElementById('guided-smart-list-btn');
+    if (guidedBtn) guidedBtn.classList.remove('hidden');
+
+    updateMangaFilterButtonCount();
+
+    if (latestAddedCountSpan) {
+      latestAddedCountSpan.textContent = latestComics.length.toString();
+    }
+    if (downloadedCountSpan) {
+      downloadedCountSpan.textContent = (Array.isArray(downloadedSmartListComics)
+        ? downloadedSmartListComics.length
+        : 0).toString();
+    }
   }
 }
 
 export function updateDownloadedButtonCount() {
-  if (downloadedCountSpan) {
-    downloadedCountSpan.textContent = (Array.isArray(downloadedSmartListComics)
-      ? downloadedSmartListComics.length
-      : 0).toString();
-  }
+  updateLatestButtonCount();
 }
 
 export function updateGuidedButtonCount() {
@@ -381,6 +447,8 @@ export function isComicManga(comic) {
 export function comicMatchesActiveSmartScope(comic) {
   const scope = state.activeSmartFilter || window.activeSmartFilter;
   if (!scope) return true;
+  if (scope === 'successful') return comic.tagStatus === 'successful';
+  if (scope === 'failed') return comic.tagStatus === 'failed';
   if (scope === 'latest') return isComicLatest(comic);
   if (scope === 'downloaded') return isComicDownloaded(comic);
   if (scope === 'guided') return isComicGuided(comic);

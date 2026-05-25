@@ -7,6 +7,7 @@ const archiver = require('archiver');
 const crypto = require('crypto');
 const { log } = require('../logger');
 const { getMetadataStorage } = require('../config');
+const { trimObjectStrings } = require('../utils');
 
 const COMICINFO_TAGS = {
   Title: 'Title',
@@ -52,14 +53,15 @@ async function getComicInfoFromArchive(comicPath) {
   try {
     archive = await openArchive(comicPath);
     const entries = archive.listEntries();
-    const infoEntry = entries.find(name => path.basename(name).toLowerCase() === 'comicinfo.xml');
+    const infoEntry = entries.find(name => name.toLowerCase() === 'comicinfo.xml') ||
+                      entries.find(name => path.basename(name).toLowerCase() === 'comicinfo.xml');
     
     if (infoEntry) {
       const buffer = await archive.readBuffer(infoEntry);
       const xml = buffer.toString('utf-8');
       try {
         const result = await parser.parseStringPromise(xml);
-        return result.ComicInfo || {};
+        return trimObjectStrings(result.ComicInfo || {});
       } catch {
         return {};
       }
@@ -120,10 +122,10 @@ async function writeComicInfoToCbz(cbzPath, metadataXml) {
 
         zipfile.readEntry();
         zipfile.on('entry', (entry) => {
-          // Case-insensitive check for ComicInfo.xml
-          if (entry.fileName.toLowerCase() === 'comicinfo.xml') {
+          // Case-insensitive check for ComicInfo.xml anywhere in the path
+          if (path.basename(entry.fileName).toLowerCase() === 'comicinfo.xml') {
             hasComicInfo = true;
-            archive.append(metadataXml, { name: 'ComicInfo.xml' });
+            archive.append(metadataXml, { name: entry.fileName });
             zipfile.readEntry();
           } else if (entry.fileName.endsWith('/')) {
             archive.append(null, { name: entry.fileName });
@@ -172,7 +174,7 @@ async function saveMetadataToComic(comicPath, metadataObj) {
   try {
     log('INFO', 'META', `Writing ComicInfo.xml for ${path.basename(comicPath)}`);
 
-    const metadataXml = buildComicInfoXml(metadataObj);
+    const metadataXml = buildComicInfoXml(trimObjectStrings(metadataObj));
     if (!metadataXml) {
       log('INFO', 'META', `No valid metadata for ${path.basename(comicPath)}; skipping save.`);
       return;

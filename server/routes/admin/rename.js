@@ -24,10 +24,10 @@ module.exports = function attach(router, deps) {
 
   router.post('/api/v1/rename-cbz', async (req, res) => {
     try {
-      const yesDir = path.join(getConfig().comicsLocation, 'yes');
+      const comicsLocation = getConfig().comicsLocation;
 
-      if (!fs.existsSync(yesDir)) {
-        return res.status(404).json({ ok: false, message: 'Yes directory not found' });
+      if (!fs.existsSync(comicsLocation)) {
+        return res.status(404).json({ ok: false, message: 'Scan directory not found' });
       }
 
       const scriptPath = path.join(SCRIPTS_DIRECTORY, 'rename_cbz.sh');
@@ -35,39 +35,48 @@ module.exports = function attach(router, deps) {
         return res.status(500).json({ ok: false, message: 'Rename script not found' });
       }
 
-      log('INFO', 'RENAME', `Starting rename operation in ${yesDir}`);
-      renameLog(`Starting rename operation in ${yesDir}`);
+      log('INFO', 'RENAME', `Starting rename operation in ${comicsLocation}`);
+      renameLog(`Starting rename operation in ${comicsLocation}`);
 
       const allowedFormats = deps.getAllowedFormats ? deps.getAllowedFormats() : 'cbz';
-      const files = (await fs.promises.readdir(yesDir)).filter(file => {
-        const ext = file.toLowerCase();
+      
+      const { dbAll } = deps;
+      const comics = await dbAll(
+        `SELECT id, path, name FROM comics WHERE tagStatus = 'successful' AND path LIKE ?`,
+        [`${comicsLocation}%`]
+      );
+
+      const files = comics.filter(c => {
+        if (!fs.existsSync(c.path)) return false;
+        const ext = c.name.toLowerCase();
         if (ext.endsWith('.cbz')) return allowedFormats === 'cbz' || allowedFormats === 'both';
         if (ext.endsWith('.cbr')) return allowedFormats === 'cbr' || allowedFormats === 'both';
         return false;
       });
 
       if (files.length === 0) {
-        renameLog('No files found to rename');
-        return res.json({ ok: true, message: 'No files found to rename', processed: 0, renamed: 0 });
+        renameLog('No successful matches found to rename');
+        return res.json({ ok: true, message: 'No successful matches found to rename', processed: 0, renamed: 0 });
       }
 
-      renameLog(`Found ${files.length} file(s) to process`);
+      renameLog(`Found ${files.length} successful comic(s) to process`);
 
       let processed = 0;
       let renamed = 0;
       let errors = 0;
       const results = [];
 
-      for (const file of files) {
+      for (const comicRecord of files) {
+        const file = comicRecord.name;
         try {
-          const filePath = path.join(yesDir, file);
+          const filePath = comicRecord.path;
           processed++;
           renameLog(`[${processed}/${files.length}] Processing: ${file}`);
 
           const result = await new Promise((resolve, reject) => {
             const child = spawn(scriptPath, [filePath], {
               stdio: ['pipe', 'pipe', 'pipe'],
-              cwd: yesDir
+              cwd: comicsLocation
             });
 
             let stdout = '';

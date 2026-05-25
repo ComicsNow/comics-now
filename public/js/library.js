@@ -165,7 +165,12 @@ function initializeLibraryUIControls() {
   if (global.latestAddedButton && !global.latestAddedButton._smartListListener) {
     global.latestAddedButton._smartListListener = (event) => {
       event.preventDefault();
-      setSmartScope(global.activeSmartFilter === 'latest' ? null : 'latest');
+      const isInbox = global.currentRootFolder === 'Smart Inbox';
+      if (isInbox) {
+        setSmartScope(global.activeSmartFilter === 'successful' ? null : 'successful');
+      } else {
+        setSmartScope(global.activeSmartFilter === 'latest' ? null : 'latest');
+      }
     };
     global.latestAddedButton.addEventListener('click', global.latestAddedButton._smartListListener);
   }
@@ -173,7 +178,12 @@ function initializeLibraryUIControls() {
   if (global.downloadedButton && !global.downloadedButton._smartListListener) {
     global.downloadedButton._smartListListener = (event) => {
       event.preventDefault();
-      setSmartScope(global.activeSmartFilter === 'downloaded' ? null : 'downloaded');
+      const isInbox = global.currentRootFolder === 'Smart Inbox';
+      if (isInbox) {
+        setSmartScope(global.activeSmartFilter === 'failed' ? null : 'failed');
+      } else {
+        setSmartScope(global.activeSmartFilter === 'downloaded' ? null : 'downloaded');
+      }
     };
     global.downloadedButton.addEventListener('click', global.downloadedButton._smartListListener);
   }

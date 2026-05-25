@@ -72,7 +72,8 @@ async function initializeDatabase() {
       guidedViewPath TEXT,
       guidedMode INTEGER DEFAULT 0, 
       bubbleMode INTEGER DEFAULT 0,
-      libraryMode TEXT DEFAULT 'metadata'
+      libraryMode TEXT DEFAULT 'metadata',
+      tagStatus TEXT DEFAULT 'pending'
     )`);
     await dbRun(`CREATE TABLE IF NOT EXISTS scan_dirs (
       dir TEXT PRIMARY KEY,
