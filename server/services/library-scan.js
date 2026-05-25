@@ -195,13 +195,13 @@ async function scanLibrary() {
           info = generateVirtualMetadata(filePath, libraryRootPath);
         } else {
           info = await getComicInfoFromArchive(filePath);
-          
-          // For CBR: preserve DB-only metadata if internal archive is empty
-          if (ext === '.cbr' && (!info || Object.keys(info).length === 0)) {
+          // For CBR or DB-only storage mode: preserve DB-only metadata if internal archive is empty
+          const storageMode = getConfig().metadata_storage || 'archive';
+          if ((storageMode === 'db' || ext === '.cbr') && (!info || Object.keys(info).length === 0)) {
             if (existing?.metadata) {
               try {
                 info = JSON.parse(existing.metadata);
-                log('INFO', 'SCAN', `Preserving DB-only metadata for CBR: ${path.basename(filePath)}`);
+                log('INFO', 'SCAN', `Preserving DB-only metadata for ${ext.toUpperCase()}: ${path.basename(filePath)}`);
               } catch {
                 info = {};
               }

@@ -19,7 +19,11 @@ module.exports = function attach(router, deps) {
     getRenameLogs,
     clearRenameLogs,
     scanLibrary,
-    formatErrorMessage
+    formatErrorMessage,
+    dbAll,
+    dbRun,
+    createId,
+    getComicInfoFromArchive
   } = deps;
 
   router.post('/api/v1/rename-cbz', async (req, res) => {
@@ -30,19 +34,13 @@ module.exports = function attach(router, deps) {
         return res.status(404).json({ ok: false, message: 'Scan directory not found' });
       }
 
-      const scriptPath = path.join(SCRIPTS_DIRECTORY, 'rename_cbz.sh');
-      if (!fs.existsSync(scriptPath)) {
-        return res.status(500).json({ ok: false, message: 'Rename script not found' });
-      }
-
       log('INFO', 'RENAME', `Starting rename operation in ${comicsLocation}`);
       renameLog(`Starting rename operation in ${comicsLocation}`);
 
       const allowedFormats = deps.getAllowedFormats ? deps.getAllowedFormats() : 'cbz';
       
-      const { dbAll } = deps;
       const comics = await dbAll(
-        `SELECT id, path, name FROM comics WHERE tagStatus = 'successful' AND path LIKE ?`,
+        `SELECT id, path, name, metadata FROM comics WHERE tagStatus = 'successful' AND path LIKE ?`,
         [`${comicsLocation}%`]
       );
 
@@ -73,53 +71,93 @@ module.exports = function attach(router, deps) {
           processed++;
           renameLog(`[${processed}/${files.length}] Processing: ${file}`);
 
-          const result = await new Promise((resolve, reject) => {
-            const child = spawn(scriptPath, [filePath], {
-              stdio: ['pipe', 'pipe', 'pipe'],
-              cwd: comicsLocation
-            });
+          let info = {};
+          try {
+            info = JSON.parse(comicRecord.metadata || '{}');
+          } catch (e) {
+            info = {};
+          }
 
-            let stdout = '';
-            let stderr = '';
+          if (!info || Object.keys(info).length === 0) {
+            info = await getComicInfoFromArchive(filePath);
+          }
 
-            child.stdout.on('data', (data) => {
-              stdout += data.toString();
-            });
+          if (!info || Object.keys(info).length === 0) {
+            renameLog(`✗ Error: ${file} - No valid ComicInfo.xml metadata found`);
+            results.push({ file, success: false, error: 'No valid ComicInfo.xml metadata found' });
+            errors++;
+            continue;
+          }
 
-            child.stderr.on('data', (data) => {
-              stderr += data.toString();
-            });
+          const series = info.Series;
+          const publisher = info.Publisher;
+          const year = info.Year || (info.CoverDate ? info.CoverDate.toString().substring(0, 4) : null);
 
-            child.on('close', (code) => {
-              if (code === 0) {
-                if (stdout.includes('Renaming to:')) {
-                  renamed = renamed + 1;
-                  const match = stdout.match(/Renaming to: (.+)/);
-                  const newName = match ? match[1].trim() : 'unknown';
-                  renameLog(`✓ Renamed: ${path.basename(newName)}`);
-                  resolve({ file, success: true, newName, output: stdout.trim() });
-                } else {
-                  renameLog(`→ Skipped: ${file} (no rename needed)`);
-                  resolve({ file, success: true, newName: file, output: stdout.trim() });
-                }
-              } else {
-                errors = errors + 1;
-                const errorMsg = stderr || stdout || 'Unknown error';
-                renameLog(`✗ Error: ${file} - ${errorMsg}`);
-                resolve({ file, success: false, error: errorMsg, code });
-              }
-            });
+          if (!series || !publisher || !year) {
+            renameLog(`✗ Error: ${file} - Missing required tags (Series, Publisher, or Year/CoverDate)`);
+            results.push({ file, success: false, error: 'Missing required tags (Series, Publisher, or Year/CoverDate)' });
+            errors++;
+            continue;
+          }
 
-            child.on('error', (err) => {
-              errors = errors + 1;
-              renameLog(`✗ Error: ${file} - ${err.message}`);
-              reject({ file, success: false, error: err.message });
-            });
-          });
+          let formatted_issue = '';
+          if (info.Number != null && info.Number !== '') {
+            formatted_issue = info.Number.toString();
+            if (/^[0-9]+$/.test(formatted_issue)) {
+              formatted_issue = formatted_issue.padStart(2, '0');
+            }
+          }
 
-          results.push(result);
-          log('INFO', 'RENAME', `Processed ${file}: ${result.success ? 'success' : 'failed'}`);
+          const ext = path.extname(filePath);
+          let newName = '';
+          if (formatted_issue) {
+            newName += `${formatted_issue} `;
+          }
+          newName += series;
+          if (info.Title) {
+            newName += ` - ${info.Title}`;
+          }
+          newName += ` [${publisher}] (${year})`;
+          if (info.PageCount) {
+            newName += ` #${info.PageCount}`;
+          }
+          newName += ext;
 
+          // Safe filename: replace '/' with '-'
+          newName = newName.replace(/\//g, '-');
+
+          const dir = path.dirname(filePath);
+          const newFilePath = path.join(dir, newName);
+
+          if (path.basename(filePath) !== newName) {
+            renameLog(`Renaming to: ${newName}`);
+
+            if (fs.existsSync(newFilePath)) {
+              renameLog(`✗ Error: ${file} - File already exists at destination: ${newName}`);
+              results.push({ file, success: false, error: `File already exists at destination: ${newName}` });
+              errors++;
+              continue;
+            }
+
+            fs.renameSync(filePath, newFilePath);
+
+            // Update database record immediately to preserve metadata and progress
+            const oldId = comicRecord.id;
+            const newId = createId(newFilePath);
+            await dbRun(
+              'UPDATE comics SET id = ?, path = ?, name = ? WHERE id = ?',
+              [newId, newFilePath, newName, oldId]
+            );
+
+            renamed++;
+            renameLog(`✓ Renamed: ${newName}`);
+            results.push({ file, success: true, newName, output: `Renamed to: ${newName}` });
+          } else {
+            renameLog(`→ Skipped: ${file} (no rename needed)`);
+            results.push({ file, success: true, newName: file, output: 'Filename already correct.' });
+          }
+
+          log('INFO', 'RENAME', `Processed ${file}: success`);
         } catch (error) {
           errors = errors + 1;
           results.push({ file, success: false, error: error.message });

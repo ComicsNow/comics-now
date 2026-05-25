@@ -294,6 +294,16 @@ module.exports = function attach(router, deps) {
               throw renameErr;
             }
           }
+
+          // Update database record immediately to preserve metadata and progress
+          const oldId = comicRecord.id;
+          const newId = createId(destPath);
+          const newName = path.basename(destPath);
+          await dbRun(
+            'UPDATE comics SET id = ?, path = ?, name = ? WHERE id = ?',
+            [newId, destPath, newName, oldId]
+          );
+
           moved++;
           moveLog(`✓ Moved: ${publisher}/${file}`);
           results.push({ file, success: true, destination: destPath });
