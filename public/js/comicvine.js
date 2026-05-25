@@ -15,7 +15,6 @@ export const cvState = {
   lastQuery: '',
   lastResources: 'issue',
   lastSort: '',
-  lastField: 'all',
   lastIssueNumber: '',
   lastYear: ''
 };
@@ -50,7 +49,6 @@ export async function performCvSearch() {
   const query     = cvState.lastQuery;
   const resources = cvState.lastResources || 'issue';
   const sort      = cvState.lastSort || '';
-  const field     = cvState.lastField || 'all';
   const issueNumber = cvState.lastIssueNumber || '';
   const year      = cvState.lastYear || '';
 
@@ -66,7 +64,6 @@ export async function performCvSearch() {
     limit: String(cvState.limit)
   });
   if (sort) params.set('sort', sort);
-  if (field === 'series') params.set('filter', `name:${query}`);
   if (issueNumber) params.set('issueNumber', issueNumber);
   if (year) params.set('year', year);
 
@@ -241,13 +238,11 @@ if (searchForm) {
     if (searchQueryInput) {
       cvState.lastQuery = searchQueryInput.value || '';
     }
-    const fieldEl         = document.getElementById('cv-field');
     const resourcesEl     = document.getElementById('cv-resources');
     const sortEl          = document.getElementById('cv-sort');
     const issueNumberEl   = document.getElementById('search-issue-number');
     const yearEl          = document.getElementById('search-year');
 
-    cvState.lastField     = fieldEl?.value || 'all';
     cvState.lastResources = resourcesEl?.value || 'issue';
     cvState.lastSort      = sortEl?.value || '';
     cvState.lastIssueNumber = issueNumberEl?.value || '';
