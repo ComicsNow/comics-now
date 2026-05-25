@@ -3,6 +3,7 @@ const { getConfig } = require('../config');
 const { stripHtml, deepFreeze } = require('../utils');
 
 const comicVineCache = new Map();
+let rateLimitQueue = Promise.resolve();
 
 async function cvFetchJson(url, options = {}) {
   if (comicVineCache.has(url)) {
@@ -12,26 +13,39 @@ async function cvFetchJson(url, options = {}) {
     return deepFreeze(cached);
   }
 
-  const res = await fetch(url, {
-    ...options,
-    headers: { 'User-Agent': 'Comics Now', ...(options.headers || {}) }
+  const result = await new Promise((resolve, reject) => {
+    rateLimitQueue = rateLimitQueue.then(async () => {
+      try {
+        const res = await fetch(url, {
+          ...options,
+          headers: { 'User-Agent': 'Comics Now', ...(options.headers || {}) }
+        });
+
+        if (!res.ok) {
+          const err = new Error(`ComicVine request failed (${res.status})`);
+          err.status = res.status;
+          throw err;
+        }
+
+        const data = await res.json();
+        const frozen = deepFreeze(data);
+        resolve(frozen);
+      } catch (err) {
+        reject(err);
+      } finally {
+        // Guarantee 500ms delay between consecutive requests
+        await new Promise(r => setTimeout(r, 500));
+      }
+    });
   });
 
-  if (!res.ok) {
-    const err = new Error(`ComicVine request failed (${res.status})`);
-    err.status = res.status;
-    throw err;
-  }
-
-  const data = await res.json();
-  const frozen = deepFreeze(data);
-  comicVineCache.set(url, frozen);
-  if (comicVineCache.size > 10) {
+  comicVineCache.set(url, result);
+  if (comicVineCache.size > 500) {
     const firstKey = comicVineCache.keys().next().value;
     comicVineCache.delete(firstKey);
   }
 
-  return frozen;
+  return result;
 }
 
 function normalizeCvId(raw) {

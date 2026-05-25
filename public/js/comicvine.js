@@ -15,7 +15,9 @@ export const cvState = {
   lastQuery: '',
   lastResources: 'issue',
   lastSort: '',
-  lastField: 'all'
+  lastField: 'all',
+  lastIssueNumber: '',
+  lastYear: ''
 };
 
 const cvPrevBtn   = document.getElementById('cv-prev');
@@ -49,6 +51,8 @@ export async function performCvSearch() {
   const resources = cvState.lastResources || 'issue';
   const sort      = cvState.lastSort || '';
   const field     = cvState.lastField || 'all';
+  const issueNumber = cvState.lastIssueNumber || '';
+  const year      = cvState.lastYear || '';
 
   if (!query) return;
 
@@ -63,6 +67,8 @@ export async function performCvSearch() {
   });
   if (sort) params.set('sort', sort);
   if (field === 'series') params.set('filter', `name:${query}`);
+  if (issueNumber) params.set('issueNumber', issueNumber);
+  if (year) params.set('year', year);
 
   try {
     const response = await fetch(`${state.API_BASE_URL || ''}/api/v1/search/comicvine?${params.toString()}`);
@@ -138,44 +144,76 @@ export async function performCvSearch() {
 
       li.appendChild(baseRow);
 
-      // --- Volume expansion ---
-      if (!isIssue && Array.isArray(result.issues) && result.issues.length > 0) {
+      // --- Volume expansion (Lazy Loaded) ---
+      if (!isIssue) {
         const toggleBtn = document.createElement('button');
         toggleBtn.textContent = 'Show Issues';
         toggleBtn.className = 'ml-14 mt-2 text-xs text-purple-400 hover:underline self-start';
         let expanded = false;
+        let loaded = false;
 
         const issueList = document.createElement('ul');
         issueList.className = 'ml-14 mt-2 space-y-1 hidden';
 
-        for (const issue of result.issues) {
-          const issueLi = document.createElement('li');
-          issueLi.className = 'flex items-center bg-gray-600 p-2 rounded cursor-pointer hover:bg-gray-500 space-x-2';
-
-          const coverUrl = issue.image?.thumb_url || '';
-          const subtitleParts = [];
-          if (issue.volumeName) subtitleParts.push(issue.volumeName);
-          if (issue.publisher)  subtitleParts.push(issue.publisher);
-          if (issue.coverDate)  subtitleParts.push(issue.coverDate);
-          const subtitle = subtitleParts.join(' • ');
-
-          issueLi.innerHTML = `
-            ${coverUrl ? `<img src="${escapeHtml(coverUrl)}" class="w-8 h-12 object-cover rounded flex-shrink-0"/>` : ''}
-            <div>
-              <span class="font-bold">${escapeHtml(issue.name || 'Unknown')}${issue.issueNumber ? ` #${escapeHtml(issue.issueNumber)}` : ''}</span>
-              <span class="text-sm text-gray-400 block">${escapeHtml(subtitle)}</span>
-            </div>
-          `;
-
-          issueLi.addEventListener('click', () => applyIssueMetadataFromSearch(issue.id));
-          issueList.appendChild(issueLi);
-        }
-
-        toggleBtn.addEventListener('click', (e) => {
+        toggleBtn.addEventListener('click', async (e) => {
           e.stopPropagation();
           expanded = !expanded;
-          toggleBtn.textContent = expanded ? 'Hide Issues' : 'Show Issues';
-          issueList.classList.toggle('hidden', !expanded);
+          
+          if (expanded) {
+            if (!loaded) {
+              toggleBtn.textContent = 'Loading Issues...';
+              toggleBtn.disabled = true;
+              try {
+                const res = await fetch(`${state.API_BASE_URL || ''}/api/v1/comicvine/volume/${result.id}/issues`);
+                const issues = await res.json();
+                if (!res.ok) throw new Error(issues.message || 'Failed to fetch issues');
+
+                issueList.innerHTML = '';
+                if (Array.isArray(issues) && issues.length > 0) {
+                  for (const issue of issues) {
+                    const issueLi = document.createElement('li');
+                    issueLi.className = 'flex items-center bg-gray-600 p-2 rounded cursor-pointer hover:bg-gray-500 space-x-2';
+
+                    const coverUrl = issue.image?.thumb_url || '';
+                    const subtitleParts = [];
+                    if (issue.volumeName) subtitleParts.push(issue.volumeName);
+                    if (issue.publisher)  subtitleParts.push(issue.publisher);
+                    if (issue.coverDate)  subtitleParts.push(issue.coverDate);
+                    const subtitle = subtitleParts.join(' • ');
+
+                    issueLi.innerHTML = `
+                      ${coverUrl ? `<img src="${escapeHtml(coverUrl)}" class="w-8 h-12 object-cover rounded flex-shrink-0"/>` : ''}
+                      <div>
+                        <span class="font-bold">${escapeHtml(issue.name || 'Unknown')}${issue.issueNumber ? ` #${escapeHtml(issue.issueNumber)}` : ''}</span>
+                        <span class="text-sm text-gray-400 block">${escapeHtml(subtitle)}</span>
+                      </div>
+                    `;
+
+                    issueLi.addEventListener('click', () => applyIssueMetadataFromSearch(issue.id));
+                    issueList.appendChild(issueLi);
+                  }
+                } else {
+                  const noIssuesLi = document.createElement('li');
+                  noIssuesLi.className = 'text-xs text-gray-400 p-2';
+                  noIssuesLi.textContent = 'No issues found for this volume.';
+                  issueList.appendChild(noIssuesLi);
+                }
+                loaded = true;
+              } catch (err) {
+                console.error(err);
+                toggleBtn.textContent = 'Error loading issues';
+                expanded = false;
+                toggleBtn.disabled = false;
+                return;
+              }
+              toggleBtn.disabled = false;
+            }
+            toggleBtn.textContent = 'Hide Issues';
+            issueList.classList.remove('hidden');
+          } else {
+            toggleBtn.textContent = 'Show Issues';
+            issueList.classList.add('hidden');
+          }
         });
 
         li.appendChild(toggleBtn);
@@ -206,12 +244,64 @@ if (searchForm) {
     const fieldEl         = document.getElementById('cv-field');
     const resourcesEl     = document.getElementById('cv-resources');
     const sortEl          = document.getElementById('cv-sort');
+    const issueNumberEl   = document.getElementById('search-issue-number');
+    const yearEl          = document.getElementById('search-year');
+
     cvState.lastField     = fieldEl?.value || 'all';
     cvState.lastResources = resourcesEl?.value || 'issue';
     cvState.lastSort      = sortEl?.value || '';
+    cvState.lastIssueNumber = issueNumberEl?.value || '';
+    cvState.lastYear      = yearEl?.value || '';
     cvState.page          = 1;
     await performCvSearch();
   });
+
+  // Dynamic layout constraint toggle for Volume vs Issue fields and sorts
+  const resourcesEl = document.getElementById('cv-resources');
+  if (resourcesEl) {
+    const handleResourceChange = () => {
+      const mode = resourcesEl.value; // 'issue' or 'volume'
+      const issueNumContainer = document.getElementById('cv-issue-number-container');
+      const issueNumInput = document.getElementById('search-issue-number');
+      const yearContainer = document.getElementById('cv-year-container');
+      const yearInput = document.getElementById('search-year');
+      const sortEl = document.getElementById('cv-sort');
+
+      if (mode === 'volume') {
+        if (issueNumContainer) issueNumContainer.classList.add('hidden');
+        if (issueNumInput) {
+          issueNumInput.value = '';
+          issueNumInput.disabled = true;
+        }
+        if (sortEl) {
+          Array.from(sortEl.options).forEach(opt => {
+            if (opt.value.startsWith('cover_date:')) {
+              opt.disabled = true;
+              opt.classList.add('hidden');
+              if (sortEl.value === opt.value) {
+                sortEl.value = ''; // fallback to Relevance
+              }
+            }
+          });
+        }
+      } else {
+        if (issueNumContainer) issueNumContainer.classList.remove('hidden');
+        if (issueNumInput) issueNumInput.disabled = false;
+        if (sortEl) {
+          Array.from(sortEl.options).forEach(opt => {
+            if (opt.value.startsWith('cover_date:')) {
+              opt.disabled = false;
+              opt.classList.remove('hidden');
+            }
+          });
+        }
+      }
+    };
+
+    resourcesEl.addEventListener('change', handleResourceChange);
+    // Initialize once on load
+    handleResourceChange();
+  }
 }
 
 // --- Pager Buttons ---
@@ -242,6 +332,7 @@ export async function applyMetadataFromSearch(volumeId) {
     if (!response.ok) throw new Error('Could not fetch details.');
     const detailedMetadata = await response.json();
     renderMetadataDisplay(detailedMetadata, true);
+    state.metadataHasUnsavedChanges = true; // Mark as having unsaved changes
     if (searchStatusDiv) searchStatusDiv.textContent = prevStatus;
   } catch (error) {
     if (searchStatusDiv) searchStatusDiv.textContent = `Error: ${error.message}`;
@@ -261,6 +352,7 @@ export async function applyIssueMetadataFromSearch(issueId) {
     if (!response.ok) throw new Error('Could not fetch issue details.');
     const detailedMetadata = await response.json();
     renderMetadataDisplay(detailedMetadata, true);
+    state.metadataHasUnsavedChanges = true; // Mark as having unsaved changes
     if (searchStatusDiv) searchStatusDiv.textContent = prevStatus;
   } catch (error) {
     if (searchStatusDiv) searchStatusDiv.textContent = `Error: ${error.message}`;
