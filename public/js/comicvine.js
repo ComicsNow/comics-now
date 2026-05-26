@@ -34,6 +34,65 @@ function renderMetadataDisplay(metadata, clearForm = true) {
   }
 }
 
+// Opens a beautiful, premium modal previewing the full cover image with scale and fade animations
+function openCoverPreviewModal(imageUrl, title) {
+  const backdrop = document.createElement('div');
+  backdrop.className = 'fixed inset-0 z-[100] flex items-center justify-center bg-black/85 backdrop-blur-sm transition-opacity duration-300 opacity-0';
+  
+  const content = document.createElement('div');
+  content.className = 'relative max-w-[90vw] max-h-[90vh] bg-gray-900/90 backdrop-blur-md p-3 rounded-2xl border border-gray-800 shadow-2xl flex flex-col items-center transform scale-95 transition-transform duration-300';
+  
+  const img = document.createElement('img');
+  img.src = imageUrl;
+  img.alt = 'Cover Preview';
+  img.className = 'max-w-full max-h-[75vh] object-contain rounded-xl shadow-inner border border-gray-800';
+  
+  const closeBtn = document.createElement('button');
+  closeBtn.className = 'absolute top-4 right-4 bg-black/60 hover:bg-black/80 text-white rounded-full p-2 focus:outline-none transition-colors border border-white/10';
+  closeBtn.innerHTML = `
+    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+    </svg>
+  `;
+  
+  const caption = document.createElement('div');
+  caption.className = 'text-white text-sm font-semibold text-center mt-3 px-4 max-w-md truncate';
+  caption.textContent = title;
+
+  content.appendChild(img);
+  content.appendChild(caption);
+  content.appendChild(closeBtn);
+  backdrop.appendChild(content);
+  document.body.appendChild(backdrop);
+
+  // Animate in
+  setTimeout(() => {
+    backdrop.classList.remove('opacity-0');
+    content.classList.remove('scale-95');
+  }, 10);
+
+  const closeModal = () => {
+    backdrop.classList.add('opacity-0');
+    content.classList.add('scale-95');
+    setTimeout(() => {
+      backdrop.remove();
+    }, 300);
+  };
+
+  closeBtn.addEventListener('click', closeModal);
+  backdrop.addEventListener('click', (e) => {
+    if (e.target === backdrop) closeModal();
+  });
+  
+  const escHandler = (e) => {
+    if (e.key === 'Escape') {
+      closeModal();
+      document.removeEventListener('keydown', escHandler);
+    }
+  };
+  document.addEventListener('keydown', escHandler);
+}
+
 // Performs the search and renders paged results with ISSUE/VOLUME badge + publisher + cover preview
 export async function performCvSearch() {
   // Disable search for local/device comics
@@ -126,12 +185,22 @@ export async function performCvSearch() {
       const baseRow = document.createElement('div');
       baseRow.className = 'flex items-center space-x-3 cursor-pointer';
       baseRow.innerHTML = `
-        ${coverUrl ? `<img src="${escapeHtml(coverUrl)}" alt="cover" class="w-10 h-14 object-cover rounded flex-shrink-0"/>` : ''}
+        ${coverUrl ? `<img src="${escapeHtml(coverUrl)}" alt="cover" class="w-10 h-14 object-cover rounded flex-shrink-0 hover:brightness-110 transition-all shadow hover:shadow-lg"/>` : ''}
         <div class="flex-1">
           <span class="font-bold">${escapeHtml(displayName)}${badgeHtml}</span>
           <span class="text-sm text-gray-400 block">${escapeHtml(subtitle)}</span>
         </div>
       `;
+
+      // Allow clicking thumbnail image to preview full high-res cover
+      const coverImg = baseRow.querySelector('img');
+      if (coverImg) {
+        coverImg.addEventListener('click', (e) => {
+          e.stopPropagation(); // prevent applying metadata!
+          const previewUrl = result.image?.medium_url || result.image?.super_url || result.image?.original_url || coverUrl;
+          openCoverPreviewModal(previewUrl, displayName);
+        });
+      }
 
       if (isIssue) {
         baseRow.addEventListener('click', () => applyIssueMetadataFromSearch(result.id));
@@ -178,13 +247,25 @@ export async function performCvSearch() {
                     if (issue.coverDate)  subtitleParts.push(issue.coverDate);
                     const subtitle = subtitleParts.join(' • ');
 
+                    const issueDisplayName = `${issue.name || 'Unknown'}${issue.issueNumber ? ` #${issue.issueNumber}` : ''}`;
+
                     issueLi.innerHTML = `
-                      ${coverUrl ? `<img src="${escapeHtml(coverUrl)}" class="w-8 h-12 object-cover rounded flex-shrink-0"/>` : ''}
+                      ${coverUrl ? `<img src="${escapeHtml(coverUrl)}" class="w-8 h-12 object-cover rounded flex-shrink-0 hover:brightness-110 transition-all shadow"/>` : ''}
                       <div>
-                        <span class="font-bold">${escapeHtml(issue.name || 'Unknown')}${issue.issueNumber ? ` #${escapeHtml(issue.issueNumber)}` : ''}</span>
+                        <span class="font-bold">${escapeHtml(issueDisplayName)}</span>
                         <span class="text-sm text-gray-400 block">${escapeHtml(subtitle)}</span>
                       </div>
                     `;
+
+                    // Allow clicking thumbnail image to preview full high-res cover
+                    const issueCoverImg = issueLi.querySelector('img');
+                    if (issueCoverImg) {
+                      issueCoverImg.addEventListener('click', (e) => {
+                        e.stopPropagation(); // prevent applying metadata!
+                        const previewUrl = issue.image?.medium_url || issue.image?.super_url || issue.image?.original_url || coverUrl;
+                        openCoverPreviewModal(previewUrl, issueDisplayName);
+                      });
+                    }
 
                     issueLi.addEventListener('click', () => applyIssueMetadataFromSearch(issue.id));
                     issueList.appendChild(issueLi);

@@ -208,6 +208,113 @@ describe('ComicVine Rework & Unsaved Changes Warning Integration', () => {
     expect(clickEventOk.defaultPrevented).toBe(false); // Navigation allowed!
     expect(sandbox.state.metadataHasUnsavedChanges).toBe(false); // Flag reset to false
   });
+
+  // ==========================================
+  // CLIENT-SIDE TEST CASE 3: Cover Preview Thumbnail Click
+  // ==========================================
+  test('Cover Preview: Thumbnail click opens modal and stops metadata autofill', async () => {
+    // 1. Set up renderMetadataDisplay spy on state
+    sandbox.state.renderMetadataDisplay = jest.fn();
+
+    // Expose URLSearchParams and fetch to the VM context
+    sandbox.URLSearchParams = URLSearchParams;
+    sandbox.fetch = (...args) => sandbox.window.fetch(...args);
+
+    // 2. Load comicvine script with window bindings appended
+    const fileContent = fs.readFileSync(path.resolve(__dirname, '../public/js/comicvine.js'), 'utf8');
+    const cleanContent = fileContent
+      .replace(/import\s+[\s\S]*?from\s+['"][^'"]+['"];?/g, '')
+      .replace(/\bexport\s+/g, '') + '\nwindow.cvState = cvState;\nwindow.performCvSearch = performCvSearch;\n';
+    const script = new vm.Script(cleanContent);
+    vm.createContext(sandbox);
+    script.runInContext(sandbox);
+
+    // 3. Set up a mock fetch to intercept search and detail API calls
+    sandbox.window.fetch = jest.fn().mockImplementation((url) => {
+      if (url.includes('/search/comicvine')) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({
+            total: 1,
+            results: [
+              {
+                id: 12345,
+                name: 'Batman',
+                type: 'issue',
+                issueNumber: '1',
+                image: {
+                  thumb_url: 'thumb.jpg',
+                  medium_url: 'medium.jpg'
+                }
+              }
+            ]
+          })
+        });
+      } else if (url.includes('/api/v1/comicvine/issue/')) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({
+            id: 12345,
+            name: 'Batman #1 Detailed'
+          })
+        });
+      }
+      return Promise.reject(new Error('Unknown URL: ' + url));
+    });
+
+    // Trigger search
+    sandbox.window.cvState.lastQuery = 'Batman';
+    await sandbox.window.performCvSearch();
+
+    // Verify search result was rendered
+    const resultsUl = document.getElementById('cv-results');
+    const li = resultsUl.querySelector('li');
+    expect(li).toBeTruthy();
+
+    const img = li.querySelector('img');
+    expect(img).toBeTruthy();
+    expect(img.src).toContain('thumb.jpg');
+
+    // Check click handler on img
+    const imgClickEvent = new MouseEvent('click', { bubbles: true, cancelable: true });
+    img.dispatchEvent(imgClickEvent);
+
+    // Assert backdrop and modal are in document.body
+    let backdrop = document.body.querySelector('.fixed.inset-0.z-\\[100\\]');
+    expect(backdrop).toBeTruthy();
+
+    // Verify the preview image inside backdrop has the correct high-res URL
+    const previewImg = backdrop.querySelector('img');
+    expect(previewImg).toBeTruthy();
+    expect(previewImg.src).toContain('medium.jpg');
+
+    // Verify backdrop title caption
+    expect(backdrop.textContent).toContain('Batman #1');
+
+    // Confirm that event propagation was stopped and metadata autofill was NOT triggered
+    expect(sandbox.state.renderMetadataDisplay).not.toHaveBeenCalled();
+
+    // Click close button to close modal
+    const closeBtn = backdrop.querySelector('button');
+    expect(closeBtn).toBeTruthy();
+    closeBtn.click();
+
+    // Wait for the close animation & removal (300ms) using real setTimeout
+    await new Promise(resolve => setTimeout(resolve, 350));
+
+    // Backdrop should be removed from DOM
+    backdrop = document.body.querySelector('.fixed.inset-0.z-\\[100\\]');
+    expect(backdrop).toBeNull();
+
+    // Now click the text/baseRow itself and verify it triggers metadata autofill
+    const baseRow = li.querySelector('.cursor-pointer');
+    baseRow.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+
+    // Wait for async handler
+    await new Promise(resolve => setTimeout(resolve, 50));
+
+    expect(sandbox.state.renderMetadataDisplay).toHaveBeenCalled();
+  });
 });
 
 // ==========================================
