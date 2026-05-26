@@ -183,6 +183,7 @@ module.exports = function attach(router, deps) {
                   id: item.id,
                   name: item.name || item.volume?.name || 'Unknown',
                   volumeName: item.volume?.name || null,
+                  volumeId: volId,
                   issueNumber: item.issue_number || null,
                   coverDate: item.cover_date || item.date_added || null,
                   startYear: '',
@@ -217,11 +218,13 @@ module.exports = function attach(router, deps) {
 
         for (const item of (sdata.results || [])) {
           const type = item.api_detail_url?.includes('/issue/') ? 'issue' : 'volume';
+          const volId = item.volume?.id ? String(item.volume.id).replace(/^(?:\d{4}-)?(\d+)$/, '$1') : null;
           results.push({
             type,
             id: item.id,
             name: item.name || item.volume?.name || 'Unknown',
             volumeName: item.volume?.name || null,
+            volumeId: volId,
             issueNumber: item.issue_number || null,
             coverDate: item.cover_date || item.date_added || null,
             startYear: item.start_year || item.startYear || '',
@@ -253,6 +256,38 @@ module.exports = function attach(router, deps) {
           });
         }
       }
+
+      // Helper function to enrich issue search results with publisher names in batch (exactly 1 API call, no N+1 bottleneck!)
+      async function enrichIssuesWithPublisher(resList, apiKey) {
+        const issuesMissingPublisher = resList.filter(r => r.type === 'issue' && r.volumeId && !r.publisher);
+        if (issuesMissingPublisher.length === 0) return;
+
+        const uniqueVolIds = [...new Set(issuesMissingPublisher.map(r => r.volumeId))];
+        if (uniqueVolIds.length === 0) return;
+
+        try {
+          const volUrl = `${COMICVINE_API_URL}/volumes/?api_key=${encodeURIComponent(apiKey)}&format=json`
+                       + `&filter=id:${encodeURIComponent(uniqueVolIds.join('|'))}&field_list=id,publisher`;
+
+          const vdata = await cvFetchJson(volUrl);
+          const volPubMap = {};
+          for (const vol of (vdata.results || [])) {
+            const normalizedId = String(vol.id).replace(/^(?:\d{4}-)?(\d+)$/, '$1');
+            volPubMap[normalizedId] = vol.publisher?.name || '';
+          }
+
+          for (const r of resList) {
+            if (r.type === 'issue' && r.volumeId && !r.publisher) {
+              r.publisher = volPubMap[r.volumeId] || '';
+            }
+          }
+        } catch (err) {
+          // Ignore enrichment errors gracefully to avoid breaking search
+        }
+      }
+
+      // Enrich issue results with publisher names in batch
+      await enrichIssuesWithPublisher(results, apiKey);
 
       return res.json({
         total: totalResults || results.length,

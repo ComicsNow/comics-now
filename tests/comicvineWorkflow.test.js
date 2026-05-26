@@ -289,7 +289,7 @@ describe('Backend ComicVine Search Rework & Sorting API', () => {
     // 1. Mock structured search calls
     // First call is volumes lookup:
     mockDeps.cvFetchJson.mockResolvedValueOnce({
-      results: [{ id: 101, name: 'Batman (1940)' }]
+      results: [{ id: 101, name: 'Batman (1940)', publisher: { name: 'DC Comics' } }]
     });
     // Second call is issues lookup for volume 101, issue 12:
     mockDeps.cvFetchJson.mockResolvedValueOnce({
@@ -325,6 +325,7 @@ describe('Backend ComicVine Search Rework & Sorting API', () => {
     expect(result.id).toBe(9999);
     expect(result.name).toBe('Batman #12');
     expect(result.issueNumber).toBe('12');
+    expect(result.publisher).toBe('DC Comics');
   });
 
   test('Lazy Loading: Fetches volume issues accurately', async () => {
