@@ -137,10 +137,15 @@ module.exports = function attach(router, deps) {
           }
 
           let volUrl = `${COMICVINE_API_URL}/volumes/?api_key=${encodeURIComponent(apiKey)}&format=json`
-                     + `&filter=${encodeURIComponent(volFilter)}&limit=10&field_list=id`;
+                     + `&filter=${encodeURIComponent(volFilter)}&limit=10&field_list=id,publisher`;
 
           const vdata = await cvFetchJson(volUrl);
           const volumes = vdata.results || [];
+          const volumePublisherMap = {};
+          for (const vol of volumes) {
+            const volId = String(vol.id).replace(/^(?:\d{4}-)?(\d+)$/, '$1');
+            volumePublisherMap[volId] = vol.publisher?.name || '';
+          }
 
           if (volumes.length > 0) {
             const volIds = volumes.map(v => v.id);
@@ -171,6 +176,8 @@ module.exports = function attach(router, deps) {
             if (idata && idata.results) {
               totalResults = idata.number_of_total_results || 0;
               for (const item of idata.results) {
+                const volId = item.volume?.id ? String(item.volume.id).replace(/^(?:\d{4}-)?(\d+)$/, '$1') : null;
+                const publisherName = volId ? volumePublisherMap[volId] : '';
                 results.push({
                   type: 'issue',
                   id: item.id,
@@ -179,7 +186,7 @@ module.exports = function attach(router, deps) {
                   issueNumber: item.issue_number || null,
                   coverDate: item.cover_date || item.date_added || null,
                   startYear: '',
-                  publisher: item.publisher?.name || item.volume?.publisher?.name || '',
+                  publisher: publisherName || item.publisher?.name || item.volume?.publisher?.name || '',
                   image: item.image || null
                 });
               }
