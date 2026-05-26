@@ -363,6 +363,10 @@ if (typeof window !== 'undefined') {
 
 metadataForm?.addEventListener('submit', async (e) => {
   e.preventDefault();
+  
+  // Instantly clear the unsaved changes flag so that any concurrent clicks during the async save do not trigger the warning
+  state.metadataHasUnsavedChanges = false;
+
   if (saveStatusDiv) saveStatusDiv.textContent = 'Saving...';
   const formData = new FormData(metadataForm);
   if (!state.currentMetadata) {
@@ -381,8 +385,6 @@ metadataForm?.addEventListener('submit', async (e) => {
     });
     const result = await response.json();
     if (!response.ok) throw new Error(result.message || 'Failed to save metadata.');
-    
-    state.metadataHasUnsavedChanges = false; // Reset the unsaved changes flag on successful save
 
     if (saveStatusDiv) {
       if (result.writeBack === 'skipped') {
@@ -424,6 +426,8 @@ metadataForm?.addEventListener('submit', async (e) => {
       if (saveStatusDiv) saveStatusDiv.textContent = ''; 
     }, 5000);
   } catch (error) {
+    // Restore the unsaved changes flag on failure so the user is protected
+    state.metadataHasUnsavedChanges = true;
     if (saveStatusDiv) saveStatusDiv.textContent = `Save failed: ${error.message}`;
   }
 });
@@ -441,8 +445,8 @@ if (metadataForm) {
 // Capturing-phase global click interceptor
 document.addEventListener('click', (e) => {
   if (state.metadataHasUnsavedChanges) {
-    // Allow internal clicks within the metadata panel to pass through
-    if (e.target.closest('#metadata-content') || e.target.closest('#metadata-tab')) {
+    // Allow internal clicks within the metadata panel, tab clicks, and form saves to pass through
+    if (e.target.closest('#metadata-content') || e.target.closest('#metadata-tab') || e.target.closest('button[type="submit"]')) {
       return;
     }
     
