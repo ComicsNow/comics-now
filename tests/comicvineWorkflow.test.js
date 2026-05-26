@@ -289,7 +289,7 @@ describe('Backend ComicVine Search Rework & Sorting API', () => {
     // 1. Mock structured search calls
     // First call is volumes lookup:
     mockDeps.cvFetchJson.mockResolvedValueOnce({
-      results: [{ id: 101, name: 'Batman (1940)', publisher: { name: 'DC Comics' } }]
+      results: [{ id: 101, name: 'Batman (1940)', publisher: { name: 'DC Comics' }, start_year: '1940' }]
     });
     // Second call is issues lookup for volume 101, issue 12:
     mockDeps.cvFetchJson.mockResolvedValueOnce({

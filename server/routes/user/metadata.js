@@ -137,14 +137,16 @@ module.exports = function attach(router, deps) {
           }
 
           let volUrl = `${COMICVINE_API_URL}/volumes/?api_key=${encodeURIComponent(apiKey)}&format=json`
-                     + `&filter=${encodeURIComponent(volFilter)}&limit=10&field_list=id,publisher`;
+                     + `&filter=${encodeURIComponent(volFilter)}&limit=10&field_list=id,publisher,start_year`;
 
           const vdata = await cvFetchJson(volUrl);
           const volumes = vdata.results || [];
           const volumePublisherMap = {};
+          const volumeYearMap = {};
           for (const vol of volumes) {
             const volId = String(vol.id).replace(/^(?:\d{4}-)?(\d+)$/, '$1');
             volumePublisherMap[volId] = vol.publisher?.name || '';
+            volumeYearMap[volId] = vol.start_year || '';
           }
 
           if (volumes.length > 0) {
@@ -178,6 +180,7 @@ module.exports = function attach(router, deps) {
               for (const item of idata.results) {
                 const volId = item.volume?.id ? String(item.volume.id).replace(/^(?:\d{4}-)?(\d+)$/, '$1') : null;
                 const publisherName = volId ? volumePublisherMap[volId] : '';
+                const startYearVal = volId ? volumeYearMap[volId] : '';
                 results.push({
                   type: 'issue',
                   id: item.id,
@@ -186,7 +189,7 @@ module.exports = function attach(router, deps) {
                   volumeId: volId,
                   issueNumber: item.issue_number || null,
                   coverDate: item.cover_date || item.date_added || null,
-                  startYear: '',
+                  startYear: startYearVal,
                   publisher: publisherName || item.publisher?.name || item.volume?.publisher?.name || '',
                   image: item.image || null
                 });
@@ -257,28 +260,31 @@ module.exports = function attach(router, deps) {
         }
       }
 
-      // Helper function to enrich issue search results with publisher names in batch (exactly 1 API call, no N+1 bottleneck!)
+      // Helper function to enrich issue search results with publisher names and volume start years in batch (exactly 1 API call, no N+1 bottleneck!)
       async function enrichIssuesWithPublisher(resList, apiKey) {
-        const issuesMissingPublisher = resList.filter(r => r.type === 'issue' && r.volumeId && !r.publisher);
-        if (issuesMissingPublisher.length === 0) return;
+        const issuesMissingDetails = resList.filter(r => r.type === 'issue' && r.volumeId && (!r.publisher || !r.startYear));
+        if (issuesMissingDetails.length === 0) return;
 
-        const uniqueVolIds = [...new Set(issuesMissingPublisher.map(r => r.volumeId))];
+        const uniqueVolIds = [...new Set(issuesMissingDetails.map(r => r.volumeId))];
         if (uniqueVolIds.length === 0) return;
 
         try {
           const volUrl = `${COMICVINE_API_URL}/volumes/?api_key=${encodeURIComponent(apiKey)}&format=json`
-                       + `&filter=id:${encodeURIComponent(uniqueVolIds.join('|'))}&field_list=id,publisher`;
+                       + `&filter=id:${encodeURIComponent(uniqueVolIds.join('|'))}&field_list=id,publisher,start_year`;
 
           const vdata = await cvFetchJson(volUrl);
           const volPubMap = {};
+          const volYearMap = {};
           for (const vol of (vdata.results || [])) {
             const normalizedId = String(vol.id).replace(/^(?:\d{4}-)?(\d+)$/, '$1');
             volPubMap[normalizedId] = vol.publisher?.name || '';
+            volYearMap[normalizedId] = vol.start_year || '';
           }
 
           for (const r of resList) {
-            if (r.type === 'issue' && r.volumeId && !r.publisher) {
-              r.publisher = volPubMap[r.volumeId] || '';
+            if (r.type === 'issue' && r.volumeId) {
+              if (!r.publisher) r.publisher = volPubMap[r.volumeId] || '';
+              if (!r.startYear) r.startYear = volYearMap[r.volumeId] || '';
             }
           }
         } catch (err) {
@@ -286,11 +292,16 @@ module.exports = function attach(router, deps) {
         }
       }
 
+      // Enrich issue results with publisher names and start years in batch FIRST so we can filter by them
+      await enrichIssuesWithPublisher(results, apiKey);
+
       // Apply in-memory year and issue number filters to guarantee strict correctness across both fallback fuzzy searches and structured searches
       if (year) {
         const yearStr = String(year).trim();
         results = results.filter(item => {
           if (item.type === 'volume') {
+            return String(item.startYear).trim() === yearStr;
+          } else if (item.type === 'issue') {
             return String(item.startYear).trim() === yearStr;
           }
           return true;
@@ -306,9 +317,6 @@ module.exports = function attach(router, deps) {
           return true;
         });
       }
-
-      // Enrich issue results with publisher names in batch
-      await enrichIssuesWithPublisher(results, apiKey);
 
       return res.json({
         total: totalResults || results.length,
