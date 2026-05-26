@@ -37,7 +37,9 @@ function renderMetadataDisplay(metadata, clearForm = true) {
 // Opens a beautiful, premium modal previewing the full cover image with scale and fade animations
 function openCoverPreviewModal(imageUrl, title) {
   const backdrop = document.createElement('div');
-  backdrop.className = 'fixed inset-0 z-[100] flex items-center justify-center bg-black/85 backdrop-blur-sm transition-opacity duration-300 opacity-0';
+  backdrop.id = 'cover-preview-modal';
+  backdrop.className = 'fixed inset-0 flex items-center justify-center bg-black/85 backdrop-blur-sm transition-opacity duration-300 opacity-0';
+  backdrop.style.zIndex = '99999';
   
   const content = document.createElement('div');
   content.className = 'relative max-w-[90vw] max-h-[90vh] bg-gray-900/90 backdrop-blur-md p-3 rounded-2xl border border-gray-800 shadow-2xl flex flex-col items-center transform scale-95 transition-transform duration-300';

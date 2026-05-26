@@ -280,7 +280,7 @@ describe('ComicVine Rework & Unsaved Changes Warning Integration', () => {
     img.dispatchEvent(imgClickEvent);
 
     // Assert backdrop and modal are in document.body
-    let backdrop = document.body.querySelector('.fixed.inset-0.z-\\[100\\]');
+    let backdrop = document.body.querySelector('#cover-preview-modal');
     expect(backdrop).toBeTruthy();
 
     // Verify the preview image inside backdrop has the correct high-res URL
@@ -303,7 +303,7 @@ describe('ComicVine Rework & Unsaved Changes Warning Integration', () => {
     await new Promise(resolve => setTimeout(resolve, 350));
 
     // Backdrop should be removed from DOM
-    backdrop = document.body.querySelector('.fixed.inset-0.z-\\[100\\]');
+    backdrop = document.body.querySelector('#cover-preview-modal');
     expect(backdrop).toBeNull();
 
     // Now click the text/baseRow itself and verify it triggers metadata autofill
