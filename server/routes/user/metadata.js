@@ -286,6 +286,27 @@ module.exports = function attach(router, deps) {
         }
       }
 
+      // Apply in-memory year and issue number filters to guarantee strict correctness across both fallback fuzzy searches and structured searches
+      if (year) {
+        const yearStr = String(year).trim();
+        results = results.filter(item => {
+          if (item.type === 'volume') {
+            return String(item.startYear).trim() === yearStr;
+          }
+          return true;
+        });
+      }
+
+      if (issueNumber && resources === 'issue') {
+        const numStr = String(issueNumber).trim();
+        results = results.filter(item => {
+          if (item.type === 'issue') {
+            return String(item.issueNumber).trim() === numStr;
+          }
+          return true;
+        });
+      }
+
       // Enrich issue results with publisher names in batch
       await enrichIssuesWithPublisher(results, apiKey);
 
