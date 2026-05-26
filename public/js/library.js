@@ -160,7 +160,6 @@ function initializeLibraryUIControls() {
     renderForActiveScope(scope);
   };
 
-  const clearSmartFilter = () => setSmartScope(null);
 
   if (global.latestAddedButton && !global.latestAddedButton._smartListListener) {
     global.latestAddedButton._smartListListener = (event) => {

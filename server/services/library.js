@@ -1,8 +1,6 @@
-const fs = require('fs');
 const path = require('path');
 const { resolveLogo } = require('./library-logos');
-const { extractPageBuffer, getComicPages, generateThumbnail } = require('./library-pages');
-const { convertCbrToCbz, convertPdfToCbz } = require('./library-conversion');
+const { extractPageBuffer, getComicPages } = require('./library-pages');
 const { generateVirtualMetadata } = require('./library-metadata');
 const { scanLibrary, scheduleNextScan, isScanning } = require('./library-scan');
 

@@ -90,7 +90,6 @@ const {
   unregisterMoveClient,
   getMoveLogs,
   clearMoveLogs,
-  guidedLog,
   registerGuidedClient,
   unregisterGuidedClient,
   getGuidedLogs,
@@ -135,11 +134,24 @@ if (isAuthEnabled()) {
   initJwksClient();
 }
 
+const { rateLimiter } = require('./server/middleware/rate-limiter');
+
 const app = express();
+app.set('trust proxy', true);
 app.use(express.json());
 
 app.use(helmet({
-  contentSecurityPolicy: false,
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
+      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+      imgSrc: ["'self'", "data:", "blob:"],
+      fontSrc: ["'self'", "https://fonts.gstatic.com"],
+      connectSrc: ["'self'", "ws:", "wss:"],
+      frameAncestors: ["'none'"]
+    }
+  },
   hsts: false,
 }));
 
@@ -256,7 +268,12 @@ const baseUrl = config.baseUrl || '/';
 // Apply authentication middleware globally
 app.use(baseUrl, extractUserFromJWT);
 
-app.use(baseUrl, apiRouter);
+const apiLimiter = rateLimiter({
+  windowMs: 15 * 60 * 1000,
+  max: 300
+});
+
+app.use(baseUrl, apiLimiter, apiRouter);
 app.use(baseUrl, staticRouter);
 
 (async () => {

@@ -156,14 +156,19 @@ export async function showUserAccessView(userId, userEmail, userRole) {
     guideToggle.addEventListener('click', (e) => {
       e.preventDefault();
       const isExpanded = guideToggle.getAttribute('aria-expanded') === 'true';
+      const textSpan = guideToggle.querySelector('span');
+      const arrowSvg = guideToggle.querySelector('svg');
+
       if (isExpanded) {
         guideContent.classList.add('hidden');
         guideToggle.setAttribute('aria-expanded', 'false');
-        guideToggle.textContent = 'How to Use Library Access';
+        if (textSpan) textSpan.textContent = 'How to Use Library Access';
+        if (arrowSvg) arrowSvg.classList.remove('rotate-180');
       } else {
         guideContent.classList.remove('hidden');
         guideToggle.setAttribute('aria-expanded', 'true');
-        guideToggle.textContent = 'Hide Guide';
+        if (textSpan) textSpan.textContent = 'Hide Guide';
+        if (arrowSvg) arrowSvg.classList.add('rotate-180');
       }
     });
   }

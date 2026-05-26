@@ -1,4 +1,3 @@
-const express = require('express');
 
 /**
  * User Settings Routes

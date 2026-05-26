@@ -4,7 +4,6 @@ import {
   createErrorMessage,
   getRelativePath,
   ICONS,
-  CSS_CLASSES,
   rootFolderListContainer,
   applyDisplayInfoToLibrary
 } from './js/globals.js';
@@ -344,17 +343,13 @@ async function initializeApp() {
 // New function to load library offline-first
 async function loadLibraryOfflineFirst() {
   try {
-    const startTime = performance.now();
     let cachedLibrary = null;
-    let cacheTimestamp = null;
 
     try {
-      const cacheStartTime = performance.now();
       if (typeof global.loadLibraryCacheFromDB === 'function') {
         const cachedRecord = await global.loadLibraryCacheFromDB();
         if (cachedRecord && cachedRecord.data) {
           cachedLibrary = cachedRecord.data;
-          cacheTimestamp = cachedRecord.timestamp;
         }
       }
     } catch (error) {
@@ -372,7 +367,7 @@ async function loadLibraryOfflineFirst() {
     // Load downloaded comic IDs early so indicators show immediately
     if (typeof global.getAllDownloadedComicIds === 'function') {
       try {
-        const ids = await global.getAllDownloadedComicIds();
+        await global.getAllDownloadedComicIds();
       } catch (error) {
         console.error('[DEBUG] Failed to load downloaded comic IDs:', error);
         // Initialize empty set to prevent errors in UI
@@ -432,10 +427,8 @@ async function loadLibraryOfflineFirst() {
 
     // If we're online, refresh from the server
     if (!isOffline) {
-      const serverFetchStart = performance.now();
       try {
         await fetchLibraryFromServer();
-        hasLibraryData = true;
       } catch (error) {
         console.error('[DEBUG] fetchLibraryFromServer error:', error);
         // Network error - if we have cached data, continue using it silently
@@ -1054,7 +1047,6 @@ async function showReadingListDetail(listId, listName) {
         }
 
         const isDownloaded = global.downloadedComicIds?.has(comic.id);
-        const downloadIndicator = isDownloaded ? '<span class="text-green-400 flex-shrink-0" title="Downloaded">📥</span>' : '';
 
         // Render based on view mode
         if (viewMode === 'compact') {
@@ -1388,6 +1380,10 @@ function estimateLibrarySize(lib) {
     }
   }
   return count;
+}
+global.estimateLibrarySize = estimateLibrarySize;
+if (typeof window !== 'undefined') {
+  window.estimateLibrarySize = estimateLibrarySize;
 }
 
 // Add event listeners for reading list modal (after DOM loads)

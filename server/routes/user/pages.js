@@ -1,5 +1,11 @@
 const fs = require('fs');
 const path = require('path');
+const { rateLimiter } = require('../../middleware/rate-limiter');
+
+const downloadLimiter = rateLimiter({
+  windowMs: 15 * 60 * 1000,
+  max: 30
+});
 
 
 /**
@@ -8,6 +14,12 @@ const path = require('path');
  * Handles comic page listing, image serving, and downloads.
  */
 module.exports = function attach(router, deps) {
+  const pagesLimiter = rateLimiter({
+    windowMs: 15 * 60 * 1000,
+    max: 2000
+  });
+  router.use(pagesLimiter);
+
   const {
     dbGet,
     dbRun,
@@ -131,7 +143,7 @@ module.exports = function attach(router, deps) {
     }
   });
 
-  router.get('/api/v1/comics/download', async (req, res) => {
+  router.get('/api/v1/comics/download', requireAuth, downloadLimiter, async (req, res) => {
     let p;
     try {
       const rawPath = Buffer.from(req.query.path || '', 'base64').toString('utf-8');

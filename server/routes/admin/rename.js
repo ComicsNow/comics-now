@@ -1,18 +1,23 @@
-const express = require('express');
 const fs = require('fs');
 const path = require('path');
-const { spawn } = require('child_process');
 
 /**
  * Admin Rename Routes
  * @param {express.Router} router 
  * @param {object} deps 
  */
+const { rateLimiter } = require('../../middleware/rate-limiter');
+
 module.exports = function attach(router, deps) {
+  const adminRenameLimiter = rateLimiter({
+    windowMs: 15 * 60 * 1000,
+    max: 200
+  });
+  router.use(adminRenameLimiter);
+
   const {
     log,
     getConfig,
-    SCRIPTS_DIRECTORY,
     renameLog,
     registerRenameClient,
     unregisterRenameClient,

@@ -1,4 +1,12 @@
+const { rateLimiter } = require('../../middleware/rate-limiter');
+
 module.exports = function attach(router, deps) {
+  const adminUsersLimiter = rateLimiter({
+    windowMs: 15 * 60 * 1000,
+    max: 200
+  });
+  router.use(adminUsersLimiter);
+
   const { dbGet, dbRun, dbAll, log, formatErrorMessage, getComicsDirectories } = deps;
 
   router.get('/api/v1/users', async (req, res) => {
@@ -170,14 +178,13 @@ module.exports = function attach(router, deps) {
             } else if (item.accessType === 'series') {
               if (item.child_access) {
                 shouldNormalize = true;
-                allChildren = ['dummy']; // Set to non-empty to trigger normalization
               } else {
                 shouldNormalize = false;
               }
             }
           }
 
-          if (shouldNormalize && allChildren.length > 0) {
+          if (shouldNormalize && (item.accessType === 'series' || allChildren.length > 0)) {
             // Convert: remove child_access, add direct_access to parent
             normalizedAccess.push({
               accessType: item.accessType,

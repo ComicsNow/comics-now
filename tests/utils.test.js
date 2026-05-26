@@ -1,4 +1,19 @@
-const { pMap } = require('../server/utils');
+const { pMap, stripHtml } = require('../server/utils');
+
+describe('stripHtml', () => {
+  it('should strip standard HTML tags', () => {
+    expect(stripHtml('<p>Hello <b>World</b></p>')).toBe('Hello World');
+  });
+
+  it('should strip nested HTML tags to prevent bypasses', () => {
+    expect(stripHtml('<<script>script>alert("XSS")</script>')).toBe('alert("XSS")');
+  });
+
+  it('should return empty string for non-string inputs', () => {
+    expect(stripHtml(null)).toBe('');
+    expect(stripHtml(undefined)).toBe('');
+  });
+});
 
 describe('pMap', () => {
   it('should map items correctly', async () => {

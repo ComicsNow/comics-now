@@ -1,6 +1,13 @@
+const { rateLimiter } = require('../../middleware/rate-limiter');
+
 module.exports = function attach(router, deps) {
+  const adminGuidedLimiter = rateLimiter({
+    windowMs: 15 * 60 * 1000,
+    max: 200
+  });
+  router.use(adminGuidedLimiter);
+
   const {
-    log,
     guidedReader,
     formatErrorMessage,
     saveSetting,

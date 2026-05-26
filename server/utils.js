@@ -164,7 +164,14 @@ function ms(since) {
 }
 
 function stripHtml(s = '') {
-  return s.replace(/<[^>]*>/gm, '');
+  if (typeof s !== 'string') return '';
+  let prev;
+  let current = s;
+  do {
+    prev = current;
+    current = current.replace(/<[^<>]*>/gm, '');
+  } while (current !== prev);
+  return current;
 }
 
 function sanitizeHtml(str) {

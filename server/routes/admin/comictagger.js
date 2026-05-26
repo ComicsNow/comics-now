@@ -1,9 +1,15 @@
 const express = require('express');
 const fs = require('fs');
-const path = require('path');
-const { spawn } = require('child_process');
+
+const { rateLimiter } = require('../../middleware/rate-limiter');
 
 module.exports = function attach(router, deps) {
+  const adminCtLimiter = rateLimiter({
+    windowMs: 15 * 60 * 1000,
+    max: 200
+  });
+  router.use(adminCtLimiter);
+
   const {
     log,
     registerCtClient,
@@ -24,8 +30,6 @@ module.exports = function attach(router, deps) {
     getComicVineApiKey,
     cvFetchJson,
     COMICVINE_API_URL,
-    getConfig,
-    SCRIPTS_DIRECTORY,
     formatErrorMessage
   } = deps;
 

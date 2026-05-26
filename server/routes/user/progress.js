@@ -26,7 +26,7 @@ module.exports = function attach(router, deps) {
       if (!v.valid) return res.status(400).json({ ok: false, message: v.error });
       const comicId = v.sanitized;
 
-      const { deviceId, lastKnownPage = 0, lastKnownTimestamp = 0 } = req.query;
+      const { deviceId } = req.query;
       if (!comicId || !deviceId) {
         return res.status(400).json({ ok: false, message: 'Missing parameters' });
       }

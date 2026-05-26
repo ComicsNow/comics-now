@@ -1,12 +1,18 @@
 const fs = require('fs');
 const path = require('path');
 const { isPathSafe: _isPathSafe } = require('../../utils');
+const { rateLimiter } = require('../../middleware/rate-limiter');
 
 module.exports = function attach(router, deps) {
+  const libraryLimiter = rateLimiter({
+    windowMs: 15 * 60 * 1000,
+    max: 1000
+  });
+  router.use(libraryLimiter);
+
   const {
     log,
     dbGet,
-    dbRun,
     dbAll,
     formatErrorMessage,
     buildLibrary,
@@ -15,7 +21,6 @@ module.exports = function attach(router, deps) {
     resolvePath,
     generateVirtualMetadata,
     checkComicAccess,
-    getAllReadingPreferences,
     getReadingPrefMaps,
     resolveReadingModes,
     validateSearchQuery,
@@ -50,7 +55,7 @@ module.exports = function attach(router, deps) {
     const publisher = parts[0];
 
     // Check Publisher access
-    const pubAccess = accessList.find(a => a.accessType === 'publisher' && a.accessValue === publisher);
+    const pubAccess = accessList.find(a => a.accessType === 'publisher' && publisher && a.accessValue === publisher);
     if (!pubAccess) return false;
     if (pubAccess.child_access) return true;
     if (!pubAccess.direct_access) return false;
@@ -59,7 +64,7 @@ module.exports = function attach(router, deps) {
 
     const series = parts[1];
     // Check Series access
-    const serAccess = accessList.find(a => a.accessType === 'series' && a.accessValue === series);
+    const serAccess = accessList.find(a => a.accessType === 'series' && series && a.accessValue === series);
     if (!serAccess) return false;
     
     return true;

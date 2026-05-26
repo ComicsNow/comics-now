@@ -220,9 +220,7 @@ const global = new Proxy(typeof window !== 'undefined' ? window : globalThis, {
     if (typeof global.resetFullscreenZoom === 'function') {
       global.resetFullscreenZoom();
     }
-    if (typeof applyFullscreenFitMode === 'function') {
-      applyFullscreenFitMode();
-    }
+    applyFullscreenFitMode();
 
     if (viewer.requestFullscreen) {
       viewer.requestFullscreen().catch((error) => {
@@ -433,10 +431,6 @@ const global = new Proxy(typeof window !== 'undefined' ? window : globalThis, {
         event.stopPropagation();
         return;
       }
-      const isDesktop = typeof global.isDesktopDevice === 'function'
-        ? global.isDesktopDevice()
-        : !((typeof global.matchMedia === 'function') && global.matchMedia('(pointer: coarse)').matches);
-      // Removed: if (!isDesktop) return;
       if (global.isFullscreenZoomed) return;
       if (global.isFullImageMode) return;
       if (global.GuidedView?.isPanning) return;
