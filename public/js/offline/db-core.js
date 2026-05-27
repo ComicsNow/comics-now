@@ -46,8 +46,22 @@ export async function openOfflineDB() {
       reject(new Error(`Error opening IndexedDB: ${event.target.error}`));
     };
 
+    request.onblocked = (event) => {
+      console.warn('[IndexedDB] Database upgrade blocked by another connection. Please close other tabs.');
+      reject(new Error('IndexedDB blocked by other connections'));
+    };
+
     request.onsuccess = (event) => {
       const database = event.target.result;
+      
+      // Close database connection if an upgrade is requested by another tab/Service Worker
+      database.onversionchange = () => {
+        database.close();
+        console.log('[IndexedDB] Database connection closed due to version change request.');
+        state.db = null;
+        window.db = null;
+      };
+
       state.db = database;
       window.db = database;
       debugLog(

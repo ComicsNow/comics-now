@@ -219,7 +219,17 @@ async function openDownloadDB() {
     const request = indexedDB.open('comics-now-offline', 13);
 
     request.onsuccess = () => {
-      resolve(request.result);
+      const database = request.result;
+      database.onversionchange = () => {
+        database.close();
+        console.log('[SW] IndexedDB connection closed due to version change request.');
+      };
+      resolve(database);
+    };
+
+    request.onblocked = () => {
+      console.warn('[SW] IndexedDB upgrade blocked by another connection.');
+      reject(new Error('SW IndexedDB blocked'));
     };
 
     request.onerror = () => {
