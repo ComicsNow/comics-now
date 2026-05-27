@@ -508,9 +508,29 @@ export const ctContentOutput = document.getElementById('ct-content-output');
 export const ctContentManagement = document.getElementById('ct-content-management');
 export const ctMatchesBadge = document.getElementById('ct-matches-badge');
 
+// Helper to automatically detect e-paper/E-Ink devices based on user agent signatures.
+function detectEinkDevice() {
+  if (typeof navigator === 'undefined' || !navigator.userAgent) return 'none';
+  const ua = navigator.userAgent.toLowerCase();
+  
+  // Kindle (E-Ink versions, excluding Kindle Fire tablets)
+  if (ua.includes('kindle') && !ua.includes('fire')) {
+    return 'monochrome';
+  }
+  // Kobo e-readers
+  if (ua.includes('kobo')) {
+    return 'monochrome';
+  }
+  // Onyx Boox / PocketBook / Generic E-ink signatures
+  if (ua.includes('onyx') || ua.includes('boox') || ua.includes('pocketbook') || ua.includes('eink') || ua.includes('e-ink')) {
+    return 'monochrome';
+  }
+  return 'none';
+}
+
 // --- STATE MANAGEMENT ---
 export const state = {
-  einkMode: (typeof localStorage !== 'undefined' ? localStorage.getItem('eink_mode') || 'none' : 'none'),
+  einkMode: (typeof localStorage !== 'undefined' ? localStorage.getItem('eink_mode') || detectEinkDevice() : 'none'),
   APP_CONFIG: window.APP_CONFIG || {}, // Dynamically injected app config
   API_BASE_URL: (window.APP_CONFIG && window.APP_CONFIG.baseUrl) ? window.APP_CONFIG.baseUrl.replace(/\/$/, '') : '',
   library: {},
