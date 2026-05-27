@@ -9,16 +9,8 @@ const {
 } = require('../constants');
 const { log } = require('../logger');
 
-const { rateLimiter } = require('../middleware/rate-limiter');
-
 function createStaticRouter({ getConfig, getComicsDirectories, getPublicLibraries }) {
   const router = express.Router();
-  const staticLimiter = rateLimiter({
-    windowMs: 15 * 60 * 1000,
-    max: 1000
-  });
-  router.use(staticLimiter);
-
   const distDir = path.join(PUBLIC_DIR, 'dist');
   const STATIC_DIR = fs.existsSync(path.join(distDir, 'index.html')) ? distDir : PUBLIC_DIR;
 

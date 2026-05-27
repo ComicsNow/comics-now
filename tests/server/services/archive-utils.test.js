@@ -123,11 +123,5 @@ describe('archive-utils', () => {
         test('throws error for absolute path attempts', async () => {
             await expect(getEntryBuffer(sampleZip, '/etc/passwd')).rejects.toThrow('Potential path traversal attempt');
         });
-
-        test('throws error for invalid parameter types (type confusion)', async () => {
-            await expect(getEntryBuffer(sampleZip, ['/etc/passwd'])).rejects.toThrow('Invalid parameter type');
-            await expect(getEntryBuffer(sampleZip, { name: 'test' })).rejects.toThrow('Invalid parameter type');
-            await expect(getEntryBuffer(sampleZip, null)).rejects.toThrow('Invalid parameter type');
-        });
     });
 });

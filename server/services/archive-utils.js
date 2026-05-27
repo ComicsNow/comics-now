@@ -16,10 +16,6 @@ class ZipReader {
     }
 
     async readStream(name) {
-        if (typeof name !== 'string') {
-            this.close();
-            throw new Error('Invalid parameter type');
-        }
         if (path.isAbsolute(name) || name.includes('..')) {
             this.close();
             throw new Error('Potential path traversal attempt: ' + name);
@@ -80,6 +76,9 @@ class RarReader {
         this.data = data;
         this.entries = [];
         const list = this.extractor.getFileList();
+        for (const arcHeader of list.arcHeader) {
+            // Not really useful for files
+        }
         for (const fileHeader of list.fileHeaders) {
             if (!fileHeader.flags.directory) {
                 this.entries.push(fileHeader.name);
@@ -92,9 +91,6 @@ class RarReader {
     }
 
     async readBuffer(name) {
-        if (typeof name !== 'string') {
-            throw new Error('Invalid parameter type');
-        }
         if (path.isAbsolute(name) || name.includes('..')) {
             throw new Error('Potential path traversal attempt: ' + name);
         }

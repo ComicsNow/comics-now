@@ -1,5 +1,8 @@
+const express = require('express');
 const fs = require('fs');
 const path = require('path');
+const xml2js = require('xml2js');
+const { promisify } = require('util');
 
 const { writeComicInfoToCbz, buildComicInfoXml } = require('../../services/metadata');
 const { safeDirName, trimObjectStrings } = require('../../utils');
@@ -9,15 +12,7 @@ const { safeDirName, trimObjectStrings } = require('../../utils');
  * @param {express.Router} router 
  * @param {object} deps 
  */
-const { rateLimiter } = require('../../middleware/rate-limiter');
-
 module.exports = function attach(router, deps) {
-  const adminLibLimiter = rateLimiter({
-    windowMs: 15 * 60 * 1000,
-    max: 200
-  });
-  router.use(adminLibLimiter);
-
   const {
     log,
     dbAll,

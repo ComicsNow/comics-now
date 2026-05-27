@@ -341,6 +341,8 @@ if (searchForm) {
       const mode = resourcesEl.value; // 'issue' or 'volume'
       const issueNumContainer = document.getElementById('cv-issue-number-container');
       const issueNumInput = document.getElementById('search-issue-number');
+      const yearContainer = document.getElementById('cv-year-container');
+      const yearInput = document.getElementById('search-year');
       const sortEl = document.getElementById('cv-sort');
 
       if (mode === 'volume') {

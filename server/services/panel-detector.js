@@ -80,6 +80,21 @@ async function includeBelowText(boxes, buffer, meta) {
   }
 }
 
+/**
+ * Adds a percentage-based safety margin.
+ */
+function applyPadding(boxes, meta, paddingPercent = 0.02) {
+  const padW = meta.width * paddingPercent;
+  const padH = meta.height * paddingPercent;
+  
+  return boxes.map(b => ({
+    x: Math.max(0, b.x - padW),
+    y: Math.max(0, b.y - padH),
+    w: Math.min(meta.width - Math.max(0, b.x - padW), b.w + padW * 2),
+    h: Math.min(meta.height - Math.max(0, b.y - padH), b.h + padH * 2),
+    conf: b.conf
+  }));
+}
 
 const sessions = {};
 const sessionPromises = {};

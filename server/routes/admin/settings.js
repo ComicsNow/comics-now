@@ -1,3 +1,4 @@
+const express = require('express');
 
 /**
  * Admin Settings Routes
@@ -84,10 +85,10 @@ module.exports = function attach(router, deps) {
       const minutes = intervalValidation.sanitized;
       const sanitizedApiKey = apiKeyValidation.sanitized;
 
-      setScanIntervalMinutes(minutes);
-      setComicVineApiKey(sanitizedApiKey);
-      setAllowedFormats(allowedFormats);
-      setMetadataStorage(metadataStorage);
+      deps.setScanIntervalMinutes(minutes);
+      deps.setComicVineApiKey(sanitizedApiKey);
+      deps.setAllowedFormats(allowedFormats);
+      deps.setMetadataStorage(metadataStorage);
 
       await saveSetting('scanInterval', minutes);
       await saveSetting('comicVineApiKey', sanitizedApiKey);

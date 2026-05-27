@@ -531,6 +531,7 @@ export class SyncManager {
       deviceElement.addEventListener('click', async () => {
         const deviceId = deviceElement.getAttribute('data-device-id');
         const syncToPage = parseInt(deviceElement.getAttribute('data-page'), 10);
+        const timestamp = parseInt(deviceElement.getAttribute('data-timestamp'), 10);
 
         document.body.removeChild(modal);
 

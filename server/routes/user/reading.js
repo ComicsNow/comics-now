@@ -1,6 +1,6 @@
 module.exports = function attach(router, deps) {
   const {
-    dbGet, dbRun, log, formatErrorMessage, validateComicId,
+    dbGet, dbRun, dbAll, log, formatErrorMessage, validateComicId,
     requireAuth, setReadingPreference, getComicsDirectories
   } = deps;
 

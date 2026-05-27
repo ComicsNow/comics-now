@@ -1,6 +1,7 @@
 import { state } from '../globals.js';
 import { positionContextMenu, attachCloseHandler, closeContextMenu } from './menu-builder.js';
 import {
+  createDownloadItem,
   createBulkReadItem,
   createMangaToggleItem,
   createContinuousToggleItem,
@@ -19,7 +20,7 @@ function showSeriesContextMenu(event, seriesData) {
   const menu = document.createElement('div');
   menu.className = 'comic-context-menu';
 
-  const { seriesName, comicsInSeries } = seriesData;
+  const { seriesName, comicsInSeries, rootFolder, publisher } = seriesData;
 
   // 0. Bulk Read
   const bulkItem = createBulkReadItem(comicsInSeries, `series "${seriesName}"`);

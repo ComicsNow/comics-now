@@ -1,6 +1,7 @@
 import {
   state,
   escapeHtml,
+  safeDirName,
   getRelativePath,
   createLoadingMessage,
   createEmptyMessage,
@@ -148,6 +149,10 @@ export function renderSearchResultsAsFolders(comics) {
     const seriesCount = Object.keys(series).length;
     const comicCount = pubComics.length;
 
+    // Try to find a logo for the publisher
+    const folderName = safeDirName(pubName);
+    const baseUrl = state.API_BASE_URL || window.API_BASE_URL || '';
+    const pubLogoUrl = `${baseUrl}/logos/${encodeURIComponent(folderName)}/logo.png`; // Fallback/Optimistic
 
     card.innerHTML = `
       <div class="relative h-48 w-full bg-gray-700 rounded-lg overflow-hidden flex items-center justify-center p-4">

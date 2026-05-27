@@ -99,7 +99,6 @@ async function checkComicAccess(userId, userRole, comicPath, publisher, series, 
   // Check publisher child_access
   const publisherChildAccess = accessList.find(a =>
     a.accessType === 'publisher' &&
-    publisher &&
     a.accessValue === publisher &&
     a.child_access === 1
   );
@@ -118,7 +117,6 @@ async function checkComicAccess(userId, userRole, comicPath, publisher, series, 
   // Check series child_access
   const seriesChildAccess = accessList.find(a =>
     a.accessType === 'series' &&
-    series &&
     a.accessValue === series &&
     a.child_access === 1
   );
@@ -131,7 +129,6 @@ async function checkComicAccess(userId, userRole, comicPath, publisher, series, 
     );
     const publisherAccess = accessList.find(a =>
       a.accessType === 'publisher' &&
-      publisher &&
       a.accessValue === publisher &&
       (a.direct_access === 1 || a.child_access === 1)
     );
@@ -154,7 +151,6 @@ async function checkComicAccess(userId, userRole, comicPath, publisher, series, 
   // Step 2: Check PUBLISHER direct access
   const publisherDirectAccess = accessList.find(a =>
     a.accessType === 'publisher' &&
-    publisher &&
     a.accessValue === publisher &&
     a.direct_access === 1
   );
@@ -166,7 +162,6 @@ async function checkComicAccess(userId, userRole, comicPath, publisher, series, 
   // Series is the lowest level - having series access grants access to all comics in that series
   const seriesDirectAccess = accessList.find(a =>
     a.accessType === 'series' &&
-    series &&
     a.accessValue === series &&
     a.direct_access === 1
   );

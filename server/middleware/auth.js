@@ -63,11 +63,7 @@ function isIPInTrustedList(clientIP, trustedIPs) {
 
     // Wildcard match (e.g., 192.168.0.*)
     if (pattern.includes('*')) {
-      const escapedPattern = pattern
-        .replace(/\\/g, '\\\\')
-        .replace(/[.+^${}()|[\]]/g, '\\$&')
-        .replace(/\*/g, '.*');
-      const regex = new RegExp('^' + escapedPattern + '$');
+      const regex = new RegExp('^' + pattern.replace(/\./g, '\\.').replace(/\*/g, '.*') + '$');
       if (regex.test(clientIP)) return true;
     }
   }

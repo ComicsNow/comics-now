@@ -28,7 +28,8 @@ function createApiRouter(deps) {
   const { 
     log, 
     getComicsDirectories, 
-    getPathFromLibraryId
+    getPathFromLibraryId,
+    getLibraryIdFromPath
   } = deps;
   
   // Create the shared helpers
@@ -78,13 +79,7 @@ function createApiRouter(deps) {
     return deps.requireAdmin(req, res, next);
   };
 
-  const { rateLimiter } = require('../middleware/rate-limiter');
   const router = express.Router();
-  const apiLimiter = rateLimiter({
-    windowMs: 15 * 60 * 1000,
-    max: 1000
-  });
-  router.use(apiLimiter);
 
   // Public routes
   const publicRouter = express.Router();

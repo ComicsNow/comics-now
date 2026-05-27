@@ -528,7 +528,41 @@ async function updateCurrentPageFromScroll() {
 // UI HELPER FUNCTIONS
 // ============================================================================
 
+/**
+ * Hide navigation buttons when in continuous mode
+ */
+function hideNavigationButtons() {
+  const buttons = [
+    'prev-page-btn', 'next-page-btn',
+    'prev-page-btn-bottom', 'next-page-btn-bottom',
+    'fullscreen-prev-page-btn', 'fullscreen-next-page-btn'
+  ];
 
+  buttons.forEach(id => {
+    const btn = document.getElementById(id);
+    if (btn) {
+      btn.classList.add('hidden');
+    }
+  });
+}
+
+/**
+ * Show navigation buttons when exiting continuous mode
+ */
+function showNavigationButtons() {
+  const buttons = [
+    'prev-page-btn', 'next-page-btn',
+    'prev-page-btn-bottom', 'next-page-btn-bottom',
+    'fullscreen-prev-page-btn', 'fullscreen-next-page-btn'
+  ];
+
+  buttons.forEach(id => {
+    const btn = document.getElementById(id);
+    if (btn) {
+      btn.classList.remove('hidden');
+    }
+  });
+}
 
 /**
  * Update continuous mode button UI state
