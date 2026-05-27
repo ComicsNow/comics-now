@@ -91,7 +91,11 @@ export function tryAdvance(direction) {
     return false; 
   }
   
-  return activeMode.tryAdvance(direction);
+  const advanced = activeMode.tryAdvance(direction);
+  if (advanced && typeof state.triggerEinkFlash === 'function') {
+    state.triggerEinkFlash();
+  }
+  return advanced;
 }
 
 export async function enable() { return state.GuidedView.ModeRegistry.enable('guided'); }

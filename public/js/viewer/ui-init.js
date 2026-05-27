@@ -131,6 +131,52 @@ const global = new Proxy(typeof window !== 'undefined' ? window : globalThis, {
       global.fullscreenOrientationBtn.addEventListener('click', global.fullscreenOrientationBtn._toggleListener);
     }
 
+    const einkBtn = document.getElementById('fullscreen-eink-toggle-btn');
+    if (einkBtn && !einkBtn._clickListener) {
+      const applyEinkVisuals = (mode) => {
+        document.body.classList.remove('eink-mode', 'eink-color-mode');
+        einkBtn.classList.remove('active', 'active-monochrome', 'active-color');
+        
+        if (mode === 'monochrome') {
+          document.body.classList.add('eink-mode');
+          einkBtn.classList.add('active', 'active-monochrome');
+          einkBtn.setAttribute('aria-pressed', 'true');
+          einkBtn.title = "E-Ink Anti-Ghosting Mode (Monochrome)";
+        } else if (mode === 'color') {
+          document.body.classList.add('eink-color-mode');
+          einkBtn.classList.add('active', 'active-color');
+          einkBtn.setAttribute('aria-pressed', 'true');
+          einkBtn.title = "E-Ink Anti-Ghosting Mode (Color)";
+        } else {
+          einkBtn.setAttribute('aria-pressed', 'false');
+          einkBtn.title = "E-Ink Anti-Ghosting Mode (Off)";
+        }
+      };
+
+      // Set initial state on load
+      applyEinkVisuals(global.einkMode);
+
+      einkBtn._clickListener = () => {
+        let nextMode = 'none';
+        if (global.einkMode === 'none') {
+          nextMode = 'monochrome';
+        } else if (global.einkMode === 'monochrome') {
+          nextMode = 'color';
+        } else {
+          nextMode = 'none';
+        }
+
+        global.einkMode = nextMode;
+        localStorage.setItem('eink_mode', nextMode);
+        applyEinkVisuals(nextMode);
+
+        if (nextMode !== 'none' && typeof global.triggerEinkFlash === 'function') {
+          global.triggerEinkFlash();
+        }
+      };
+      einkBtn.addEventListener('click', einkBtn._clickListener);
+    }
+
     if (global.fullscreenBtn && !global.fullscreenBtn._openListener) {
       global.fullscreenBtn._openListener = (event) => {
         event.preventDefault();

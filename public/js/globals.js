@@ -510,6 +510,7 @@ export const ctMatchesBadge = document.getElementById('ct-matches-badge');
 
 // --- STATE MANAGEMENT ---
 export const state = {
+  einkMode: (typeof localStorage !== 'undefined' ? localStorage.getItem('eink_mode') || 'none' : 'none'),
   APP_CONFIG: window.APP_CONFIG || {}, // Dynamically injected app config
   API_BASE_URL: (window.APP_CONFIG && window.APP_CONFIG.baseUrl) ? window.APP_CONFIG.baseUrl.replace(/\/$/, '') : '',
   library: {},
@@ -594,6 +595,33 @@ export function resetFullscreenZoom() {
   }
 }
 
+/**
+ * Fast black-to-white physical flash reset overlay for e-paper devices.
+ */
+export function triggerEinkFlash() {
+  if (!state.einkMode || state.einkMode === 'none') return;
+  
+  let flash = document.getElementById('eink-flash-overlay');
+  if (!flash) {
+    flash = document.createElement('div');
+    flash.id = 'eink-flash-overlay';
+    document.body.appendChild(flash);
+  }
+  
+  // Instant solid black mask
+  flash.style.transition = 'none';
+  flash.style.opacity = '1';
+  flash.style.backgroundColor = 'black';
+  
+  // Cycle to white, then hide
+  setTimeout(() => {
+    flash.style.backgroundColor = 'white';
+    setTimeout(() => {
+      flash.style.opacity = '0';
+    }, 80);
+  }, 80);
+}
+
 // Register all exported functions, constants, and UI selectors on state & window for Proxy accessibility
 const globalsObj = {
   escapeHtml,
@@ -619,6 +647,7 @@ const globalsObj = {
   applyDisplayInfoToLibrary,
   getPathForCurrentView,
   resetFullscreenZoom,
+  triggerEinkFlash,
 
   // Constants
   ICONS,

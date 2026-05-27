@@ -31,6 +31,9 @@ export function handleImageClick(e) {
     if (typeof state.GuidedView.refreshRender === 'function') {
       state.GuidedView.refreshRender();
     }
+    if (typeof state.triggerEinkFlash === 'function') {
+      state.triggerEinkFlash();
+    }
     return;
   }
 
@@ -55,6 +58,9 @@ export function handleImageClick(e) {
     if (handled) {
       e.preventDefault();
       e.stopPropagation();
+      if (typeof state.triggerEinkFlash === 'function') {
+        state.triggerEinkFlash();
+      }
     } else {
       // Not handled by the mode -> show menu
       const showControls = state.showFullscreenControls || window.showFullscreenControls;
@@ -93,6 +99,9 @@ export function handleDoubleClickZoom(event) {
     if (typeof state.GuidedView.refreshRender === 'function') {
       state.GuidedView.refreshRender();
     }
+    if (typeof state.triggerEinkFlash === 'function') {
+      state.triggerEinkFlash();
+    }
     return;
   }
 
@@ -108,6 +117,9 @@ export function handleDoubleClickZoom(event) {
   if (!isPointerEvt) { event.preventDefault?.(); event.stopPropagation?.(); }
   if (typeof state.GuidedView.refreshRender === 'function') {
     state.GuidedView.refreshRender();
+  }
+  if (typeof state.triggerEinkFlash === 'function') {
+    state.triggerEinkFlash();
   }
 }
 

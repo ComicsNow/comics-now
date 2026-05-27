@@ -249,6 +249,9 @@ const global = new Proxy(typeof window !== 'undefined' ? window : globalThis, {
         if (global.viewerContent) {
           global.viewerContent.scrollTop = 0;
         }
+        if (typeof global.triggerEinkFlash === 'function') {
+          global.triggerEinkFlash();
+        }
       }
     } catch (error) {
       console.error('[VIEWER-LOCAL] navigatePage ERROR:', error);

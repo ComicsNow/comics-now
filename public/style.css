@@ -1587,3 +1587,49 @@ body.is-offline .comic-context-menu-item.hide-offline {
     .sm\:text-2xl { font-size: 1.5rem !important; line-height: 2rem !important; }
     .sm\:space-x-2 > :not([hidden]) ~ :not([hidden]) { margin-left: 0.5rem !important; }
 }
+
+/* --- E-INK SCREEN MODE --- */
+body.eink-mode,
+body.eink-mode *,
+body.eink-color-mode,
+body.eink-color-mode * {
+    transition: none !important;
+    animation: none !important;
+}
+
+/* Grayscale + Contrast optimization for monochrome E-Ink screens */
+body.eink-mode #fullscreen-image,
+body.eink-mode #bubble-magnifier-img {
+    filter: grayscale(100%) contrast(140%) brightness(102%) !important;
+}
+
+/* Saturation + Contrast optimization for Color E-Ink screens */
+body.eink-color-mode #fullscreen-image,
+body.eink-color-mode #bubble-magnifier-img {
+    filter: contrast(125%) saturate(135%) brightness(102%) !important;
+}
+
+/* E-Ink Physical Refresh Overlay */
+#eink-flash-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    z-index: 99999;
+    background-color: black;
+    opacity: 0;
+    pointer-events: none;
+}
+
+/* Active style for E-Ink button states */
+#fullscreen-eink-toggle-btn.active-monochrome {
+    color: #38bdf8 !important;
+    background-color: rgba(56, 189, 248, 0.12) !important;
+}
+
+#fullscreen-eink-toggle-btn.active-color {
+    color: #10b981 !important;
+    background-color: rgba(16, 185, 129, 0.12) !important;
+}
+
