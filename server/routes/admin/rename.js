@@ -91,7 +91,8 @@ module.exports = function attach(router, deps) {
 
           const series = info.Series;
           const publisher = info.Publisher;
-          const year = info.Year || (info.CoverDate ? info.CoverDate.toString().substring(0, 4) : null);
+          const coverDate = info.CoverDate || info['Cover Date'];
+          const year = info.Year || (coverDate ? coverDate.toString().substring(0, 4) : null);
 
           if (!series || !publisher || !year) {
             renameLog(`✗ Error: ${file} - Missing required tags (Series, Publisher, or Year/CoverDate)`);
