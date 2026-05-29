@@ -203,10 +203,8 @@ const global = new Proxy(typeof window !== 'undefined' ? window : globalThis, {
     }
 
     viewer.classList.remove('hidden');
-    if (typeof updateFullscreenPageStatus === 'function') {
-      const totalPages = typeof getPageCounterTotal === 'function' ? getPageCounterTotal() : 0;
-      updateFullscreenPageStatus(global.currentPageIndex + 1, totalPages);
-    }
+    const totalPages = typeof getPageCounterTotal === 'function' ? getPageCounterTotal() : 0;
+    updateFullscreenPageStatus(global.currentPageIndex + 1, totalPages);
 
     // Check if continuous mode should be enabled
     if (global.currentComic?.continuousMode && typeof global.enableContinuousMode === 'function') {
@@ -220,9 +218,7 @@ const global = new Proxy(typeof window !== 'undefined' ? window : globalThis, {
     if (typeof global.resetFullscreenZoom === 'function') {
       global.resetFullscreenZoom();
     }
-    if (typeof applyFullscreenFitMode === 'function') {
-      applyFullscreenFitMode();
-    }
+    applyFullscreenFitMode();
 
     if (viewer.requestFullscreen) {
       viewer.requestFullscreen().catch((error) => {
