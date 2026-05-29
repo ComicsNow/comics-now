@@ -169,10 +169,7 @@ app.use(cors((req, callback) => {
   }
 
   const isAllowed = (corsConfig.allowedOrigins || []).some(allowed => {
-    if (allowed === origin) return true;
-    const allowedWithoutProtocol = allowed.replace(/^https?:\/\//, '');
-    const originWithoutProtocol = origin.replace(/^https?:\/\//, '');
-    return allowedWithoutProtocol === originWithoutProtocol;
+    return allowed === origin;
   });
 
   options.origin = isAllowed ? origin : false;
