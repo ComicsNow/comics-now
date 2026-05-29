@@ -3,26 +3,6 @@
  */
 import { state, escapeHtml } from './globals.js';
 
-const global = new Proxy(typeof window !== 'undefined' ? window : globalThis, {
-  get(target, prop) {
-    if (prop in state) {
-      return state[prop];
-    }
-    const val = target[prop];
-    if (typeof val === 'function') {
-      return val.bind(target);
-    }
-    return val;
-  },
-  set(target, prop, value) {
-    state[prop] = value;
-    try {
-      target[prop] = value;
-    } catch (e) {}
-    return true;
-  }
-});
-
 // State for the "Add to Reading List" modal
 let pendingComicIds = [];
 let selectedListIds = new Set();

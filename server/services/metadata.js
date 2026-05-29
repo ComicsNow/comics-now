@@ -1,6 +1,6 @@
 const fs = require('fs');
 const path = require('path');
-const { openArchive, getEntryBuffer } = require('./archive-utils');
+const { openArchive } = require('./archive-utils');
 const yauzl = require('yauzl'); // yauzl still needed for writeComicInfoToCbz repacking logic
 const xml2js = require('xml2js');
 const archiver = require('archiver');

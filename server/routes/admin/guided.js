@@ -1,6 +1,5 @@
 module.exports = function attach(router, deps) {
   const {
-    log,
     guidedReader,
     formatErrorMessage,
     saveSetting,

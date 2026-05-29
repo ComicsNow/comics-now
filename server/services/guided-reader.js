@@ -1,9 +1,3 @@
-// Guided Reader: panel-detection orchestrator.
-//
-// Phase 1: queue + hierarchical traversal + scheduling + live SSE log.
-// Phase 2 will swap `processComic` for the real ONNX panel detector.
-
-const path = require('path');
 const { dbAll, dbGet, dbRun, getReadingPrefMaps, resolveReadingModes } = require('../db');
 const { log, guidedLog } = require('../logger');
 const { getComicsDirectories } = require('../config');

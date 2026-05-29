@@ -1,7 +1,4 @@
-const express = require('express');
 const fs = require('fs');
-const path = require('path');
-const { spawn } = require('child_process');
 
 module.exports = function attach(router, deps) {
   const {
@@ -24,8 +21,6 @@ module.exports = function attach(router, deps) {
     getComicVineApiKey,
     cvFetchJson,
     COMICVINE_API_URL,
-    getConfig,
-    SCRIPTS_DIRECTORY,
     formatErrorMessage
   } = deps;
 

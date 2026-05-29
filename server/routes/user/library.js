@@ -6,7 +6,6 @@ module.exports = function attach(router, deps) {
   const {
     log,
     dbGet,
-    dbRun,
     dbAll,
     formatErrorMessage,
     buildLibrary,
@@ -15,7 +14,6 @@ module.exports = function attach(router, deps) {
     resolvePath,
     generateVirtualMetadata,
     checkComicAccess,
-    getAllReadingPreferences,
     getReadingPrefMaps,
     resolveReadingModes,
     validateSearchQuery,

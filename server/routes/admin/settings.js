@@ -1,19 +1,13 @@
-const express = require('express');
-
 /**
  * Admin Settings Routes
- * @param {express.Router} router 
+ * @param {object} router 
  * @param {object} deps 
  */
 module.exports = function attach(router, deps) {
   const {
-    setScanIntervalMinutes,
-    setComicVineApiKey,
     getLibraries,
     addLibrary,
     removeLibrary,
-    setAllowedFormats,
-    setMetadataStorage,
     saveSetting,
     scheduleNextScan,
     formatErrorMessage,

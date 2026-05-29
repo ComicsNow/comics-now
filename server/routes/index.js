@@ -28,8 +28,7 @@ function createApiRouter(deps) {
   const { 
     log, 
     getComicsDirectories, 
-    getPathFromLibraryId,
-    getLibraryIdFromPath
+    getPathFromLibraryId
   } = deps;
   
   // Create the shared helpers

@@ -1,7 +1,5 @@
-const express = require('express');
 const fs = require('fs');
 const path = require('path');
-const { spawn } = require('child_process');
 
 /**
  * Admin Rename Routes
@@ -12,7 +10,6 @@ module.exports = function attach(router, deps) {
   const {
     log,
     getConfig,
-    SCRIPTS_DIRECTORY,
     renameLog,
     registerRenameClient,
     unregisterRenameClient,

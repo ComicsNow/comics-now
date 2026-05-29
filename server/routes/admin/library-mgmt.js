@@ -1,8 +1,5 @@
-const express = require('express');
 const fs = require('fs');
 const path = require('path');
-const xml2js = require('xml2js');
-const { promisify } = require('util');
 
 const { writeComicInfoToCbz, buildComicInfoXml } = require('../../services/metadata');
 const { safeDirName, trimObjectStrings } = require('../../utils');
