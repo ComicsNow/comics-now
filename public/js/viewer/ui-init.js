@@ -157,7 +157,7 @@ const global = new Proxy(typeof window !== 'undefined' ? window : globalThis, {
       applyEinkVisuals(global.einkMode);
 
       einkBtn._clickListener = () => {
-        let nextMode = 'none';
+        let nextMode;
         if (global.einkMode === 'none') {
           nextMode = 'monochrome';
         } else if (global.einkMode === 'monochrome') {

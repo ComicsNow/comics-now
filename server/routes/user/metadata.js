@@ -488,13 +488,11 @@ module.exports = function attach(router, deps) {
       const data = await cvFetchJson(issueUrl);
       const issue = data?.results;
 
-      let publisherFrom = '';
       let publisher =
-        (issue?.publisher?.name && (publisherFrom = 'issue.publisher')) && issue.publisher.name ||
-        (issue?.volume?.publisher?.name && (publisherFrom = 'issue.volume.publisher')) && issue.volume.publisher.name ||
+        issue?.publisher?.name ||
+        issue?.volume?.publisher?.name ||
         '';
 
-      let volStatus = null;
       let volUrl = null;
       if (!publisher && issue?.volume?.id) {
         const volIdNum = normalizeCvId(issue.volume.id);
@@ -503,13 +501,11 @@ module.exports = function attach(router, deps) {
           + `?api_key=${encodeURIComponent(apiKey)}&format=json`;
         try {
           const vjson = await cvFetchJson(volUrl);
-          volStatus = 200;
           if (vjson?.results?.publisher?.name) {
             publisher = vjson.results.publisher.name;
-            publisherFrom = 'volume.publisher (fallback)';
           }
         } catch (err) {
-          volStatus = err.status;
+          // Fallback failed
         }
       }
 
