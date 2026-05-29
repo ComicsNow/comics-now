@@ -23,6 +23,13 @@ module.exports = function attach(router, deps) {
     requireAuth
   } = deps;
 
+  function getQueryParamString(param) {
+    if (Array.isArray(param)) {
+      param = param[0];
+    }
+    return typeof param === 'string' ? param : '';
+  }
+
   // Serve a comic's guided-view sidecar (panel coordinates).
   router.get('/api/v1/comics/:id/guided-view', requireAuth, async (req, res) => {
     try {
@@ -47,7 +54,7 @@ module.exports = function attach(router, deps) {
 
   router.get('/api/v1/comics/pages', async (req, res) => {
     try {
-      const rawPath = Buffer.from(req.query.path || '', 'base64').toString('utf-8');
+      const rawPath = Buffer.from(getQueryParamString(req.query.path), 'base64').toString('utf-8');
       const p = resolvePath(rawPath);
 
       // Security: Validate path is within allowed directories
@@ -86,7 +93,7 @@ module.exports = function attach(router, deps) {
 
   router.get('/api/v1/comics/pages/image', async (req, res) => {
     try {
-      const rawPath = Buffer.from(req.query.path || '', 'base64').toString('utf-8');
+      const rawPath = Buffer.from(getQueryParamString(req.query.path), 'base64').toString('utf-8');
       const p = resolvePath(rawPath);
 
       // Security: Validate path is within allowed directories
@@ -112,7 +119,7 @@ module.exports = function attach(router, deps) {
         }
       }
 
-      const pageName = req.query.page || '';
+      const pageName = getQueryParamString(req.query.page);
       if (!p || !pageName || !fs.existsSync(p)) return res.status(404).end();
 
       const { getEntryBuffer } = require('../../services/archive-utils');
@@ -134,7 +141,7 @@ module.exports = function attach(router, deps) {
   router.get('/api/v1/comics/download', async (req, res) => {
     let p;
     try {
-      const rawPath = Buffer.from(req.query.path || '', 'base64').toString('utf-8');
+      const rawPath = Buffer.from(getQueryParamString(req.query.path), 'base64').toString('utf-8');
       p = resolvePath(rawPath);
 
       // Security: Validate path is within allowed directories
