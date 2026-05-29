@@ -143,6 +143,7 @@ app.use(helmet({
     useDefaults: true,
     directives: {
       "script-src": ["'self'", "'unsafe-inline'"],
+      "script-src-attr": ["'unsafe-inline'"],
       "style-src": ["'self'", "'unsafe-inline'"],
       "img-src": ["'self'", "data:", "https://placehold.co"],
       "upgrade-insecure-requests": null,
