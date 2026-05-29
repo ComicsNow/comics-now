@@ -1405,9 +1405,9 @@ body.is-offline .comic-context-menu-item.hide-offline {
 }
 
 #fullscreen-pages-continuous img {
-    /* Use CSS fill-available and fit-content for proper sizing */
+    /* Use vendor fallback and standard width value for proper sizing */
     width: -webkit-fill-available;
-    width: fill-available;
+    width: stretch;
     height: fit-content;
     display: block;
     margin: 0 auto;
