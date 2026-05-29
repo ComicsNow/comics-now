@@ -1511,21 +1511,7 @@ body.is-offline .comic-context-menu-item.hide-offline {
 }
 
 /* Missing Responsive Classes */
-@media (min-width: 640px) {
-    .sm\:inline { display: inline !important; }
-    .sm\:hidden { display: none !important; }
-    .sm\:flex { display: flex !important; }
-    .sm\:flex-row { flex-direction: row !important; }
-    .sm\:flex-initial { flex: 0 1 auto !important; }
-    .sm\:h-auto { height: auto !important; }
-    .sm\:max-h-\[90vh\] { max-height: 90vh !important; }
-    .sm\:p-6 { padding: 1.5rem !important; }
-    .sm\:px-6 { padding-left: 1.5rem !important; padding-right: 1.5rem !important; }
-    .sm\:px-4 { padding-left: 1rem !important; padding-right: 1rem !important; }
-    .sm\:text-base { font-size: 1rem !important; }
-    .sm\:text-2xl { font-size: 1.5rem !important; line-height: 2rem !important; }
-    .sm\:space-x-2 > :not([hidden]) ~ :not([hidden]) { margin-left: 0.5rem !important; }
-}
+
 
 /* Settings Modal Tab Bar Fixes */
 #settings-modal .flex.overflow-x-auto {
