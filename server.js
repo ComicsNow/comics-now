@@ -139,8 +139,14 @@ const app = express();
 app.use(express.json());
 
 app.use(helmet({
-  contentSecurityPolicy: false,
-  hsts: false,
+  contentSecurityPolicy: {
+    useDefaults: true,
+    directives: {
+      "script-src": ["'self'", "'unsafe-inline'"],
+      "style-src": ["'self'", "'unsafe-inline'"],
+      "img-src": ["'self'", "data:", "https://placehold.co"],
+    },
+  },
 }));
 
 // CORS middleware - standardized using the 'cors' package
