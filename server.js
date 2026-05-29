@@ -169,10 +169,7 @@ app.use(cors((req, callback) => {
   }
 
   const isAllowed = (corsConfig.allowedOrigins || []).some(allowed => {
-    if (allowed === origin) return true;
-    const allowedWithoutProtocol = allowed.replace(/^https?:\/\//, '');
-    const originWithoutProtocol = origin.replace(/^https?:\/\//, '');
-    return allowedWithoutProtocol === originWithoutProtocol;
+    return allowed === origin;
   });
 
   options.origin = isAllowed ? origin : false;
@@ -294,7 +291,19 @@ const pathJoin = (base, sub) => {
 // Apply rate limiting before routes and authentication
 app.use(pathJoin(baseUrl, 'api/v1/public/auth'), authLimiter);
 app.use(pathJoin(baseUrl, 'api/v1/comics/pages/image'), pagesLimiter);
-app.use(baseUrl, generalLimiter);
+const generalLimiterExclusions = new Set([
+  '/api/v1/public/auth',
+  '/api/v1/comics/pages/image'
+]);
+app.use(baseUrl, (req, res, next) => {
+  const relativePath = req.path.startsWith(baseUrl) ? req.path.slice(baseUrl.length) || '/' : req.path;
+  for (const excluded of generalLimiterExclusions) {
+    if (relativePath === excluded || relativePath.startsWith(excluded + '/')) {
+      return next();
+    }
+  }
+  return generalLimiter(req, res, next);
+});
 
 // Apply authentication middleware globally
 app.use(baseUrl, extractUserFromJWT);
@@ -354,10 +363,11 @@ app.use(baseUrl, staticRouter);
     });
 
     // Fallback exit if server.close hangs
-    setTimeout(() => {
+    const forceExitTimer = setTimeout(() => {
       log('WARN', 'SERVER', 'Shutdown timed out, forcing exit.');
       process.exit(1);
     }, 10000);
+    forceExitTimer.unref();
   }
 
   process.on('SIGTERM', () => shutdown('SIGTERM'));
