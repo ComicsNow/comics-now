@@ -615,11 +615,16 @@ async function processDownloadQueue() {
 
         // Remove from queue
         setTimeout(async () => {
+          let db2;
           try {
-            const db2 = await openDownloadDB();
+            db2 = await openDownloadDB();
             await removeQueueItem(db2, item.id);
           } catch (error) {
             console.error('[SW] Error removing completed item:', error);
+          } finally {
+            if (db2) {
+              db2.close();
+            }
           }
         }, 3000);
 
