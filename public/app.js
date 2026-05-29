@@ -346,7 +346,6 @@ async function loadLibraryOfflineFirst() {
   try {
     const startTime = performance.now();
     let cachedLibrary = null;
-    let cacheTimestamp = null;
 
     try {
       const cacheStartTime = performance.now();
@@ -354,7 +353,6 @@ async function loadLibraryOfflineFirst() {
         const cachedRecord = await global.loadLibraryCacheFromDB();
         if (cachedRecord && cachedRecord.data) {
           cachedLibrary = cachedRecord.data;
-          cacheTimestamp = cachedRecord.timestamp;
         }
       }
     } catch (error) {
@@ -435,7 +433,6 @@ async function loadLibraryOfflineFirst() {
       const serverFetchStart = performance.now();
       try {
         await fetchLibraryFromServer();
-        hasLibraryData = true;
       } catch (error) {
         console.error('[DEBUG] fetchLibraryFromServer error:', error);
         // Network error - if we have cached data, continue using it silently
