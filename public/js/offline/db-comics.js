@@ -332,10 +332,14 @@ export async function deleteFromCache(comicId, comicPath) {
     const keys = await cache.keys();
     const idStr = String(comicId);
     
-    let encodedPath = null;
+    const encodedPaths = [];
     if (comicPath) {
       try {
-        encodedPath = encodePath(comicPath);
+        const pathForward = comicPath.replace(/\\/g, '/');
+        const pathBackward = comicPath.replace(/\//g, '\\');
+        encodedPaths.push(encodePath(pathForward));
+        encodedPaths.push(encodePath(pathBackward));
+        encodedPaths.push(encodePath(comicPath));
       } catch (e) {
         console.error('[OFFLINE] Error encoding path for cache deletion:', e);
       }
@@ -353,8 +357,10 @@ export async function deleteFromCache(comicId, comicPath) {
       if (apiPattern.test(url)) {
         shouldDelete = true;
       } 
-      else if (encodedPath && url.includes('path=') && url.includes(encodeURIComponent(encodedPath))) {
-        shouldDelete = true;
+      else if (encodedPaths.length > 0 && url.includes('path=')) {
+        if (encodedPaths.some(enc => url.includes(encodeURIComponent(enc)) || url.includes(enc))) {
+          shouldDelete = true;
+        }
       }
       else if (url.includes(`/thumbnails/${idStr}.jpg`)) {
         shouldDelete = true;
@@ -483,8 +489,8 @@ export async function deleteOfflineComic(comicId) {
       try { statusStore.delete(`comic:${idStr}`); } catch (_) { console.warn('[OFFLINE] Failed to delete status idStr:', idStr, _); }
 
       tx.oncomplete = async () => {
-        const comicPath = comicDataFound?.comicInfo?.path;
-        await deleteFromCache(comicId, comicPath);
+        const comicPath = comicDataFound?.comicInfo?.path || comicDataFound?.path;
+        await deleteFromCache(originalId, comicPath);
 
         const cleanupId = (id) => {
           if (state.downloadedComicIds) state.downloadedComicIds.delete(id);
