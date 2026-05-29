@@ -76,9 +76,6 @@ class RarReader {
         this.data = data;
         this.entries = [];
         const list = this.extractor.getFileList();
-        for (const arcHeader of list.arcHeader) {
-            // Not really useful for files
-        }
         for (const fileHeader of list.fileHeaders) {
             if (!fileHeader.flags.directory) {
                 this.entries.push(fileHeader.name);
