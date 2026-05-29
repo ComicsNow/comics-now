@@ -1,4 +1,4 @@
-const { pMap } = require('../server/utils');
+const { pMap, stripHtml } = require('../server/utils');
 
 describe('pMap', () => {
   it('should map items correctly', async () => {
@@ -35,5 +35,29 @@ describe('pMap', () => {
       return x;
     };
     await expect(pMap(items, mapper)).rejects.toThrow('fail');
+  });
+});
+
+describe('stripHtml', () => {
+  it('should return empty string for non-string inputs', () => {
+    expect(stripHtml(null)).toBe('');
+    expect(stripHtml(undefined)).toBe('');
+    expect(stripHtml(123)).toBe('');
+  });
+
+  it('should preserve plain text', () => {
+    expect(stripHtml('Hello World')).toBe('Hello World');
+    expect(stripHtml('5 < 10')).toBe('5 < 10');
+  });
+
+  it('should strip basic HTML tags', () => {
+    expect(stripHtml('<p>Hello <b>World</b></p>')).toBe('Hello World');
+    expect(stripHtml('<a href="https://example.com">Link</a>')).toBe('Link');
+  });
+
+  it('should recursively strip nested HTML tags', () => {
+    expect(stripHtml('<<script>script>')).toBe('');
+    expect(stripHtml('<<script src="foo">script src="bar">')).toBe('');
+    expect(stripHtml('abc<<p>p>def')).toBe('abcdef');
   });
 });
