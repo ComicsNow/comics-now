@@ -354,10 +354,11 @@ app.use(baseUrl, staticRouter);
     });
 
     // Fallback exit if server.close hangs
-    setTimeout(() => {
+    const forceExitTimer = setTimeout(() => {
       log('WARN', 'SERVER', 'Shutdown timed out, forcing exit.');
       process.exit(1);
     }, 10000);
+    forceExitTimer.unref();
   }
 
   process.on('SIGTERM', () => shutdown('SIGTERM'));
