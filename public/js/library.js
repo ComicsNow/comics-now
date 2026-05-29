@@ -65,6 +65,11 @@ function goToInitialView() {
   if (typeof global.showRootFolderList === 'function') {
     global.showRootFolderList({ force: true });
   }
+
+  // Navigate to root route via router to ensure SPA updates correctly
+  if (!global._isNavigatingFromRouter && global.router) {
+    global.router.navigate('/', true);
+  }
 }
 
 if (typeof window !== 'undefined') window.goToInitialView = goToInitialView;
