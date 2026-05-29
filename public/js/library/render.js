@@ -4,7 +4,6 @@ import {
   escapeHtml,
   showView,
   createEmptyMessage,
-  createErrorMessage,
   createLoadingMessage,
   getRelativePath,
   rootFolderListDiv,
@@ -13,19 +12,13 @@ import {
   publisherListContainer,
   seriesListDiv,
   comicListDiv,
-  comicViewerDiv,
   publisherAlphaFilter,
   seriesAlphaFilter,
   comicAlphaFilter,
   publisherTitleH2,
   seriesTitleH2,
   comicListTitleH2,
-  smartListView,
   smartListContainer,
-  smartListTitle,
-  smartListBackBtn,
-  filterButtonsDiv,
-  smartListButtonsDiv,
   applyDisplayInfoToComic
 } from '../globals.js';
 

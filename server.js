@@ -91,7 +91,6 @@ const {
   unregisterMoveClient,
   getMoveLogs,
   clearMoveLogs,
-  guidedLog,
   registerGuidedClient,
   unregisterGuidedClient,
   getGuidedLogs,

@@ -1,8 +1,6 @@
-const express = require('express');
-
 /**
  * User Settings Routes
- * @param {express.Router} router 
+ * @param {object} router 
  * @param {object} deps 
  */
 module.exports = function attach(router, deps) {

@@ -44,7 +44,7 @@ describe('Admin Rename Route', () => {
     attachRenameRoutes(router, deps);
 
     // Mock existsSync and renameSync
-    const existsSpy = jest.spyOn(fs, 'existsSync').mockImplementation((p) => {
+    jest.spyOn(fs, 'existsSync').mockImplementation((p) => {
       if (p === '/comics') return true;
       if (p === '/comics/Justice League.cbz') return true;
       return false; // new path does not exist, safe to rename
