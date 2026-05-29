@@ -19,6 +19,7 @@
     "archiver": "^5.3.1",
     "cors": "^2.8.6",
     "express": "^4.19.2",
+    "express-rate-limit": "^8.5.2",
     "globals": "^16.4.0",
     "helmet": "^8.1.0",
     "jsonwebtoken": "^9.0.2",

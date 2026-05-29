@@ -8,7 +8,7 @@
  */
 (function checkDeps() {
   // Critical modules that must be present for the app to start
-  const criticalDeps = ['express', 'cors', 'helmet', 'onnxruntime-node', 'sharp', 'sqlite3'];
+  const criticalDeps = ['express', 'cors', 'helmet', 'onnxruntime-node', 'sharp', 'sqlite3', 'express-rate-limit'];
   let missing = false;
   for (const dep of criticalDeps) {
     try {
@@ -38,6 +38,7 @@ const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const fs = require('fs');
+const rateLimit = require('express-rate-limit');
 
 const {
   LOGOS_DIRECTORY,
@@ -260,6 +261,40 @@ const staticRouter = createStaticRouter({
 
 const config = getConfig();
 const baseUrl = config.baseUrl || '/';
+
+// Rate limiting middleware to address js/missing-rate-limiting alerts
+const authLimiter = rateLimit({
+  windowMs: 1 * 60 * 1000, // 1 minute
+  max: 60, // Limit each IP to 60 authentication attempts per minute
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: 'Too many authentication attempts, please try again after a minute'
+});
+
+const pagesLimiter = rateLimit({
+  windowMs: 1 * 60 * 1000, // 1 minute
+  max: 1500, // Very generous to support rapid page-turning, gallery preloads, etc.
+  standardHeaders: true,
+  legacyHeaders: false
+});
+
+const generalLimiter = rateLimit({
+  windowMs: 1 * 60 * 1000, // 1 minute
+  max: 500, // Generous limit for overall API usage, static files, and admin actions
+  standardHeaders: true,
+  legacyHeaders: false
+});
+
+const pathJoin = (base, sub) => {
+  const b = base.endsWith('/') ? base : (base + '/');
+  const s = sub.startsWith('/') ? sub.substring(1) : sub;
+  return b + s;
+};
+
+// Apply rate limiting before routes and authentication
+app.use(pathJoin(baseUrl, 'api/v1/public/auth'), authLimiter);
+app.use(pathJoin(baseUrl, 'api/v1/comics/pages/image'), pagesLimiter);
+app.use(baseUrl, generalLimiter);
 
 // Apply authentication middleware globally
 app.use(baseUrl, extractUserFromJWT);
