@@ -145,7 +145,7 @@ app.use(helmet({
       "script-src": ["'self'", "'unsafe-inline'"],
       "script-src-attr": ["'unsafe-inline'"],
       "style-src": ["'self'", "'unsafe-inline'"],
-      "img-src": ["'self'", "data:", "https://placehold.co"],
+      "img-src": ["'self'", "data:", "https://placehold.co", "blob:"],
       "upgrade-insecure-requests": null,
     },
   },

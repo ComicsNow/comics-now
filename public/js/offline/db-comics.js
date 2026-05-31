@@ -54,29 +54,60 @@ export async function getComicFromDB(comicId) {
   // Get current userId
   const currentUserId = getCurrentUserId();
 
+  const originalId = comicId;
+  const idStr = String(comicId);
+  let idNum = null;
+  if (/^\d+$/.test(idStr)) {
+    idNum = Number(comicId);
+  }
+
   return new Promise((resolve, reject) => {
     try {
       const tx = activeDb.transaction(['comics'], 'readonly');
       const store = tx.objectStore('comics');
-      const request = store.get(comicId);
+      
+      let retrievalAttempts = 0;
+      const maxRetrievalAttempts = 3;
 
-      request.onsuccess = (event) => {
-        const result = event.target.result;
-
-        // Verify userId matches (or comic has no userId for legacy support)
-        if (result && result.userId && result.userId !== currentUserId) {
-          debugLog('PROGRESS', `getComicFromDB - comic ${comicId} belongs to different user, denying access`);
+      function attemptRetrieval() {
+        if (retrievalAttempts >= maxRetrievalAttempts) {
           resolve(null);
           return;
         }
 
-        debugLog('PROGRESS', `getComicFromDB success - found comic: ${!!result} for ID: ${comicId}`);
-        resolve(result || null);
-      };
+        let keyToTry;
+        if (retrievalAttempts === 0) {
+          keyToTry = originalId;
+        } else if (retrievalAttempts === 1 && idNum !== null) {
+          keyToTry = idNum;
+        } else {
+          keyToTry = idStr;
+        }
 
-      request.onerror = (event) => {
-        reject(new Error(`Failed to get comic: ${event.target.errorCode}`));
-      };
+        const request = store.get(keyToTry);
+        request.onsuccess = (event) => {
+          const result = event.target.result;
+          if (result) {
+            // Verify userId matches (or comic has no userId for legacy support)
+            if (result.userId && result.userId !== currentUserId) {
+              debugLog('PROGRESS', `getComicFromDB - comic ${comicId} belongs to different user, denying access`);
+              resolve(null);
+              return;
+            }
+            debugLog('PROGRESS', `getComicFromDB success - found comic: true for ID: ${comicId} (key: ${keyToTry})`);
+            resolve(result);
+          } else {
+            retrievalAttempts++;
+            attemptRetrieval();
+          }
+        };
+        request.onerror = () => {
+          retrievalAttempts++;
+          attemptRetrieval();
+        };
+      }
+
+      attemptRetrieval();
     } catch (error) {
       reject(error);
     }
