@@ -1,29 +1,63 @@
-const sqlite3 = require('sqlite3').verbose();
-const { promisify } = require('util');
+const Database = require('better-sqlite3');
 const fs = require('fs');
 const path = require('path');
 const { DB_FILE } = require('./constants');
 const { log } = require('./logger');
 
-const db = new sqlite3.Database(DB_FILE);
-const dbGet = promisify(db.get.bind(db));
-const dbAll = promisify(db.all.bind(db));
+const db = new Database(DB_FILE);
 
-// Custom wrapper for db.run that returns the execution context with changes property
-function dbRun(sql, params = []) {
-  return new Promise((resolve, reject) => {
-    db.run(sql, params, function(err) {
-      if (err) {
-        reject(err);
-      } else {
-        // 'this' contains lastID, changes, etc.
-        resolve({
-          lastID: this.lastID,
-          changes: this.changes
-        });
-      }
-    });
-  });
+// Enable performance pragmas (WAL mode, busy timeout, foreign keys)
+db.pragma('journal_mode = WAL');
+db.pragma('synchronous = NORMAL');
+db.pragma('busy_timeout = 5000');
+db.pragma('foreign_keys = ON');
+
+// Custom async wrapper for db.get
+async function dbGet(sql, params = []) {
+  try {
+    const stmt = db.prepare(sql);
+    if (Array.isArray(params)) {
+      return stmt.get(...params);
+    }
+    return stmt.get(params);
+  } catch (err) {
+    log('ERROR', 'DB', `dbGet failed: ${err.message} (SQL: ${sql})`);
+    throw err;
+  }
+}
+
+// Custom async wrapper for db.all
+async function dbAll(sql, params = []) {
+  try {
+    const stmt = db.prepare(sql);
+    if (Array.isArray(params)) {
+      return stmt.all(...params);
+    }
+    return stmt.all(params);
+  } catch (err) {
+    log('ERROR', 'DB', `dbAll failed: ${err.message} (SQL: ${sql})`);
+    throw err;
+  }
+}
+
+// Custom async wrapper for db.run
+async function dbRun(sql, params = []) {
+  try {
+    const stmt = db.prepare(sql);
+    let info;
+    if (Array.isArray(params)) {
+      info = stmt.run(...params);
+    } else {
+      info = stmt.run(params);
+    }
+    return {
+      lastID: info.lastInsertRowid,
+      changes: info.changes
+    };
+  } catch (err) {
+    log('ERROR', 'DB', `dbRun failed: ${err.message} (SQL: ${sql})`);
+    throw err;
+  }
 }
 
 async function runMigrations() {
@@ -365,19 +399,9 @@ function resolveReadingModes(comicId, series, publisher, comicPath, prefMaps, co
 }
 
 async function closeDb() {
-  return new Promise((resolve, reject) => {
-    if (db) {
-      db.close((err) => {
-        if (err) {
-          reject(err);
-        } else {
-          resolve();
-        }
-      });
-    } else {
-      resolve();
-    }
-  });
+  if (db && typeof db.close === 'function') {
+    db.close();
+  }
 }
 
 module.exports = {
