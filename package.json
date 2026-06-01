@@ -17,6 +17,7 @@
   "dependencies": {
     "@eslint/js": "^9.38.0",
     "archiver": "^5.3.1",
+    "better-sqlite3": "^12.10.0",
     "cors": "^2.8.6",
     "express": "^4.19.2",
     "express-rate-limit": "^8.5.2",
@@ -29,7 +30,6 @@
     "node-unrar-js": "^2.0.2",
     "onnxruntime-node": "^1.25.1",
     "sharp": "^0.33.3",
-    "sqlite3": "^6.0.1",
     "xml2js": "^0.6.2",
     "yauzl": "^2.10.0"
   },

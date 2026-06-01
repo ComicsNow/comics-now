@@ -8,7 +8,7 @@
  */
 (function checkDeps() {
   // Critical modules that must be present for the app to start
-  const criticalDeps = ['express', 'cors', 'helmet', 'onnxruntime-node', 'sharp', 'sqlite3', 'express-rate-limit'];
+  const criticalDeps = ['express', 'cors', 'helmet', 'onnxruntime-node', 'sharp', 'better-sqlite3', 'express-rate-limit'];
   let missing = false;
   for (const dep of criticalDeps) {
     try {
