@@ -138,8 +138,10 @@ module.exports = function attach(router, deps) {
       const hasSeries = (metadata.Series || '').toString().trim().length > 0;
       const hasPublisher = (metadata.Publisher || '').toString().trim().length > 0;
       const hasDate = (metadata.Year || metadata.CoverDate || metadata.StoreDate || metadata['Cover Date'] || metadata['Store Date'] || '').toString().trim().length > 0;
+      const hasNumber = (metadata.Number !== undefined && metadata.Number !== null && metadata.Number.toString().trim().length > 0);
 
-      let tagStatus = (hasSeries && hasPublisher && hasDate) ? 'successful' : 'failed';      await dbRun('UPDATE comics SET tagStatus = ? WHERE id = ?', [tagStatus, id]);
+      let tagStatus = (hasSeries && hasPublisher && hasDate && hasNumber) ? 'successful' : 'failed';
+      await dbRun('UPDATE comics SET tagStatus = ? WHERE id = ?', [tagStatus, id]);
 
       if (!fs.existsSync(cbzPath)) {
         log('ERROR', 'META', `❌ CBZ not found on disk: ${cbzPath}`);

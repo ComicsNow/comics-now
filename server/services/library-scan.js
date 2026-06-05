@@ -229,10 +229,11 @@ async function scanLibrary(force = false) {
           const hasSeries = (info.Series || '').toString().trim().length > 0;
           const hasPublisher = (info.Publisher || '').toString().trim().length > 0;
           const hasDate = (info.Year || info.CoverDate || info.StoreDate || info['Cover Date'] || info['Store Date'] || '').toString().trim().length > 0;
+          const hasNumber = (info.Number || '').toString().trim().length > 0;
 
-          if (hasSeries && hasPublisher && hasDate) {
+          if (hasSeries && hasPublisher && hasDate && hasNumber) {
             tagStatus = 'successful';
-          } else if (tagStatus === 'successful') {
+          } else {
             tagStatus = 'failed';
           }
         }
