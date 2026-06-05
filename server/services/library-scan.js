@@ -19,7 +19,7 @@ let isScanning = false;
 let scanProgress = { totalFiles: 0, scannedFiles: 0, status: 'Idle' };
 let scanTimeout = null;
 
-async function scanLibrary() {
+async function scanLibrary(force = false) {
   if (isScanning) {
     log('INFO', 'SCAN', 'Already scanning; skip.');
     return;
@@ -148,11 +148,16 @@ async function scanLibrary() {
           return;
         }
 
-        totalSeen++;
-        log('INFO', 'SCAN', `📄 Processing: ${path.basename(filePath)} (${libraryMode} mode)`);
         fileSystemComics.add(filePath);
         const id = createId(filePath);
-        const existing = await dbGet('SELECT metadata, lastReadPage, totalPages, convertedAt, guidedViewStatus, guidedViewPath, guidedViewError, tagStatus FROM comics WHERE id = ?', [id]);
+        const existing = await dbGet('SELECT updatedAt, metadata, lastReadPage, totalPages, convertedAt, guidedViewStatus, guidedViewPath, guidedViewError, tagStatus FROM comics WHERE id = ?', [id]);
+
+        if (!force && !wasConverted && existing && existing.updatedAt === stats.mtimeMs) {
+          return;
+        }
+
+        totalSeen++;
+        log('INFO', 'SCAN', `📄 Processing: ${path.basename(filePath)} (${libraryMode} mode)`);
         const lastReadPage = existing?.lastReadPage || 0;
         let totalPages = existing?.totalPages || 0;
         const convertedAt = wasConverted ? Date.now() : (existing?.convertedAt || null);
@@ -212,7 +217,7 @@ async function scanLibrary() {
         info = trimObjectStrings(info || {});
         const publisher = (info.Publisher || 'Unknown Publisher').trim();
         const series = (info.Series || 'Unknown Series').trim();
-        const newStats = await fs.promises.stat(filePath);
+        const fileStats = wasConverted ? await fs.promises.stat(filePath) : stats;
 
         try {
           const pages = await getComicPages(filePath);
@@ -239,7 +244,7 @@ async function scanLibrary() {
             id,
             filePath,
             thumbnailPath,
-            newStats.mtimeMs,
+            fileStats.mtimeMs,
             path.basename(filePath),
             series,
             publisher,

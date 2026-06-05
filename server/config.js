@@ -13,7 +13,8 @@ const DEFAULT_CONFIG = {
   comicVineApiKey: '',
   ctScheduleMinutes: 60,
   allowed_formats: 'cbz',
-  metadata_storage: 'archive'
+  metadata_storage: 'archive',
+  trustProxy: false
 };
 
 let config = { ...DEFAULT_CONFIG };
@@ -28,6 +29,12 @@ function applyEnvOverrides() {
   if (process.env.CT_SCHEDULE_MINUTES) config.ctScheduleMinutes = parseInt(process.env.CT_SCHEDULE_MINUTES, 10);
   if (process.env.ALLOWED_FORMATS) config.allowed_formats = process.env.ALLOWED_FORMATS;
   if (process.env.METADATA_STORAGE) config.metadata_storage = process.env.METADATA_STORAGE;
+  if (process.env.TRUST_PROXY) {
+    const tp = process.env.TRUST_PROXY;
+    config.trustProxy = (tp === 'true') ? true : 
+                        (tp === 'false') ? false : 
+                        (!isNaN(Number(tp))) ? Number(tp) : tp;
+  }
 
   if (process.env.CORS_ENABLED) {
     if (!config.cors) config.cors = {};

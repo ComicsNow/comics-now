@@ -136,6 +136,10 @@ if (isAuthEnabled()) {
 }
 
 const app = express();
+const bootConfig = getConfig();
+if (bootConfig.trustProxy !== undefined) {
+  app.set('trust proxy', bootConfig.trustProxy);
+}
 app.use(express.json());
 
 app.use(helmet({
@@ -276,7 +280,7 @@ const pagesLimiter = rateLimit({
 
 const generalLimiter = rateLimit({
   windowMs: 1 * 60 * 1000, // 1 minute
-  max: 500, // Generous limit for overall API usage, static files, and admin actions
+  max: 1500, // Very generous limit for overall API usage, static files, and admin actions
   standardHeaders: true,
   legacyHeaders: false
 });
