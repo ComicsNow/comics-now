@@ -5,9 +5,17 @@ const path = require('path');
 const { Readable } = require('stream');
 const { isImage } = require('../utils');
 
+function isSafeEntry(name) {
+    if (typeof name !== 'string') return false;
+    if (path.isAbsolute(name)) return false;
+    const parts = name.split(/[\\/]/);
+    return !parts.includes('..');
+}
+
 class ZipReader {
-    constructor(zipfile) {
+    constructor(zipfile, filePath) {
         this.zipfile = zipfile;
+        this.filePath = filePath;
         this.entries = new Map();
     }
 
@@ -17,11 +25,25 @@ class ZipReader {
     }
 
     async readStream(name) {
-        if (typeof name !== 'string') {
+        if (!isSafeEntry(name)) {
             this.close();
-            throw new Error('Invalid parameter type');
+            throw new Error('Potential path traversal attempt: ' + name);
         }
-        if (path.isAbsolute(name) || name.includes('..')) {
+        if (!this.entries) {
+            throw new Error('Reader is closed');
+        }
+        const entry = this.entries.get(name);
+        if (!entry) {
+            this.close();
+            throw new Error('Entry not found: ' + name);
+        }
+        const { spawn } = require('child_process');
+        const child = spawn('unzip', ['-p', this.filePath, name]);
+        return child.stdout;
+    }
+
+    async readBuffer(name) {
+        if (!isSafeEntry(name)) {
             this.close();
             throw new Error('Potential path traversal attempt: ' + name);
         }
@@ -34,32 +56,28 @@ class ZipReader {
             throw new Error('Entry not found: ' + name);
         }
         return new Promise((resolve, reject) => {
-            this.zipfile.openReadStream(entry, (err, stream) => {
-                if (err) {
-                    this.close();
-                    return reject(err);
-                }
-                resolve(stream);
-            });
-        });
-    }
-
-    async readBuffer(name) {
-        if (typeof name !== 'string') {
-            this.close();
-            throw new Error('Invalid parameter type');
-        }
-        if (path.isAbsolute(name) || name.includes('..')) {
-            this.close();
-            throw new Error('Potential path traversal attempt: ' + name);
-        }
-        const stream = await this.readStream(name);
-        return new Promise((resolve, reject) => {
+            const { spawn } = require('child_process');
+            const child = spawn('unzip', ['-p', this.filePath, name]);
             const chunks = [];
-            stream.on('data', (chunk) => chunks.push(chunk));
-            stream.on('end', () => resolve(Buffer.concat(chunks)));
-            stream.on('error', (err) => {
-                this.close();
+            let errorOutput = '';
+
+            child.stdout.on('data', (chunk) => {
+                chunks.push(chunk);
+            });
+
+            child.stderr.on('data', (data) => {
+                errorOutput += data.toString();
+            });
+
+            child.on('close', (code) => {
+                if (code === 0) {
+                    resolve(Buffer.concat(chunks));
+                } else {
+                    reject(new Error(`unzip failed with code ${code}: ${errorOutput}`));
+                }
+            });
+
+            child.on('error', (err) => {
                 reject(err);
             });
         });
@@ -78,7 +96,7 @@ async function createZipReader(filePath) {
     return new Promise((resolve, reject) => {
         yauzl.open(filePath, { lazyEntries: true, autoClose: false }, (err, zipfile) => {
             if (err) return reject(err);
-            const reader = new ZipReader(zipfile);
+            const reader = new ZipReader(zipfile, filePath);
             zipfile.readEntry();
             zipfile.on('entry', (entry) => {
                 reader.entries.set(entry.fileName, entry);
@@ -112,7 +130,7 @@ class RarReader {
     }
 
     async readBuffer(name) {
-        if (path.isAbsolute(name) || name.includes('..')) {
+        if (!isSafeEntry(name)) {
             throw new Error('Potential path traversal attempt: ' + name);
         }
         const extracted = this.extractor.extract({ files: [name] });
