@@ -28,8 +28,8 @@
     "jwks-rsa": "^3.2.0",
     "node-fetch": "^3.3.2",
     "node-unrar-js": "^2.0.2",
-    "onnxruntime-node": "^1.25.1",
-    "sharp": "^0.33.3",
+    "onnxruntime-node": "^1.26.0",
+    "sharp": "^0.33.5",
     "xml2js": "^0.6.2",
     "yauzl": "^2.10.0"
   },

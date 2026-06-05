@@ -38,6 +38,7 @@ RUN apt-get update && apt-get install -y \
     libvips42 \
     libgomp1 \
     unrar-free \
+    zip \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app

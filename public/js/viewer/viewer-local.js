@@ -84,6 +84,9 @@ const global = new Proxy(typeof window !== 'undefined' ? window : globalThis, {
     const pages = global.getViewerPages?.() || [];
     if (!Array.isArray(pages) || pages.length === 0) {
       if (global.viewerPagesDiv) {
+        if (global.viewerPagesDiv.dataset.loading === 'true') {
+          return false;
+        }
         global.viewerPagesDiv.innerHTML = `<div class="text-center text-gray-400">No pages found.</div>`;
       }
       global.updateViewerPageCounter?.([]);

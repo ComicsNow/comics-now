@@ -37,10 +37,11 @@ module.exports = function attach(router, deps) {
   router.post('/api/v1/scan', requireAdmin, async (req, res) => {
     if (isScanning()) return res.json({ ok: true, message: 'Scan already in progress' });
     try {
-      if (req.body && req.body.full) {
+      const isFull = !!(req.body && req.body.full);
+      if (isFull) {
         await dbRun('DELETE FROM scan_dirs');
       }
-      scanLibrary();
+      scanLibrary(isFull);
       res.json({ ok: true });
     } catch (e) {
       res.status(400).json({ ok: false, message: formatErrorMessage(e, req, 'Scan failed') });

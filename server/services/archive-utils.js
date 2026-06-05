@@ -12,13 +12,21 @@ class ZipReader {
     }
 
     listEntries() {
+        if (!this.entries) return [];
         return Array.from(this.entries.keys());
     }
 
     async readStream(name) {
+        if (typeof name !== 'string') {
+            this.close();
+            throw new Error('Invalid parameter type');
+        }
         if (path.isAbsolute(name) || name.includes('..')) {
             this.close();
             throw new Error('Potential path traversal attempt: ' + name);
+        }
+        if (!this.entries) {
+            throw new Error('Reader is closed');
         }
         const entry = this.entries.get(name);
         if (!entry) {
@@ -37,17 +45,32 @@ class ZipReader {
     }
 
     async readBuffer(name) {
+        if (typeof name !== 'string') {
+            this.close();
+            throw new Error('Invalid parameter type');
+        }
+        if (path.isAbsolute(name) || name.includes('..')) {
+            this.close();
+            throw new Error('Potential path traversal attempt: ' + name);
+        }
         const stream = await this.readStream(name);
         return new Promise((resolve, reject) => {
             const chunks = [];
             stream.on('data', (chunk) => chunks.push(chunk));
             stream.on('end', () => resolve(Buffer.concat(chunks)));
-            stream.on('error', reject);
+            stream.on('error', (err) => {
+                this.close();
+                reject(err);
+            });
         });
     }
 
     close() {
-        this.zipfile.close();
+        if (this.zipfile) {
+            this.zipfile.close();
+        }
+        this.zipfile = null;
+        this.entries = null;
     }
 }
 
@@ -69,6 +92,7 @@ async function createZipReader(filePath) {
         });
     });
 }
+
 
 class RarReader {
     constructor(extractor, data) {

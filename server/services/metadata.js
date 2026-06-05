@@ -101,7 +101,41 @@ function buildComicInfoXml(metadataObj) {
   return builder.buildObject(safeObj);
 }
 
+function writeComicInfoNative(cbzPath, metadataXml) {
+  const os = require('os');
+  const { execFile } = require('child_process');
+
+  return new Promise((resolve, reject) => {
+    const tempDir = os.tmpdir();
+    const tempXmlPath = path.join(tempDir, `ComicInfo-${crypto.randomBytes(8).toString('hex')}.xml`);
+
+    fs.writeFile(tempXmlPath, metadataXml, 'utf8', (err) => {
+      if (err) return reject(err);
+
+      // -j ignores directory paths, storing ComicInfo.xml at the root
+      execFile('zip', ['-j', cbzPath, tempXmlPath], (zipErr, stdout, stderr) => {
+        // Clean up temp file
+        fs.unlink(tempXmlPath, () => {});
+
+        if (zipErr) {
+          return reject(zipErr);
+        }
+        resolve();
+      });
+    });
+  });
+}
+
 async function writeComicInfoToCbz(cbzPath, metadataXml) {
+  // Try native zip utility first for blistering speed (copies compressed streams in C)
+  try {
+    await writeComicInfoNative(cbzPath, metadataXml);
+    log('INFO', 'META', `✅ Updated ComicInfo.xml in ${path.basename(cbzPath)} using native zip`);
+    return;
+  } catch (nativeErr) {
+    log('INFO', 'META', `Native zip update failed/unavailable; falling back to JS repacking: ${nativeErr.message}`);
+  }
+
   // Use a unique temporary filename to prevent race conditions and collisions
   const randomSuffix = crypto.randomBytes(4).toString('hex');
   const tempPath = cbzPath + '.tmp.' + randomSuffix;

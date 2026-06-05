@@ -528,6 +528,7 @@ const global = new Proxy(typeof window !== 'undefined' ? window : globalThis, {
     }
 
     if (global.viewerPagesDiv) {
+      global.viewerPagesDiv.dataset.loading = 'true';
       global.viewerPagesDiv.dataset.pages = JSON.stringify([]);
       global.viewerPagesDiv.innerHTML = '';
       if (global.pageLoader) {
@@ -573,6 +574,10 @@ const global = new Proxy(typeof window !== 'undefined' ? window : globalThis, {
           }
         }
       }
+    }
+
+    if (global.viewerPagesDiv) {
+      delete global.viewerPagesDiv.dataset.loading;
     }
 
     global.pageLoader?.classList.add('hidden');
