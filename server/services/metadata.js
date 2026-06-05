@@ -101,26 +101,68 @@ function buildComicInfoXml(metadataObj) {
   return builder.buildObject(safeObj);
 }
 
+async function getExistingComicInfoPath(cbzPath) {
+  let archive;
+  try {
+    archive = await openArchive(cbzPath);
+    const entries = archive.listEntries();
+    const infoEntry = entries.find(name => name.toLowerCase() === 'comicinfo.xml') ||
+                      entries.find(name => path.basename(name).toLowerCase() === 'comicinfo.xml');
+    if (infoEntry) {
+      return infoEntry;
+    }
+  } catch (err) {
+    // ignore
+  } finally {
+    if (archive) archive.close();
+  }
+  return null;
+}
+
 function writeComicInfoNative(cbzPath, metadataXml) {
   const os = require('os');
   const { execFile } = require('child_process');
 
-  return new Promise((resolve, reject) => {
+  return new Promise(async (resolve, reject) => {
+    // Find if there is an existing ComicInfo.xml path (case-insensitive) in the ZIP
+    const existingPath = await getExistingComicInfoPath(cbzPath);
+
     const tempDir = os.tmpdir();
-    const tempXmlPath = path.join(tempDir, `ComicInfo-${crypto.randomBytes(8).toString('hex')}.xml`);
+    const uniqueSubDir = path.join(tempDir, `comicinfo-${crypto.randomBytes(8).toString('hex')}`);
 
-    fs.writeFile(tempXmlPath, metadataXml, 'utf8', (err) => {
-      if (err) return reject(err);
+    fs.mkdir(uniqueSubDir, { recursive: true }, (dirErr) => {
+      if (dirErr) return reject(dirErr);
 
-      // -j ignores directory paths, storing ComicInfo.xml at the root
-      execFile('zip', ['-j', cbzPath, tempXmlPath], (zipErr, stdout, stderr) => {
-        // Clean up temp file
-        fs.unlink(tempXmlPath, () => {});
+      const tempXmlPath = path.join(uniqueSubDir, 'ComicInfo.xml');
 
-        if (zipErr) {
-          return reject(zipErr);
+      fs.writeFile(tempXmlPath, metadataXml, 'utf8', (err) => {
+        if (err) {
+          fs.rm(uniqueSubDir, { recursive: true, force: true }, () => {});
+          return reject(err);
         }
-        resolve();
+
+        const runZipAdd = () => {
+          // -j ignores directory paths, storing ComicInfo.xml at the root
+          execFile('zip', ['-j', cbzPath, tempXmlPath], (zipErr, stdout, stderr) => {
+            // Clean up temp folder recursively
+            fs.rm(uniqueSubDir, { recursive: true, force: true }, () => {});
+
+            if (zipErr) {
+              return reject(zipErr);
+            }
+            resolve();
+          });
+        };
+
+        if (existingPath) {
+          // Delete the existing entry first to prevent duplicate files with different casing/paths
+          execFile('zip', ['-d', cbzPath, existingPath], (delErr) => {
+            // Even if delete fails, try to add
+            runZipAdd();
+          });
+        } else {
+          runZipAdd();
+        }
       });
     });
   });
