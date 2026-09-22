@@ -16,10 +16,12 @@ import {
   ctTabSettings,
   ctTabMatches,
   ctTabOutput,
+  ctTabLogs,
   ctTabManagement,
   ctContentSettings,
   ctContentMatches,
   ctContentOutput,
+  ctContentLogs,
   ctContentManagement,
   ctMatchesBadge,
   metadataForm,
@@ -57,6 +59,26 @@ function switchSettingsTab(tabName) {
     state.logInterval = null;
   }
 }
+
+// Guard: warn before leaving the Comics Defaults subtab with unsaved changes.
+// Runs in the capture phase so it can cancel the per-tab click handlers (which
+// navigate and switch content) before they fire.
+document.addEventListener('click', (e) => {
+  if (!state.comicsDefaultsDirty) return;
+  const tabBtn = e.target.closest('[id^="settings-tab-"]');
+  if (!tabBtn || tabBtn.id === 'settings-tab-comics-defaults') return;
+
+  const proceed = confirm(
+    'You have unsaved changes in Comics Defaults. Leave without saving? Your changes will be lost.'
+  );
+  if (!proceed) {
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    return;
+  }
+  state.comicsDefaultsDirty = false;
+  if (typeof window !== 'undefined') window.comicsDefaultsDirty = false;
+}, true);
 
 document.getElementById('settings-tab-general')?.addEventListener('click', () => {
   if (!state._isNavigatingFromRouter && state.router) {
@@ -240,91 +262,56 @@ document.getElementById('ct-grab-btn')?.addEventListener('click', function() {
   }
 });
 
-ctRunBtn?.addEventListener('click', async () => {
-  await fetch(`${state.API_BASE_URL}/api/v1/comictagger/run`, { method: 'POST' });
-});
 
-ctTabSettings?.addEventListener('click', () => {
-  if (ctTabSettings.classList.contains('active')) return;
-  if (!state._isNavigatingFromRouter && state.router) {
-    state.router.navigate('/comictagger', true);
+function switchCtTab(activeTab, activeContent, routePath) {
+  if (activeTab.classList.contains('active')) return;
+  if (!state._isNavigatingFromRouter && state.router && routePath) {
+    state.router.navigate(routePath, true);
   }
-  ctTabSettings.classList.add('active');
-  ctTabMatches.classList.remove('active');
-  ctTabOutput.classList.remove('active');
-  ctTabManagement.classList.remove('active');
-  ctContentSettings.classList.remove('hidden');
-  ctContentMatches.classList.add('hidden');
-  ctContentOutput.classList.add('hidden');
-  ctContentManagement.classList.add('hidden');
+  [ctTabOutput, ctTabMatches, ctTabSettings, ctTabLogs, ctTabManagement].forEach(t => t?.classList.remove('active'));
+  [ctContentOutput, ctContentMatches, ctContentSettings, ctContentLogs, ctContentManagement].forEach(c => c?.classList.add('hidden'));
+  activeTab?.classList.add('active');
+  activeContent?.classList.remove('hidden');
 
   const stopRenameFn = state.stopRenameStream || window.stopRenameStream;
   const stopMoveFn = state.stopMoveStream || window.stopMoveStream;
-  if (typeof stopRenameFn === 'function') stopRenameFn();
-  if (typeof stopMoveFn === 'function') stopMoveFn();
+  if (activeTab !== ctTabManagement) {
+    if (typeof stopRenameFn === 'function') stopRenameFn();
+    if (typeof stopMoveFn === 'function') stopMoveFn();
+  }
+}
+
+ctTabOutput?.addEventListener('click', () => {
+  switchCtTab(ctTabOutput, ctContentOutput, '/comictagger/output');
+  const ctSyncFn = state.ctSyncLogsAndState || window.ctSyncLogsAndState;
+  if (typeof ctSyncFn === 'function') ctSyncFn();
 });
 
 ctTabMatches?.addEventListener('click', () => {
-  if (ctTabMatches.classList.contains('active')) return;
-  if (!state._isNavigatingFromRouter && state.router) {
-    state.router.navigate('/comictagger/matches', true);
-  }
-  ctTabMatches.classList.add('active');
-  ctTabSettings.classList.remove('active');
-  ctTabOutput.classList.remove('active');
-  ctTabManagement.classList.remove('active');
-  ctContentMatches.classList.remove('hidden');
-  ctContentSettings.classList.add('hidden');
-  ctContentOutput.classList.add('hidden');
-  ctContentManagement.classList.add('hidden');
-  // Clear badge when viewing matches
+  switchCtTab(ctTabMatches, ctContentMatches, '/comictagger/matches');
   if (ctMatchesBadge) ctMatchesBadge.classList.add('hidden');
-
-  const stopRenameFn = state.stopRenameStream || window.stopRenameStream;
-  const stopMoveFn = state.stopMoveStream || window.stopMoveStream;
-  if (typeof stopRenameFn === 'function') stopRenameFn();
-  if (typeof stopMoveFn === 'function') stopMoveFn();
+  const fetchPendingMatchDetailsFn = state.fetchPendingMatchDetails || window.fetchPendingMatchDetails;
+  if (typeof fetchPendingMatchDetailsFn === 'function') fetchPendingMatchDetailsFn();
 });
 
-ctTabOutput?.addEventListener('click', () => {
-  if (ctTabOutput.classList.contains('active')) return;
-  if (!state._isNavigatingFromRouter && state.router) {
-    state.router.navigate('/comictagger/output', true);
-  }
-  ctTabOutput.classList.add('active');
-  ctTabSettings.classList.remove('active');
-  ctTabMatches.classList.remove('active');
-  ctTabManagement.classList.remove('active');
-  ctContentOutput.classList.remove('hidden');
-  ctContentSettings.classList.add('hidden');
-  ctContentMatches.classList.add('hidden');
-  ctContentManagement.classList.add('hidden');
+ctTabSettings?.addEventListener('click', () => {
+  switchCtTab(ctTabSettings, ctContentSettings, '/comictagger');
+});
 
-  const stopRenameFn = state.stopRenameStream || window.stopRenameStream;
-  const stopMoveFn = state.stopMoveStream || window.stopMoveStream;
-  if (typeof stopRenameFn === 'function') stopRenameFn();
-  if (typeof stopMoveFn === 'function') stopMoveFn();
+ctTabLogs?.addEventListener('click', () => {
+  switchCtTab(ctTabLogs, ctContentLogs, '/comictagger/logs');
+  const loadScanLogsFn = state.loadScanLogs || window.loadScanLogs;
+  if (typeof loadScanLogsFn === 'function') loadScanLogsFn();
 });
 
 ctTabManagement?.addEventListener('click', () => {
-  if (ctTabManagement.classList.contains('active')) return;
-  if (!state._isNavigatingFromRouter && state.router) {
-    state.router.navigate('/comictagger/management', true);
-  }
-  ctTabManagement.classList.add('active');
-  ctTabSettings.classList.remove('active');
-  ctTabMatches.classList.remove('active');
-  ctTabOutput.classList.remove('active');
-  ctContentManagement.classList.remove('hidden');
-  ctContentSettings.classList.add('hidden');
-  ctContentMatches.classList.add('hidden');
-  ctContentOutput.classList.add('hidden');
-
+  switchCtTab(ctTabManagement, ctContentManagement, '/comictagger/management');
   const startRenameFn = state.startRenameStream || window.startRenameStream;
   const startMoveFn = state.startMoveStream || window.startMoveStream;
   if (typeof startRenameFn === 'function') startRenameFn();
   if (typeof startMoveFn === 'function') startMoveFn();
 });
+
 
 ctModal?.addEventListener('keydown', (e) => {
   if (ctConfirmBar && !ctConfirmBar.classList.contains('hidden')) {
@@ -365,7 +352,8 @@ metadataForm?.addEventListener('submit', async (e) => {
   // Instantly clear the unsaved changes flag so that any concurrent clicks during the async save do not trigger the warning
   state.metadataHasUnsavedChanges = false;
 
-  if (saveStatusDiv) saveStatusDiv.textContent = 'Saving...';
+  const statusDiv = document.getElementById('save-status') || saveStatusDiv;
+  if (statusDiv) statusDiv.textContent = 'Saving...';
   const formData = new FormData(metadataForm);
   if (!state.currentMetadata) {
     state.currentMetadata = await (await fetch(`${state.API_BASE_URL}/api/v1/comics/info?path=${encodeURIComponent(encodePath(state.currentComic.path))}`)).json();
@@ -384,20 +372,21 @@ metadataForm?.addEventListener('submit', async (e) => {
     const result = await response.json();
     if (!response.ok) throw new Error(result.message || 'Failed to save metadata.');
 
-    if (saveStatusDiv) {
+    if (statusDiv) {
       if (result.writeBack === 'skipped') {
-        saveStatusDiv.textContent = 'Changes saved to database (CBZ write-back skipped for Folder Mode)';
+        statusDiv.textContent = 'Changes saved to database (CBZ write-back skipped for Folder Mode)';
       } else {
-        saveStatusDiv.textContent = 'Changes saved successfully!';
+        statusDiv.textContent = 'Changes saved successfully!';
       }
     }
 
     if (state.currentComic) {
       state.currentComic.metadata = JSON.stringify(state.currentMetadata);
-      const hasSeries = (state.currentMetadata.Series || '').toString().trim().length > 0;
+      const hasSeries = ((state.currentMetadata.Series || '').toString().trim().length > 0) || ((state.currentMetadata.Title || '').toString().trim().length > 0);
       const hasPublisher = (state.currentMetadata.Publisher || '').toString().trim().length > 0;
       const hasDate = (state.currentMetadata.Year || state.currentMetadata.CoverDate || state.currentMetadata.StoreDate || state.currentMetadata['Cover Date'] || state.currentMetadata['Store Date'] || '').toString().trim().length > 0;
-      const newTag = (hasSeries && hasPublisher && hasDate) ? 'successful' : 'failed';
+      const hasNumber = (state.currentMetadata.Number !== undefined && state.currentMetadata.Number !== null && state.currentMetadata.Number.toString().trim().length > 0);
+      const newTag = (hasSeries && hasPublisher && hasDate && hasNumber) ? 'successful' : 'failed';
       state.currentComic.tagStatus = newTag;
 
       const comicMap = state.comicIdMap || window.comicIdMap;
@@ -421,12 +410,12 @@ metadataForm?.addEventListener('submit', async (e) => {
     }
     
     setTimeout(() => { 
-      if (saveStatusDiv) saveStatusDiv.textContent = ''; 
+      if (statusDiv) statusDiv.textContent = ''; 
     }, 5000);
   } catch (error) {
     // Restore the unsaved changes flag on failure so the user is protected
     state.metadataHasUnsavedChanges = true;
-    if (saveStatusDiv) saveStatusDiv.textContent = `Save failed: ${error.message}`;
+    if (statusDiv) statusDiv.textContent = `Save failed: ${error.message}`;
   }
 });
 

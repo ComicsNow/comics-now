@@ -34,10 +34,25 @@ module.exports = function attach(router, deps) {
   router.get('/api/v1/comics/:id/guided-view', requireAuth, async (req, res) => {
     try {
       const row = await dbGet(
-        'SELECT guidedViewStatus, guidedViewPath FROM comics WHERE id = ?',
+        'SELECT id, path, publisher, series, guidedViewStatus, guidedViewPath FROM comics WHERE id = ?',
         [req.params.id]
       );
       if (!row) return res.status(404).json({ ok: false, message: 'Comic not found' });
+
+      // Security: Validate user has access to this comic
+      const hasAccess = await checkComicAccess(
+        req.user?.userId,
+        req.user?.role,
+        row.path,
+        row.publisher,
+        row.series,
+        getComicsDirectories(),
+        row.id
+      );
+      if (!hasAccess) {
+        return res.status(403).json({ ok: false, message: 'Access denied' });
+      }
+
       if (row.guidedViewStatus !== 'completed' || !row.guidedViewPath) {
         return res.status(404).json({ ok: false, message: 'Guided view not available' });
       }

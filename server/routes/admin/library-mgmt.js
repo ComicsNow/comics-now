@@ -50,7 +50,7 @@ module.exports = function attach(router, deps) {
 
   router.post('/api/v1/admin/metadata/migrate', requireAdmin, async (req, res) => {
     const { mode } = req.body;
-    if (!['archive', 'db'].includes(mode)) {
+    if (!['archive', 'db', 'sidecar'].includes(mode)) {
       return res.status(400).json({ ok: false, message: 'Invalid mode' });
     }
 
@@ -66,26 +66,42 @@ module.exports = function attach(router, deps) {
 
         const metadata = comic.metadata ? JSON.parse(comic.metadata) : {};
         const ext = path.extname(comicPath).toLowerCase();
-        const sidecarPath = comicPath.replace(/\.(cbz|cbr)$/i, '.xml');
+        const sidecarPath = path.join(path.dirname(comicPath), path.basename(comicPath, ext) + '.ComicInfo.xml');
+        const legacySidecarPath = path.join(path.dirname(comicPath), path.basename(comicPath, ext) + '.xml');
 
         try {
-          if (mode === 'archive') {
+          if (mode === 'sidecar') {
+            const metadataXml = buildComicInfoXml(metadata);
+            if (metadataXml) {
+              await fs.promises.writeFile(sidecarPath, metadataXml, 'utf-8');
+            }
+            // Cleanup legacy sidecar if it exists
+            if (fs.existsSync(legacySidecarPath)) {
+              fs.unlinkSync(legacySidecarPath);
+            }
+          } else if (mode === 'archive') {
             if (ext === '.cbz') {
               // Always write DB metadata to internal CBZ when migrating to 'archive' mode
               const metadataXml = buildComicInfoXml(metadata);
               if (metadataXml) {
                 await writeComicInfoToCbz(comicPath, metadataXml);
               }
-              // Cleanup sidecar if it exists
-              if (fs.existsSync(sidecarPath)) {
-                fs.unlinkSync(sidecarPath);
-              }
+            }
+            // Cleanup sidecars (both new and legacy)
+            if (fs.existsSync(sidecarPath)) {
+              fs.unlinkSync(sidecarPath);
+            }
+            if (fs.existsSync(legacySidecarPath)) {
+              fs.unlinkSync(legacySidecarPath);
             }
             // CBR: No action (CBR uses database exclusively)
           } else if (mode === 'db') {
-            // Delete any .xml sidecars for both CBZ and CBR
+            // Delete any sidecars for both CBZ and CBR
             if (fs.existsSync(sidecarPath)) {
               fs.unlinkSync(sidecarPath);
+            }
+            if (fs.existsSync(legacySidecarPath)) {
+              fs.unlinkSync(legacySidecarPath);
             }
           }
         } catch (err) {
@@ -131,17 +147,21 @@ module.exports = function attach(router, deps) {
       const comicRow = await dbGet('SELECT libraryMode FROM comics WHERE id = ?', [id]);
       const libraryMode = comicRow ? comicRow.libraryMode : 'metadata';
 
-      await dbRun('UPDATE comics SET metadata = ? WHERE id = ?', [JSON.stringify(metadata), id]);
-      log('INFO', 'META', `💾 DB updated for ${path.basename(cbzPath)}`);
-
       // Evaluate tagStatus
-      const hasSeries = (metadata.Series || '').toString().trim().length > 0;
+      const hasSeries = ((metadata.Series || '').toString().trim().length > 0) || ((metadata.Title || '').toString().trim().length > 0);
       const hasPublisher = (metadata.Publisher || '').toString().trim().length > 0;
       const hasDate = (metadata.Year || metadata.CoverDate || metadata.StoreDate || metadata['Cover Date'] || metadata['Store Date'] || '').toString().trim().length > 0;
       const hasNumber = (metadata.Number !== undefined && metadata.Number !== null && metadata.Number.toString().trim().length > 0);
 
       let tagStatus = (hasSeries && hasPublisher && hasDate && hasNumber) ? 'successful' : 'failed';
-      await dbRun('UPDATE comics SET tagStatus = ? WHERE id = ?', [tagStatus, id]);
+      const pub = (metadata.Publisher || '').trim() || null;
+      const ser = (metadata.Series || metadata.Title || '').trim() || null;
+
+      await dbRun(
+        'UPDATE comics SET metadata = ?, tagStatus = ?, publisher = COALESCE(?, publisher), series = COALESCE(?, series) WHERE id = ?',
+        [JSON.stringify(metadata), tagStatus, pub, ser, id]
+      );
+      log('INFO', 'META', `💾 DB updated for ${path.basename(cbzPath)}`);
 
       if (!fs.existsSync(cbzPath)) {
         log('ERROR', 'META', `❌ CBZ not found on disk: ${cbzPath}`);
@@ -156,6 +176,10 @@ module.exports = function attach(router, deps) {
       try {
         await saveMetadataToComic(cbzPath, metadata);
         log('INFO', 'META', `📂 ComicInfo.xml written back into ${path.basename(cbzPath)}`);
+        try {
+          const stats = await fs.promises.stat(cbzPath);
+          await dbRun('UPDATE comics SET updatedAt = ? WHERE id = ?', [stats.mtimeMs, id]);
+        } catch (_) {}
       } catch (e) {
         log('ERROR', 'META', `❌ Write-back failed for ${path.basename(cbzPath)}: ${e.message}`);
         return res.status(200).json({ ok: true, writeBack: false, error: formatErrorMessage(e, req, 'Metadata write-back failed') });
@@ -292,6 +316,23 @@ module.exports = function attach(router, deps) {
               fs.unlinkSync(filePath);
             } else {
               throw renameErr;
+            }
+          }
+
+          // Move the adjacent ComicInfo.xml sidecar alongside the comic
+          const srcExt = path.extname(filePath);
+          const srcSidecar = path.join(path.dirname(filePath), path.basename(filePath, srcExt) + '.ComicInfo.xml');
+          if (fs.existsSync(srcSidecar)) {
+            const destSidecar = path.join(destDir, path.basename(destPath, path.extname(destPath)) + '.ComicInfo.xml');
+            try {
+              fs.renameSync(srcSidecar, destSidecar);
+            } catch (sErr) {
+              if (sErr.code === 'EXDEV') {
+                fs.copyFileSync(srcSidecar, destSidecar);
+                fs.unlinkSync(srcSidecar);
+              } else {
+                moveLog(`  ↳ ⚠ Failed to move sidecar for ${file}: ${sErr.message}`);
+              }
             }
           }
 

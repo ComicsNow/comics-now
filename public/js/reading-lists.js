@@ -35,7 +35,12 @@ async function fetchReadingLists() {
     const response = await fetch(`${baseUrl}/api/v1/reading-lists`);
     const data = await response.json();
     if (data.ok) {
-      return data.lists || [];
+      const lists = data.lists || [];
+      const setCached = state.setCachedReadingLists || window.setCachedReadingLists || state.LibrarySmartLists?.setCachedReadingLists;
+      if (typeof setCached === 'function') {
+        setCached(lists);
+      }
+      return lists;
     }
     throw new Error(data.message || 'Failed to fetch reading lists');
   } catch (error) {

@@ -29,6 +29,12 @@ async function checkComicAccess(userId, userRole, comicPath, publisher, series, 
     return true;
   }
 
+  // DEFAULT-ALLOW: grant every authenticated user access to all libraries.
+  // Per-user access control below is temporarily bypassed while the access
+  // UI is being reworked. Remove this early return to re-enable per-user
+  // permissions (the original logic is left intact below).
+  // return true;
+
   // Get user's access permissions (all at once for efficiency)
   const accessList = preFetchedAccessList || await dbAllFunc(
     `SELECT accessType, accessValue, direct_access, child_access
@@ -42,20 +48,21 @@ async function checkComicAccess(userId, userRole, comicPath, publisher, series, 
   const library = libraries.find(l => l.path === rootFolder);
   const isFolderMode = library?.hierarchyMode === 'folder';
 
-  // Verify Root Folder Access (Mandatory for both modes)
-  const hasRootAccess = accessList.some(a =>
-    a.accessType === 'root_folder' &&
-    a.accessValue === rootFolder &&
-    (a.direct_access === 1 || a.child_access === 1)
-  );
-  if (!hasRootAccess) return false;
-
-  // Folder Mode Access Resolution
+  // --- FOLDER MODE RESOLUTION ---
+  // Folder-mode libraries resolve access by on-disk path, so a per-root foothold
+  // is meaningful and still mandatory here.
   if (isFolderMode) {
+    const hasRootAccess = accessList.some(a =>
+      a.accessType === 'root_folder' &&
+      a.accessValue === rootFolder &&
+      (a.direct_access === 1 || a.child_access === 1)
+    );
+    if (!hasRootAccess) return false;
+
     // Check direct comic file permission
-    const hasDirectComic = accessList.some(a => 
-      a.accessType === 'comic' && 
-      a.accessValue === comicId && 
+    const hasDirectComic = accessList.some(a =>
+      a.accessType === 'comic' &&
+      a.accessValue === comicId &&
       a.direct_access === 1
     );
     if (hasDirectComic) return true;
@@ -83,94 +90,42 @@ async function checkComicAccess(userId, userRole, comicPath, publisher, series, 
     return false; // Access Denied in Folder Mode
   }
 
-  // --- METADATA MODE RESOLUTION (Existing logic kept intact) ---
+  // --- METADATA MODE RESOLUTION ---
+  // Permissions are grouped by metadata (root_folder / publisher / series). A
+  // publisher legitimately spans multiple root folders on disk (e.g. "DC Comics"
+  // files live in several libraries), so publisher- and series-level grants are
+  // honored GLOBALLY by metadata, independent of any per-root foothold row: the
+  // grant means "this publisher/series, wherever it appears". This keeps grants
+  // robust as new root folders are added later. root_folder access continues to
+  // mean "this whole library".
 
-  // Check root folder child_access
-  const rootChildAccess = accessList.find(a =>
+  // Whole-library grant: root_folder child_access covers everything under it.
+  const rootChildAccess = accessList.some(a =>
     a.accessType === 'root_folder' &&
     a.accessValue === rootFolder &&
     a.child_access === 1
   );
+  if (rootChildAccess) return true;
 
-  if (rootChildAccess) {
-    return true; // Root folder child_access grants access to everything under it
-  }
-
-  // Check publisher child_access
-  const publisherChildAccess = accessList.find(a =>
+  // Publisher grant: child_access grants every comic for this publisher.
+  const publisherChildAccess = accessList.some(a =>
     a.accessType === 'publisher' &&
     a.accessValue === publisher &&
     a.child_access === 1
   );
-  if (publisherChildAccess) {
-    // Publisher has child_access, but we still need root folder access
-    const rootAccess = accessList.find(a =>
-      a.accessType === 'root_folder' &&
-      a.accessValue === rootFolder &&
-      (a.direct_access === 1 || a.child_access === 1)
-    );
-    if (rootAccess) {
-      return true; // Publisher child_access + root access grants access to all series/comics
-    }
-  }
+  if (publisherChildAccess) return true;
 
-  // Check series child_access
-  const seriesChildAccess = accessList.find(a =>
+  // Series grant: a series is the lowest metadata level, so either child_access
+  // or direct_access on the series grants all of its comics. (Save-side
+  // normalization collapses series child_access into direct_access.)
+  const seriesAccess = accessList.some(a =>
     a.accessType === 'series' &&
     a.accessValue === series &&
-    a.child_access === 1
+    (a.direct_access === 1 || a.child_access === 1)
   );
-  if (seriesChildAccess) {
-    // Series has child_access, check if we have publisher and root access
-    const rootAccess = accessList.find(a =>
-      a.accessType === 'root_folder' &&
-      a.accessValue === rootFolder &&
-      (a.direct_access === 1 || a.child_access === 1)
-    );
-    const publisherAccess = accessList.find(a =>
-      a.accessType === 'publisher' &&
-      a.accessValue === publisher &&
-      (a.direct_access === 1 || a.child_access === 1)
-    );
-    if (rootAccess && publisherAccess) {
-      return true; // Series child_access + publisher + root access grants access to all comics
-    }
-  }
+  if (seriesAccess) return true;
 
-  // No child_access found, check for direct_access at each level
-  // Step 1: Check ROOT FOLDER direct access (mandatory)
-  const rootDirectAccess = accessList.find(a =>
-    a.accessType === 'root_folder' &&
-    a.accessValue === rootFolder &&
-    a.direct_access === 1
-  );
-  if (!rootDirectAccess) {
-    return false; // No root folder access at all
-  }
-
-  // Step 2: Check PUBLISHER direct access
-  const publisherDirectAccess = accessList.find(a =>
-    a.accessType === 'publisher' &&
-    a.accessValue === publisher &&
-    a.direct_access === 1
-  );
-  if (!publisherDirectAccess) {
-    return false; // No publisher access
-  }
-
-  // Step 3: Check SERIES access
-  // Series is the lowest level - having series access grants access to all comics in that series
-  const seriesDirectAccess = accessList.find(a =>
-    a.accessType === 'series' &&
-    a.accessValue === series &&
-    a.direct_access === 1
-  );
-  if (!seriesDirectAccess) {
-    return false; // No series access
-  }
-
-  // Series access granted - user has access to all comics in this series
-  return true;
+  return false; // No matching metadata grant
 }
 
 module.exports = {

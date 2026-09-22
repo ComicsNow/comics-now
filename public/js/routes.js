@@ -139,10 +139,17 @@ function registerRoutes() {
       if (ctTabOutput) ctTabOutput.click();
     });
 
+    global.router.addRoute('/comictagger/logs', () => {
+      if (typeof global.openCTModal === 'function') global.openCTModal();
+      const tab = document.getElementById('ct-tab-logs');
+      if (tab) tab.click();
+    });
+
     global.router.addRoute('/comictagger/management', () => {
       if (typeof global.openCTModal === 'function') global.openCTModal();
       if (ctTabManagement) ctTabManagement.click();
     });
+
 
     global.router.addRoute('/settings/guided-reader', () => {
       if (typeof global.openSettingsModal === 'function') {

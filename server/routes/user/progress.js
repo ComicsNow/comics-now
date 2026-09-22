@@ -39,6 +39,11 @@ module.exports = function attach(router, deps) {
       if (device && device.userId !== userId) {
         log('WARN', 'SYNC', `User ${userId} attempted to access device ${deviceId} owned by ${device.userId}`);
         return res.status(403).json({ ok: false, message: 'Unauthorized device' });
+      } else if (!device) {
+        await dbRun(
+          'INSERT OR IGNORE INTO devices (deviceId, deviceName, userId, lastSeen, created) VALUES (?, ?, ?, ?, ?)',
+          [deviceId, 'Browser Device', userId, Date.now(), Date.now()]
+        );
       }
 
       // Get comic total pages
@@ -117,6 +122,11 @@ module.exports = function attach(router, deps) {
       if (device && device.userId !== userId) {
         log('WARN', 'SYNC', `User ${userId} attempted to update device ${deviceId} owned by ${device.userId}`);
         return res.status(403).json({ ok: false, message: 'Unauthorized device' });
+      } else if (!device) {
+        await dbRun(
+          'INSERT OR IGNORE INTO devices (deviceId, deviceName, userId, lastSeen, created) VALUES (?, ?, ?, ?, ?)',
+          [deviceId, 'Browser Device', userId, Date.now(), Date.now()]
+        );
       }
 
       const now = Date.now();

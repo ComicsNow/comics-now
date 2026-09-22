@@ -80,6 +80,8 @@ import './js/settings/continuous-mode.js';
 import './js/settings/devices.js';
 import './js/settings/users.js';
 import './js/settings/user-access.js';
+import './js/settings/user-stats.js';
+import './js/impersonation.js';
 import './js/settings/comics-defaults.js';
 import './js/settings/comics-management.js';
 import './js/settings.js';
@@ -293,6 +295,9 @@ function initUIControls() {
   if (typeof global.initializeProgressTracking === 'function') {
     global.initializeProgressTracking();
   }
+  if (typeof global.initComicsDefaults === 'function') {
+    global.initComicsDefaults();
+  }
 }
 
 /**
@@ -312,6 +317,11 @@ async function loadInitialData() {
 
   // 5) Load library from cache first, then sync with server
   await loadLibraryOfflineFirst();
+
+  // 6) Pre-fetch reading lists for smart filter integration
+  if (global.LibrarySmartLists && typeof global.LibrarySmartLists.fetchAndCacheReadingLists === 'function') {
+    global.LibrarySmartLists.fetchAndCacheReadingLists().catch(err => console.warn('[loadInitialData:readingLists]', err));
+  }
 }
 
 async function initializeApp() {
@@ -1116,14 +1126,14 @@ async function showReadingListDetail(listId, listName) {
               ${!isLocal ? downloadIndicatorGrid : ''}
               <div class="aspect-[2/3] w-full bg-gray-700 overflow-hidden flex items-center justify-center">
                 ${comic.thumbnailPath ? 
-                  `<img src="${coverUrl}" alt="${escapeHtml(title)}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500">` :
+                  `<img src="${coverUrl}" alt="${escapeHtml(title)}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" loading="lazy">` :
                   (isLocal ? 
                     `<div class="text-purple-500">
                       <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
                       </svg>
                     </div>` :
-                    `<img src="${coverUrl}" alt="${escapeHtml(title)}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500">`
+                    `<img src="${coverUrl}" alt="${escapeHtml(title)}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" loading="lazy">`
                   )
                 }
               </div>

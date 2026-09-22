@@ -1,9 +1,62 @@
-body {
-    font-family: 'Inter', sans-serif;
-    background-color: #121212;
-    background-image: radial-gradient(ellipse at center, #1a1a1a 0%, #0c0c0c 100%);
-    color: #e0e0e0;
+:root {
+    /* Surfaces — warm ink-black */
+    --ink:        #15120e;   /* page background */
+    --ink-2:      #1e1a14;   /* raised panel */
+    --ink-3:      #2a241b;   /* hover / input */
+    --line:       #3a3226;   /* hairline dividers */
+
+    /* Content — bone / newsprint cream */
+    --paper:      #f3e9d2;   /* primary text */
+    --paper-dim:  #b3a88e;   /* secondary text */
+    --cream:      #f3e9d2;
+
+    /* Duotone accents (riso inks) */
+    --red:            #fb4d3d;   /* primary — vermilion riso */
+    --red-deep:       #c5301f;
+    --vermilion:      #fb4d3d;
+    --vermilion-dark: #c5301f;
+    --cyan:           #2ec6d6;   /* secondary — process cyan */
+    --yellow:         #ffce3a;   /* highlight — counts, accents */
+
+    /* Typography */
+    --font-display: 'Anton', sans-serif;
+    --font-body: 'Hanken Grotesk', sans-serif;
+    --font-mono: 'Space Mono', monospace;
+
+    /* Shape hierarchy */
+    --r-sharp:   3px;        /* panels, cards */
+    --r-soft:    8px;        /* inputs */
+    --r-pill:    999px;      /* toggles */
+
+    /* Brutalist shadows */
+    --shadow:    4px 4px 0 #000;
+    --shadow-lg: 6px 6px 0 #000;
 }
+
+body {
+    font-family: 'Hanken Grotesk', sans-serif;
+    background-color: var(--ink);
+    background-image: url('background.png');
+    background-size: cover;
+    background-position: center;
+    background-attachment: fixed;
+    background-repeat: no-repeat;
+    color: var(--paper);
+    position: relative;
+}
+
+body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: -1;
+    opacity: 0.08;
+    background-image: radial-gradient(rgba(243, 233, 210, 0.4) 1px, transparent 1.4px);
+    background-size: 6px 6px;
+    background-repeat: repeat;
+}
+
 
 body::after {
     content: '';
@@ -26,24 +79,33 @@ body::after {
 }
 
 .skeleton-card {
-    background-color: #1e1e1e;
-    border-radius: 0.5rem;
-    overflow: hidden;
+    background: none !important;
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    position: relative !important;
+    overflow: visible !important;
 }
 
 .skeleton-img {
-    aspect-ratio: 2 / 3;
-    background: linear-gradient(90deg, #252525 25%, #2e2e2e 50%, #252525 75%);
-    background-size: 200% 100%;
-    animation: shimmer 1.6s ease-in-out infinite;
+    aspect-ratio: 3/4 !important;
+    background: linear-gradient(90deg, var(--ink-2) 25%, var(--ink-3) 50%, var(--ink-2) 75%) !important;
+    background-size: 200% 100% !important;
+    animation: shimmer 1.6s ease-in-out infinite !important;
+    border: 2px solid #000 !important;
+    border-radius: 12px !important;
+    box-shadow: var(--shadow) !important;
 }
 
 .skeleton-line {
-    height: 0.65rem;
-    border-radius: 9999px;
-    background: linear-gradient(90deg, #252525 25%, #2e2e2e 50%, #252525 75%);
-    background-size: 200% 100%;
-    animation: shimmer 1.6s ease-in-out infinite;
+    height: 0.65rem !important;
+    border-radius: 9999px !important;
+    background: linear-gradient(90deg, var(--ink-2) 25%, var(--ink-3) 50%, var(--ink-2) 75%) !important;
+    background-size: 200% 100% !important;
+    animation: shimmer 1.6s ease-in-out infinite !important;
 }
 
 .empty-state {
@@ -59,7 +121,7 @@ body::after {
 
 .empty-state-icon {
     opacity: 0.25;
-    color: #c084fc;
+    color: #e63928;
 }
 
 .empty-state-message {
@@ -67,21 +129,55 @@ body::after {
     font-size: 0.95rem;
 }
 
-.app-title {
-    background: linear-gradient(135deg, #e879f9 0%, #c084fc 40%, #818cf8 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-    letter-spacing: -0.03em;
+.app-title-riso {
+    font-family: var(--font-display);
+    font-size: clamp(40px, 13vw, 58px);
+    line-height: .82;
+    letter-spacing: -1px;
+    text-transform: uppercase;
+    color: var(--paper);
+    transform: skewX(-5deg);
+    display: inline-block;
+    text-shadow: 3px 3px 0 var(--red), 6px 6px 0 var(--cyan);
+}
+
+.logo-dot {
+    display: inline-block;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: var(--yellow);
+    box-shadow: 0 0 0 4px var(--ink), 0 0 0 6px var(--red);
+    margin-left: 0.3rem;
+    vertical-align: middle;
+}
+
+.logo-container {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 10px;
+    margin: 6px 0 22px;
 }
 
 .view-title {
-    background: linear-gradient(135deg, #f0abfc 0%, #c084fc 60%, #a5b4fc 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
+    font-family: var(--font-display);
+    text-transform: uppercase;
     letter-spacing: -0.02em;
+    font-size: 2.25rem;
+    line-height: 1.1;
+    margin-left: 0.5rem;
 }
+
+.view-title .text-cream {
+    color: var(--cream);
+    -webkit-text-fill-color: var(--cream);
+}
+
+.view-title .text-vermilion {
+    color: var(--vermilion);
+    -webkit-text-fill-color: var(--vermilion);
+}
+
 
 /* Offline Mode UI Adjustments */
 body.is-offline #logout-button,
@@ -106,8 +202,8 @@ body.is-offline .comic-context-menu-item.hide-offline {
 }
 .comic-card:hover, .series-card:hover, .folder-card:hover {
     transform: translateY(-5px) scale(1.015);
-    box-shadow: 0 20px 48px rgba(0, 0, 0, 0.65), 0 0 0 1px rgba(168, 85, 247, 0.3);
-    border-color: rgba(168, 85, 247, 0.22);
+    box-shadow: 0 20px 48px rgba(0, 0, 0, 0.65), 0 0 0 1px rgba(230, 57, 40, 0.3);
+    border-color: rgba(230, 57, 40, 0.22);
 }
 .comic-card .comic-cover-image,
 .series-card .comic-cover-image {
@@ -139,33 +235,35 @@ body.is-offline .comic-context-menu-item.hide-offline {
     background-color: #121212;
 }
 .comic-summary-toggle {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    padding: 0.35rem 0.9rem;
-    border-radius: 9999px;
-    border: 1px solid rgba(168, 85, 247, 0.45);
-    background-color: rgba(88, 28, 135, 0.4);
-    color: #ede9fe;
-    font-size: 0.85rem;
-    font-weight: 600;
-    letter-spacing: 0.02em;
-    cursor: pointer;
-    transition: background-color 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    padding: 0.35rem 0.9rem !important;
+    border: 2px solid #000 !important;
+    border-radius: 4px !important;
+    box-shadow: 3px 3px 0px #000 !important;
+    font-family: var(--font-body) !important;
+    font-weight: 700 !important;
+    font-size: 0.85rem !important;
+    letter-spacing: 0.02em !important;
+    cursor: pointer !important;
+    background-color: var(--ink-3) !important;
+    color: var(--paper) !important;
+    transition: transform 0.05s ease, box-shadow 0.05s ease, background-color 0.1s ease !important;
 }
 .comic-summary-toggle:hover {
-    background-color: rgba(124, 58, 237, 0.5);
-    border-color: rgba(168, 85, 247, 0.6);
+    background-color: var(--ink-2) !important;
 }
 .comic-summary-toggle:focus {
     outline: none;
 }
 .comic-summary-toggle:focus-visible {
-    outline: 2px solid rgba(168, 85, 247, 0.85);
+    outline: 2px solid #000;
     outline-offset: 2px;
 }
 .comic-summary-toggle:active {
-    transform: scale(0.98);
+    transform: translate(2px, 2px) !important;
+    box-shadow: 1px 1px 0px #000 !important;
 }
 .comic-summary-content {
     margin: 0.75rem auto 0;
@@ -222,8 +320,8 @@ body.is-offline .comic-context-menu-item.hide-offline {
     backface-visibility: hidden;
 }
 #manga-guided-toggle-btn.active {
-    color: #38bdf8;
-    background-color: rgba(56, 189, 248, 0.12);
+    color: #00a3af;
+    background-color: rgba(0, 163, 175, 0.12);
 }
 #manga-guided-toggle-btn[disabled] {
     opacity: 0.45;
@@ -248,7 +346,7 @@ body.is-offline .comic-context-menu-item.hide-offline {
     border: 1px solid rgba(148, 163, 184, 0.4);
     background-color: rgba(31, 41, 55, 0.75);
     color: #f9fafb;
-    font-family: 'JetBrains Mono', 'Fira Code', 'SFMono-Regular', Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
+    font-family: 'Space Mono', monospace;
     font-size: 1rem;
     font-weight: 600;
     font-variant-numeric: tabular-nums;
@@ -258,13 +356,13 @@ body.is-offline .comic-context-menu-item.hide-offline {
 }
 .page-counter-button:hover:not([disabled]) {
     background-color: rgba(55, 65, 81, 0.85);
-    border-color: rgba(129, 140, 248, 0.6);
+    border-color: rgba(0, 163, 175, 0.6);
 }
 .page-counter-button:focus {
     outline: none;
 }
 .page-counter-button:focus-visible {
-    outline: 2px solid rgba(129, 140, 248, 0.8);
+    outline: 2px solid rgba(0, 163, 175, 0.8);
     outline-offset: 2px;
 }
 .page-counter-button:active:not([disabled]) {
@@ -288,7 +386,7 @@ body.is-offline .comic-context-menu-item.hide-offline {
     border: 1px solid rgba(96, 165, 250, 0.65);
     background-color: rgba(17, 24, 39, 0.98);
     color: #f9fafb;
-    font-family: 'JetBrains Mono', 'Fira Code', 'SFMono-Regular', Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
+    font-family: 'Space Mono', monospace;
     font-size: 1rem;
     font-variant-numeric: tabular-nums;
     text-align: center;
@@ -298,8 +396,8 @@ body.is-offline .comic-context-menu-item.hide-offline {
 }
 .page-jump-input:focus {
     outline: none;
-    border-color: rgba(168, 85, 247, 0.8);
-    box-shadow: 0 0 0 3px rgba(168, 85, 247, 0.35);
+    border-color: rgba(230, 57, 40, 0.8);
+    box-shadow: 0 0 0 3px rgba(230, 57, 40, 0.35);
 }
 .page-jump-input::placeholder {
     color: rgba(156, 163, 175, 0.75);
@@ -316,7 +414,7 @@ body.is-offline .comic-context-menu-item.hide-offline {
     display: none !important;
 }
 .search-input-wrapper:focus-within {
-    box-shadow: 0 0 0 2px rgb(168 85 247 / 0.5);
+    box-shadow: 0 0 0 2px rgb(230 57 40 / 0.5);
 }
 .search-by-select {
     width: 4.5rem;
@@ -581,7 +679,7 @@ body.is-offline .comic-context-menu-item.hide-offline {
 }
 
 .fullscreen-nav-button:hover:not([disabled]) {
-    background-color: rgba(147, 51, 234, 0.7);
+    background-color: rgba(196, 45, 31, 0.7);
     border-color: rgba(255, 255, 255, 0.5);
     transform: scale(1.1);
 }
@@ -614,7 +712,7 @@ body.is-offline .comic-context-menu-item.hide-offline {
     border: 1px solid rgba(255, 255, 255, 0.3);
     background-color: rgba(255, 255, 255, 0.15);
     color: rgba(255, 255, 255, 0.95);
-    font-family: 'JetBrains Mono', 'Fira Code', 'SFMono-Regular', Menlo, Monaco, Consolas, monospace;
+    font-family: 'Space Mono', monospace;
     font-size: 0.85rem;
     font-weight: 600;
     font-variant-numeric: tabular-nums;
@@ -625,7 +723,7 @@ body.is-offline .comic-context-menu-item.hide-offline {
 
 .fullscreen-page-counter-button:hover {
     background-color: rgba(255, 255, 255, 0.25);
-    border-color: rgba(129, 140, 248, 0.6);
+    border-color: rgba(0, 163, 175, 0.6);
 }
 
 .fullscreen-page-counter-button:active {
@@ -643,7 +741,7 @@ body.is-offline .comic-context-menu-item.hide-offline {
     border: 1px solid rgba(96, 165, 250, 0.65);
     background-color: rgba(17, 24, 39, 0.98);
     color: #f9fafb;
-    font-family: 'JetBrains Mono', 'Fira Code', 'SFMono-Regular', Menlo, Monaco, Consolas, monospace;
+    font-family: 'Space Mono', monospace;
     font-size: 0.9rem;
     font-variant-numeric: tabular-nums;
     text-align: center;
@@ -654,8 +752,8 @@ body.is-offline .comic-context-menu-item.hide-offline {
 
 .fullscreen-page-jump-input:focus {
     outline: none;
-    border-color: rgba(168, 85, 247, 0.8);
-    box-shadow: 0 0 0 3px rgba(168, 85, 247, 0.35);
+    border-color: rgba(230, 57, 40, 0.8);
+    box-shadow: 0 0 0 3px rgba(230, 57, 40, 0.35);
 }
 
 .fullscreen-page-jump-input::placeholder {
@@ -747,11 +845,28 @@ body.is-offline .comic-context-menu-item.hide-offline {
 #logs-container, #ct-output {
     height: 400px;
     overflow-y: auto;
-    font-family: 'Courier New', Courier, monospace;
+    overflow-x: hidden;
+    font-family: 'Space Mono', monospace;
     font-size: 0.8rem;
     background-color: #0d0d0d;
     border-radius: 0.5rem;
     padding: 0.75rem;
+    word-break: break-word;
+    overflow-wrap: anywhere;
+}
+.ct-log-line {
+    white-space: pre-wrap;
+    word-break: break-word;
+    overflow-wrap: anywhere;
+    max-width: 100%;
+}
+.ct-log-line span {
+    word-break: break-word;
+    overflow-wrap: anywhere;
+}
+#ct-progress-badge {
+    position: relative;
+    left: -1.5px;
 }
 .log-entry {
     white-space: pre-wrap;
@@ -762,12 +877,12 @@ body.is-offline .comic-context-menu-item.hide-offline {
 .log-ERROR { color: #fca5a5; }
 .log-SCAN { color: #93c5fd; }
 .log-DB { color: #fde047; }
-.log-THUMBNAIL { color: #d8b4fe; }
+.log-THUMBNAIL { color: #e63928; }
 .log-SERVER { color: #6ee7b7; }
 .log-CONVERT { color: #facc15; }
 .log-DOWNLOAD { color: #fdba74; }
 .log-PROGRESS { color: #f472b6; }
-.log-LIST { color: #a5b4fc; }
+.log-LIST { color: #00a3af; }
 .alpha-filter-btn {
     display: inline-flex;
     align-items: center;
@@ -790,7 +905,7 @@ body.is-offline .comic-context-menu-item.hide-offline {
 }
 
 .alpha-filter-btn.active {
-    background-color: #9333ea;
+    background-color: #e63928;
     color: #ffffff;
 }
 .metadata-tag {
@@ -802,7 +917,7 @@ body.is-offline .comic-context-menu-item.hide-offline {
     margin-bottom: 4px;
     display: inline-block;
 }
-/* Filter & smart-list pills — aligned with the gray-800 + ring + translucent-purple design language */
+/* Filter & smart-list pills — aligned with the gray-800 + ring + vermilion design language */
 #filter-buttons .pill-button,
 #smart-list-buttons .pill-button {
     background-color: rgb(31 41 55); /* gray-800 */
@@ -815,15 +930,15 @@ body.is-offline .comic-context-menu-item.hide-offline {
 }
 #filter-buttons .pill-button.active,
 #smart-list-buttons .pill-button[aria-pressed="true"] {
-    background-color: rgba(168, 85, 247, 0.18);
-    box-shadow: inset 0 0 0 1px rgba(168, 85, 247, 0.55);
-    color: #f3e8ff; /* purple-100 */
+    background-color: rgba(230, 57, 40, 0.18);
+    box-shadow: inset 0 0 0 1px rgba(230, 57, 40, 0.55);
+    color: #f0ead6; /* vermilion-tinted cream */
     transform: none;
 }
 #filter-buttons .pill-button.active:hover,
 #smart-list-buttons .pill-button[aria-pressed="true"]:hover {
-    background-color: rgba(168, 85, 247, 0.26);
-    box-shadow: inset 0 0 0 1px rgba(168, 85, 247, 0.7);
+    background-color: rgba(230, 57, 40, 0.26);
+    box-shadow: inset 0 0 0 1px rgba(230, 57, 40, 0.7);
 }
 #filter-buttons .pill-button .count-badge,
 #smart-list-buttons .pill-button .count-badge {
@@ -831,7 +946,7 @@ body.is-offline .comic-context-menu-item.hide-offline {
 }
 #filter-buttons .pill-button.active .count-badge,
 #smart-list-buttons .pill-button[aria-pressed="true"] .count-badge {
-    background-color: rgba(168, 85, 247, 0.32);
+    background-color: rgba(230, 57, 40, 0.32);
     color: #fff;
 }
 
@@ -878,7 +993,7 @@ body.is-offline .comic-context-menu-item.hide-offline {
 
 .pill-button:focus-visible,
 .pill-select:focus-visible {
-    outline: 2px solid rgba(168, 85, 247, 0.45);
+    outline: 2px solid rgba(230, 57, 40, 0.45);
     outline-offset: 2px;
 }
 
@@ -955,7 +1070,7 @@ body.is-offline .comic-context-menu-item.hide-offline {
     left: 6px;
     transform: translateY(-50%) rotate(-90deg);
     transform-origin: center left;
-    background-color: rgba(168, 85, 247, 0.7); /* purple with 70% opacity */
+    background-color: rgba(230, 57, 40, 0.7); /* vermilion with 70% opacity */
     color: white;
     font-size: 0.7rem;
     font-weight: bold;
@@ -1010,11 +1125,11 @@ body.is-offline .comic-context-menu-item.hide-offline {
     color: white;
 }
 .status-toggle-btn:focus-visible {
-    outline: 2px solid #a855f7;
+    outline: 2px solid #e63928;
     outline-offset: 2px;
 }
 .status-toggle-btn.loading {
-    background-color: rgba(168, 85, 247, 0.6);
+    background-color: rgba(230, 57, 40, 0.6);
     animation: pulse 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
 .status-toggle-btn:disabled {
@@ -1067,8 +1182,8 @@ body.is-offline .comic-context-menu-item.hide-offline {
 }
 
 .card-count-chip.unread {
-    background: rgba(168, 85, 247, 0.15);
-    color: #c084fc;
+    background: rgba(230, 57, 40, 0.15);
+    color: #e63928;
 }
 
 .card-count-chip.in-progress {
@@ -1079,6 +1194,11 @@ body.is-offline .comic-context-menu-item.hide-offline {
 .card-count-chip.read {
     background: rgba(16, 185, 129, 0.15);
     color: #34d399;
+}
+
+.card-count-chip.reading-list {
+    background: rgba(147, 51, 234, 0.15);
+    color: #c084fc;
 }
 
 /* Sleeker title for collection cards */
@@ -1148,8 +1268,8 @@ body.is-offline .comic-context-menu-item.hide-offline {
 }
 
 .tab-button.active {
-    color: #c084fc;
-    border-bottom-color: #a855f7;
+    color: #e63928;
+    border-bottom-color: #e63928;
     font-weight: 600;
 }
 
@@ -1223,7 +1343,7 @@ body.is-offline .comic-context-menu-item.hide-offline {
 }
 
 .comic-context-menu-item:active {
-    background-color: rgba(88, 28, 135, 0.4);
+    background-color: rgba(140, 25, 18, 0.4);
 }
 
 .comic-context-menu-item svg {
@@ -1233,7 +1353,7 @@ body.is-offline .comic-context-menu-item.hide-offline {
 }
 
 .comic-context-menu-item.manga-active {
-    color: #c084fc;
+    color: #e63928;
 }
 
 /* Mobile-friendly touch target */
@@ -1246,42 +1366,46 @@ body.is-offline .comic-context-menu-item.hide-offline {
 
 /* Manga Mode Button Styles */
 .manga-mode-btn {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 0.5rem;
-    padding: 0.35rem 0.9rem;
-    border-radius: 9999px;
-    font-size: 0.85rem;
-    font-weight: 600;
-    line-height: 1.1;
-    letter-spacing: 0.01em;
-    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.25);
-    transition: all 0.15s ease;
-    cursor: pointer;
-    border: none;
-    background-color: #374151;
-    color: #e5e7eb;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 0.5rem !important;
+    padding: 0.35rem 0.9rem !important;
+    border: 2px solid #000 !important;
+    border-radius: 4px !important;
+    box-shadow: 3px 3px 0px #000 !important;
+    font-family: var(--font-body) !important;
+    font-weight: 700 !important;
+    font-size: 0.85rem !important;
+    line-height: 1.1 !important;
+    letter-spacing: 0.01em !important;
+    cursor: pointer !important;
+    background-color: var(--ink-3) !important;
+    color: var(--paper-dim) !important;
+    transition: transform 0.05s ease, box-shadow 0.05s ease, background-color 0.1s ease !important;
 }
 
 .manga-mode-btn:hover {
-    background-color: #4b5563;
-    transform: translateY(-1px);
-    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
+    background-color: var(--ink-2) !important;
 }
 
 .manga-mode-btn:active {
-    transform: translateY(1px);
-    box-shadow: 0 3px 12px rgba(0, 0, 0, 0.2);
+    transform: translate(2px, 2px) !important;
+    box-shadow: 1px 1px 0px #000 !important;
 }
 
 .manga-mode-btn.active {
-    background-color: #a855f7;
-    color: #ffffff;
+    background-color: var(--red) !important;
+    color: var(--paper) !important;
 }
 
 .manga-mode-btn.active:hover {
-    background-color: #9333ea;
+    background-color: var(--red-deep) !important;
+}
+
+.manga-mode-btn.active:active {
+    transform: translate(2px, 2px) !important;
+    box-shadow: 1px 1px 0px #000 !important;
 }
 
 /* Continuous Mode Button */
@@ -1340,11 +1464,11 @@ body.is-offline .comic-context-menu-item.hide-offline {
     display: block;
 }
 #fullscreen-zoom-toggle-btn.active {
-    background-color: #a855f7;
+    background-color: #e63928;
     color: #ffffff;
 }
 #fullscreen-zoom-toggle-btn.active:hover {
-    background-color: #9333ea;
+    background-color: #c42d1f;
 }
 
 /* Continuous Viewer Container */
@@ -1411,11 +1535,11 @@ body.is-offline .comic-context-menu-item.hide-offline {
 
 /* Context Menu Active States */
 .manga-active {
-    color: #a855f7 !important;
+    color: #e63928 !important;
 }
 
 .manga-active svg {
-    color: #a855f7 !important;
+    color: #e63928 !important;
 }
 
 .continuous-active {
@@ -1464,8 +1588,8 @@ body.is-offline .comic-context-menu-item.hide-offline {
 }
 
 .peer:checked + .toggle-bg {
-    background: linear-gradient(to right, #9333ea, #a855f7);
-    border-color: #9333ea;
+    background: linear-gradient(to right, #c42d1f, #e63928);
+    border-color: #c42d1f;
 }
 
 /* Specific colors for Continuous Mode Toggle */
@@ -1474,35 +1598,92 @@ body.is-offline .comic-context-menu-item.hide-offline {
     border-color: #2563eb;
 }
 
+/* ─── CUSTOM TOGGLES (from settings-modal.html redesign) ─── */
+.toggle {
+    position: relative;
+    display: inline-block;
+    width: 50px;
+    height: 28px;
+    cursor: pointer;
+    flex: none;
+}
+.toggle input {
+    display: none;
+}
+.toggle .track {
+    position: absolute;
+    inset: 0;
+    border-radius: 99px;
+    background: var(--ink);
+    border: 2px solid var(--line);
+    transition: background .2s, border-color .2s;
+}
+.toggle input:checked ~ .track {
+    background: var(--cyan) !important;
+    border-color: #000 !important;
+}
+.toggle .thumb {
+    position: absolute;
+    top: 4px;
+    left: 4px;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: var(--paper-dim);
+    transition: transform .2s, background .2s;
+    z-index: 1;
+}
+.toggle input:checked ~ .track .thumb {
+    transform: translateX(22px);
+    background: #04282d !important;
+}
+
+/* Smaller toggles for library-specific items */
+.toggle.sm {
+    width: 38px;
+    height: 22px;
+}
+.toggle.sm .thumb {
+    width: 12px;
+    height: 12px;
+    top: 3px;
+    left: 3px;
+}
+.toggle.sm input:checked ~ .track .thumb {
+    transform: translateX(16px);
+}
+
+
+
 
 /* Bubble Zoom Active State */
 #western-guided-toggle-btn.active {
-    background-color: #a855f7 !important;
+    background-color: #e63928 !important;
     color: #ffffff !important;
 }
 
 #western-guided-toggle-btn.active:hover {
-    background-color: #9333ea !important;
+    background-color: #c42d1f !important;
 }
 
 #western-speech-zoom.active,
 #manga-panel-zoom.active {
-    background-color: #a855f7 !important;
+    background-color: #e63928 !important;
     color: #ffffff !important;
 }
 
 #western-speech-zoom.active:hover,
 #manga-panel-zoom.active:hover {
-    background-color: #9333ea !important;
+    background-color: #c42d1f !important;
 }
 
 #manga-speech-zoom-btn.active {
-    background-color: #a855f7 !important;
+    background-color: #e63928 !important;
     color: #ffffff !important;
 }
 
 #manga-speech-zoom-btn.active:hover {
-    background-color: #9333ea !important;
+    background-color: #c42d1f !important;
 }
 
 /* Missing Responsive Classes */
@@ -1605,12 +1786,1116 @@ body.eink-color-mode #bubble-magnifier-img {
 
 /* Active style for E-Ink button states */
 #fullscreen-eink-toggle-btn.active-monochrome {
-    color: #38bdf8 !important;
-    background-color: rgba(56, 189, 248, 0.12) !important;
+    color: #00a3af !important;
+    background-color: rgba(0, 163, 175, 0.12) !important;
 }
 
-#fullscreen-eink-toggle-btn.active-color {
-    color: #10b981 !important;
-    background-color: rgba(16, 185, 129, 0.12) !important;
+
+
+
+/* ==========================================================================
+   BRUTALIST & RISO REDESIGN OVERRIDES
+   ========================================================================== */
+
+/* Halftone / collage background overlays */
+#app {
+    position: relative;
+    z-index: 10;
+}
+
+/* Brutalist Button Styles */
+.brutalist-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 2px solid #000 !important;
+    border-radius: 4px !important;
+    box-shadow: 3px 3px 0px #000 !important;
+    font-family: var(--font-body) !important;
+    font-weight: 700 !important;
+    cursor: pointer;
+    transition: transform 0.05s ease, box-shadow 0.05s ease, background-color 0.1s ease;
+}
+
+.brutalist-btn:active {
+    transform: translate(2px, 2px) !important;
+    box-shadow: 1px 1px 0px #000 !important;
+}
+
+.btn-vermilion {
+    background-color: var(--vermilion) !important;
+    color: var(--cream) !important;
+    border-color: #000 !important;
+}
+.btn-vermilion:hover {
+    background-color: var(--vermilion-dark) !important;
+}
+.btn-vermilion svg {
+    color: var(--cream) !important;
+}
+
+.btn-cream {
+    background-color: var(--cream) !important;
+    color: var(--ink) !important;
+    border-color: #000 !important;
+}
+.btn-cream:hover {
+    background-color: #e2dbca !important;
+}
+.btn-cream svg {
+    color: var(--ink) !important;
+}
+
+.btn-cyan {
+    background-color: var(--cyan) !important;
+    color: var(--ink) !important;
+    border-color: #000 !important;
+}
+.btn-cyan:hover {
+    background-color: #008f99;
+}
+.btn-cyan svg {
+    color: var(--ink) !important;
+}
+
+.btn-yellow {
+    background-color: var(--yellow) !important;
+    color: var(--ink) !important;
+    border-color: #000 !important;
+}
+.btn-yellow:hover {
+    background-color: #e0b835;
+}
+.btn-yellow svg {
+    color: var(--ink) !important;
+}
+
+.btn-ink {
+    background-color: var(--ink) !important;
+    color: var(--cream) !important;
+    border-color: #000 !important;
+}
+.btn-ink:hover {
+    background-color: #2b2b28 !important;
+}
+.btn-ink svg {
+    color: var(--cream) !important;
+}
+
+/* Brutalist Search Bar overrides */
+.search-input-wrapper {
+    background-color: #1f1f1d !important;
+    border: 2px solid #000 !important;
+    border-radius: 4px !important;
+    box-shadow: 3px 3px 0px #000 !important;
+    overflow: visible !important;
+}
+.search-input-wrapper input {
+    font-family: var(--font-body) !important;
+    color: var(--cream) !important;
+}
+.search-input-wrapper input::placeholder {
+    color: rgba(240, 234, 214, 0.4) !important;
+}
+.search-by-select {
+    background-color: #1f1f1d !important;
+    border: 2px solid #000 !important;
+    border-radius: 4px !important;
+    color: var(--cream) !important;
+    box-shadow: 3px 3px 0px #000 !important;
+    padding-left: 0.75rem !important;
+    padding-right: 1.75rem !important;
+    font-family: var(--font-body) !important;
+    font-weight: 700 !important;
+    text-transform: uppercase;
+}
+
+/* Overwrite pill-button style to brutalist rect */
+.pill-button {
+    border-radius: 4px !important;
+    border: 2px solid #000 !important;
+    box-shadow: 3px 3px 0px #000 !important;
+    font-family: var(--font-body) !important;
+    font-weight: 700 !important;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    padding: 0.45rem 1rem !important;
+    transition: transform 0.05s ease, box-shadow 0.05s ease, background-color 0.1s ease;
+}
+
+.pill-button:active {
+    transform: translate(2px, 2px) !important;
+    box-shadow: 1px 1px 0px #000 !important;
+}
+
+/* Main filter pill active/inactive state */
+#filter-buttons .pill-button {
+    background-color: #1f1f1d !important;
+    color: var(--cream) !important;
+}
+#filter-buttons .pill-button:hover {
+    background-color: #2b2b28 !important;
+}
+#filter-buttons .pill-button.active {
+    background-color: var(--vermilion) !important;
+    color: var(--cream) !important;
+}
+#filter-buttons .pill-button.active:hover {
+    background-color: var(--vermilion-dark) !important;
+}
+
+/* Smart lists sub-filter active/inactive state */
+#smart-list-buttons .pill-button {
+    background-color: #1f1f1d !important;
+    color: var(--cream) !important;
+}
+#smart-list-buttons .pill-button:hover {
+    background-color: #2b2b28 !important;
+}
+#smart-list-buttons .pill-button[aria-pressed="true"] {
+    background-color: var(--cyan) !important;
+    color: var(--ink) !important;
+}
+#smart-list-buttons .pill-button[aria-pressed="true"]:hover {
+    background-color: #008f99 !important;
+}
+
+/* Count Badges style override */
+.pill-button .count-badge {
+    background-color: #000 !important;
+    color: var(--yellow) !important;
+    border-radius: 2px !important;
+    font-family: var(--font-mono) !important;
+    font-weight: 700 !important;
+    padding: 0.15rem 0.45rem !important;
+}
+
+/* Count Badges inside active main filters */
+#filter-buttons .pill-button.active .count-badge {
+    color: var(--vermilion) !important;
+}
+
+/* Count Badges inside active smart list filters */
+#smart-list-buttons .pill-button[aria-pressed="true"] .count-badge {
+    color: var(--cyan) !important;
+}
+
+/* Alphabet Filter button style overrides */
+.alpha-filter-btn {
+    width: 1.75rem !important;
+    height: 1.75rem !important;
+    border-radius: 2px !important;
+    border: 1px solid #000 !important;
+    font-family: var(--font-mono) !important;
+    font-size: 0.75rem !important;
+    font-weight: 700 !important;
+    color: var(--cream) !important;
+    background-color: #1f1f1d !important;
+    box-shadow: 2px 2px 0px #000 !important;
+    transition: transform 0.05s ease, box-shadow 0.05s ease, background-color 0.1s ease;
+    cursor: pointer;
+}
+.alpha-filter-btn:hover {
+    background-color: #2b2b28 !important;
+}
+.alpha-filter-btn.active {
+    background-color: var(--yellow) !important;
+    color: var(--ink) !important;
+    box-shadow: 2px 2px 0px #000 !important;
+}
+.alpha-filter-btn:active {
+    transform: translate(1px, 1px) !important;
+    box-shadow: 1px 1px 0px #000 !important;
+}
+
+/* Support link hidden to preserve Riso layout purity */
+#support-link {
+    display: none !important;
+}
+
+/* Card overrides to match mockup zine panel style */
+.comic-card, .series-card, .folder-card {
+    background: none !important;
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    position: relative !important;
+    overflow: visible !important;
+}
+
+/* Panel wrapper inside each card (covers / folder icons / logos) */
+.comic-card > div:first-child,
+.series-card > div:first-child,
+.folder-card > div:first-child {
+    position: relative !important;
+    border: 2px solid #000 !important;
+    border-radius: 12px !important;
+    overflow: hidden !important;
+    aspect-ratio: 3/4 !important;
+    width: 100% !important;
+    height: auto !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    background-color: var(--ink-2) !important; /* raised dark panel default for covers */
+    box-shadow: var(--shadow) !important;
+    transition: transform 0.1s ease, box-shadow 0.1s ease !important;
+}
+
+/* Publisher panels: white background by default to match logos */
+#publisher-list-container .series-card > div:first-child {
+    background-color: #ffffff !important;
+}
+
+/* Comic cover images inside panels */
+.comic-cover-image {
+    width: 100% !important;
+    height: 100% !important;
+    object-fit: cover !important;
+    display: block !important;
+}
+
+/* Logos inside publisher panels */
+#publisher-list-container .series-card img {
+    width: 100% !important;
+    height: 100% !important;
+    object-fit: contain !important;
+    padding: 12px !important;
+}
+
+/* SVG icons (like folder icon) inside panel */
+.folder-card > div:first-child > svg {
+    width: 48% !important;
+    height: 48% !important;
+    color: var(--red) !important; /* zine style red folder icon */
+}
+
+/* Fix aspect ratio for folder/library card images by stripping Tailwind heights/backgrounds */
+.folder-card > div:first-child > div {
+    width: 100% !important;
+    height: 100% !important;
+    border-radius: 0 !important;
+    background: none !important;
+}
+
+/* Card hover animation (shifts panel, not the whole card) */
+.comic-card:hover > div:first-child,
+.series-card:hover > div:first-child,
+.folder-card:hover > div:first-child {
+    transform: translate(-2px, -2px) !important;
+    box-shadow: var(--shadow-lg) !important;
+}
+
+.comic-card:active > div:first-child,
+.series-card:active > div:first-child,
+.folder-card:active > div:first-child {
+    transform: scale(0.97) !important;
+}
+
+/* Card titles */
+.comic-card h3, 
+.series-card h3, 
+.folder-card h3,
+.comic-card p {
+    font-family: var(--font-body) !important;
+    font-weight: 800 !important;
+    font-size: 15px !important;
+    color: var(--paper) !important;
+    text-align: center !important;
+    margin: 12px 0 9px !important;
+    padding: 0 !important;
+    white-space: normal !important;
+    word-break: break-word !important;
+    line-height: 1.2 !important;
+}
+
+/* Independent styling for library/folder card publisher/count subtext to avoid overlapping */
+.folder-card p {
+    font-family: var(--font-body) !important;
+    font-weight: 600 !important;
+    font-size: 13px !important;
+    color: var(--paper-dim) !important;
+    text-align: center !important;
+    margin: -4px 0 4px !important;
+    padding: 0 !important;
+    line-height: 1.2 !important;
+}
+
+.comic-card .p-2 {
+    padding: 0 !important; /* reset original padding */
+}
+
+/* Eye and Download overlays styling */
+.comic-card .status-toggle-btn,
+.series-card .status-toggle-btn,
+.comic-card .download-btn,
+.series-card .download-btn,
+.folder-card .download-btn {
+    position: absolute !important;
+    top: 10px !important;
+    width: 46px !important;
+    height: 46px !important;
+    border-radius: 50% !important;
+    display: grid !important;
+    place-items: center !important;
+    cursor: pointer !important;
+    background: rgba(30, 30, 30, 0.72) !important;
+    backdrop-filter: blur(6px) !important;
+    border: 1.5px solid rgba(255, 255, 255, 0.2) !important;
+    transition: transform 0.08s ease !important;
+    z-index: 20 !important;
+    box-shadow: none !important;
+    transform: none !important;
+}
+
+.comic-card .status-toggle-btn,
+.series-card .status-toggle-btn {
+    left: 10px !important;
+}
+
+.comic-card .download-btn,
+.series-card .download-btn,
+.folder-card .download-btn {
+    right: 10px !important;
+}
+
+.comic-card .status-toggle-btn svg,
+.series-card .status-toggle-btn svg,
+.comic-card .download-btn svg,
+.series-card .download-btn svg,
+.folder-card .download-btn svg {
+    width: 20px !important;
+    height: 20px !important;
+    stroke: #ccc !important;
+    fill: none !important;
+    stroke-width: 1.8 !important;
+}
+
+.comic-card .status-toggle-btn:active,
+.series-card .status-toggle-btn:active,
+.comic-card .download-btn:active,
+.series-card .download-btn:active,
+.folder-card .download-btn:active {
+    transform: scale(0.88) !important;
+}
+
+/* Green highlight states for downloaded / read */
+.comic-card .download-btn.text-green-400,
+.series-card .download-btn.text-green-400,
+.folder-card .download-btn.text-green-400,
+.comic-card .status-toggle-btn.text-green-400,
+.series-card .status-toggle-btn.text-green-400 {
+    background: rgba(10, 100, 40, 0.85) !important;
+    border-color: rgba(33, 194, 90, 0.6) !important;
+    color: #21c25a !important;
+}
+
+.comic-card .download-btn.text-green-400 svg,
+.series-card .download-btn.text-green-400 svg,
+.folder-card .download-btn.text-green-400 svg,
+.comic-card .status-toggle-btn.text-green-400 svg,
+.series-card .status-toggle-btn.text-green-400 svg {
+    stroke: #21c25a !important;
+}
+
+/* Card Count Chips (pills) flow below title */
+.card-counts {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    gap: 7px !important;
+    justify-content: center !important;
+    margin-bottom: 4px !important;
+    margin-top: 6px !important;
+    padding: 0 !important;
+}
+
+.card-count-chip {
+    font-family: var(--font-body) !important;
+    font-weight: 700 !important;
+    font-size: 12px !important;
+    padding: 5px 12px !important;
+    border-radius: 999px !important;
+    letter-spacing: normal !important;
+    border: none !important;
+}
+
+.card-count-chip:not(.unread):not(.in-progress):not(.read) {
+    background-color: var(--ink-3) !important;
+    color: var(--paper-dim) !important;
+}
+
+.card-count-chip.unread {
+    background-color: #5c1a12 !important;
+    color: #fb8070 !important;
+}
+
+.card-count-chip.in-progress {
+    background-color: #3d3010 !important;
+    color: var(--yellow) !important;
+}
+
+.card-count-chip.read {
+    background-color: #0b3028 !important;
+    color: var(--cyan) !important;
+}
+
+.card-count-chip.reading-list {
+    background-color: #2e1065 !important;
+    color: #d8b4fe !important;
+}
+
+/* Account stamp in footer */
+.acct {
+    margin-top: 30px !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 9px !important;
+    background: var(--ink-2) !important;
+    border: 2px solid var(--line) !important;
+    border-radius: var(--r-pill) !important;
+    padding: 9px 16px !important;
+    font-size: 13px !important;
+    color: var(--paper-dim) !important;
+}
+
+.acct .live {
+    width: 9px !important;
+    height: 9px !important;
+    border-radius: 50% !important;
+    background: var(--cyan) !important;
+    box-shadow: 0 0 0 3px rgba(46, 198, 214, 0.2) !important;
+}
+
+.anim {
+    opacity: 0;
+    transform: translateY(8px);
+    animation: rise .5s ease forwards;
+}
+
+@keyframes rise {
+    to {
+        opacity: 1;
+        transform: none;
+    }
+}
+
+/* Compact logo styling when drilled down into folders/series/comics */
+.logo-compact .app-title-riso {
+    font-size: 1.8rem !important;
+    line-height: 1 !important;
+    letter-spacing: -0.5px !important;
+    text-shadow: 1.5px 1.5px 0 var(--red), 3px 3px 0 var(--cyan) !important;
+    transform: skewX(-5deg) !important;
+}
+
+.logo-compact .logo-dot {
+    width: 6px !important;
+    height: 6px !important;
+    box-shadow: 0 0 0 2px var(--ink), 0 0 0 3px var(--red) !important;
+    margin-left: 0.15rem !important;
+}
+
+.logo-compact br {
+    display: none !important;
+}
+
+.logo-compact {
+    margin: 2px 0 10px !important;
+}
+
+/* ─── DOWNLOAD MODAL REDESIGN ──────────────── */
+.dl-queue-container {
+    background: var(--ink-2) !important;
+    border-radius: 18px 18px 0 0 !important;
+    border-top: 3px solid #000 !important;
+    border-left: 3px solid #000 !important;
+    border-right: 3px solid #000 !important;
+    padding-bottom: 24px !important;
+    overflow: hidden !important;
+    box-shadow: var(--shadow) !important;
+}
+
+/* drag handle */
+.dl-queue-container .handle {
+    width: 44px !important;
+    height: 5px !important;
+    border-radius: 99px !important;
+    background: var(--line) !important;
+    margin: 12px auto 0 !important;
+}
+
+/* header */
+.dl-queue-container .modal-header {
+    display: flex !important;
+    align-items: center !important;
+    gap: 10px !important;
+    padding: 12px 18px 14px !important;
+    border-bottom: 2px solid var(--line) !important;
+}
+
+.dl-queue-container .dl-icon {
+    width: 36px !important;
+    height: 36px !important;
+    border-radius: 50% !important;
+    background: var(--cyan) !important;
+    border: 2px solid #000 !important;
+    display: grid !important;
+    place-items: center !important;
+    flex: none !important;
+    box-shadow: 2px 2px 0 #000 !important;
+    animation: dl-pulse-ring 2s ease infinite !important;
+}
+
+.dl-queue-container .dl-icon svg {
+    width: 18px !important;
+    height: 18px !important;
+    stroke: #04282d !important;
+    fill: none !important;
+    stroke-width: 2.2 !important;
+}
+
+@keyframes dl-pulse-ring {
+    0%, 100% {
+        box-shadow: 2px 2px 0 #000, 0 0 0 0 rgba(46, 198, 214, .4);
+    }
+    50% {
+        box-shadow: 2px 2px 0 #000, 0 0 0 6px rgba(46, 198, 214, 0);
+    }
+}
+
+.dl-queue-container .modal-title {
+    font-family: 'Anton', sans-serif !important;
+    text-transform: uppercase !important;
+    font-size: 22px !important;
+    color: var(--paper) !important;
+    letter-spacing: .5px !important;
+    flex: 1 !important;
+    margin: 0 !important;
+}
+
+.dl-queue-container .modal-count {
+    font-family: 'Space Mono', monospace !important;
+    font-weight: 700 !important;
+    font-size: 13px !important;
+    background: #000 !important;
+    color: var(--yellow) !important;
+    padding: 4px 10px !important;
+    border-radius: var(--r-sharp) !important;
+    border: 1.5px solid rgba(255, 206, 58, .3) !important;
+    letter-spacing: .5px !important;
+}
+
+.dl-queue-container .header-actions {
+    display: flex !important;
+    gap: 8px !important;
+}
+
+.dl-queue-container .ha {
+    width: 34px !important;
+    height: 34px !important;
+    border-radius: var(--r-sharp) !important;
+    background: var(--ink-3) !important;
+    border: 2px solid var(--line) !important;
+    display: grid !important;
+    place-items: center !important;
+    cursor: pointer !important;
+    transition: background 0.1s ease !important;
+}
+
+.dl-queue-container .ha svg {
+    width: 16px !important;
+    height: 16px !important;
+    stroke: var(--paper-dim) !important;
+    fill: none !important;
+    stroke-width: 2 !important;
+}
+
+.dl-queue-container .ha:active {
+    background: var(--line) !important;
+}
+
+/* sync notices */
+.dl-queue-container .sync-notice {
+    display: flex !important;
+    align-items: flex-start !important;
+    gap: 10px !important;
+    margin: 14px 18px !important;
+    padding: 12px 14px !important;
+    border-radius: var(--r-sharp) !important;
+}
+
+/* Green Sync Notice (Active) */
+.dl-queue-container .sync-notice.sync-active {
+    background: #0e2218 !important;
+    border: 2px solid rgba(33, 194, 90, .25) !important;
+    border-left: 3px solid var(--green) !important;
+}
+
+.dl-queue-container .sync-notice.sync-active svg {
+    width: 16px !important;
+    height: 16px !important;
+    stroke: var(--green) !important;
+    fill: none !important;
+    stroke-width: 2 !important;
+    flex: none !important;
+    margin-top: 1px !important;
+}
+
+.dl-queue-container .sync-notice.sync-active p {
+    font-size: 13px !important;
+    color: rgba(33, 194, 90, .75) !important;
+    line-height: 1.45 !important;
+    font-weight: 500 !important;
+    margin: 0 !important;
+}
+
+/* Yellow Sync Notice (Inactive/Warning) */
+.dl-queue-container .sync-notice.sync-warning {
+    background: #221e10 !important;
+    border: 2px solid rgba(255, 206, 58, .25) !important;
+    border-left: 3px solid var(--yellow) !important;
+}
+
+.dl-queue-container .sync-notice.sync-warning svg {
+    width: 16px !important;
+    height: 16px !important;
+    stroke: var(--yellow) !important;
+    fill: none !important;
+    stroke-width: 2 !important;
+    flex: none !important;
+    margin-top: 1px !important;
+}
+
+.dl-queue-container .sync-notice.sync-warning p {
+    font-size: 13px !important;
+    color: rgba(255, 206, 58, .75) !important;
+    line-height: 1.45 !important;
+    font-weight: 500 !important;
+    margin: 0 !important;
+}
+
+/* scroll content area */
+.download-queue-scroll {
+    max-height: 280px !important;
+    overflow-y: auto !important;
+}
+
+/* items */
+.dl-queue-container .item-list {
+    padding: 0 18px 18px !important;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 12px !important;
+}
+
+.dl-queue-container .item {
+    padding: 16px !important;
+    background: var(--ink-3) !important;
+    border-radius: var(--r-soft) !important;
+    border: 2px solid var(--line) !important;
+    display: block !important;
+}
+
+.dl-queue-container .item-top {
+    display: flex !important;
+    align-items: center !important;
+    gap: 10px !important;
+    margin-bottom: 14px !important;
+}
+
+.dl-queue-container .status-dot {
+    width: 10px !important;
+    height: 10px !important;
+    border-radius: 50% !important;
+    flex: none !important;
+}
+
+.dl-queue-container .status-dot.dot-active {
+    background: var(--cyan) !important;
+    animation: dl-blink 1.4s ease-in-out infinite !important;
+}
+
+.dl-queue-container .status-dot.dot-pending {
+    background: var(--paper-dim) !important;
+}
+
+.dl-queue-container .status-dot.dot-paused {
+    background: var(--yellow) !important;
+}
+
+.dl-queue-container .status-dot.dot-error {
+    background: var(--red) !important;
+}
+
+.dl-queue-container .status-dot.dot-completed {
+    background: var(--green) !important;
+}
+
+@keyframes dl-blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: .3; }
+}
+
+.dl-queue-container .item-name {
+    font-family: 'Hanken Grotesk', sans-serif !important;
+    font-weight: 800 !important;
+    font-size: 15px !important;
+    color: var(--paper) !important;
+    flex: 1 !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+}
+
+.dl-queue-container .cancel {
+    width: 30px !important;
+    height: 30px !important;
+    border-radius: 50% !important;
+    background: rgba(251, 77, 61, .15) !important;
+    border: 1.5px solid rgba(251, 77, 61, .35) !important;
+    display: grid !important;
+    place-items: center !important;
+    cursor: pointer !important;
+    flex: none !important;
+    transition: background 0.1s ease !important;
+}
+
+.dl-queue-container .cancel svg {
+    width: 14px !important;
+    height: 14px !important;
+    stroke: var(--red) !important;
+    fill: none !important;
+    stroke-width: 2.5 !important;
+}
+
+.dl-queue-container .cancel:active {
+    background: rgba(251, 77, 61, .3) !important;
+}
+
+/* progress track */
+.dl-queue-container .progress-track {
+    height: 8px !important;
+    background: rgba(0, 0, 0, .4) !important;
+    border-radius: 99px !important;
+    overflow: hidden !important;
+    margin-bottom: 10px !important;
+    border: 1.5px solid rgba(255, 255, 255, .06) !important;
+}
+
+.dl-queue-container .progress-fill {
+    height: 100% !important;
+    border-radius: 99px !important;
+    background: var(--cyan) !important;
+    position: relative !important;
+    box-shadow: 0 0 8px rgba(46, 198, 214, .5) !important;
+    transition: width 0.3s ease !important;
+}
+
+.dl-queue-container .progress-fill::after {
+    content: "" !important;
+    position: absolute !important;
+    inset: 0 !important;
+    border-radius: 99px !important;
+    background: linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, .3) 50%, transparent 100%) !important;
+    background-size: 200% 100% !important;
+    animation: dl-shimmer 1.6s linear infinite !important;
+}
+
+@keyframes dl-shimmer {
+    from { background-position: 200% 0; }
+    to { background-position: -200% 0; }
+}
+
+.dl-queue-container .item-status {
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+}
+
+.dl-queue-container .status-label {
+    font-size: 12px !important;
+    color: var(--paper-dim) !important;
+}
+
+.dl-queue-container .status-label.status-error {
+    color: var(--red) !important;
+}
+
+.dl-queue-container .status-pct {
+    font-family: 'Space Mono', monospace !important;
+    font-weight: 700 !important;
+    font-size: 14px !important;
+    color: var(--cyan) !important;
+    letter-spacing: .5px !important;
+}
+
+.dl-queue-container .status-pct.pct-completed {
+    color: var(--green) !important;
+}
+
+.dl-queue-container .status-pct.pct-error {
+    color: var(--red) !important;
+}
+
+/* empty state */
+.dl-queue-container .empty-state-dl {
+    padding: 32px 24px !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    text-align: center !important;
+}
+
+.dl-queue-container .empty-icon {
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    width: 56px !important;
+    height: 56px !important;
+    border-radius: 12px !important;
+    background: var(--ink-3) !important;
+    border: 2px solid var(--line) !important;
+    margin-bottom: 14px !important;
+}
+
+.dl-queue-container .empty-icon svg {
+    width: 28px !important;
+    height: 28px !important;
+    stroke: var(--paper-dim) !important;
+    fill: none !important;
+    stroke-width: 1.5 !important;
+}
+
+.dl-queue-container .empty-title {
+    font-size: 14px !important;
+    font-weight: 700 !important;
+    color: var(--paper) !important;
+}
+
+.dl-queue-container .empty-subtitle {
+    margin-top: 4px !important;
+    font-size: 12px !important;
+    color: var(--paper-dim) !important;
+}
+
+/* Yellow exclamation mark color for logo wordmark */
+.logo-exclamation {
+    color: var(--yellow) !important;
+}
+
+/* ─── MODALS BRUTALIST/RISO OVERRIDES ───────── */
+#settings-modal > div,
+#reading-list-modal > div,
+#add-to-list-modal > div,
+#directory-selection-modal > div,
+#ct-modal > div {
+    background-color: var(--ink-2) !important;
+    border: 2px solid #000 !important;
+    border-radius: 12px !important;
+    box-shadow: var(--shadow) !important;
+    color: var(--paper) !important;
+}
+
+/* Modal headers */
+#settings-modal h3,
+#reading-list-modal h3,
+#add-to-list-modal h3,
+#directory-selection-modal h3,
+#ct-modal h3 {
+    font-family: var(--font-display) !important;
+    font-size: 24px !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.5px !important;
+    color: var(--paper) !important;
+}
+
+#settings-modal .border-b,
+#reading-list-modal .border-b,
+#add-to-list-modal .border-b,
+#directory-selection-modal .border-b,
+#ct-modal .border-b {
+    border-bottom: 2px solid var(--line) !important;
+}
+
+/* Settings tab buttons */
+#settings-modal .tab-button {
+    font-family: var(--font-body) !important;
+    font-weight: 700 !important;
+    color: var(--paper-dim) !important;
+}
+
+#settings-modal .tab-button.active {
+    color: var(--red) !important;
+    border-bottom: 3px solid var(--red) !important;
+}
+
+/* Modal inputs, selects, and textareas */
+#settings-modal input[type="text"],
+#settings-modal input[type="number"],
+#settings-modal select,
+#reading-list-modal input[type="text"],
+#add-to-list-modal input[type="text"],
+#ct-modal input[type="text"],
+#ct-modal select,
+#ct-modal textarea {
+    background-color: var(--ink-3) !important;
+    border: 2px solid var(--line) !important;
+    border-radius: var(--r-sharp) !important;
+    color: var(--paper) !important;
+    font-family: var(--font-body) !important;
+    padding: 8px 12px !important;
+}
+
+#settings-modal input[type="text"]:focus,
+#settings-modal input[type="number"]:focus,
+#settings-modal select:focus,
+#reading-list-modal input[type="text"]:focus,
+#add-to-list-modal input[type="text"]:focus,
+#ct-modal input[type="text"]:focus,
+#ct-modal select:focus,
+#ct-modal textarea:focus {
+    border-color: var(--yellow) !important;
+    outline: none !important;
+}
+
+/* Modal close button clean styles */
+.modal-close-btn {
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    background: none !important;
+    border: none !important;
+    box-shadow: none !important;
+    color: var(--paper-dim) !important;
+    font-size: 28px !important;
+    font-family: var(--font-body) !important;
+    cursor: pointer !important;
+    transition: color 0.15s ease !important;
+    width: auto !important;
+    height: auto !important;
+    padding: 0 !important;
+    margin: 0 !important;
+}
+.modal-close-btn:hover {
+    color: var(--paper) !important;
+}
+
+/* Modal action buttons (excluding top-right close buttons) */
+#settings-modal button:not(.modal-close-btn):not(.remove-library-btn),
+#reading-list-modal button:not(.modal-close-btn),
+#add-to-list-modal button:not(.modal-close-btn),
+#ct-modal button:not(.modal-close-btn) {
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    border: 2px solid #000 !important;
+    border-radius: 4px !important;
+    box-shadow: 3px 3px 0px #000 !important;
+    font-family: var(--font-body) !important;
+    font-weight: 700 !important;
+    cursor: pointer !important;
+    padding: 8px 16px !important;
+    transition: transform 0.05s ease, box-shadow 0.05s ease, background-color 0.1s ease !important;
+}
+
+#settings-modal button:not(.modal-close-btn):not(.remove-library-btn):active,
+#reading-list-modal button:not(.modal-close-btn):active,
+#add-to-list-modal button:not(.modal-close-btn):active,
+#ct-modal button:not(.modal-close-btn):active {
+    transform: translate(2px, 2px) !important;
+    box-shadow: 1px 1px 0px #000 !important;
+}
+
+/* Modal action buttons color matching design tokens */
+#add-library-btn,
+#directory-confirm-btn {
+    background-color: var(--green) !important;
+    color: #000 !important;
+}
+#add-library-btn:hover,
+#directory-confirm-btn:hover:not(:disabled) {
+    background-color: #1aa04a !important;
+}
+
+#create-reading-list-btn,
+#save-reading-lists-order-btn {
+    background-color: var(--green) !important;
+    color: #fff !important;
+}
+#create-reading-list-btn:hover,
+#save-reading-lists-order-btn:hover {
+    background-color: #1aa04a !important;
+}
+
+#scan-button {
+    background-color: var(--yellow) !important;
+    color: #000 !important;
+}
+#scan-button:hover {
+    background-color: #e0b835 !important;
+}
+
+#full-scan-button,
+#settings-modal button[type="submit"],
+#import-lists-btn,
+#ct-modal button[type="submit"] {
+    background-color: var(--red) !important;
+    color: var(--paper) !important;
+}
+#full-scan-button:hover,
+#settings-modal button[type="submit"]:hover,
+#import-lists-btn:hover,
+#ct-modal button[type="submit"]:hover {
+    background-color: var(--red-deep) !important;
+}
+
+#export-all-lists-btn {
+    background-color: var(--cyan) !important;
+    color: #000 !important;
+}
+#export-all-lists-btn:hover {
+    background-color: #24a8b7 !important;
+}
+
+#edit-reading-lists-btn,
+#cancel-reading-lists-edit-btn,
+#directory-cancel-btn {
+    background-color: var(--ink-3) !important;
+    color: var(--paper) !important;
+}
+#edit-reading-lists-btn:hover,
+#cancel-reading-lists-edit-btn:hover,
+#directory-cancel-btn:hover {
+    background-color: var(--ink-2) !important;
+}
+
+/* Modal list items (e.g. library lists, reading lists, directory options) */
+#library-folders-list > div,
+#reading-lists-container > div,
+#add-to-list-container > div,
+#directory-options > div {
+    background-color: var(--ink-3) !important;
+    border: 2px solid var(--line) !important;
+    border-radius: 8px !important;
+    padding: 12px !important;
+    margin-bottom: 8px !important;
+    transition: border-color 0.15s ease, background-color 0.15s ease !important;
+}
+
+#library-folders-list > div:hover,
+#reading-lists-container > div:hover,
+#add-to-list-container > div:hover,
+#directory-options > div:hover {
+    border-color: var(--yellow) !important;
+}
+
+/* Subtitles / info texts inside modals */
+#settings-modal p,
+#reading-list-modal p,
+#add-to-list-modal p {
+    color: var(--paper-dim) !important;
 }
 

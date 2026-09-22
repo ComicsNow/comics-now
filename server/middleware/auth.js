@@ -2,11 +2,35 @@ const jwt = require('jsonwebtoken');
 const jwksClient = require('jwks-rsa');
 const path = require('path');
 const { isAuthEnabled, getAdminEmail, getCloudflareConfig, getTrustedIPs } = require('../config');
-const { dbRun, dbGet } = require('../db');
+const { dbRun, dbGet, dbAll } = require('../db');
+const { autoSeedNewUserReadingLists } = require('../services/readingLists');
 const { log } = require('../logger');
 
 let jwksClientInstance = null;
 let jwksConfigErrorLogged = false;
+
+const lastSeenCache = new Map();
+const LAST_SEEN_THROTTLE_MS = 5 * 60 * 1000; // 5 minutes
+
+async function recordUserActivity(userId, email, role) {
+  const now = Date.now();
+  const lastRecorded = lastSeenCache.get(userId);
+  if (!lastRecorded || (now - lastRecorded) > LAST_SEEN_THROTTLE_MS) {
+    lastSeenCache.set(userId, now);
+    try {
+      await dbRun(`
+        INSERT INTO users (userId, email, role, lastSeen)
+        VALUES (?, ?, ?, ?)
+        ON CONFLICT(userId) DO UPDATE SET
+          email = excluded.email,
+          role = excluded.role,
+          lastSeen = excluded.lastSeen
+      `, [userId, email, role, now]);
+    } catch (error) {
+      log('ERROR', 'AUTH', `User upsert failed: ${error.message}`);
+    }
+  }
+}
 
 /**
  * Initialize JWKS client for JWT verification
@@ -29,7 +53,12 @@ function initJwksClient() {
 
   if (!jwksClientInstance) {
     jwksClientInstance = jwksClient({
-      jwksUri: `https://${teamDomain}/cdn-cgi/access/certs`
+      jwksUri: `https://${teamDomain}/cdn-cgi/access/certs`,
+      cache: true,
+      cacheMaxEntries: 5,
+      cacheMaxAge: 3600000,
+      rateLimit: true,
+      jwksRequestsPerMinute: 10
     });
     log('INFO', 'AUTH', `JWKS client initialized for ${teamDomain}`);
   }
@@ -132,15 +161,7 @@ async function extractUserFromJWT(req, res, next) {
     };
 
     // Ensure user exists in database
-    try {
-      await dbRun(`
-        INSERT INTO users (userId, email, role, lastSeen)
-        VALUES (?, ?, ?, ?)
-        ON CONFLICT(userId) DO UPDATE SET lastSeen = excluded.lastSeen
-      `, [userId, email, role, Date.now()]);
-    } catch (error) {
-      log('ERROR', 'AUTH', `User upsert failed (auth-disabled mode): ${error.message}`);
-    }
+    await recordUserActivity(userId, email, role);
 
     return next();
   }
@@ -154,30 +175,21 @@ async function extractUserFromJWT(req, res, next) {
   if (!jwtToken) {
     const trustedIPs = getTrustedIPs();
     if (trustedIPs.length > 0) {
-      const clientIP = req.ip || req.connection.remoteAddress || req.socket.remoteAddress;
-      const normalizedIP = clientIP?.replace(/^::ffff:/, ''); // Remove IPv6 prefix
+      // Validate direct socket IP to prevent WAN X-Forwarded-For header spoofing
+      const directSocketIP = (req.socket?.remoteAddress || req.connection?.remoteAddress)?.replace(/^::ffff:/, '');
+      const clientIP = req.ip?.replace(/^::ffff:/, '');
+      const isTrusted = isIPInTrustedList(directSocketIP, trustedIPs) ||
+                        (!req.headers['x-forwarded-for'] && isIPInTrustedList(clientIP, trustedIPs));
 
-      if (isIPInTrustedList(normalizedIP, trustedIPs)) {
-        
+      if (isTrusted) {
         req.user = {
           userId: 'default-user',
           email: 'local@localhost',
           role: 'admin'
         };
 
-        // Ensure local admin user exists in database (same user as auth-disabled mode)
-        try {
-          await dbRun(`
-            INSERT INTO users (userId, email, role, lastSeen)
-            VALUES (?, ?, ?, ?)
-            ON CONFLICT(userId) DO UPDATE SET
-              email = excluded.email,
-              role = excluded.role,
-              lastSeen = excluded.lastSeen
-          `, ['default-user', 'local@localhost', 'admin', Date.now()]);
-        } catch (error) {
-          log('ERROR', 'AUTH', `User upsert failed (trusted IP): ${error.message}`);
-        }
+        // Ensure local admin user exists in database
+        await recordUserActivity('default-user', 'local@localhost', 'admin');
 
         return next();
       }
@@ -191,7 +203,6 @@ async function extractUserFromJWT(req, res, next) {
 
   // Development bypass (only if NODE_ENV is development)
   if (!jwtToken && process.env.NODE_ENV === 'development') {
-    
     req.user = {
       email: 'dev@localhost',
       userId: 'dev-user-1',
@@ -199,15 +210,7 @@ async function extractUserFromJWT(req, res, next) {
     };
 
     // Create dev user in database
-    try {
-      await dbRun(`
-        INSERT INTO users (userId, email, role, lastSeen)
-        VALUES (?, ?, ?, ?)
-        ON CONFLICT(userId) DO UPDATE SET lastSeen = excluded.lastSeen
-      `, ['dev-user-1', 'dev@localhost', 'admin', Date.now()]);
-    } catch (error) {
-      log('ERROR', 'AUTH', `User upsert failed (dev mode): ${error.message}`);
-    }
+    await recordUserActivity('dev-user-1', 'dev@localhost', 'admin');
 
     return next();
   }
@@ -228,11 +231,12 @@ async function extractUserFromJWT(req, res, next) {
       throw new Error('Cloudflare configuration incomplete');
     }
 
-    // Verify JWT
+    // Verify JWT with pinned RS256 algorithm
     const decoded = await new Promise((resolve, reject) => {
       jwt.verify(jwtToken, getKey, {
         audience: audience,
-        issuer: `https://${teamDomain}`
+        issuer: `https://${teamDomain}`,
+        algorithms: ['RS256']
       }, (err, decoded) => {
         if (err) reject(err);
         else resolve(decoded);
@@ -245,14 +249,7 @@ async function extractUserFromJWT(req, res, next) {
     const isAdmin = email === adminEmail;
 
     // Upsert user in database
-    await dbRun(`
-      INSERT INTO users (userId, email, role, lastSeen)
-      VALUES (?, ?, ?, ?)
-      ON CONFLICT(userId) DO UPDATE SET
-        email = excluded.email,
-        role = excluded.role,
-        lastSeen = excluded.lastSeen
-    `, [userId, email, isAdmin ? 'admin' : 'user', Date.now()]);
+    await recordUserActivity(userId, email, isAdmin ? 'admin' : 'user');
 
     // Get user from database (in case role was updated)
     const user = await dbGet('SELECT * FROM users WHERE userId = ?', [userId]);
@@ -262,6 +259,11 @@ async function extractUserFromJWT(req, res, next) {
       email: user.email,
       role: user.role
     };
+
+    // Auto-seed default reading lists for new users
+    autoSeedNewUserReadingLists(user.userId, { dbRun, dbGet, dbAll, log }).catch(err => {
+      log('ERROR', 'AUTH', `Auto-seed reading lists error: ${err.message}`);
+    });
 
     next();
   } catch (error) {

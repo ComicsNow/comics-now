@@ -95,12 +95,29 @@ async function buildLibrary(userId = 'default-user') {
       fullMetadata = {};
     }
 
+    let year = fullMetadata.Year || fullMetadata.year || '';
+    let month = fullMetadata.Month || fullMetadata.month || '';
+    let day = fullMetadata.Day || fullMetadata.day || '';
+    const coverDate = fullMetadata.CoverDate || fullMetadata['Cover Date'] || fullMetadata.StoreDate || fullMetadata['Store Date'] || '';
+    if (!year && coverDate) {
+      const match = String(coverDate).match(/\b(19\d\d|20\d\d)\b/);
+      if (match) year = match[1];
+    }
+    if (!year && r.name) {
+      const match = String(r.name).match(/\b(19\d\d|20\d\d)\b/);
+      if (match) year = match[1];
+    }
+
     // Only include minimal metadata fields needed for display
     // Full metadata can be fetched via /api/v1/comics/info when needed
     const metadata = {
       Number: fullMetadata.Number || fullMetadata.Issue || fullMetadata.IssueNumber || fullMetadata.SortNumber || fullMetadata.AlternateNumber || '',
       Series: fullMetadata.Series || fullMetadata.SeriesName || fullMetadata.AlternateSeries || '',
-      Title: fullMetadata.Title || fullMetadata.DisplayTitle || fullMetadata.SortName || fullMetadata.FullTitle || fullMetadata.StoryTitle || ''
+      Title: fullMetadata.Title || fullMetadata.DisplayTitle || fullMetadata.SortName || fullMetadata.FullTitle || fullMetadata.StoryTitle || '',
+      Year: year,
+      Month: month,
+      Day: day,
+      CoverDate: coverDate
     };
 
     // Use per-user progress if available, otherwise default to 0

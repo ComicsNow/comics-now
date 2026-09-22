@@ -187,9 +187,14 @@ function createDisplayField() {
   return document.createElement('div');
 }
 
-/** Render the entire metadata form — editable if admin, read-only otherwise */
 function renderMetadataDisplay(metadata, clearForm = true) {
-  if (clearForm) global.metadataForm.innerHTML = '';
+  if (clearForm) {
+    global.metadataForm.innerHTML = '';
+    const statusDiv = document.createElement('div');
+    statusDiv.id = 'save-status';
+    statusDiv.className = 'text-sm text-gray-300';
+    global.metadataForm.appendChild(statusDiv);
+  }
 
   // Check if user is admin
   const isAdmin = global.syncManager && global.syncManager.userRole === 'admin';

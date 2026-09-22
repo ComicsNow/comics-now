@@ -50,11 +50,8 @@ export function initAuthUI() {
   // Check auth status from APP_CONFIG (injected by server)
   const authEnabled = state.APP_CONFIG?.authEnabled === true;
 
-  if (authEnabled) {
-    logoutButton.classList.remove('hidden');
-  } else {
-    logoutButton.classList.add('hidden');
-  }
+  // Always show the logout/refresh button to match the mockup layout
+  logoutButton.classList.remove('hidden');
 }
 
 // Initialize auth UI when DOM is ready

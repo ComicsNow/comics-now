@@ -167,6 +167,28 @@ export function showView(targetView) {
     searchContainer?.classList.remove('hidden');
     filtersContainer?.classList.remove('hidden');
   }
+
+  // Toggle compact logo styling when drilled down
+  const logoContainer = document.querySelector('.logo-container');
+  if (logoContainer) {
+    if (targetView === rootFolderListDiv) {
+      logoContainer.classList.remove('logo-compact');
+    } else {
+      logoContainer.classList.add('logo-compact');
+    }
+  }
+
+  // Ensure scroll position resets to top on view change (avoid starting partway down on tall views)
+  if (targetView !== comicViewerDiv && typeof window !== 'undefined') {
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+    if (document.documentElement) document.documentElement.scrollTop = 0;
+    if (document.body) document.body.scrollTop = 0;
+    requestAnimationFrame(() => {
+      window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+      if (document.documentElement) document.documentElement.scrollTop = 0;
+      if (document.body) document.body.scrollTop = 0;
+    });
+  }
 }
 
 // Template functions for common HTML patterns
@@ -416,6 +438,8 @@ export const viewerPublisherBtn = document.getElementById('viewer-publisher-btn'
 export const viewerSeriesBtn = document.getElementById('viewer-series-btn');
 export const publisherAlphaFilter = document.getElementById('publisher-alpha-filter');
 export const seriesAlphaFilter = document.getElementById('series-alpha-filter');
+export const seriesSortContainer = document.getElementById('series-sort-container');
+export const seriesSortSelect = document.getElementById('series-sort-select');
 export const comicAlphaFilter = document.getElementById('comic-alpha-filter');
 export const folderAlphaFilter = document.getElementById('folder-alpha-filter');
 export const publisherTitleH2 = document.getElementById('publisher-title');
@@ -498,13 +522,16 @@ export const ctConfirmNo = document.getElementById('ct-confirm-no');
 export const ctOutputDiv = document.getElementById('ct-output');
 export const ctClearOutputBtn = document.getElementById('ct-clear-output');
 export const ctRunBtn = document.getElementById('ct-run-btn');
+export const ctCancelBtn = document.getElementById('ct-cancel-btn');
 export const ctTabSettings = document.getElementById('ct-tab-settings');
 export const ctTabMatches = document.getElementById('ct-tab-matches');
 export const ctTabOutput = document.getElementById('ct-tab-output');
+export const ctTabLogs = document.getElementById('ct-tab-logs');
 export const ctTabManagement = document.getElementById('ct-tab-management');
 export const ctContentSettings = document.getElementById('ct-content-settings');
 export const ctContentMatches = document.getElementById('ct-content-matches');
 export const ctContentOutput = document.getElementById('ct-content-output');
+export const ctContentLogs = document.getElementById('ct-content-logs');
 export const ctContentManagement = document.getElementById('ct-content-management');
 export const ctMatchesBadge = document.getElementById('ct-matches-badge');
 
@@ -538,6 +565,7 @@ export const state = {
   lastSearchField: 'all',
   lastSearchResults: null,
   activeAlphaFilter: 'All',
+  seriesSortOrder: (typeof localStorage !== 'undefined' ? localStorage.getItem('publisher_series_sort') || localStorage.getItem('seriesSortOrder') || 'name' : 'name'),
   configuredRootFolders: [],
   activeFilter: 'all',
   activeSmartFilter: null,
@@ -783,20 +811,26 @@ const globalsObj = {
   ctOutputDiv,
   ctClearOutputBtn,
   ctRunBtn,
+  ctCancelBtn,
   ctTabSettings,
   ctTabMatches,
   ctTabOutput,
+  ctTabLogs,
   ctTabManagement,
   ctContentSettings,
   ctContentMatches,
   ctContentOutput,
+  ctContentLogs,
   ctContentManagement,
-  ctMatchesBadge
+  ctMatchesBadge,
+  seriesSortContainer,
+  seriesSortSelect
 };
 
 Object.assign(state, globalsObj);
 if (typeof window !== 'undefined') {
   Object.assign(window, globalsObj);
   window.API_BASE_URL = state.API_BASE_URL;
+  window.seriesSortOrder = state.seriesSortOrder;
 }
 

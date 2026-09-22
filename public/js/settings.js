@@ -54,6 +54,13 @@ function openSettingsModal() {
       global.refreshDeviceList();
     }
   }
+  // If Comics Defaults tab is active, reload its data
+  const defaultsTab = document.getElementById('settings-tab-comics-defaults');
+  if (defaultsTab && defaultsTab.classList.contains('active')) {
+    if (typeof global.loadComicsDefaults === 'function') {
+      global.loadComicsDefaults();
+    }
+  }
   // If the Guided Reader tab is the active one when re-opening settings,
   // re-arm its live polling/SSE — closeSettingsModal tears it down.
   const guidedPane = document.getElementById('settings-content-guided-reader');
@@ -98,6 +105,9 @@ async function fetchSettings() {
       initialMetadataStorage = data.metadataStorage;
     }
 
+    // Gate the XML Sidecar option on Tag Comics Now being configured
+    await applyStorageOptionConstraints();
+
     // Handle API key display
     if (apiKeyInput) {
       if (data.comicVineApiKey !== undefined) {
@@ -121,6 +131,19 @@ async function fetchSettings() {
       settingsStatusDiv.textContent = 'Failed to load settings.';
     }
   }
+}
+
+// XML Sidecar storage is only valid when the tagger is Tag Comics Now (mode 'new')
+// AND a service URL is configured. Otherwise grey out the option and, if it was
+// selected, fall back to Archive.
+async function applyStorageOptionConstraints() {
+  const select = document.getElementById('metadata-storage-select');
+  if (!select) return;
+  const sidecarOption = select.querySelector('option[value="sidecar"]');
+  if (!sidecarOption) return;
+
+  sidecarOption.disabled = false;
+  sidecarOption.title = 'Stores metadata in a companion .ComicInfo.xml file alongside each comic (works for CBZ & CBR).';
 }
 
 async function refreshLibraryFolders() {
@@ -256,9 +279,17 @@ if (settingsForm) {
     if (settingsStatusDiv) settingsStatusDiv.textContent = 'Saving...';
 
     const interval = scanIntervalInput ? scanIntervalInput.value : null;
-    const apiKey = apiKeyInput ? apiKeyInput.value : null;
-    const allowedFormats = document.getElementById('allowed-formats-select')?.value || 'cbz';
-    const metadataStorage = document.getElementById('metadata-storage-select')?.value || 'archive';
+    let apiKey = '';
+    let allowedFormats = 'cbz';
+    let metadataStorage = 'archive';
+    try {
+      const existing = await (await fetch(`${global.API_BASE_URL}/api/v1/settings`)).json();
+      apiKey = existing.comicVineApiKey || '';
+      allowedFormats = existing.allowedFormats || 'cbz';
+      metadataStorage = existing.metadataStorage || 'archive';
+    } catch (err) {
+      console.error('Failed to read existing settings before save:', err);
+    }
 
     try {
       const res = await fetch(`${global.API_BASE_URL}/api/v1/settings`, {
@@ -277,6 +308,10 @@ if (settingsForm) {
           global.showSettingsMessage('Settings saved!', 'success');
         }
       }
+      // Re-sync the form with the authoritative server state so the displayed
+      // values always reflect what was actually persisted (the storage mode may
+      // be coerced server-side, e.g. sidecar -> archive without a tagger URL).
+      await fetchSettings();
       if (typeof global.fetchLibrary === 'function') {
         global.fetchLibrary(); // Refresh library after saving settings
       }

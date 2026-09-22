@@ -182,9 +182,15 @@ export function filterPublishersByActiveFilter(publishers = {}) {
 
   const filtered = {};
   for (const [publisherName, publisherData] of Object.entries(publishers)) {
+    if (scope === 'reading-list') {
+      const SmartLists = state.LibrarySmartLists || window.LibrarySmartLists || {};
+      const getReadingLists = state.getReadingListsForPublisher || window.getReadingListsForPublisher || SmartLists.getReadingListsForPublisher;
+      const readingLists = typeof getReadingLists === 'function' ? getReadingLists(publisherName) : [];
+      if (readingLists.length === 0) continue;
+    }
     const counts = getPublisherStatusCounts(publisherData);
-    // When a scope is active, drop publishers with zero in-scope total.
-    if (scope && (counts.total || 0) === 0) continue;
+    // When a scope is active (other than reading-list where we already checked reading lists), drop publishers with zero in-scope total.
+    if (scope && scope !== 'reading-list' && (counts.total || 0) === 0) continue;
     if (statusCountsMatchFilter(counts)) {
       filtered[publisherName] = publisherData;
     }

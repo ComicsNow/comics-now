@@ -1,7 +1,10 @@
 {
   "port": 3000,
   "baseUrl": "/comics",
-  "comictaggerPath": "/path/to/comictagger",
+  "taggerMode": "new", // "new" for embedded Python tagger service
+  "taggerServiceUrl": "http://localhost:5000",
+  "taggerEngine": "gemini",
+  "taggerTextEngine": "google-books",
 
   /* 
      comicsLocation: The "workspace" directory where ComicTagger looks for 

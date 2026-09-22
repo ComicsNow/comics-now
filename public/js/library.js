@@ -29,6 +29,42 @@ function filterLibrary(originalLibrary, filter) {
 // filter to 'All', restores the status pill highlight, then renders the root folder list.
 // Wired to the "Comics Now!" title click in index.html.
 function goToInitialView() {
+  // Exit fullscreen reader if active
+  if (typeof window.closeFullscreen === 'function') {
+    try {
+      window.closeFullscreen();
+    } catch (e) {
+      console.error('Failed to close fullscreen viewer:', e);
+    }
+  }
+
+  // Close settings, ComicTagger, and reading list modals
+  if (typeof window.closeSettingsModal === 'function') {
+    try {
+      window.closeSettingsModal();
+    } catch (e) {}
+  }
+  if (typeof window.closeCTModal === 'function') {
+    try {
+      window.closeCTModal();
+    } catch (e) {}
+  }
+  if (typeof window.closeReadingListModal === 'function') {
+    try {
+      window.closeReadingListModal();
+    } catch (e) {}
+  }
+  if (window.ReadingLists && typeof window.ReadingLists.closeAddToListModal === 'function') {
+    try {
+      window.ReadingLists.closeAddToListModal();
+    } catch (e) {}
+  }
+
+  // Fallback direct hide for all modals
+  ['directory-selection-modal', 'settings-modal', 'ct-modal', 'reading-list-modal', 'add-to-list-modal'].forEach(id => {
+    document.getElementById(id)?.classList.add('hidden');
+  });
+
   // Clear smart-filter scope
   global.activeSmartFilter = null;
   if (typeof window !== 'undefined') window.activeSmartFilter = null;
@@ -116,11 +152,15 @@ function initializeLibraryUIControls() {
     global.filterButtonsDiv.addEventListener('click', global.filterButtonsDiv._filterListener);
   }
 
+  if (typeof global.initSeriesSortControls === 'function') {
+    global.initSeriesSortControls();
+  }
+
   // Smart filter is now a *scope*, not a navigation target.
   // - Folder mode (default): re-render whatever drill-in view we're already in (publishers /
   //   series / comics) with the new scope applied. Don't bounce back to root.
   // - List mode + active scope: navigate to the flat #smart-list-view for that scope.
-  const SMART_LIST_VIEWS = ['latest', 'downloaded', 'guided', 'manga', 'non-manga'];
+  const SMART_LIST_VIEWS = ['latest', 'downloaded', 'guided', 'manga', 'non-manga', 'reading-list'];
   const renderForActiveScope = (scope) => {
     if (scope && global.smartListViewMode === 'list') {
       if (scope === 'latest' && typeof global.showLatestAddedSmartList === 'function') return global.showLatestAddedSmartList();
@@ -209,6 +249,15 @@ function initializeLibraryUIControls() {
       setSmartScope(global.activeSmartFilter === type ? null : type);
     };
     mangaFilterBtn.addEventListener('click', mangaFilterBtn._smartListListener);
+  }
+
+  const readingListFilterBtn = document.getElementById('dynamic-reading-list-filter-btn');
+  if (readingListFilterBtn && !readingListFilterBtn._smartListListener) {
+    readingListFilterBtn._smartListListener = (event) => {
+      event.preventDefault();
+      setSmartScope(global.activeSmartFilter === 'reading-list' ? null : 'reading-list');
+    };
+    readingListFilterBtn.addEventListener('click', readingListFilterBtn._smartListListener);
   }
 
   if (global.smartListBackBtn && !global.smartListBackBtn._smartListBackListener) {

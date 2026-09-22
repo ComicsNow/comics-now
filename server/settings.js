@@ -5,7 +5,9 @@ const {
   setComicVineApiKey,
   setCtScheduleMinutes,
   setAllowedFormats,
-  setMetadataStorage
+  setMetadataStorage,
+  setTaggerMode,
+  setTaggerServiceUrl
 } = require('./config');
 
 async function loadSettings() {
@@ -53,6 +55,48 @@ async function loadSettings() {
         } catch {
           setMetadataStorage(row.value, true);
         }
+      }
+      if (row.key === 'taggerMode') {
+        try {
+          setTaggerMode(JSON.parse(row.value), true);
+        } catch {
+          setTaggerMode(row.value, true);
+        }
+      }
+      if (row.key === 'taggerServiceUrl') {
+        try {
+          setTaggerServiceUrl(JSON.parse(row.value), true);
+        } catch {
+          setTaggerServiceUrl(row.value, true);
+        }
+      }
+      if (row.key === 'taggerLowerThreshold') {
+        const val = typeof row.value === 'string' ? JSON.parse(row.value) : row.value;
+        const { setTaggerLowerThreshold } = require('./config');
+        setTaggerLowerThreshold(val, true);
+      }
+      if (row.key === 'taggerUpperThreshold') {
+        const val = typeof row.value === 'string' ? JSON.parse(row.value) : row.value;
+        const { setTaggerUpperThreshold } = require('./config');
+        setTaggerUpperThreshold(val, true);
+      }
+      if (row.key === 'taggerEnabledSources') {
+        let val;
+        try { val = JSON.parse(row.value); } catch { val = row.value; }
+        const { setTaggerEnabledSources } = require('./config');
+        setTaggerEnabledSources(val, true);
+      }
+      if (row.key === 'metronUser') {
+        let val;
+        try { val = JSON.parse(row.value); } catch { val = row.value; }
+        const { setMetronUser } = require('./config');
+        setMetronUser(val, true);
+      }
+      if (row.key === 'metronPassword') {
+        let val;
+        try { val = JSON.parse(row.value); } catch { val = row.value; }
+        const { setMetronPassword } = require('./config');
+        setMetronPassword(val, true);
       }
     }
     log('INFO', 'SERVER', 'Settings loaded from DB.');

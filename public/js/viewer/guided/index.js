@@ -98,28 +98,38 @@ export function tryAdvance(direction) {
   return advanced;
 }
 
-export async function enable() { return state.GuidedView.ModeRegistry.enable('guided'); }
-export function disable() { state.GuidedView.ModeRegistry.disable('guided'); }
+export async function enable(modeOrOptions, maybeOptions) {
+  if (typeof modeOrOptions === 'string') {
+    return state.GuidedView.ModeRegistry.enable(modeOrOptions, maybeOptions);
+  }
+  return state.GuidedView.ModeRegistry.enable('guided', modeOrOptions);
+}
+export function disable(modeOrOptions, maybeOptions) {
+  if (typeof modeOrOptions === 'string') {
+    return state.GuidedView.ModeRegistry.disable(modeOrOptions, maybeOptions);
+  }
+  return state.GuidedView.ModeRegistry.disable('guided', modeOrOptions);
+}
 export async function toggle() { return state.GuidedView.ModeRegistry.toggle('guided'); }
 export function isActive() { return state.GuidedView.ModeRegistry.getActiveModeName() === 'guided'; }
 
-export async function enableBubble() { return state.GuidedView.ModeRegistry.enable('bubble'); }
-export function disableBubble() { state.GuidedView.ModeRegistry.disable('bubble'); }
+export async function enableBubble(options) { return state.GuidedView.ModeRegistry.enable('bubble', options); }
+export function disableBubble(options) { state.GuidedView.ModeRegistry.disable('bubble', options); }
 export async function toggleBubble() { return state.GuidedView.ModeRegistry.toggle('bubble'); }
 export function isBubbleActive() { return state.GuidedView.ModeRegistry.getActiveModeName() === 'bubble'; }
 
-export async function enableWesternSpeechZoom() { return state.GuidedView.ModeRegistry.enable('western-speech-zoom'); }
-export function disableWesternSpeechZoom() { state.GuidedView.ModeRegistry.disable('western-speech-zoom'); }
+export async function enableWesternSpeechZoom(options) { return state.GuidedView.ModeRegistry.enable('western-speech-zoom', options); }
+export function disableWesternSpeechZoom(options) { state.GuidedView.ModeRegistry.disable('western-speech-zoom', options); }
 export async function toggleWesternSpeechZoom() { return state.GuidedView.ModeRegistry.toggle('western-speech-zoom'); }
 export function isWesternSpeechZoomActive() { return state.GuidedView.ModeRegistry.getActiveModeName() === 'western-speech-zoom'; }
 
-export async function enableMangaPanelZoom() { return state.GuidedView.ModeRegistry.enable('manga-panel-zoom'); }
-export function disableMangaPanelZoom() { state.GuidedView.ModeRegistry.disable('manga-panel-zoom'); }
+export async function enableMangaPanelZoom(options) { return state.GuidedView.ModeRegistry.enable('manga-panel-zoom', options); }
+export function disableMangaPanelZoom(options) { state.GuidedView.ModeRegistry.disable('manga-panel-zoom', options); }
 export async function toggleMangaPanelZoom() { return state.GuidedView.ModeRegistry.toggle('manga-panel-zoom'); }
 export function isMangaPanelZoomActive() { return state.GuidedView.ModeRegistry.getActiveModeName() === 'manga-panel-zoom'; }
 
-export async function enableMangaSpeechZoom() { return state.GuidedView.ModeRegistry.enable('manga-speech-zoom'); }
-export function disableMangaSpeechZoom() { state.GuidedView.ModeRegistry.disable('manga-speech-zoom'); }
+export async function enableMangaSpeechZoom(options) { return state.GuidedView.ModeRegistry.enable('manga-speech-zoom', options); }
+export function disableMangaSpeechZoom(options) { state.GuidedView.ModeRegistry.disable('manga-speech-zoom', options); }
 export async function toggleMangaSpeechZoom() { return state.GuidedView.ModeRegistry.toggle('manga-speech-zoom'); }
 export function isMangaSpeechZoomActive() { return state.GuidedView.ModeRegistry.getActiveModeName() === 'manga-speech-zoom'; }
 
@@ -148,8 +158,8 @@ function init() {
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
 else init();
 
-export function disableAll() {
-  state.GuidedView.ModeRegistry.disableAll();
+export function disableAll(options) {
+  state.GuidedView.ModeRegistry.disableAll(options);
 }
 
 export function getActiveModeName() { return state.GuidedView.ModeRegistry.getActiveModeName(); }
