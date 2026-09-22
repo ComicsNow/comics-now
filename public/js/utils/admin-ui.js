@@ -24,15 +24,18 @@ const global = new Proxy(typeof window !== 'undefined' ? window : globalThis, {
 
 // --- HIDE ADMIN UI FOR NON-ADMINS ---
 export function hideAdminUI() {
+  if (global.APP_CONFIG && global.APP_CONFIG.hideSupportForAdmin) {
+    const sl = document.getElementById("support-link");
+    if (sl) sl.style.display = "none";
+    const ksl = document.getElementById("kofi-settings-link");
+    if (ksl) ksl.style.display = "none";
+  }
+
   if (!global.syncManager || !global.syncManager.authEnabled) {
     return;
   }
 
   if (global.syncManager.userRole === "admin") {
-    if (global.APP_CONFIG && global.APP_CONFIG.hideSupportForAdmin) {
-      const sl = document.getElementById("support-link");
-      if (sl) sl.style.display = "none";
-    }
     return;
   }
 

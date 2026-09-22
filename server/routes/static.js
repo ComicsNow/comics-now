@@ -19,6 +19,8 @@ function createStaticRouter({ getConfig, getComicsDirectories, getPublicLibrarie
       const config = getConfig();
       const indexHtml = fs.readFileSync(path.join(STATIC_DIR, 'index.html'), 'utf-8');
       const baseHref = config.baseUrl.endsWith('/') ? config.baseUrl : (config.baseUrl + '/');
+      const hideSupport = config.hideSupportForAdmin || process.env.HIDE_SUPPORT_FOR_ADMIN === 'true';
+      const supportCss = hideSupport ? '\n  <style>#kofi-settings-link, #support-link { display: none !important; }</style>' : '';
       const injectedHtml = indexHtml
         .replace(
           '<script id="app-config"></script>',
@@ -28,7 +30,7 @@ function createStaticRouter({ getConfig, getComicsDirectories, getPublicLibrarie
             authEnabled: require('../config').isAuthEnabled(),
             cloudflareTeamDomain: config.authentication?.cloudflare?.teamDomain || null,
             hideSupportForAdmin: config.hideSupportForAdmin || false
-          })}</script>\n  <link rel="manifest" href="${baseHref}manifest.json">`
+          })}</script>${supportCss}\n  <link rel="manifest" href="${baseHref}manifest.json">`
         )
         .replace('<base href="/">', `<base href="${baseHref}">`);
 
