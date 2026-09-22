@@ -3,7 +3,7 @@ const path = require('path');
 const { dbGet, dbRun, dbAll } = require('../db');
 const { log } = require('../logger');
 const { getConfig, getScanIntervalMs, getLibraries } = require('../config');
-const { getComicInfoFromArchive } = require('./metadata');
+const { getComicInfoFromArchive, normalizePublisher, cleanDescription, splitVolumeSeriesAndTitle } = require('./metadata');
 const { createId, t0, ms, pMap, trimObjectStrings } = require('../utils');
 const {
   THUMBNAILS_DIRECTORY,
@@ -23,6 +23,15 @@ async function scanLibrary(force = false) {
   if (isScanning) {
     log('INFO', 'SCAN', 'Already scanning; skip.');
     return;
+  }
+  if (!force) {
+    try {
+      const tagger = require('./tagger');
+      if (tagger.isTaggerRunning && tagger.isTaggerRunning()) {
+        log('INFO', 'SCAN', 'Scan skipped: Tag Comics Now is actively running.');
+        return;
+      }
+    } catch (_) {}
   }
   isScanning = true;
 
@@ -51,10 +60,12 @@ async function scanLibrary(force = false) {
   const dbComicsMap = new Map(dbComics.map(c => [c.path, c.thumbnailPath]));
   const conversionRoot = config.comicsLocation ? path.resolve(config.comicsLocation) : null;
   const unreachableTopDirs = [];
+  let subDirScanErrors = 0;
 
   const walkDir = async (dir, libraryMode, libraryRootPath) => {
     if (!fs.existsSync(dir)) {
       log('ERROR', 'SCAN', `Missing dir: ${dir}`);
+      subDirScanErrors++;
       return;
     }
 
@@ -63,6 +74,7 @@ async function scanLibrary(force = false) {
       dirStat = await fs.promises.stat(dir);
     } catch {
       log('ERROR', 'SCAN', `Missing dir: ${dir}`);
+      subDirScanErrors++;
       return;
     }
 
@@ -81,7 +93,14 @@ async function scanLibrary(force = false) {
       log('INFO', 'SCAN', `Skipping unchanged dir: ${dir}`);
     }
 
-    const files = await fs.promises.readdir(dir);
+    let files = [];
+    try {
+      files = await fs.promises.readdir(dir);
+    } catch (e) {
+      log('ERROR', 'SCAN', `Failed to read dir ${dir}: ${e.message}`);
+      subDirScanErrors++;
+      return;
+    }
     await pMap(files, async (file) => {
       if (file.startsWith('.')) return;
       let filePath = path.join(dir, file);
@@ -150,9 +169,10 @@ async function scanLibrary(force = false) {
 
         fileSystemComics.add(filePath);
         const id = createId(filePath);
-        const existing = await dbGet('SELECT updatedAt, metadata, lastReadPage, totalPages, convertedAt, guidedViewStatus, guidedViewPath, guidedViewError, tagStatus FROM comics WHERE id = ?', [id]);
+        const existing = await dbGet('SELECT updatedAt, thumbnailPath, metadata, lastReadPage, totalPages, convertedAt, guidedViewStatus, guidedViewPath, guidedViewError, tagStatus FROM comics WHERE id = ?', [id]);
+        const hasValidThumbnail = Boolean(existing?.thumbnailPath && fs.existsSync(path.join(THUMBNAILS_DIRECTORY, existing.thumbnailPath)));
 
-        if (!force && !wasConverted && existing && existing.updatedAt === stats.mtimeMs) {
+        if (!force && !wasConverted && existing && existing.updatedAt === stats.mtimeMs && hasValidThumbnail) {
           return;
         }
 
@@ -200,9 +220,9 @@ async function scanLibrary(force = false) {
           info = generateVirtualMetadata(filePath, libraryRootPath);
         } else {
           info = await getComicInfoFromArchive(filePath);
-          // For CBR or DB-only storage mode: preserve DB-only metadata if internal archive is empty
+          // For CBR, DB-only, or sidecar storage mode: preserve DB-only metadata if internal archive is empty
           const storageMode = getConfig().metadata_storage || 'archive';
-          if ((storageMode === 'db' || ext === '.cbr') && (!info || Object.keys(info).length === 0)) {
+          if ((storageMode === 'db' || storageMode === 'sidecar' || ext === '.cbr') && (!info || Object.keys(info).length === 0)) {
             if (existing?.metadata) {
               try {
                 info = JSON.parse(existing.metadata);
@@ -215,8 +235,27 @@ async function scanLibrary(force = false) {
         }
 
         info = trimObjectStrings(info || {});
-        const publisher = (info.Publisher || 'Unknown Publisher').trim();
-        const series = (info.Series || 'Unknown Series').trim();
+        if (info.Publisher) {
+          info.Publisher = normalizePublisher(info.Publisher);
+        }
+        if (info.Summary) {
+          info.Summary = cleanDescription(info.Summary);
+        }
+        const publisher = normalizePublisher(info.Publisher || 'Unknown Publisher');
+        let series = (info.Series || info.Title || 'Unknown Series').trim();
+        let title = (info.Title || '').trim();
+        const volSplit = splitVolumeSeriesAndTitle(series, title);
+        if (volSplit.series && volSplit.number) {
+          series = volSplit.series;
+          info.Series = volSplit.series;
+          info.Title = volSplit.title;
+          if (!info.Number || info.Number === '1' || info.Number === '01') {
+            info.Number = volSplit.number;
+          }
+          if (!info.Volume) {
+            info.Volume = volSplit.volume;
+          }
+        }
         const fileStats = wasConverted ? await fs.promises.stat(filePath) : stats;
 
         try {
@@ -224,9 +263,9 @@ async function scanLibrary(force = false) {
           if (pages.length > 0) totalPages = pages.length;
         } catch {}
 
-        let tagStatus = existing?.tagStatus || 'pending';
+        let tagStatus = wasConverted ? 'pending' : (existing?.tagStatus || 'pending');
         if (effectiveLibraryMode !== 'folder') {
-          const hasSeries = (info.Series || '').toString().trim().length > 0;
+          const hasSeries = ((info.Series || '').toString().trim().length > 0) || ((info.Title || '').toString().trim().length > 0);
           const hasPublisher = (info.Publisher || '').toString().trim().length > 0;
           const hasDate = (info.Year || info.CoverDate || info.StoreDate || info['Cover Date'] || info['Store Date'] || '').toString().trim().length > 0;
           const hasNumber = (info.Number || '').toString().trim().length > 0;
@@ -234,7 +273,7 @@ async function scanLibrary(force = false) {
           if (hasSeries && hasPublisher && hasDate && hasNumber) {
             tagStatus = 'successful';
           } else {
-            tagStatus = 'failed';
+            tagStatus = wasConverted ? 'pending' : (existing?.tagStatus || 'pending');
           }
         }
 
@@ -286,13 +325,18 @@ async function scanLibrary(force = false) {
       log('INFO', 'SCAN', `Walk done: ${dir} in ${ms(t)} ms`);
     }, 2); // Concurrency 2 for top-level libraries to avoid too much IO thrashing
 
-    // Safety guard: never wipe comics when any top-level scan dir was unreachable.
+    // Safety guard: never wipe comics when any scan dir was unreachable or encountered errors.
     const toDelete = Array.from(dbComicsMap.keys()).filter(p => !fileSystemComics.has(p));
 
-    if (unreachableTopDirs.length > 0) {
-      log('ERROR', 'SCAN', `Aborting stale-comic cleanup: ${unreachableTopDirs.length} top-level dir(s) unreachable: ${unreachableTopDirs.join(', ')}. Would have deleted ${toDelete.length} comics.`);
+    if (unreachableTopDirs.length > 0 || subDirScanErrors > 0) {
+      log('ERROR', 'SCAN', `Aborting stale-comic cleanup: ${unreachableTopDirs.length} top-level dir(s) unreachable, ${subDirScanErrors} subfolder error(s). Would have deleted ${toDelete.length} comics.`);
     } else {
       for (const p of toDelete) {
+        // Critical safeguard: verify file is actually gone from filesystem before deleting from DB
+        if (fs.existsSync(p)) {
+          log('WARN', 'SCAN', `Safeguard: preserving comic that exists on disk but was missed in scan: ${path.basename(p)}`);
+          continue;
+        }
         const thumb = dbComicsMap.get(p);
         log('INFO', 'SCAN', `Removing missing comic: ${path.basename(p)}`);
         await dbRun('DELETE FROM comics WHERE path = ?', [p]);
@@ -304,6 +348,27 @@ async function scanLibrary(force = false) {
           }
         }
       }
+    }
+
+    // Repair any comics in database that lack a thumbnail or whose thumbnail file was lost
+    try {
+      const missingThumbs = await dbAll(
+        "SELECT id, path, thumbnailPath FROM comics WHERE thumbnailPath IS NULL OR thumbnailPath = ''"
+      );
+      for (const item of missingThumbs) {
+        if (fs.existsSync(item.path)) {
+          const gen = await generateThumbnail(item.path);
+          if (gen) {
+            await dbRun("UPDATE comics SET thumbnailPath = ? WHERE id = ?", [gen, item.id]);
+            thumbOk++;
+            log('INFO', 'THUMBNAIL', `Restored missing thumbnail for: ${path.basename(item.path)}`);
+          } else {
+            thumbFail++;
+          }
+        }
+      }
+    } catch (repairErr) {
+      log('ERROR', 'SCAN', `Error repairing missing thumbnails: ${repairErr.message}`);
     }
   } catch (e) {
     log('ERROR', 'SCAN', `Scan error: ${e.message}`);

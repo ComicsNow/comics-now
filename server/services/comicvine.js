@@ -58,7 +58,7 @@ function normalizeCvId(raw) {
  */
 async function searchIssue(title, year, issueNumber) {
   const config = getConfig();
-  const apiKey = config.comicvine_api_key;
+  const apiKey = config.comicVineApiKey;
   if (!apiKey) throw new Error('ComicVine API key not configured');
 
   const query = `${title} (${year}) #${issueNumber}`;
@@ -73,7 +73,7 @@ async function searchIssue(title, year, issueNumber) {
  */
 async function getIssueDetails(cvIssueId) {
   const config = getConfig();
-  const apiKey = config.comicvine_api_key;
+  const apiKey = config.comicVineApiKey;
   if (!apiKey) throw new Error('ComicVine API key not configured');
 
   const idNum = normalizeCvId(cvIssueId);

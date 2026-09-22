@@ -15,7 +15,12 @@ module.exports = function attach(router, deps) {
       userId: req.user.userId,
       email: req.user.email,
       role: req.user.role,
-      authEnabled: isAuthEnabled()
+      authEnabled: isAuthEnabled(),
+      // Present only when an admin is currently impersonating this identity, so
+      // the client can show the "Viewing as …" banner and an Exit control.
+      impersonating: req.impersonator
+        ? { adminEmail: req.impersonator.email, targetEmail: req.user.email }
+        : null
     });
   });
 };

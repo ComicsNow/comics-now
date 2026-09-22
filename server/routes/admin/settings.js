@@ -79,15 +79,18 @@ module.exports = function attach(router, deps) {
       const minutes = intervalValidation.sanitized;
       const sanitizedApiKey = apiKeyValidation.sanitized;
 
+      const effectiveStorage = metadataStorage === 'sidecar' ? 'sidecar' : 'archive';
+
+
       deps.setScanIntervalMinutes(minutes);
       deps.setComicVineApiKey(sanitizedApiKey);
       deps.setAllowedFormats(allowedFormats);
-      deps.setMetadataStorage(metadataStorage);
+      deps.setMetadataStorage(effectiveStorage);
 
       await saveSetting('scanInterval', minutes);
       await saveSetting('comicVineApiKey', sanitizedApiKey);
       await saveSetting('allowed_formats', allowedFormats);
-      await saveSetting('metadata_storage', metadataStorage);
+      await saveSetting('metadata_storage', effectiveStorage);
 
       scheduleNextScan();
       res.json({ ok: true });

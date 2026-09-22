@@ -24,6 +24,9 @@ const global = new Proxy(typeof window !== 'undefined' ? window : globalThis, {
 class AppRouter {
   constructor() {
     this.routes = [];
+    if (typeof global.history !== 'undefined' && 'scrollRestoration' in global.history) {
+      global.history.scrollRestoration = 'manual';
+    }
     global.addEventListener('popstate', this.handlePopState.bind(this));
   }
 
@@ -120,6 +123,11 @@ class AppRouter {
   }
 
   handlePopState(event) {
+    if (typeof window !== 'undefined') {
+      window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+      if (document.documentElement) document.documentElement.scrollTop = 0;
+      if (document.body) document.body.scrollTop = 0;
+    }
     this.navigate(global.location.pathname + global.location.search, false);
   }
 }

@@ -24,10 +24,32 @@ function pushWithLimit(collection, entry) {
 }
 
 function ctLog(message) {
+  const isRateDefense = /Rate defense|cooldown|waiting/i.test(message);
+  const lastEntry = ctLogs.length > 0 ? ctLogs[ctLogs.length - 1] : null;
+
+  if (isRateDefense && lastEntry && /Rate defense|cooldown|waiting/i.test(lastEntry.message)) {
+    lastEntry.message = message;
+    lastEntry.timestamp = new Date().toISOString();
+    for (const res of Array.from(ctClients)) {
+      try {
+        res.write(`data: ${JSON.stringify({ ...lastEntry, isUpdate: true })}\n\n`);
+        if (typeof res.flush === 'function') res.flush();
+      } catch (e) {
+        ctClients.delete(res);
+      }
+    }
+    return;
+  }
+
   const entry = { timestamp: new Date().toISOString(), message };
   pushWithLimit(ctLogs, entry);
-  for (const res of ctClients) {
-    res.write(`data: ${JSON.stringify(entry)}\n\n`);
+  for (const res of Array.from(ctClients)) {
+    try {
+      res.write(`data: ${JSON.stringify(entry)}\n\n`);
+      if (typeof res.flush === 'function') res.flush();
+    } catch (e) {
+      ctClients.delete(res);
+    }
   }
 }
 

@@ -139,6 +139,18 @@ module.exports = function attach(router, deps) {
 
             fs.renameSync(filePath, newFilePath);
 
+            // Move the adjacent ComicInfo.xml sidecar alongside the renamed comic
+            const oldSidecar = path.join(dir, path.basename(filePath, ext) + '.ComicInfo.xml');
+            if (fs.existsSync(oldSidecar)) {
+              const newSidecar = path.join(dir, path.basename(newFilePath, ext) + '.ComicInfo.xml');
+              try {
+                fs.renameSync(oldSidecar, newSidecar);
+                renameLog(`  ↳ Renamed sidecar: ${path.basename(newSidecar)}`);
+              } catch (sErr) {
+                renameLog(`  ↳ ⚠ Failed to rename sidecar: ${sErr.message}`);
+              }
+            }
+
             // Update database record immediately to preserve metadata and progress
             const oldId = comicRecord.id;
             const newId = createId(newFilePath);

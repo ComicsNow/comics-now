@@ -1,0 +1,33 @@
+{
+    "config": {
+        "default_directory": "/path/to/comics/processing-inbox",
+        "interval_value": 1,
+        "interval_unit": "day",
+        "enabled": true,
+        "comicvine_api_key": "",
+        "google_books_api_key": "",
+        "metron_user": "",
+        "metron_pass": "",
+        "confidence_threshold": 0.9,
+        "lower_threshold": 0.8,
+        "upper_threshold": 0.9,
+        "batch_concurrency": 4,
+        "selected_fields": [
+            "Writer",
+            "Penciller",
+            "Inker",
+            "Colorist",
+            "Letterer",
+            "CoverArtist",
+            "Editor",
+            "Characters",
+            "Teams",
+            "Locations"
+        ]
+    },
+    "status": {
+        "last_run": null,
+        "next_run": null,
+        "history": []
+    }
+}

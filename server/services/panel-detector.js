@@ -88,9 +88,14 @@ async function getSession(type) {
   if (sessions[type]) return sessions[type];
   if (sessionPromises[type]) return sessionPromises[type];
 
-  const modelPath = MODEL_PATHS[type];
+  let modelPath = MODEL_PATHS[type];
   if (!modelPath || !fs.existsSync(modelPath)) {
-    throw new Error("Model file missing for type \"" + type + "\": " + modelPath);
+    if (type === 'western' && fs.existsSync(MODEL_PATHS.manga)) {
+      log('WARN', 'GUIDED', `Western model missing at ${modelPath}; falling back to manga model.`);
+      modelPath = MODEL_PATHS.manga;
+    } else {
+      throw new Error("Model file missing for type \"" + type + "\": " + modelPath);
+    }
   }
 
   sessionPromises[type] = ort.InferenceSession.create(modelPath, { intraOpNumThreads: 2, interOpNumThreads: 2 })

@@ -187,7 +187,24 @@ export async function getSeriesComics(rootFolder, publisher, series) {
   await ensureSeriesLoaded(rootFolder, publisher, series);
 
   const library = state.library || window.library;
-  const seriesData = library[rootFolder]?.publishers?.[publisher]?.series?.[series];
+  if (!library) return [];
+
+  let rootData = library[rootFolder];
+  if (!rootData && rootFolder) {
+    const normalized = rootFolder.replace(/[\\\/]+$/, '');
+    rootData = library[normalized] || library[normalized + '/'];
+  }
+  if (!rootData) {
+    for (const rKey of Object.keys(library)) {
+      if (rKey.startsWith('_')) continue;
+      if (library[rKey]?.publishers?.[publisher]?.series?.[series]) {
+        rootData = library[rKey];
+        break;
+      }
+    }
+  }
+
+  const seriesData = rootData?.publishers?.[publisher]?.series?.[series];
 
   if (Array.isArray(seriesData)) {
     return seriesData;

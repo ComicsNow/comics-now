@@ -48,11 +48,22 @@ export function setMangaFilterButtonActive(isActive) {
   btn.setAttribute('aria-pressed', String(Boolean(isActive)));
 }
 
+export function setReadingListFilterButtonActive(isActive) {
+  const btn = document.getElementById('dynamic-reading-list-filter-btn');
+  if (!btn) return;
+  btn.classList.toggle('bg-purple-600', Boolean(isActive));
+  btn.classList.toggle('hover:bg-purple-500', Boolean(isActive));
+  btn.classList.toggle('bg-gray-700', !isActive);
+  btn.classList.toggle('hover:bg-gray-600', !isActive);
+  btn.setAttribute('aria-pressed', String(Boolean(isActive)));
+}
+
 export function clearSmartFilterButtons() {
   setLatestButtonActive(false);
   setDownloadedButtonActive(false);
   setGuidedButtonActive(false);
   setMangaFilterButtonActive(false);
+  setReadingListFilterButtonActive(false);
 }
 
 export function syncSmartFilterButtons() {
@@ -64,11 +75,13 @@ export function syncSmartFilterButtons() {
     setDownloadedButtonActive(scope === 'failed');
     setGuidedButtonActive(false);
     setMangaFilterButtonActive(false);
+    setReadingListFilterButtonActive(false);
   } else {
     setLatestButtonActive(scope === 'latest');
     setDownloadedButtonActive(scope === 'downloaded');
     setGuidedButtonActive(scope === 'guided');
     setMangaFilterButtonActive(scope === 'manga' || scope === 'non-manga');
+    setReadingListFilterButtonActive(scope === 'reading-list');
   }
   const modeToggle = document.getElementById('smart-scope-mode-toggle');
   if (modeToggle) {
@@ -469,6 +482,7 @@ const LibrarySmartFilters = {
   setDownloadedButtonActive,
   setGuidedButtonActive,
   setMangaFilterButtonActive,
+  setReadingListFilterButtonActive,
   clearSmartFilterButtons,
   syncSmartFilterButtons,
   mountSmartFilterHostInto,

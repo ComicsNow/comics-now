@@ -327,6 +327,92 @@ module.exports = function attach(router, deps) {
     }
   });
 
+  router.get('/api/v1/search/external', async (req, res) => {
+    try {
+      const { source = 'all', query = '' } = req.query;
+      if (!query) {
+        return res.status(400).json({ message: 'Query is required' });
+      }
+
+      const { getConfig } = require('../../config');
+      const config = getConfig();
+      const sidecarUrl = config.taggerServiceUrl || 'http://localhost:5000';
+      const requestBody = { source, query };
+      const cvApiKey = (typeof getComicVineApiKey === 'function' ? getComicVineApiKey() : null) || config.comicVineApiKey || process.env.COMICVINE_API_KEY || '';
+      if ((source === 'all' || source === 'comicvine') && cvApiKey) {
+        requestBody.comicvine_api_key = cvApiKey;
+      }
+      if (config.googleBooksApiKey) {
+        requestBody.google_books_api_key = config.googleBooksApiKey;
+      }
+      if (config.metronUser && config.metronPass) {
+        requestBody.metron_user = config.metronUser;
+        requestBody.metron_pass = config.metronPass;
+      }
+
+      const response = await fetch(`${sidecarUrl}/api/search`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(requestBody)
+      });
+
+      if (!response.ok) {
+        const errText = await response.text();
+        throw new Error(errText || `Sidecar returned status ${response.status}`);
+      }
+
+      const results = await response.json();
+      
+      const mappedResults = results.map((item, idx) => {
+        const coverUrl = item.cover_image_url || item.cover_url || '';
+        const itemSource = item.source || source;
+        
+        const fullMetadata = {
+          Title: item.title || '',
+          Series: item.series || '',
+          Number: item.number || item.issue_number || '',
+          Summary: item.description || '',
+          Publisher: item.publisher || '',
+          Writer: item.writer || (Array.isArray(item.authors) ? item.authors.join(', ') : (item.authors || '')),
+          Penciller: item.penciller || '',
+          Inker: item.inker || '',
+          Colorist: item.colorist || '',
+          Letterer: item.letterer || '',
+          Editor: item.editor || '',
+          Genre: item.genre || (Array.isArray(item.genres) ? item.genres.join(', ') : (item.genres || '')),
+          ISBN: item.isbn || '',
+          Characters: Array.isArray(item.characters) ? item.characters.join(', ') : (item.characters || ''),
+          Teams: Array.isArray(item.teams) ? item.teams.join(', ') : (item.teams || ''),
+          Locations: Array.isArray(item.locations) ? item.locations.join(', ') : (item.locations || ''),
+          'Cover Date': item.publish_date || '',
+          Web: item.source_url || ''
+        };
+
+        return {
+          type: 'issue',
+          id: `external-${itemSource}-${idx}`,
+          source: itemSource,
+          name: item.title || 'Unknown Title',
+          volumeName: item.series || '',
+          issueNumber: item.number || item.issue_number || '',
+          publisher: item.publisher || '',
+          coverDate: item.publish_date || '',
+          image: {
+            thumb_url: coverUrl,
+            medium_url: coverUrl,
+            super_url: coverUrl,
+            original_url: coverUrl
+          },
+          fullMetadata
+        };
+      });
+
+      return res.json({ results: mappedResults, total: mappedResults.length });
+    } catch (e) {
+      return res.status(500).json({ message: formatErrorMessage(e, req, 'Failed to search external source') });
+    }
+  });
+
   router.get('/api/v1/comicvine/volume/:volumeId/issues', async (req, res) => {
     try {
       const apiKey = getComicVineApiKey();

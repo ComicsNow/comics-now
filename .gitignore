@@ -1,12 +1,14 @@
 node_modules/
 config.json
-comics-now.db
 thumbnails/
 metadata/
 .gemini_security/
 conductor/
 temp/
+scratch/
 .env
+.env.*
+!.env.example
 dist/
 build/
 *.log
@@ -18,3 +20,39 @@ CODE_REVIEW.md
 verify_migration.js
 plans/
 .antigravitycli/
+.claude/
+.deploy-backups/
+
+# Database files and backups
+*.db
+*.db-*
+*.db.bak*
+*.db.*.bak
+*.sqlite
+*.sqlite3
+*.bak
+*.bak-*
+
+# Python / Tagger caches & configs
+__pycache__/
+*.py[cod]
+.pytest_cache/
+tagger/.pytest_cache/
+tagger/scan_logs/
+tagger/uploads/
+**/scheduler_config.json
+!**/scheduler_config.example.json
+
+# Test files and test generated folders
+tests/
+test-results/
+coverage/
+
+# pnpm files
+pnpm-lock.yaml
+pnpm-workspace.yaml
+.pnpm-store/
+
+# MCP virtual environment
+mcp/.venv/
+

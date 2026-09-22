@@ -203,6 +203,7 @@ const global = new Proxy(typeof window !== 'undefined' ? window : globalThis, {
     }
 
     viewer.classList.remove('hidden');
+    viewer.style.display = '';
     const totalPages = typeof getPageCounterTotal === 'function' ? getPageCounterTotal() : 0;
     updateFullscreenPageStatus(global.currentPageIndex + 1, totalPages);
 
@@ -239,6 +240,20 @@ const global = new Proxy(typeof window !== 'undefined' ? window : globalThis, {
         });
       }
     }
+
+    const refreshToggle = global.refreshGuidedToggle || state.refreshGuidedToggle || window.refreshGuidedToggle;
+    if (typeof refreshToggle === 'function') {
+      try {
+        const p = refreshToggle();
+        if (p && typeof p.catch === 'function') {
+          p.catch((err) => {
+            console.error('[openFullscreen] Error calling refreshGuidedToggle:', err);
+          });
+        }
+      } catch (err) {
+        console.error('[openFullscreen] Error calling refreshGuidedToggle:', err);
+      }
+    }
   }
 
   async function closeFullscreen() {
@@ -254,7 +269,7 @@ const global = new Proxy(typeof window !== 'undefined' ? window : globalThis, {
     // 2. CLEANUP IN BACKGROUND
     try {
       if (global.GuidedView && typeof global.GuidedView.disableAll === 'function') {
-        global.GuidedView.disableAll();
+        global.GuidedView.disableAll({ persist: false });
       }
     } catch (e) {
       console.error('[closeFullscreen] GuidedView cleanup failed:', e);

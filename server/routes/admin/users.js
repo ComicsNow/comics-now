@@ -85,9 +85,21 @@ module.exports = function attach(router, deps) {
       let normalizedAccess = [];
 
       if (metadataAccess.length > 0) {
-        // Build hierarchy map from comics database
-        const comics = await dbAll('SELECT MIN(path) as path, publisher, series FROM comics GROUP BY publisher, series');
         const rootFolders = getComicsDirectories();
+
+        // Build hierarchy map from comics database.
+        // IMPORTANT: only include comics that live under a configured library
+        // root. This must mirror the /api/v1/library-tree endpoint, which skips
+        // comics whose root folder is 'Unknown' (i.e. on disk but outside any
+        // configured library). If we counted those extra series here, the
+        // "are all children selected?" check below would compare the admin's
+        // selection (built from the tree) against an inflated total and wrongly
+        // strip child_access — the bug that made publishers such as
+        // "DC Comics" and "IDW Publishing" impossible to grant.
+        const allComics = await dbAll('SELECT path, publisher, series FROM comics');
+        const comics = allComics.filter(c =>
+          c.path && rootFolders.some(folder => c.path.startsWith(folder))
+        );
 
         // Map: root_folder -> Set of publishers
         // Map: publisher -> Set of series
@@ -135,46 +147,25 @@ module.exports = function attach(router, deps) {
           let shouldNormalize = false;
           let allChildren = [];
 
-          // If parent has child_access, check how many children are present
-          if (item.child_access) {
-            if (item.accessType === 'root_folder') {
-              // Get all publishers under this root folder
-              allChildren = Array.from(rootToPublishers.get(item.accessValue) || []);
-              const presentChildren = allChildren.filter(pub =>
-                accessSet.has(`publisher:${pub}`)
-              );
-
-              // Only normalize if SOME (but not all) children are present
-              if (presentChildren.length === allChildren.length && allChildren.length > 0) {
-                shouldNormalize = false;
-              } else if (presentChildren.length > 0) {
-                shouldNormalize = true;
-              } else {
-                shouldNormalize = false;
-              }
-
-            } else if (item.accessType === 'publisher') {
-              // Get all series under this publisher
-              allChildren = Array.from(publisherToSeries.get(item.accessValue) || []);
-              const presentChildren = allChildren.filter(series =>
-                accessSet.has(`series:${series}`)
-              );
-              if (presentChildren.length === allChildren.length && allChildren.length > 0) {
-                shouldNormalize = false;
-              } else if (presentChildren.length > 0) {
-                shouldNormalize = true;
-              } else {
-                shouldNormalize = false;
-              }
-
-            } else if (item.accessType === 'series') {
-              if (item.child_access) {
-                shouldNormalize = true;
-                allChildren = ['dummy']; // Set to non-empty to trigger normalization
-              } else {
-                shouldNormalize = false;
-              }
-            }
+          // A root_folder or publisher that arrives with child_access=true means
+          // the admin explicitly granted "all descendants" via the tree's Child
+          // checkbox (which cascades to select every child). Honor that flag
+          // directly and keep child_access.
+          //
+          // We deliberately do NOT re-derive child_access by counting how many
+          // child rows were submitted vs. how many exist in the database. The
+          // selectable tree only contains comics under a configured library, so
+          // any comic that exists on disk outside a configured library makes the
+          // counts disagree and silently strips child_access — the bug that made
+          // publishers such as "DC Comics" and "IDW Publishing" impossible to
+          // grant (they get direct_access only, which grants no comic visibility
+          // because access resolution requires child_access or a full direct
+          // chain down to the series level).
+          if (item.child_access && item.accessType === 'series') {
+            // Series is the lowest level: collapse its child_access into
+            // direct_access (there is nothing meaningful below a series).
+            shouldNormalize = true;
+            allChildren = ['dummy']; // non-empty to trigger normalization below
           }
 
           if (shouldNormalize && allChildren.length > 0) {

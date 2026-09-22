@@ -589,14 +589,19 @@ export async function saveUserAccess() {
       }
 
       const item = accessMap.get(key);
+      // Accumulate (OR) rather than overwrite: a multi-root publisher (e.g. "DC
+      // Comics") renders as several tree nodes that share one accessType:accessValue
+      // key. Metadata grants are global by value, so a grant on ANY instance must
+      // stick — plain assignment let an unchecked duplicate node processed later
+      // zero out the grant, so multi-root publishers could never be saved.
       if (accessMode === 'direct') {
-        item.direct_access = checkbox.checked;
+        item.direct_access = item.direct_access || checkbox.checked;
       } else if (accessMode === 'child') {
-        item.child_access = checkbox.checked;
+        item.child_access = item.child_access || checkbox.checked;
       } else if (accessMode === 'both') {
         // For leaf nodes (comics)
-        item.direct_access = checkbox.checked;
-        item.child_access = checkbox.checked;
+        item.direct_access = item.direct_access || checkbox.checked;
+        item.child_access = item.child_access || checkbox.checked;
       }
     });
 

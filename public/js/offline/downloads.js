@@ -592,18 +592,18 @@ export class BackgroundDownloadManager {
       downloadQueueDiv.className = 'fixed bottom-16 right-4 sm:bottom-8 sm:right-8 z-40';
 
       const iconButton = document.createElement('button');
-      iconButton.className = 'bg-gray-900 hover:bg-gray-800 text-white px-3 py-2 rounded-full shadow-lg flex items-center space-x-2 transition-colors ring-1 ring-white/10';
+      iconButton.className = 'brutalist-btn btn-cyan px-3 py-1.5 flex items-center space-x-2 transition-all';
       iconButton.onclick = () => this.toggleCollapsed();
       iconButton.title = 'Show download queue';
 
       const icon = document.createElement('span');
-      icon.innerHTML = ICONS.DOWNLOAD;
-      icon.className = 'text-lg w-5 h-5';
+      icon.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"/></svg>';
+      icon.className = 'inline-flex items-center justify-center';
       iconButton.appendChild(icon);
 
       const count = document.createElement('span');
-      count.textContent = `(${activeCount}/${totalCount})`;
-      count.className = 'text-sm font-medium';
+      count.textContent = `Downloads (${activeCount}/${totalCount})`;
+      count.className = 'text-xs font-mono font-bold uppercase tracking-wider';
       iconButton.appendChild(count);
 
       downloadQueueDiv.appendChild(iconButton);
@@ -611,191 +611,167 @@ export class BackgroundDownloadManager {
     }
 
     // Expanded state — restore full container styling
-    downloadQueueDiv.className = 'fixed bottom-16 right-4 sm:bottom-8 sm:right-8 z-40 w-[22rem] max-w-[calc(100vw-2rem)] rounded-2xl overflow-hidden ring-1 ring-white/10 shadow-2xl';
+    downloadQueueDiv.className = 'fixed bottom-0 right-4 sm:right-8 z-40 w-[22rem] max-w-[calc(100vw-2rem)] dl-queue-container';
 
     // Create header bar
     const header = document.createElement('div');
-    header.className = 'relative bg-gray-900/95 backdrop-blur-sm text-white px-4 py-3 flex items-center justify-between cursor-pointer border-b border-white/5';
-    header.onclick = () => this.toggleCollapsed();
+    header.className = 'modal-header';
 
-    // Thin gradient accent line at the top
-    const accent = document.createElement('div');
-    accent.className = 'absolute top-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-purple-500/60 to-transparent';
-    header.appendChild(accent);
+    // Header content: icon
+    const dlIcon = document.createElement('div');
+    dlIcon.className = 'dl-icon';
+    dlIcon.innerHTML = '<svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>';
+    header.appendChild(dlIcon);
 
-    // Header content (icon + title)
-    const headerContent = document.createElement('div');
-    headerContent.className = 'flex items-center gap-2.5';
-
-    // Download icon (SVG, matches toolbar style)
-    const iconWrap = document.createElement('span');
-    iconWrap.className = 'inline-flex items-center justify-center w-7 h-7 rounded-full bg-purple-500/15 text-purple-300';
-    iconWrap.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"/></svg>';
-    headerContent.appendChild(iconWrap);
-
-    // Title with monospaced counter
-    const titleGroup = document.createElement('div');
-    titleGroup.className = 'flex items-baseline gap-2';
+    // Title text
     const titleLabel = document.createElement('span');
-    titleLabel.className = 'text-sm font-semibold tracking-wide';
+    titleLabel.className = 'modal-title';
     titleLabel.textContent = 'Downloads';
+    header.appendChild(titleLabel);
+
+    // Counter badge
     const counter = document.createElement('span');
-    counter.className = 'text-xs font-mono text-gray-400';
-    counter.textContent = `${activeCount}/${totalCount}`;
-    titleGroup.appendChild(titleLabel);
-    titleGroup.appendChild(counter);
-    headerContent.appendChild(titleGroup);
+    counter.className = 'modal-count';
+    counter.textContent = `${activeCount} / ${totalCount}`;
+    header.appendChild(counter);
 
-    header.appendChild(headerContent);
-
-    // Right-side action group (Stop All + Collapse)
+    // Actions group
     const actionGroup = document.createElement('div');
-    actionGroup.className = 'flex items-center gap-1';
+    actionGroup.className = 'header-actions';
 
+    // Stop all button
     const stopAllBtn = document.createElement('button');
-    stopAllBtn.className = 'text-red-400 hover:text-red-300 p-1 rounded-md hover:bg-red-500/10 transition-colors';
-    stopAllBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M5.25 7.5A2.25 2.25 0 017.5 5.25h9a2.25 2.25 0 012.25 2.25v9a2.25 2.25 0 01-2.25 2.25h-9a2.25 2.25 0 01-2.25-2.25v-9z"/></svg>';
+    stopAllBtn.type = 'button';
+    stopAllBtn.className = 'ha';
     stopAllBtn.title = 'Stop all downloads';
+    stopAllBtn.innerHTML = '<svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2" stroke="currentColor" stroke-width="2" fill="none"/></svg>';
     stopAllBtn.onclick = (e) => {
       e.stopPropagation();
       this.stopAllDownloads();
     };
     actionGroup.appendChild(stopAllBtn);
 
+    // Collapse button
     const collapseBtn = document.createElement('button');
-    collapseBtn.className = 'text-gray-400 hover:text-white p-1 rounded-md hover:bg-white/5 transition-colors';
-    collapseBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 15.75l7.5-7.5 7.5 7.5"/></svg>';
+    collapseBtn.type = 'button';
+    collapseBtn.className = 'ha';
     collapseBtn.title = 'Collapse';
+    collapseBtn.innerHTML = '<svg viewBox="0 0 24 24"><polyline points="18 15 12 9 6 15" stroke="currentColor" stroke-width="2" fill="none"/></svg>';
+    collapseBtn.onclick = (e) => {
+      e.stopPropagation();
+      this.toggleCollapsed();
+    };
     actionGroup.appendChild(collapseBtn);
 
     header.appendChild(actionGroup);
-
     downloadQueueDiv.appendChild(header);
 
     // Queue content container
     const queueContent = document.createElement('div');
-    queueContent.className = 'bg-gray-900/95 backdrop-blur-sm download-queue-scroll';
+    queueContent.className = 'download-queue-scroll';
 
-    // Background sync indicator (compact pill row)
+    // Dynamic Sync Notice
     const syncIndicator = document.createElement('div');
-    syncIndicator.className = 'px-4 py-2 text-[11px] flex items-center gap-2 border-b border-white/5';
-
-    const syncDot = document.createElement('span');
-    syncDot.className = 'inline-block w-1.5 h-1.5 rounded-full';
-    const syncText = document.createElement('span');
+    const syncText = document.createElement('p');
+    syncIndicator.innerHTML = '<svg viewBox="0 0 24 24"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>';
 
     if (this.useServiceWorker) {
-      syncDot.classList.add('bg-emerald-400');
-      syncText.className = 'text-emerald-300/90';
+      syncIndicator.className = 'sync-notice sync-active';
       syncText.textContent = 'Background sync on — downloads continue if you close this tab';
     } else {
-      syncDot.classList.add('bg-amber-400');
-      syncText.className = 'text-amber-300/90';
+      syncIndicator.className = 'sync-notice sync-warning';
       syncText.textContent = 'Keep this tab open — background sync unavailable';
     }
 
-    syncIndicator.appendChild(syncDot);
     syncIndicator.appendChild(syncText);
     queueContent.appendChild(syncIndicator);
 
-    const STATUS_STYLES = {
-      downloading: { dot: 'bg-blue-400 animate-pulse',     bar: 'from-blue-500 to-purple-500',     label: 'Downloading' },
-      pending:     { dot: 'bg-gray-400',                    bar: 'from-gray-500 to-gray-400',       label: 'Waiting' },
-      paused:      { dot: 'bg-amber-400',                   bar: 'from-amber-500 to-amber-400',     label: 'Paused' },
-      completed:   { dot: 'bg-emerald-400',                 bar: 'from-emerald-500 to-emerald-400', label: 'Completed' },
-      error:       { dot: 'bg-rose-400',                    bar: 'from-rose-500 to-rose-400',       label: 'Failed' }
-    };
-
     // Items list
     const list = document.createElement('div');
-    list.className = 'p-2 space-y-1.5';
+    list.className = 'item-list';
 
     this.persistentQueue.forEach(item => {
-      const styles = STATUS_STYLES[item.status] || STATUS_STYLES.pending;
       const pct = Math.round((item.progress || 0) * 100);
 
       const wrapper = document.createElement('div');
-      wrapper.className = 'group relative bg-white/[0.03] hover:bg-white/[0.06] ring-1 ring-white/5 rounded-xl px-3 py-2.5 transition-colors';
+      wrapper.className = 'item';
       wrapper.dataset.comicId = item.id;
 
       // Top row: status dot + title + actions
       const topRow = document.createElement('div');
-      topRow.className = 'flex items-start gap-2';
+      topRow.className = 'item-top';
 
       const dot = document.createElement('span');
-      dot.className = `mt-1 inline-block w-2 h-2 rounded-full flex-shrink-0 ${styles.dot}`;
+      let statusDotClass = 'dot-pending';
+      let statusLabel = 'Waiting';
+
+      if (item.status === 'downloading') {
+        statusDotClass = 'dot-active';
+        statusLabel = 'Downloading…';
+      } else if (item.status === 'paused') {
+        statusDotClass = 'dot-paused';
+        statusLabel = 'Paused';
+      } else if (item.status === 'error') {
+        statusDotClass = 'dot-error';
+        statusLabel = item.error || 'Download failed';
+      } else if (item.status === 'completed') {
+        statusDotClass = 'dot-completed';
+        statusLabel = 'Completed';
+      }
+
+      dot.className = `status-dot ${statusDotClass}`;
       topRow.appendChild(dot);
 
-      const title = document.createElement('div');
-      title.className = 'flex-1 min-w-0 text-[13px] leading-snug text-gray-100 truncate';
+      const title = document.createElement('span');
+      title.className = 'item-name';
       title.title = item.displayName || item.comicName;
       title.textContent = item.displayName || item.comicName;
       topRow.appendChild(title);
 
-      // Action buttons based on status
-      const btnContainer = document.createElement('div');
-      btnContainer.className = 'flex items-center gap-1 -mr-1 opacity-70 group-hover:opacity-100 transition-opacity';
-
-      if (item.status === 'downloading') {
-        if (!this.useServiceWorker || this.currentDownload?.id === item.id) {
-          btnContainer.appendChild(this.createButton('⏸', 'Pause', 'text-blue-400',
-            () => this.pauseDownload(item.id)));
-        }
-        btnContainer.appendChild(this.createButton('×', 'Cancel', 'text-rose-400',
-          () => this.cancelDownload(item.id)));
-      } else if (item.status === 'paused') {
-        btnContainer.appendChild(this.createButton('▶', 'Resume', 'text-emerald-400',
-          () => this.resumeDownload(item.id)));
-        btnContainer.appendChild(this.createButton('×', 'Cancel', 'text-rose-400',
-          () => this.cancelDownload(item.id)));
-      } else if (item.status === 'error') {
-        btnContainer.appendChild(this.createButton('↻', 'Restart', 'text-emerald-400',
-          () => this.restartDownload(item.id)));
-        btnContainer.appendChild(this.createButton('×', 'Remove', 'text-rose-400',
-          () => this.cancelDownload(item.id)));
-      } else if (item.status === 'pending') {
-        btnContainer.appendChild(this.createButton('×', 'Cancel', 'text-rose-400',
-          () => this.cancelDownload(item.id)));
-      } else if (item.status === 'completed') {
-        btnContainer.appendChild(this.createButton('×', 'Remove', 'text-gray-400',
-          () => this.cancelDownload(item.id)));
-      }
-
-      topRow.appendChild(btnContainer);
+      // Cancel button
+      const cancelBtn = document.createElement('div');
+      cancelBtn.className = 'cancel';
+      cancelBtn.title = (item.status === 'completed' || item.status === 'error') ? 'Remove' : 'Cancel';
+      cancelBtn.innerHTML = '<svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>';
+      cancelBtn.onclick = (e) => {
+        e.stopPropagation();
+        this.cancelDownload(item.id);
+      };
+      topRow.appendChild(cancelBtn);
       wrapper.appendChild(topRow);
 
       // Progress bar
-      const bar = document.createElement('div');
-      bar.className = 'w-full bg-white/5 rounded-full h-1 mt-2 overflow-hidden';
-      const inner = document.createElement('div');
-      inner.className = `h-full rounded-full bg-gradient-to-r ${styles.bar} transition-all duration-300`;
-      inner.style.width = `${pct}%`;
-      bar.appendChild(inner);
-      wrapper.appendChild(bar);
+      const track = document.createElement('div');
+      track.className = 'progress-track';
+      const fill = document.createElement('div');
+      fill.className = 'progress-fill';
+      fill.style.width = `${pct}%`;
+      track.appendChild(fill);
+      wrapper.appendChild(track);
 
-      // Status row: label · percent / error
+      // Status row: label + percent
       const statusRow = document.createElement('div');
-      statusRow.className = 'flex items-center justify-between mt-1.5 text-[11px]';
-      const statusLeft = document.createElement('span');
-      statusLeft.className = 'text-gray-400';
-      if (item.status === 'error') {
-        statusLeft.classList.remove('text-gray-400');
-        statusLeft.classList.add('text-rose-300');
-        statusLeft.textContent = item.error || 'Download failed';
-      } else {
-        statusLeft.textContent = styles.label;
-      }
-      const statusRight = document.createElement('span');
-      statusRight.className = 'font-mono text-gray-500';
+      statusRow.className = 'item-status';
+
+      const labelSpan = document.createElement('span');
+      labelSpan.className = `status-label${item.status === 'error' ? ' status-error' : ''}`;
+      labelSpan.textContent = statusLabel;
+      statusRow.appendChild(labelSpan);
+
+      const pctSpan = document.createElement('span');
+      let pctClass = 'status-pct';
+      if (item.status === 'completed') pctClass += ' pct-completed';
+      else if (item.status === 'error') pctClass += ' pct-error';
+      pctSpan.className = pctClass;
+      
       if (item.status === 'completed') {
-        statusRight.textContent = '100%';
+        pctSpan.textContent = '100%';
       } else if (item.status === 'error') {
-        statusRight.textContent = '';
+        pctSpan.textContent = 'Failed';
       } else {
-        statusRight.textContent = `${pct}%`;
+        pctSpan.textContent = `${pct}%`;
       }
-      statusRow.appendChild(statusLeft);
-      statusRow.appendChild(statusRight);
+      statusRow.appendChild(pctSpan);
       wrapper.appendChild(statusRow);
 
       list.appendChild(wrapper);
@@ -823,34 +799,27 @@ export class BackgroundDownloadManager {
 
     // If queue is empty, show empty state message
     if (this.persistentQueue.length === 0) {
-      downloadQueueDiv.className = 'fixed bottom-16 right-4 sm:bottom-8 sm:right-8 z-40 w-[22rem] max-w-[calc(100vw-2rem)] rounded-2xl overflow-hidden ring-1 ring-white/10 shadow-2xl';
+      downloadQueueDiv.className = 'fixed bottom-0 right-4 sm:right-8 z-40 w-[22rem] max-w-[calc(100vw-2rem)] dl-queue-container';
       downloadQueueDiv.innerHTML = `
-        <div class="relative bg-gray-900/95 backdrop-blur-sm">
-          <div class="absolute top-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-purple-500/60 to-transparent"></div>
-          <div class="px-4 py-3 flex items-center justify-between border-b border-white/5">
-            <div class="flex items-center gap-2.5">
-              <span class="inline-flex items-center justify-center w-7 h-7 rounded-full bg-purple-500/15 text-purple-300">
-                <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"/>
-                </svg>
-              </span>
-              <span class="text-sm font-semibold text-white tracking-wide">Downloads</span>
-            </div>
-            <button type="button" data-close="downloads" class="text-gray-400 hover:text-white transition-colors p-1 rounded-md hover:bg-white/5" aria-label="Close downloads">
-              <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
-              </svg>
+        <div class="handle"></div>
+        <div class="modal-header">
+          <div class="dl-icon">
+            <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          </div>
+          <span class="modal-title">Downloads</span>
+          <span class="modal-count">0 / 0</span>
+          <div class="header-actions">
+            <button type="button" data-close="downloads" class="ha" aria-label="Close downloads">
+              <svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
             </button>
           </div>
-          <div class="px-6 py-10 bg-gray-900/95 flex flex-col items-center text-center">
-            <span class="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-gradient-to-br from-gray-800 to-gray-900 ring-1 ring-white/5 mb-4">
-              <svg xmlns="http://www.w3.org/2000/svg" class="w-7 h-7 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 15a4.5 4.5 0 004.5 4.5H18a3.75 3.75 0 001.332-7.257 3 3 0 00-3.758-3.848 5.25 5.25 0 00-10.233 2.33A4.502 4.502 0 002.25 15z"/>
-              </svg>
-            </span>
-            <p class="text-sm font-medium text-gray-200">No active downloads</p>
-            <p class="mt-1 text-xs text-gray-500">Comics you queue will appear here.</p>
-          </div>
+        </div>
+        <div class="empty-state-dl">
+          <span class="empty-icon">
+            <svg viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 15a4.5 4.5 0 004.5 4.5H18a3.75 3.75 0 001.332-7.257 3 3 0 00-3.758-3.848 5.25 5.25 0 00-10.233 2.33A4.502 4.502 0 002.25 15z"/></svg>
+          </span>
+          <p class="empty-title">No active downloads</p>
+          <p class="empty-subtitle">Comics you queue will appear here.</p>
         </div>
       `;
       const closeBtn = downloadQueueDiv.querySelector('[data-close="downloads"]');

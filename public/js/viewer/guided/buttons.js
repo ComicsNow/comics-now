@@ -16,7 +16,7 @@ export function bindToggleButton() {
       const comic = state.currentComic || window.currentComic;
       if (!comic || comic.guidedViewStatus !== 'completed' || !state.GuidedView.isFullscreenOpen()) return;
       const willActivate = registry.getActiveModeName() !== 'guided';
-      if (willActivate) await state.GuidedView.enable(); else state.GuidedView.disable('guided');
+      if (willActivate) await state.GuidedView.enable(); else state.GuidedView.disable();
     });
   }
 

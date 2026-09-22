@@ -12,10 +12,26 @@ db.pragma('synchronous = NORMAL');
 db.pragma('busy_timeout = 5000');
 db.pragma('foreign_keys = ON');
 
+const statementCache = new Map();
+const MAX_CACHED_STATEMENTS = 250;
+
+function getPreparedStatement(sql) {
+  let stmt = statementCache.get(sql);
+  if (!stmt) {
+    stmt = db.prepare(sql);
+    if (statementCache.size >= MAX_CACHED_STATEMENTS) {
+      const firstKey = statementCache.keys().next().value;
+      statementCache.delete(firstKey);
+    }
+    statementCache.set(sql, stmt);
+  }
+  return stmt;
+}
+
 // Custom async wrapper for db.get
 async function dbGet(sql, params = []) {
   try {
-    const stmt = db.prepare(sql);
+    const stmt = getPreparedStatement(sql);
     if (Array.isArray(params)) {
       return stmt.get(...params);
     }
@@ -29,7 +45,7 @@ async function dbGet(sql, params = []) {
 // Custom async wrapper for db.all
 async function dbAll(sql, params = []) {
   try {
-    const stmt = db.prepare(sql);
+    const stmt = getPreparedStatement(sql);
     if (Array.isArray(params)) {
       return stmt.all(...params);
     }
@@ -43,7 +59,7 @@ async function dbAll(sql, params = []) {
 // Custom async wrapper for db.run
 async function dbRun(sql, params = []) {
   try {
-    const stmt = db.prepare(sql);
+    const stmt = getPreparedStatement(sql);
     let info;
     if (Array.isArray(params)) {
       info = stmt.run(...params);
@@ -229,6 +245,17 @@ async function initializeDatabase() {
       FOREIGN KEY (listId) REFERENCES reading_lists(id) ON DELETE CASCADE
     )`);
 
+    // Admin impersonation audit trail ("login as user")
+    await dbRun(`CREATE TABLE IF NOT EXISTS impersonation_audit (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      adminUserId TEXT,
+      adminEmail TEXT,
+      targetUserId TEXT,
+      targetEmail TEXT,
+      action TEXT,
+      ts INTEGER DEFAULT (strftime('%s', 'now') * 1000)
+    )`);
+
     // Run incremental migrations
     await runMigrations();
 
@@ -399,6 +426,7 @@ function resolveReadingModes(comicId, series, publisher, comicPath, prefMaps, co
 }
 
 async function closeDb() {
+  statementCache.clear();
   if (db && typeof db.close === 'function') {
     db.close();
   }

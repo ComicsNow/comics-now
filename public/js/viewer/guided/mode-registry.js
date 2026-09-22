@@ -31,7 +31,7 @@ export const ModeRegistry = {
     return transitioning;
   },
 
-  async enable(name) {
+  async enable(name, { persist = true } = {}) {
     if (transitioning) return false;
     const mode = modes.get(name);
     if (!mode) return false;
@@ -40,8 +40,8 @@ export const ModeRegistry = {
     transitioning = true;
     try {
       if (activeModeName) {
-        // Synchronously clear the old state variables and internal flags
-        this.disable(activeModeName);
+        // Synchronously clear the old state variables and internal flags without clearing preference
+        this.disable(activeModeName, { persist: false });
       }
 
       // Pre-set the active mode name so that any refreshRender() calls 
@@ -50,8 +50,10 @@ export const ModeRegistry = {
 
       // Persist the intent immediately so that concurrent lifecycle checks 
       // (e.g. from resize or orientation changes) don't try to revert us.
-      const currentComic = state.currentComic || window.currentComic;
-      this.persistOnlyMode(currentComic, name);
+      if (persist) {
+        const currentComic = state.currentComic || window.currentComic;
+        this.persistOnlyMode(currentComic, name);
+      }
 
       const success = await mode.enable();
       if (!success) {
@@ -64,7 +66,7 @@ export const ModeRegistry = {
     }
   },
 
-  disable(name) {
+  disable(name, { persist = true } = {}) {
     const mode = modes.get(name);
     if (mode) {
       // IMPORTANT: Clear the state BEFORE calling the cleanup.
@@ -72,28 +74,35 @@ export const ModeRegistry = {
       // correctly sees that there is NO active mode.
       if (activeModeName === name) {
         activeModeName = null;
-        const currentComic = state.currentComic || window.currentComic;
-        this.persistOnlyMode(currentComic, null);
+        if (persist) {
+          const currentComic = state.currentComic || window.currentComic;
+          this.persistOnlyMode(currentComic, null);
+        }
       }
       mode.disable();
     }
     manualOverrideBox = null;
   },
 
-  disableAll() {
+  disableAll({ persist = false } = {}) {
     if (activeModeName) {
-      this.disable(activeModeName);
+      const mode = modes.get(activeModeName);
+      if (mode) mode.disable();
+      activeModeName = null;
     }
-    const currentComic = state.currentComic || window.currentComic;
-    this.persistOnlyMode(currentComic, null);
+    if (persist) {
+      const currentComic = state.currentComic || window.currentComic;
+      this.persistOnlyMode(currentComic, null);
+    }
+    manualOverrideBox = null;
   },
 
   toggle(name) {
     if (activeModeName === name) {
-      this.disable(name);
+      this.disable(name, { persist: true });
       return false;
     }
-    return this.enable(name);
+    return this.enable(name, { persist: true });
   },
 
   setManualOverrideBox(box) {
@@ -115,33 +124,27 @@ export const ModeRegistry = {
       'manga-speech-zoom': 'mangaBubbleHotMode'
     };
 
+    const keptPrefKey = (kept && modeMapping[kept]) ? modeMapping[kept] : null;
+
     // Set the kept mode to true
     if (kept && modeMapping[kept]) {
       const prefKey = modeMapping[kept];
-      if (!comic[prefKey]) {
-        comic[prefKey] = true;
-        const updateComic = state.updateComicInLibrary || window.updateComicInLibrary;
-        updateComic?.(comic.id, { [prefKey]: true });
-        this.saveModePreference(comic.id, kept, true);
-      }
-      // Persist to local storage per-comic
-      try {
-        localStorage.setItem(`guided_pref_${comic.id}`, kept);
-      } catch (e) { /* ignore */ }
-    } else if (kept === null) {
-      // Clear preference if disabling all
-      try {
-        localStorage.removeItem(`guided_pref_${comic.id}`);
-      } catch (e) { /* ignore */ }
+      comic[prefKey] = true;
+      const updateComic = state.updateComicInLibrary || window.updateComicInLibrary;
+      updateComic?.(comic.id, { [prefKey]: true });
+      this.saveModePreference(comic.id, kept, true);
+    } else if (kept === null || kept === 'none') {
+      // User explicitly turned off guided mode
+      this.saveModePreference(comic.id, null, false);
     }
 
     // Clear all other modes
-    Object.entries(modeMapping).forEach(([key, prefKey]) => {
-      if (kept !== key && comic[prefKey]) {
+    const allPrefKeys = new Set(Object.values(modeMapping));
+    allPrefKeys.forEach(prefKey => {
+      if (prefKey !== keptPrefKey && comic[prefKey]) {
         comic[prefKey] = false;
         const updateComic = state.updateComicInLibrary || window.updateComicInLibrary;
         updateComic?.(comic.id, { [prefKey]: false });
-        this.saveModePreference(comic.id, key, false);
       }
     });
   },
@@ -149,13 +152,13 @@ export const ModeRegistry = {
   async saveModePreference(comicId, modeName, value) {
     // Local storage is the primary source of truth for "remembering"
     try {
-      if (value) {
+      if (value && modeName) {
         localStorage.setItem(`guided_pref_${comicId}`, modeName);
+        localStorage.setItem('guided_pref_last_mode', modeName);
+        localStorage.setItem('guided_pref_global_active', 'true');
       } else {
-        const current = localStorage.getItem(`guided_pref_${comicId}`);
-        if (current === modeName) {
-          localStorage.removeItem(`guided_pref_${comicId}`);
-        }
+        localStorage.setItem(`guided_pref_${comicId}`, 'none');
+        localStorage.setItem('guided_pref_global_active', 'false');
       }
     } catch (e) { /* ignore */ }
   }

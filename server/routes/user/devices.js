@@ -44,6 +44,12 @@ module.exports = function attach(router, deps) {
           return res.status(400).json({ ok: false, message: deviceIdValidation.error });
         }
         deviceId = deviceIdValidation.sanitized;
+
+        // Security check: verify this device doesn't belong to another user
+        const existingOwner = await dbGet('SELECT userId FROM devices WHERE deviceId = ?', [deviceId]);
+        if (existingOwner && existingOwner.userId !== userId && req.user?.role !== 'admin') {
+          return res.status(409).json({ ok: false, message: 'Device ID is registered to another user' });
+        }
       }
 
       // Validate and sanitize device name

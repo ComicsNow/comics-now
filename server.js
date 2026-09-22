@@ -61,6 +61,8 @@ const {
   setScanIntervalMinutes,
   getComicVineApiKey,
   setComicVineApiKey,
+  getGoogleBooksApiKey,
+  setGoogleBooksApiKey,
   getCtScheduleMinutes,
   setCtScheduleMinutes,
   getComicsLocation,
@@ -71,7 +73,23 @@ const {
   setMetadataStorage,
   getCorsConfig,
   isAuthEnabled,
-  getAuthConfig
+  getAuthConfig,
+  getTaggerMode,
+  setTaggerMode,
+  getTaggerServiceUrl,
+  setTaggerServiceUrl,
+  getTaggerLowerThreshold,
+  setTaggerLowerThreshold,
+  getTaggerUpperThreshold,
+  setTaggerUpperThreshold,
+  getTaggerEnabledSources,
+  setTaggerEnabledSources,
+  getMetronUser,
+  setMetronUser,
+  getMetronPassword,
+  setMetronPassword,
+  getTaggerForceReprocess,
+  setTaggerForceReprocess
 } = require('./server/config');
 
 const {
@@ -108,9 +126,23 @@ const {
   generateVirtualMetadata,
   isScanning
 } = require('./server/services/library');
-const { scheduleCtRun, runComicTagger, applyUserSelection, skipCurrentMatch, getPendingMatch } = require('./server/services/comictagger');
+const {
+  scheduleCtRun,
+  runComicTagger,
+  cancelComicTagger,
+  isTaggerRunning,
+  applyUserSelection,
+  skipCurrentMatch,
+  getPendingMatch,
+  searchExternal,
+  getScanLogsList,
+  getScanLogDetail,
+  clearEnhancedTracking
+} = require('./server/services/tagger');
+const { startTaggerWorker, stopTaggerWorker } = require('./server/services/tagger-process');
 const guidedReader = require('./server/services/guided-reader');
 const { saveMetadataToComic, getComicInfoFromArchive } = require('./server/services/metadata');
+
 const {
   cvFetchJson,
   normalizeCvId,
@@ -127,6 +159,10 @@ const {
   requireAuth,
   initJwksClient
 } = require('./server/middleware/auth');
+const {
+  createImpersonationMiddleware,
+  impersonationReadOnlyGuard
+} = require('./server/middleware/impersonation');
 
 const dbReady = initializeDatabase();
 loadConfigFromDisk();
@@ -140,7 +176,10 @@ const bootConfig = getConfig();
 if (bootConfig.trustProxy !== undefined) {
   app.set('trust proxy', bootConfig.trustProxy);
 }
-app.use(express.json());
+// 10mb limit so bulk operations (e.g. granting a user access to all comics,
+// which sends one access entry per node) don't hit the default 100kb cap and
+// get rejected with an HTML 413 page that breaks client-side response.json().
+app.use(express.json({ limit: '10mb' }));
 
 app.use(helmet({
   contentSecurityPolicy: {
@@ -149,7 +188,7 @@ app.use(helmet({
       "script-src": ["'self'", "'unsafe-inline'"],
       "script-src-attr": ["'unsafe-inline'"],
       "style-src": ["'self'", "'unsafe-inline'"],
-      "img-src": ["'self'", "data:", "https://placehold.co", "blob:"],
+      "img-src": ["'self'", "data:", "https://placehold.co", "blob:", "https:"],
       "upgrade-insecure-requests": null,
     },
   },
@@ -205,6 +244,8 @@ const apiRouter = createApiRouter({
   setScanIntervalMinutes,
   getComicVineApiKey,
   setComicVineApiKey,
+  getGoogleBooksApiKey,
+  setGoogleBooksApiKey,
   getLibraries,
   getPathFromLibraryId,
   getLibraryIdFromPath,
@@ -218,6 +259,22 @@ const apiRouter = createApiRouter({
   setAllowedFormats,
   getMetadataStorage,
   setMetadataStorage,
+  getTaggerMode,
+  setTaggerMode,
+  getTaggerServiceUrl,
+  setTaggerServiceUrl,
+  getTaggerLowerThreshold,
+  setTaggerLowerThreshold,
+  getTaggerUpperThreshold,
+  setTaggerUpperThreshold,
+  getTaggerEnabledSources,
+  setTaggerEnabledSources,
+  getMetronUser,
+  setMetronUser,
+  getMetronPassword,
+  setMetronPassword,
+  getTaggerForceReprocess,
+  setTaggerForceReprocess,
   getComicsDirectories,
   getConfig,
   saveSetting,
@@ -232,10 +289,16 @@ const apiRouter = createApiRouter({
   dbRun,
   dbAll,
   runComicTagger,
+  cancelComicTagger,
+  isTaggerRunning,
   scheduleCtRun,
   applyUserSelection,
   skipCurrentMatch,
   getPendingMatch,
+  searchExternal,
+  getScanLogsList,
+  getScanLogDetail,
+  clearEnhancedTracking,
   saveMetadataToComic,
   getComicInfoFromArchive,
   cvFetchJson,
@@ -280,7 +343,7 @@ const pagesLimiter = rateLimit({
 
 const generalLimiter = rateLimit({
   windowMs: 1 * 60 * 1000, // 1 minute
-  max: 1500, // Very generous limit for overall API usage, static files, and admin actions
+  max: 10000, // Very generous limit for overall API usage, static files, and admin actions to handle large libraries
   standardHeaders: true,
   legacyHeaders: false
 });
@@ -296,7 +359,10 @@ app.use(pathJoin(baseUrl, 'api/v1/public/auth'), authLimiter);
 app.use(pathJoin(baseUrl, 'api/v1/comics/pages/image'), pagesLimiter);
 const generalLimiterExclusions = new Set([
   '/api/v1/public/auth',
-  '/api/v1/comics/pages/image'
+  '/api/v1/comics/pages/image',
+  '/thumbnails',
+  '/icons',
+  '/logos'
 ]);
 app.use(baseUrl, (req, res, next) => {
   const relativePath = req.path.startsWith(baseUrl) ? req.path.slice(baseUrl.length) || '/' : req.path;
@@ -310,6 +376,11 @@ app.use(baseUrl, (req, res, next) => {
 
 // Apply authentication middleware globally
 app.use(baseUrl, extractUserFromJWT);
+
+// Admin impersonation: swap req.user to the impersonated target (real admin +
+// valid cookie only), then block mutating requests while impersonating.
+app.use(baseUrl, createImpersonationMiddleware({ dbGet, dbRun, log }));
+app.use(baseUrl, impersonationReadOnlyGuard);
 
 app.use(baseUrl, apiRouter);
 app.use(baseUrl, staticRouter);
@@ -356,6 +427,7 @@ app.use(baseUrl, staticRouter);
     
     server.close(async () => {
       log('INFO', 'SERVER', 'HTTP server closed.');
+      stopTaggerWorker();
       try {
         await closeDb();
         log('INFO', 'SERVER', 'DB closed cleanly.');
@@ -368,6 +440,7 @@ app.use(baseUrl, staticRouter);
     // Fallback exit if server.close hangs
     const forceExitTimer = setTimeout(() => {
       log('WARN', 'SERVER', 'Shutdown timed out, forcing exit.');
+      stopTaggerWorker();
       process.exit(1);
     }, 10000);
     forceExitTimer.unref();
@@ -376,8 +449,15 @@ app.use(baseUrl, staticRouter);
   process.on('SIGTERM', () => shutdown('SIGTERM'));
   process.on('SIGINT',  () => shutdown('SIGINT'));
 
+  try {
+    await startTaggerWorker();
+  } catch (err) {
+    log('WARN', 'SERVER', `Failed to initialize tagger worker on boot: ${err.message}`);
+  }
+
   scheduleCtRun();
   await guidedReader.initialize();
+
 
   (async () => {
     await scanLibrary();

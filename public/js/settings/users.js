@@ -66,8 +66,10 @@ export async function refreshUsersList() {
           </div>
         </div>
         <div class="flex items-center gap-2 self-start sm:self-auto pl-10 sm:pl-0">
-          ${user.role !== 'admin' 
-            ? '<span class="text-purple-400 group-hover:translate-x-1 transition-transform">Manage Access →</span>' 
+          <button class="user-stats-btn px-3 py-1.5 text-xs font-semibold rounded-lg bg-blue-600/20 text-blue-300 hover:bg-blue-600/40 transition-colors">Stats</button>
+          ${user.role !== 'admin'
+            ? `<button class="user-impersonate-btn px-3 py-1.5 text-xs font-semibold rounded-lg bg-amber-500/20 text-amber-300 hover:bg-amber-500/40 transition-colors">Login as</button>
+               <span class="text-purple-400 text-sm hidden sm:inline group-hover:translate-x-1 transition-transform">Manage Access →</span>`
             : '<span class="text-gray-500 italic text-sm">Full Admin Access</span>'}
         </div>
       </div>
@@ -75,15 +77,38 @@ export async function refreshUsersList() {
 
     // Add click handlers to user cards
     document.querySelectorAll('.user-card').forEach(card => {
+      const userId = card.dataset.userId;
+      const userEmail = card.dataset.userEmail;
+      const userRole = card.dataset.userRole;
+
+      // Card body → manage access
       card.addEventListener('click', () => {
-        const userId = card.dataset.userId;
-        const userEmail = card.dataset.userEmail;
-        const userRole = card.dataset.userRole;
         const showUserAccess = state.showUserAccessView || window.showUserAccessView;
         if (typeof showUserAccess === 'function') {
           showUserAccess(userId, userEmail, userRole);
         }
       });
+
+      // Stats button
+      const statsBtn = card.querySelector('.user-stats-btn');
+      if (statsBtn) {
+        statsBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const showStats = state.showUserStatsView || window.showUserStatsView;
+          if (typeof showStats === 'function') showStats(userId, userEmail);
+        });
+      }
+
+      // Login-as (impersonate) button
+      const impBtn = card.querySelector('.user-impersonate-btn');
+      if (impBtn) {
+        impBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          if (!confirm(`Log in as ${userEmail}?\n\nYou will see the app exactly as they do (read-only). They will not be notified. An audit entry is recorded.`)) return;
+          const start = state.startImpersonation || window.startImpersonation;
+          if (typeof start === 'function') start(userId, userEmail);
+        });
+      }
     });
 
   } catch (error) {

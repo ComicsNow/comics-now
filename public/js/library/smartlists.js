@@ -78,6 +78,7 @@ export function updateLatestButtonCount() {
     if (guidedBtn) guidedBtn.classList.remove('hidden');
 
     updateMangaFilterButtonCount();
+    updateReadingListFilterButtonCount();
 
     if (latestAddedCountSpan) {
       latestAddedCountSpan.textContent = latestComics.length.toString();
@@ -97,6 +98,126 @@ export function updateDownloadedButtonCount() {
 export function updateGuidedButtonCount() {
   const span = document.getElementById('guided-smart-list-count');
   if (span) span.textContent = (Array.isArray(guidedComics) ? guidedComics.length : 0).toString();
+}
+
+let cachedReadingLists = [];
+
+export function normalizePub(str) {
+  return String(str || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
+export function matchesPublisher(list, publisherName) {
+  if (!list || !publisherName) return false;
+  const normTarget = normalizePub(publisherName);
+  if (!normTarget) return false;
+
+  // 1. Direct or fuzzy match against list.publishers
+  if (Array.isArray(list.publishers)) {
+    for (const p of list.publishers) {
+      const normP = normalizePub(p);
+      if (normP && (normP === normTarget || normP.includes(normTarget) || normTarget.includes(normP))) {
+        return true;
+      }
+    }
+  }
+
+  // 2. Name prefix match e.g. "DC: ..." or "Dark Horse: ..." or "Image: ..."
+  const colonIdx = list.name.indexOf(':');
+  if (colonIdx > 0) {
+    const prefix = normalizePub(list.name.substring(0, colonIdx));
+    if (prefix && (prefix === normTarget || prefix.includes(normTarget) || normTarget.includes(prefix))) {
+      return true;
+    }
+  }
+
+  // 3. Fallback name contains
+  const normName = normalizePub(list.name);
+  if (normName.includes(normTarget)) return true;
+
+  return false;
+}
+
+export async function fetchAndCacheReadingLists() {
+  try {
+    const fetchLists = (state.ReadingLists || window.ReadingLists)?.fetchReadingLists;
+    if (typeof fetchLists === 'function') {
+      cachedReadingLists = await fetchLists();
+    } else {
+      const resp = await fetch('/api/v1/reading-lists');
+      const data = await resp.json();
+      if (data && data.ok) {
+        cachedReadingLists = data.lists || [];
+      }
+    }
+  } catch (err) {
+    console.warn('[smartlists] Error caching reading lists:', err);
+  }
+  updateReadingListFilterButtonCount();
+
+  const currentView = state.currentView || window.currentView;
+  const scope = state.activeSmartFilter || window.activeSmartFilter;
+  if (scope === 'reading-list' && (currentView === 'publishers' || currentView === 'series')) {
+    const applyFilter = state.applyFilterAndRender || window.applyFilterAndRender || state.LibraryRender?.applyFilterAndRender;
+    if (typeof applyFilter === 'function') {
+      applyFilter();
+    }
+  }
+
+  return cachedReadingLists;
+}
+
+export function getCachedReadingLists() {
+  return cachedReadingLists;
+}
+
+export function setCachedReadingLists(lists) {
+  cachedReadingLists = Array.isArray(lists) ? lists : [];
+  updateReadingListFilterButtonCount();
+}
+
+export function getReadingListsForPublisher(publisherName) {
+  if (!publisherName) return [];
+  if (cachedReadingLists.length === 0) {
+    fetchAndCacheReadingLists();
+  }
+  return cachedReadingLists.filter(list => matchesPublisher(list, publisherName));
+}
+
+export function updateReadingListFilterButtonCount() {
+  const span = document.getElementById('dynamic-reading-list-filter-count');
+  const btn = document.getElementById('dynamic-reading-list-filter-btn');
+  if (!span || !btn) return;
+
+  const currentView = state.currentView || window.currentView;
+  const currentPublisher = state.currentPublisher || window.currentPublisher;
+  const currentRootFolder = state.currentRootFolder || window.currentRootFolder;
+  const library = state.library || window.library;
+
+  if (cachedReadingLists.length === 0) {
+    fetchAndCacheReadingLists();
+  }
+
+  if (currentView === 'series' && currentPublisher) {
+    const matchingLists = getReadingListsForPublisher(currentPublisher);
+    span.textContent = matchingLists.length.toString();
+    btn.classList.toggle('hidden', matchingLists.length === 0);
+    return;
+  }
+
+  if (currentView === 'publishers') {
+    let publishers = {};
+    if (currentRootFolder && library) {
+      const normalizedPath = currentRootFolder.replace(/[\\\/]+$/, '');
+      const rootData = library[currentRootFolder] || library[normalizedPath] || library[normalizedPath + '/'];
+      publishers = rootData?.publishers || {};
+    }
+    const pubNamesWithLists = Object.keys(publishers).filter(pubName => getReadingListsForPublisher(pubName).length > 0);
+    span.textContent = pubNamesWithLists.length.toString();
+    btn.classList.toggle('hidden', pubNamesWithLists.length === 0);
+    return;
+  }
+
+  btn.classList.add('hidden');
 }
 
 export function updateMangaFilterButtonCount() {
@@ -481,6 +602,11 @@ const LibrarySmartLists = {
   getDownloadedSmartListComics,
   getDownloadedSmartListError,
   updateDownloadedSmartListComic,
+  updateReadingListFilterButtonCount,
+  getReadingListsForPublisher,
+  fetchAndCacheReadingLists,
+  getCachedReadingLists,
+  setCachedReadingLists
 };
 
 state.LibrarySmartLists = LibrarySmartLists;
@@ -493,6 +619,8 @@ state.comicMatchesActiveSmartScope = comicMatchesActiveSmartScope;
 state.updateDownloadedComicProgressData = updateDownloadedComicProgressData;
 state.rebuildDownloadedComics = rebuildDownloadedComics;
 state.updateDownloadedSmartListComic = updateDownloadedSmartListComic;
+state.updateReadingListFilterButtonCount = updateReadingListFilterButtonCount;
+state.getReadingListsForPublisher = getReadingListsForPublisher;
 
 if (typeof window !== 'undefined') {
   window.LibrarySmartLists = LibrarySmartLists;
@@ -505,4 +633,6 @@ if (typeof window !== 'undefined') {
   window.updateDownloadedComicProgressData = updateDownloadedComicProgressData;
   window.rebuildDownloadedComics = rebuildDownloadedComics;
   window.updateDownloadedSmartListComic = updateDownloadedSmartListComic;
+  window.updateReadingListFilterButtonCount = updateReadingListFilterButtonCount;
+  window.getReadingListsForPublisher = getReadingListsForPublisher;
 }

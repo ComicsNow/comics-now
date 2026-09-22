@@ -1,251 +1,336 @@
 import { state } from '../globals.js';
 
-// --- COMICS DEFAULTS ---
-export async function loadComicsDefaults() {
-  const libraryContainer = document.getElementById('library-preferences-container');
-  const allowedFormatsSelect = document.getElementById('allowed-formats-select');
-  const metadataStorageSelect = document.getElementById('metadata-storage-select');
-  const migrationOptions = document.getElementById('metadata-migration-options');
-  const migrateBtn = document.getElementById('migrate-metadata-btn');
-  const applyCheckbox = document.getElementById('apply-to-existing-metadata');
-  const migrationStatus = document.getElementById('metadata-migration-status');
-  
-  // Master Toggles
-  const masterMangaToggle = document.getElementById('master-manga-toggle');
-  const masterContinuousToggle = document.getElementById('master-continuous-toggle');
+// --- COMICS DEFAULTS (deferred save) ---
+// All controls on this subtab stage their changes locally and are only
+// persisted when the user clicks "Save Changes". A dirty flag
+// (state.comicsDefaultsDirty) drives the unsaved-changes guard in events.js.
 
-  const apiBaseUrl = state.API_BASE_URL || window.API_BASE_URL || '';
-  const showSettingsMsg = state.showSettingsMessage || window.showSettingsMessage || (() => {});
+let wired = false;
 
-  // --- MASTER TOGGLE LOGIC ---
-  async function loadMasterDefaults() {
-    try {
-      const mangaRes = await fetch(`${apiBaseUrl}/api/v1/manga-mode-preference`);
-      const contRes = await fetch(`${apiBaseUrl}/api/v1/continuous-mode-preference`);
-      
-      const mangaData = await mangaRes.json();
-      const contData = await contRes.json();
+// Snapshot of the last-saved server state, used to compute what changed.
+const baseline = {
+  masterManga: false,
+  masterContinuous: false,
+  allowedFormats: 'cbz',
+  libraryPrefs: {}, // path -> { mangaMode, continuousMode }
+};
 
-      if (masterMangaToggle) masterMangaToggle.checked = !!mangaData.mangaMode;
-      if (masterContinuousToggle) masterContinuousToggle.checked = !!contData.continuousMode;
-    } catch (e) {
-      console.error('[DEFAULTS] Failed to load master defaults:', e);
+const $ = (id) => document.getElementById(id);
+const apiBase = () => state.API_BASE_URL || window.API_BASE_URL || '';
+const toast = (msg, type) =>
+  (state.showSettingsMessage || window.showSettingsMessage || (() => {}))(msg, type);
+
+// --- DIRTY STATE ---
+function currentState() {
+  const libraryPrefs = {};
+  const container = $('library-preferences-container');
+  container?.querySelectorAll('[data-lib-path]').forEach((row) => {
+    libraryPrefs[row.getAttribute('data-lib-path')] = {
+      mangaMode: !!row.querySelector('.lib-toggle-manga')?.checked,
+      continuousMode: !!row.querySelector('.lib-toggle-scroll')?.checked,
+    };
+  });
+  return {
+    masterManga: !!$('master-manga-toggle')?.checked,
+    masterContinuous: !!$('master-continuous-toggle')?.checked,
+    allowedFormats: $('allowed-formats-select')?.value || 'cbz',
+    libraryPrefs,
+  };
+}
+
+function isDirty() {
+  const cur = currentState();
+  if (cur.allowedFormats !== baseline.allowedFormats) return true;
+  if (cur.masterManga !== baseline.masterManga) return true;
+  if (cur.masterContinuous !== baseline.masterContinuous) return true;
+  const paths = new Set([
+    ...Object.keys(cur.libraryPrefs),
+    ...Object.keys(baseline.libraryPrefs),
+  ]);
+  for (const p of paths) {
+    const a = cur.libraryPrefs[p] || {};
+    const b = baseline.libraryPrefs[p] || {};
+    if (!!a.mangaMode !== !!b.mangaMode || !!a.continuousMode !== !!b.continuousMode) {
+      return true;
     }
   }
+  return false;
+}
 
-  if (masterMangaToggle) {
-    masterMangaToggle.addEventListener('change', async () => {
-      const enabled = masterMangaToggle.checked;
-      if (!confirm(`Switch ALL libraries and comics to ${enabled ? 'Manga' : 'Standard'} mode? This clears individual overrides.`)) {
-        masterMangaToggle.checked = !enabled;
-        return;
-      }
-      
-      try {
-        const res = await fetch(`${apiBaseUrl}/api/v1/comics/set-all-manga-mode`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ mangaMode: enabled })
-        });
-        if (res.ok) {
-          showSettingsMsg(`All libraries set to ${enabled ? 'Manga' : 'Standard'}`, 'success');
-          loadLibraryPreferences();
-        } else {
-          throw new Error('Update failed');
-        }
-      } catch (e) {
-        showSettingsMsg('Failed to apply changes', 'error');
-        masterMangaToggle.checked = !enabled;
-      }
-    });
+function refreshDirtyUI() {
+  const dirty = isDirty();
+  state.comicsDefaultsDirty = dirty;
+  if (typeof window !== 'undefined') window.comicsDefaultsDirty = dirty;
+  const btn = $('comics-defaults-save-btn');
+  const ind = $('comics-defaults-dirty-indicator');
+  const status = $('comics-defaults-save-status');
+  if (btn) btn.disabled = !dirty;
+  if (ind) ind.classList.toggle('hidden', !dirty);
+  if (status && dirty) status.textContent = '';
+}
+
+// --- CHANGE HANDLERS (stage only, no network) ---
+function onMasterMangaChange() {
+  const checked = !!$('master-manga-toggle')?.checked;
+  document
+    .querySelectorAll('#library-preferences-container .lib-toggle-manga')
+    .forEach((t) => { t.checked = checked; });
+  refreshDirtyUI();
+}
+
+function onMasterContinuousChange() {
+  const checked = !!$('master-continuous-toggle')?.checked;
+  document
+    .querySelectorAll('#library-preferences-container .lib-toggle-scroll')
+    .forEach((t) => { t.checked = checked; });
+  refreshDirtyUI();
+}
+
+// --- SAVE ---
+async function saveAll() {
+  const cur = currentState();
+  const masterChanged =
+    cur.masterManga !== baseline.masterManga ||
+    cur.masterContinuous !== baseline.masterContinuous;
+
+  if (masterChanged && !confirm(
+    'Saving will apply the master defaults to all libraries and clear individual ' +
+    'reading-mode overrides (per-comic, series and publisher). Continue?'
+  )) {
+    return;
   }
 
-  if (masterContinuousToggle) {
-    masterContinuousToggle.addEventListener('change', async () => {
-      const enabled = masterContinuousToggle.checked;
-      if (!confirm(`Switch ALL libraries and comics to ${enabled ? 'Continuous' : 'Paginated'} mode? This clears individual overrides.`)) {
-        masterContinuousToggle.checked = !enabled;
-        return;
-      }
-      
+  const btn = $('comics-defaults-save-btn');
+  const status = $('comics-defaults-save-status');
+  if (btn) btn.disabled = true;
+  if (status) status.textContent = 'Saving…';
+
+  try {
+    // 1. Library format settings (allowedFormats).
+    if (cur.allowedFormats !== baseline.allowedFormats) {
+      let interval = 5;
+      let apiKey = '';
+      let metadataStorage = 'archive';
       try {
-        const res = await fetch(`${apiBaseUrl}/api/v1/comics/set-all-continuous-mode`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ continuousMode: enabled })
-        });
-        if (res.ok) {
-          showSettingsMsg(`All libraries set to ${enabled ? 'Continuous' : 'Paginated'}`, 'success');
-          loadLibraryPreferences();
-        } else {
-          throw new Error('Update failed');
-        }
+        const existing = await (await fetch(`${apiBase()}/api/v1/settings`)).json();
+        interval = existing.scanInterval ?? 5;
+        apiKey = existing.comicVineApiKey ?? '';
+        metadataStorage = existing.metadataStorage ?? 'archive';
       } catch (e) {
-        showSettingsMsg('Failed to apply changes', 'error');
-        masterContinuousToggle.checked = !enabled;
+        console.error('[DEFAULTS] Failed to read existing settings before save:', e);
       }
-    });
-  }
-
-  // --- PER-LIBRARY LOGIC ---
-  async function loadLibraryPreferences() {
-    if (!libraryContainer) return;
-    
-    // Show spinner
-    libraryContainer.innerHTML = `
-      <div class="flex flex-col items-center justify-center py-12 text-gray-500">
-        <svg class="animate-spin h-8 w-8 text-purple-500 mb-4" fill="none" viewBox="0 0 24 24">
-          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-        </svg>
-        <span class="text-sm font-medium animate-pulse">Loading library preferences...</span>
-      </div>
-    `;
-
-    try {
-      const response = await fetch(`${apiBaseUrl}/api/v1/user/library-preferences`);
-      const data = await response.json();
-      if (!response.ok || !data.ok) throw new Error(data.message || 'Failed to load');
-      renderLibraryPreferences(data.preferences);
-    } catch (error) {
-      console.error('Failed to load library preferences:', error);
-      libraryContainer.innerHTML = `<div class="text-red-400 text-sm py-8 italic text-center bg-red-900/10 rounded-xl border border-red-500/20">Error loading libraries: ${error.message}</div>`;
+      const res = await fetch(`${apiBase()}/api/v1/settings`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          interval,
+          apiKey,
+          allowedFormats: cur.allowedFormats,
+          metadataStorage,
+        }),
+      });
+      if (!res.ok) throw new Error('format settings');
     }
-  }
 
-  function renderLibraryPreferences(preferences) {
-    if (!preferences || preferences.length === 0) {
-      libraryContainer.innerHTML = '<div class="text-gray-500 text-sm py-10 italic text-center bg-gray-800/20 rounded-xl border border-gray-700/50">No libraries found in your configuration.</div>';
+    // 2. Per-library reading preferences.
+    const allPaths = Object.keys(cur.libraryPrefs);
+    const changedPaths = masterChanged
+      ? allPaths
+      : allPaths.filter((p) => {
+          const a = cur.libraryPrefs[p];
+          const b = baseline.libraryPrefs[p] || {};
+          return !!a.mangaMode !== !!b.mangaMode || !!a.continuousMode !== !!b.continuousMode;
+        });
+
+    for (const path of changedPaths) {
+      const pref = cur.libraryPrefs[path];
+      const res = await fetch(`${apiBase()}/api/v1/user/library-preferences`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          path,
+          mangaMode: pref.mangaMode,
+          continuousMode: pref.continuousMode,
+        }),
+      });
+      if (!res.ok) throw new Error('library preferences');
+    }
+
+    toast('Comics defaults saved', 'success');
+    if (status) status.textContent = '';
+
+    const fetchLib = state.fetchLibraryFromServer || window.fetchLibraryFromServer;
+    if (typeof fetchLib === 'function') fetchLib();
+
+    await reloadAll();
+  } catch (e) {
+    toast(`Save failed: ${e.message}`, 'error');
+    if (status) status.textContent = 'Save failed';
+    refreshDirtyUI();
+  }
+}
+
+// --- DATA LOADERS ---
+async function loadSettingsValues() {
+  try {
+    const res = await fetch(`${apiBase()}/api/v1/settings`);
+    const data = await res.json();
+    const af = $('allowed-formats-select');
+    if (af && data.allowedFormats) af.value = data.allowedFormats;
+  } catch (e) {
+    console.error('[DEFAULTS] Failed to load settings:', e);
+  }
+  baseline.allowedFormats = $('allowed-formats-select')?.value || 'cbz';
+}
+
+async function loadMasterDefaults() {
+  try {
+    const [mangaRes, contRes] = await Promise.all([
+      fetch(`${apiBase()}/api/v1/manga-mode-preference`),
+      fetch(`${apiBase()}/api/v1/continuous-mode-preference`),
+    ]);
+    const mangaData = await mangaRes.json();
+    const contData = await contRes.json();
+    baseline.masterManga = !!mangaData.mangaMode;
+    baseline.masterContinuous = !!contData.continuousMode;
+    const mt = $('master-manga-toggle');
+    const ct = $('master-continuous-toggle');
+    if (mt) mt.checked = baseline.masterManga;
+    if (ct) ct.checked = baseline.masterContinuous;
+  } catch (e) {
+    console.error('[DEFAULTS] Failed to load master defaults:', e);
+  }
+}
+
+async function renderLibraryPreferences() {
+  const container = $('library-preferences-container');
+  if (!container) return;
+  container.innerHTML = '<p class="text-xs text-gray-500">Loading library folders…</p>';
+
+  try {
+    const [libRes, prefRes] = await Promise.all([
+      fetch(`${apiBase()}/api/v1/admin/libraries`),
+      fetch(`${apiBase()}/api/v1/user/library-preferences`),
+    ]);
+    const libData = libRes.ok ? await libRes.json().catch(() => ({})) : {};
+    const prefData = prefRes.ok ? await prefRes.json().catch(() => ({})) : {};
+
+    const libraries = Array.isArray(libData.libraries) ? libData.libraries : [];
+    const prefs = prefData.preferences || {};
+    baseline.libraryPrefs = {};
+
+    if (libraries.length === 0) {
+      container.innerHTML =
+        '<p class="text-xs text-gray-500">No library folders configured yet.</p>';
       return;
     }
 
-    libraryContainer.innerHTML = '';
-    preferences.forEach((pref, index) => {
-      const path = pref.path;
-      const parts = path.split(/[\\/]/).filter(Boolean);
-      const displayPath = parts[parts.length - 1] || path;
-      
-      const mangaId = `lib-manga-${index}`;
-      const scrollId = `lib-scroll-${index}`;
+    container.innerHTML = '';
+    for (const lib of libraries) {
+      const p = lib.path;
+      const effectivePref = prefs[p] || {};
+      const manga =
+        effectivePref.mangaMode !== undefined
+          ? !!effectivePref.mangaMode
+          : baseline.masterManga;
+      const continuous =
+        effectivePref.continuousMode !== undefined
+          ? !!effectivePref.continuousMode
+          : baseline.masterContinuous;
+
+      baseline.libraryPrefs[p] = { mangaMode: manga, continuousMode: continuous };
 
       const row = document.createElement('div');
-      row.className = 'bg-gray-900/40 rounded-xl p-4 border border-gray-800 flex flex-col md:flex-row md:items-center justify-between gap-4 hover:border-purple-500/30 transition-all group';
-      row.innerHTML = `
-        <div class="flex items-center gap-3 overflow-hidden">
-          <div class="bg-gray-800 p-2 rounded-lg border border-gray-700 group-hover:bg-gray-700 transition-colors">
-            <svg class="w-5 h-5 text-gray-500 group-hover:text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path></svg>
-          </div>
-          <div class="overflow-hidden">
-            <p class="text-sm font-bold text-gray-200 truncate">${displayPath}</p>
-            <p class="text-[10px] text-gray-600 font-mono truncate" title="${path}">${path}</p>
-          </div>
-        </div>
+      row.className =
+        'flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3 bg-gray-900/60 rounded-lg border border-gray-800 text-xs';
+      row.setAttribute('data-lib-path', p);
 
-        <div class="flex items-center gap-4 bg-black/20 p-2 rounded-lg border border-gray-800/50">
-          <!-- Manga -->
-          <div class="flex items-center gap-2">
-            <span class="text-[9px] font-bold text-gray-500 uppercase tracking-widest">Manga</span>
-            <label for="${mangaId}" class="cursor-pointer flex-shrink-0">
-              <input type="checkbox" id="${mangaId}" class="sr-only peer lib-toggle-manga" ${pref.mangaMode ? 'checked' : ''}>
-              <div class="toggle-bg bg-gray-700 border-2 border-gray-600 h-5 rounded-full" style="width: 2.5rem;"></div>
-            </label>
-          </div>
+      const label = document.createElement('div');
+      label.className = 'flex-1 min-w-0';
+      const name = document.createElement('div');
+      name.className = 'font-semibold text-white truncate';
+      name.textContent = lib.name || p;
+      const pathEl = document.createElement('div');
+      pathEl.className = 'text-gray-400 font-mono truncate text-[11px]';
+      pathEl.textContent = p;
+      label.appendChild(name);
+      label.appendChild(pathEl);
 
-          <div class="w-px h-4 bg-gray-800"></div>
+      const toggles = document.createElement('div');
+      toggles.className = 'flex items-center gap-3 shrink-0';
 
-          <!-- Scroll -->
-          <div class="flex items-center gap-2">
-            <span class="text-[9px] font-bold text-gray-500 uppercase tracking-widest">Scroll</span>
-            <label for="${scrollId}" class="cursor-pointer flex-shrink-0">
-              <input type="checkbox" id="${scrollId}" class="sr-only peer lib-toggle-scroll" ${pref.continuousMode ? 'checked' : ''}>
-              <div class="toggle-bg bg-gray-700 border-2 border-gray-600 h-5 rounded-full" style="width: 2.5rem;"></div>
-            </label>
-          </div>
-        </div>
-      `;
-      libraryContainer.appendChild(row);
+      const mangaLabel = document.createElement('label');
+      mangaLabel.className = 'inline-flex items-center gap-1.5 cursor-pointer text-gray-300';
+      mangaLabel.title = 'Default to Manga (RTL) mode for this library';
+      const mangaCb = document.createElement('input');
+      mangaCb.type = 'checkbox';
+      mangaCb.className =
+        'lib-toggle-manga rounded bg-gray-800 border-gray-700 text-purple-600 focus:ring-0';
+      mangaCb.checked = manga;
+      mangaCb.addEventListener('change', refreshDirtyUI);
+      mangaLabel.appendChild(mangaCb);
+      mangaLabel.appendChild(document.createTextNode('Manga'));
 
-      const mToggle = row.querySelector('.lib-toggle-manga');
-      const sToggle = row.querySelector('.lib-toggle-scroll');
+      const scrollLabel = document.createElement('label');
+      scrollLabel.className = 'inline-flex items-center gap-1.5 cursor-pointer text-gray-300';
+      scrollLabel.title = 'Default to Vertical Scroll mode for this library';
+      const scrollCb = document.createElement('input');
+      scrollCb.type = 'checkbox';
+      scrollCb.className =
+        'lib-toggle-scroll rounded bg-gray-800 border-gray-700 text-purple-600 focus:ring-0';
+      scrollCb.checked = continuous;
+      scrollCb.addEventListener('change', refreshDirtyUI);
+      scrollLabel.appendChild(scrollCb);
+      scrollLabel.appendChild(document.createTextNode('Scroll'));
 
-      mToggle.addEventListener('change', () => {
-        updateLibraryPreference(path, mToggle.checked, sToggle.checked);
-      });
-      sToggle.addEventListener('change', () => {
-        updateLibraryPreference(path, mToggle.checked, sToggle.checked);
-      });
-    });
-  }
+      toggles.appendChild(mangaLabel);
+      toggles.appendChild(scrollLabel);
 
-  async function updateLibraryPreference(path, mangaMode, continuousMode) {
-    try {
-      const response = await fetch(`${apiBaseUrl}/api/v1/user/library-preferences`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ path, mangaMode, continuousMode })
-      });
-      if (response.ok) {
-        showSettingsMsg('Saved', 'success');
-        const fetchLibraryFromServer = state.fetchLibraryFromServer || window.fetchLibraryFromServer;
-        if (typeof fetchLibraryFromServer === 'function') {
-          fetchLibraryFromServer();
-        }
-      }
-    } catch (error) {
-      showSettingsMsg('Save failed', 'error');
-      loadLibraryPreferences();
+      row.appendChild(label);
+      row.appendChild(toggles);
+      container.appendChild(row);
     }
+  } catch (e) {
+    console.error('[DEFAULTS] Failed to render library preferences:', e);
+    container.innerHTML =
+      '<p class="text-xs text-red-400">Failed to load library preferences.</p>';
   }
-
-  // --- OTHER SETTINGS ---
-  let initialMetadataStorage = null;
-  if (metadataStorageSelect && migrationOptions) {
-    setTimeout(() => { initialMetadataStorage = metadataStorageSelect.value; }, 500);
-    metadataStorageSelect.addEventListener('change', () => {
-      migrationOptions.classList.toggle('hidden', metadataStorageSelect.value === initialMetadataStorage);
-    });
-  }
-
-  if (migrateBtn) {
-    migrateBtn.addEventListener('click', async () => {
-      if (!applyCheckbox?.checked) {
-        if (migrationStatus) migrationStatus.textContent = 'Confirm by checking the box.';
-        return;
-      }
-      migrateBtn.disabled = true;
-      try {
-        const res = await fetch(`${apiBaseUrl}/api/v1/admin/metadata/migrate`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ mode: metadataStorageSelect.value, applyToExisting: true })
-        });
-        if (res.ok) showSettingsMsg('Migration complete', 'success');
-      } catch (e) {
-        showSettingsMsg('Migration failed', 'error');
-      } finally { migrateBtn.disabled = false; }
-    });
-  }
-
-  if (allowedFormatsSelect) {
-    allowedFormatsSelect.addEventListener('change', async () => {
-      try {
-        const res = await fetch(`${apiBaseUrl}/api/v1/settings`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ allowedFormats: allowedFormatsSelect.value })
-        });
-        if (res.ok) showSettingsMsg('Saved', 'success');
-      } catch (e) { showSettingsMsg('Failed', 'error'); }
-    });
-  }
-
-  // Initial load
-  loadMasterDefaults();
-  loadLibraryPreferences();
 }
 
-state.loadComicsDefaults = loadComicsDefaults;
+export async function reloadAll() {
+  await Promise.all([loadSettingsValues(), loadMasterDefaults()]);
+  await renderLibraryPreferences();
+  refreshDirtyUI();
+}
 
+export const loadComicsDefaults = reloadAll;
+
+// Expose on global state and window
+state.loadComicsDefaults = reloadAll;
+state.initComicsDefaults = initComicsDefaults;
 if (typeof window !== 'undefined') {
-  window.loadComicsDefaults = loadComicsDefaults;
+  window.loadComicsDefaults = reloadAll;
+  window.initComicsDefaults = initComicsDefaults;
+}
+
+// --- INIT / WIRE ---
+export function initComicsDefaults() {
+  if (wired) return;
+  wired = true;
+
+  $('allowed-formats-select')?.addEventListener('change', refreshDirtyUI);
+  $('master-manga-toggle')?.addEventListener('change', onMasterMangaChange);
+  $('master-continuous-toggle')?.addEventListener('change', onMasterContinuousChange);
+  $('comics-defaults-save-btn')?.addEventListener('click', saveAll);
+
+  $('settings-tab-comics-defaults')?.addEventListener('click', () => {
+    reloadAll();
+  });
+}
+
+// Auto-wire on module load or DOMContentLoaded
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', () => initComicsDefaults());
+} else {
+  initComicsDefaults();
 }

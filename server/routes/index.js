@@ -78,6 +78,22 @@ function createApiRouter(deps) {
     return deps.requireAdmin(req, res, next);
   };
 
+  // Guards ONLY the impersonation-control endpoints, judged by the REAL
+  // identity. While impersonating, req.user is the (non-admin) target, so the
+  // blanket requireAdmin on adminRouter would reject "stop"/"status". This
+  // router is mounted before adminRouter so those paths resolve here; every
+  // other path passes straight through untouched.
+  const requireRealAdminAuth = (req, res, next) => {
+    const normalizedPath = path.posix.normalize(req.path);
+    if (!normalizedPath.startsWith('/api/v1/admin/impersonate')) return next();
+    if (!deps.isAuthEnabled()) return next();
+    const real = req.realUser || req.user;
+    if (!real || real.role !== 'admin') {
+      return res.status(403).json({ error: 'Forbidden: Admin access required' });
+    }
+    next();
+  };
+
   const router = express.Router();
 
   // Public routes
@@ -106,8 +122,19 @@ function createApiRouter(deps) {
   require('./admin/settings')(adminRouter, extendedDeps);
   require('./admin/library-mgmt')(adminRouter, extendedDeps);
   require('./admin/rename')(adminRouter, extendedDeps);
-  
+  require('./admin/mcp-tools')(adminRouter, extendedDeps);
+  require('./admin/user-stats')(adminRouter, extendedDeps);
+
+  // Impersonation control (judged by the real admin identity, not the swap).
+  // Must be registered BEFORE adminRouter so its /api/v1/admin/impersonate/*
+  // routes resolve here and bypass adminRouter's blanket requireAdmin (which
+  // sees the swapped non-admin identity while impersonating).
+  const impersonationRouter = express.Router();
+  impersonationRouter.use(requireRealAdminAuth);
+  require('./admin/impersonate')(impersonationRouter, extendedDeps);
+
   // Register extracted routes
+  router.use(impersonationRouter);
   router.use(userRouter);
   router.use(adminRouter);
   
