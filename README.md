@@ -1,118 +1,176 @@
-# Comics Now!
+# Comics Now! 💥📚
 
-A modern, simple web app for managing and reading your digital comic book collection.
+<p align="center">
+  <strong>The modern, self-hosted comic book library server, smart reader, and AI-augmented cataloging platform.</strong>
+</p>
 
-## Features
+<p align="center">
+  <a href="#quick-start-60-seconds"><img src="https://img.shields.io/badge/docker-ready-blue.svg?logo=docker" alt="Docker Ready"></a>
+  <a href="https://github.com/ComicsNow/comics-now/pkgs/container/comics-now"><img src="https://img.shields.io/badge/ghcr.io-comics--now-2496ED.svg?logo=github" alt="GHCR Image"></a>
+  <a href="https://github.com/ComicsNow/comics-now/actions/workflows/docker-publish.yml"><img src="https://github.com/ComicsNow/comics-now/actions/workflows/docker-publish.yml/badge.svg" alt="Build Status"></a>
+  <a href="https://github.com/ComicsNow/comics-now/actions/workflows/codeql.yml"><img src="https://github.com/ComicsNow/comics-now/actions/workflows/codeql.yml/badge.svg" alt="CodeQL Status"></a>
+  <a href="docs/WIKI.md"><img src="https://img.shields.io/badge/docs-WIKI%20Manual-green.svg" alt="Documentation"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-AGPL--3.0-orange.svg" alt="License"></a>
+</p>
 
-**Reading Experience**
-- **Smart Guided View:** Automatically detects panels and speech bubbles for an immersive, panel-by-panel reading experience.
-- **Reading Modes:** Choose from Standard, Continuous (vertical scrolling), Manga (right-to-left), Bubble, Hot Zoom, Landscape, and Full Image modes. Modes can be set per-comic, series, or publisher.
-- **Progress Tracking & Sync:** Automatically saves your reading progress and syncs it across all your devices.
-- **End-of-Comic Navigation:** Automatically prompts you to jump to the next issue when you finish reading.
+---
 
-**Library & Organization**
-- **Library Structures:** Organize your server-side comics in two distinct ways:
-  - **Metadata Mode:** Groups by Publisher → Series → Issue using `ComicInfo.xml` metadata.
-  - **Folder Mode:** Mirrors your physical folder structure directly, ignoring internal metadata.
-- **Local Device Library:** Read comics stored directly on your phone or computer without uploading them to the server.
-- **Reading Lists:** Create custom collections and drag-and-drop reading orders for events or crossovers.
-- **Bulk Management:** Easily mark entire series or publishers as read/unread.
+## ⚡ Why Comics Now!?
 
-**Format & Metadata Support**
-- **Supported Formats:** Read CBZ and CBR files seamlessly.
-- **Auto-Conversion:** Automatically converts PDF and CBR files to the more efficient CBZ format during scanning.
-- **Metadata Management:** Integrates with ComicTagger to fetch rich metadata and covers from ComicVine. Metadata is written directly into the comic files as `ComicInfo.xml`.
+Most digital comic servers were built a decade ago as basic file browsers. **Comics Now!** re-imagines your comic library as a modern, intelligent web application designed for desktops, tablets, and phones:
 
-**Offline & Sync**
-- **Offline Reading:** Download individual comics, series, or entire reading lists to read without internet.
-- **Background Downloads:** A reliable download queue that continues working even if you close the app.
+* 🧠 **Smart Guided View**: Automatically detects panels and dialogue bubbles using deep learning neural networks (`western.onnx` and `manga.onnx`) for an immersive panel-by-panel reading experience.
+* 🔄 **True Cross-Device Sync**: Pick up right where you left off. Reading progress syncs in real-time between your phone, tablet, and PC.
+* 📱 **Installable Offline PWA**: Install Comics Now! to your iOS, iPadOS, Android, or desktop home screen. Queue comics in the background and read them completely offline without internet.
+* 🏷️ **Multi-Source Metadata Tagger**: Built-in enrichment engine querying ComicVine, Metron, GCD, Goodreads, Amazon, and Google Books with perceptual cover image hashing and automatic file renaming/sorting.
+* 🤖 **AI Model Context Protocol (MCP)**: Native Python MCP server allowing Claude, Cursor, and Gemini to curate reading lists, inspect cover art, and query your collection with natural language.
+* 🛡️ **Cloudflare Zero Trust Ready**: Zero open ports needed. Full integration with Cloudflare Access JWT authentication, granular user permissions (down to publisher and series), and admin impersonation.
+* 📂 **Metadata Mode & Folder Mode**: Organize your library by metadata tags (Publisher → Series → Issue) or mirror your physical directory tree directly.
+* 💻 **Client-Side Local Reader**: Drag and drop local CBZ/CBR files directly into the browser to read instantly with WebAssembly—no file upload required.
 
-**Administration**
-- **Access Control:** Multi-user support with detailed access controls (e.g., share specific publishers or series with friends).
-- **Secure Login:** Optional integration with Cloudflare Zero Trust for secure access.
+---
 
-## Installation & Setup
+## 🎬 Showcase
 
-### Docker (Recommended)
+| AI Smart Guided View | Multi-Device Reader |
+| :---: | :---: |
+| ![Guided View Demo](docs/assets/guided-view-demo.gif) | ![Feature Demo](docs/assets/f9404841b6094ed7b9f0bc1036d14360.gif) |
 
-The easiest way to run Comics Now! is with Docker. You can either use our pre-built image from the GitHub Container Registry (fastest) or build it locally.
+<details>
+<summary>📸 <strong>Click to view UI Screenshots</strong></summary>
 
-#### Using Pre-built Image (Fastest)
-
-1. **Download the configuration:**
-   ```bash
-   curl -O https://raw.githubusercontent.com/ComicsNow/comics-now/main/docker-compose.yml
-   ```
-
-2. **Configure:**
-   Edit `docker-compose.yml` and replace `build: .` with `image: ghcr.io/comicsnow/comics-now:latest`. Then mount your comic libraries.
-   ```yaml
-   services:
-     server:
-       image: ghcr.io/comicsnow/comics-now:latest
-       volumes:
-         - ./data:/app/data
-         - /path/to/your/comics:/comics:ro
-   ```
-
-3. **Start the service:**
-   `docker compose up -d`
-
-#### Building Locally
-1. **Clone the repository:**
-   `git clone <repository-url>`
-   `cd comics-now`
-
-2. **Configure:**
-   Edit `docker-compose.yml` to mount your comic libraries.
-   ```yaml
-   volumes:
-     - ./data:/app/data
-     - /path/to/your/comics:/comics:ro  # Change this to your library path
-   ```
-
-3. **Start the service:**
-   `docker compose up -d --build`
-
-The app will be available at `http://localhost:3000`. Persistent data (database, config, and thumbnails) will be stored in the `./data` directory on your host.
-
-### Manual Install (NPM)
-
-1. **Clone the repository:**
-   `git clone <repository-url>`
-   `cd comics-now`
-
-2. **Install system requirements:**
-   - **Utilities (Ubuntu/Debian):** `sudo apt install poppler-utils zip unrar`
-   - **Metadata Engine (Python):** `pip3 install "comictagger[all]"`
-
-3. **Install app dependencies:**
-   `npm install`
-
-4. **Compile production assets:**
-   `npm run build`
-
-5. **Configure:**
-   Copy the example config: `cp config.example.json config.json`
-   Edit `config.json` to add your comic folders.
-
-6. **Start:**
-   `npm start`
-
-Access the app in your browser at `http://localhost:3000`.
-
-*See the `server/routes/api.js` file for full API documentation.*
-
-## Gallery
-
-### Demos
-![Feature Demo 1](docs/assets/f9404841b6094ed7b9f0bc1036d14360.gif)
-![Feature Demo 2](docs/assets/guided-view-demo.gif)
-
-### Screenshots
 | | | |
 |:---:|:---:|:---:|
-| ![Screenshot 1](docs/assets/59563.jpg) | ![Screenshot 2](docs/assets/59564.jpg) | ![Screenshot 3](docs/assets/59565.jpg) |
-| ![Screenshot 4](docs/assets/59566.jpg) | ![Screenshot 5](docs/assets/59567.jpg) | ![Screenshot 6](docs/assets/59568.jpg) |
-| ![Screenshot 7](docs/assets/59569.jpg) | ![Screenshot 8](docs/assets/59570.jpg) | ![Screenshot 9](docs/assets/59571.jpg) |
+| ![Library View](docs/assets/59563.jpg) | ![Series View](docs/assets/59564.jpg) | ![Comic Details](docs/assets/59565.jpg) |
+| ![Reader Controls](docs/assets/59566.jpg) | ![Guided View Panels](docs/assets/59567.jpg) | ![Reading Lists](docs/assets/59568.jpg) |
+| ![Metadata Inspector](docs/assets/59569.jpg) | ![Tagger Matches](docs/assets/59570.jpg) | ![User Settings](docs/assets/59571.jpg) |
 
+</details>
+
+---
+
+## 🚀 Quick Start (60 Seconds)
+
+### Option 1: Docker CLI (Fastest)
+
+```bash
+docker run -d \
+  --name comics-now \
+  -p 3000:3000 \
+  -v $(pwd)/data:/app/data \
+  -v /path/to/your/comics:/comics:ro \
+  --restart unless-stopped \
+  ghcr.io/comicsnow/comics-now:latest
+```
+
+Open [http://localhost:3000](http://localhost:3000) in your browser!
+
+---
+
+### Option 2: Docker Compose
+
+Save as `docker-compose.yml`:
+
+```yaml
+services:
+  comics-now:
+    image: ghcr.io/comicsnow/comics-now:latest
+    container_name: comics-now
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - DATA_DIR=/app/data
+      - PORT=3000
+    volumes:
+      - ./data:/app/data
+      - /path/to/your/comics:/comics:ro
+    restart: unless-stopped
+```
+
+Launch with:
+```bash
+docker compose up -d
+```
+
+---
+
+## 📖 Complete Documentation & Wiki
+
+Looking for detailed setup guides, configuration tables, or workflow deep dives? Check out our comprehensive documentation manual:
+
+👉 **[Read the Full Comics Now! Wiki Manual](docs/WIKI.md)**
+
+### Manual Highlights:
+- [Cloudflare Zero Trust & LAN Admin Configuration](docs/WIKI.md#3-cloudflare-zero-trust--authentication)
+- [Granular Permissions & User Impersonation](docs/WIKI.md#4-user--administrator-management)
+- [Metadata Mode vs. Folder Mode](docs/WIKI.md#5-libraries-folder-structures--scanning)
+- [Sidecar vs. Database vs. Archive Write-Back](docs/WIKI.md#6-supported-formats-auto-conversion--metadata-storage)
+- [Multi-Source Tagging & Auto-Renaming Engine](docs/WIKI.md#7-the-tagging-engine--file-organization)
+- [Smart Guided View & Reading Modes (Continuous, Manga, Bubble Zoom)](docs/WIKI.md#8-smart-guided-view--reading-modes)
+- [Curating & Syncing Reading Lists to All Users](docs/WIKI.md#9-reading-lists)
+- [Progressive Web App (PWA) Offline Installation](docs/WIKI.md#10-devices-progress-syncing--offline-pwa)
+- [UI Long-Press Context Menus & Actions](docs/WIKI.md#11-ui-navigation-views--long-press-menus)
+- [Model Context Protocol (MCP) Setup for Claude & Cursor](docs/WIKI.md#13-model-context-protocol-mcp-server)
+
+---
+
+## 🤖 Model Context Protocol (MCP) Integration
+
+Comics Now! includes a built-in Python MCP server (`mcp/`) that lets your AI coding assistant or desktop agent manage your collection:
+
+```bash
+# Add to Claude Code
+claude mcp add comics-now -- /path/to/comics-now/mcp/run.sh
+
+# Or start directly
+npm run mcp
+```
+
+**What your AI agent can do:**
+- 🔍 *"Create a chronological reading list for the Infinity Gauntlet event across all my comics."*
+- 🎨 *"Inspect the cover of comic #412, verify the issue via web search, and tag the writer and artist."*
+- 📊 *"Query SQLite for all unread Spider-Man comics published between 1985 and 1992."*
+
+*(Read the [MCP Architecture & Setup Guide](mcp/README.md) for configuration details.)*
+
+---
+
+## 🛠️ Bare Metal Installation
+
+If you prefer running without Docker on Debian / Ubuntu / Raspberry Pi OS:
+
+```bash
+# 1. Install prerequisites
+sudo apt update
+sudo apt install -y nodejs npm python3 python3-pip python3-venv poppler-utils zip unrar
+
+# 2. Clone repository & install dependencies
+git clone https://github.com/ComicsNow/comics-now.git
+cd comics-now
+npm install
+npm run build
+
+# 3. Configure environment
+cp .env.example .env
+
+# 4. Start server
+npm start
+```
+
+---
+
+## 🤝 Contributing
+
+Contributions, feature requests, and bug reports are warmly welcome!
+1. Fork the repository.
+2. Create your feature branch (`git checkout -b feature/amazing-feature`).
+3. Run automated tests (`npm test`).
+4. Commit your changes (`git commit -m 'feat: add amazing feature'`).
+5. Push to your branch and open a Pull Request.
+
+---
+
+## 📄 License
+
+Comics Now! is free and open-source software licensed under the **GNU Affero General Public License v3.0** (`AGPL-3.0`). See the [LICENSE](LICENSE) file for details.
