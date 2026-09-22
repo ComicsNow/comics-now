@@ -92,7 +92,13 @@
   <div id="settings-modal" class="hidden fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-40 p-4">
     <div class="bg-gray-800 rounded-lg w-full h-full sm:h-auto sm:max-h-[90vh] max-w-4xl shadow-lg flex flex-col overflow-hidden">
         <div class="flex justify-between items-center p-4 sm:p-6 border-b border-gray-700">
-          <h3 class="text-xl sm:text-2xl font-bold">Settings</h3>
+          <div class="flex items-center gap-3">
+            <h3 class="text-xl sm:text-2xl font-bold">Settings</h3>
+            <a id="kofi-settings-link" href="https://ko-fi.com/comicsnow" target="_blank" rel="noopener noreferrer" aria-label="Support on Ko-fi" title="Support on Ko-fi" class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#FF5E5B] hover:bg-[#ff7674] text-white text-xs sm:text-sm font-semibold shadow transition-colors">
+              <svg class="w-3.5 h-3.5" fill="currentColor" aria-hidden="true"><use href="#icon-22"></use></svg>
+              <span>Support on Ko-fi</span>
+            </a>
+          </div>
           <button onclick="closeSettingsModal()" class="modal-close-btn text-2xl font-bold hover:text-gray-300 transition-colors">&times;</button>
         </div>
         <div class="flex overflow-x-auto border-b border-gray-600 px-4 sm:px-6 scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-gray-800 flex-shrink-0">
