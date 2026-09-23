@@ -148,6 +148,10 @@ function removeLibrary(dir) {
 }
 
 function ensureConfigFileExists() {
+  const dir = path.dirname(CONFIG_FILE);
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
   if (!fs.existsSync(CONFIG_FILE)) {
     const initialConfig = { ...DEFAULT_CONFIG, libraries: [{ path: '/comics', hierarchyMode: 'metadata' }] };
     fs.writeFileSync(CONFIG_FILE, JSON.stringify(initialConfig, null, 2));
@@ -157,6 +161,10 @@ function ensureConfigFileExists() {
 
 function saveConfigToDisk() {
   try {
+    const dir = path.dirname(CONFIG_FILE);
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
     // Ensure we don't save legacy comicsDirectories if it somehow got into the config object
     const { comicsDirectories, ...safeConfig } = config;
     fs.writeFileSync(CONFIG_FILE, JSON.stringify(safeConfig, null, 2));

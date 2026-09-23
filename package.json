@@ -1,20 +1,63 @@
 {
   "name": "comics-now",
   "version": "1.0.0",
-  "description": "A simple comic reader app.",
+  "description": "Modern self-hosted comic book library server, smart AI guided reader, and cataloging platform.",
   "main": "server.js",
+  "bin": {
+    "comics-now": "./bin/comics-now.js"
+  },
+  "files": [
+    "bin/",
+    "server/",
+    "server.js",
+    "public/",
+    "styles/",
+    "models/",
+    "logos/",
+    "icons/",
+    "scripts/check-dependencies.js",
+    "tagger/",
+    "config.example.json",
+    "LICENSE",
+    "README.md"
+  ],
   "scripts": {
     "start": "node server.js",
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
     "build:css": "tailwindcss -i ./styles/tailwind.css -o ./public/tailwind.css --minify",
+    "prepack": "npm run build:css && npm run build",
     "test": "jest",
     "test:watch": "jest --watch",
     "test:e2e": "playwright test",
     "test:all": "npm run test && npm run test:e2e",
     "postinstall": "node scripts/check-dependencies.js",
     "mcp": "bash mcp/run.sh"
+  },
+  "keywords": [
+    "comic",
+    "comics",
+    "comic-reader",
+    "comic-server",
+    "cbz",
+    "cbr",
+    "cbt",
+    "manga",
+    "guided-view",
+    "smart-reader",
+    "self-hosted",
+    "pwa",
+    "mcp",
+    "comicvine"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ComicsNow/comics-now.git"
+  },
+  "homepage": "https://github.com/ComicsNow/comics-now#readme",
+  "bugs": {
+    "url": "https://github.com/ComicsNow/comics-now/issues"
   },
   "license": "AGPL-3.0",
   "dependencies": {
