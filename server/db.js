@@ -4,6 +4,11 @@ const path = require('path');
 const { DB_FILE } = require('./constants');
 const { log } = require('./logger');
 
+const dbDir = path.dirname(DB_FILE);
+if (!fs.existsSync(dbDir)) {
+  fs.mkdirSync(dbDir, { recursive: true });
+}
+
 const db = new Database(DB_FILE);
 
 // Enable performance pragmas (WAL mode, busy timeout, foreign keys)

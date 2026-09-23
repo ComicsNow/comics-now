@@ -1,0 +1,63 @@
+# Development and temporary files
+.git/
+.github/
+.claude/
+.antigravitycli/
+.remember/
+scratch/
+plans/
+conductor/
+coverage/
+test-results/
+tests/
+playwright.config.js
+jest.config.js
+.pytest_cache/
+__pycache__/
+
+# Database files and backups
+*.db
+*.db-*
+*.db.bak*
+*.sqlite*
+*.bak*
+
+# User caches and media
+thumbnails/
+data/
+metadata/
+.deploy-backups/
+temp/
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Lock files
+pnpm-lock.yaml
+pnpm-workspace.yaml
+package-lock.json
+
+# Docker files
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# Tagger runtime data & tests
+tagger/*.db
+tagger/scan_logs/
+tagger/uploads/
+tagger/__pycache__/
+tagger/**/__pycache__/
+tagger/**/*.pyc
+tagger/.pytest_cache/
+tagger/**/.pytest_cache/
+tagger/tests/
+tagger/scheduler_config.json
+!tagger/scheduler_config.example.json
+
+# Model checkpoints and redundant models not used by inference engine
+models/**/*.pt
+models/manga/manga_panel_detector_fp32.onnx
+models/western/
