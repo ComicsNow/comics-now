@@ -5,8 +5,10 @@
 </p>
 
 <p align="center">
+  <a href="https://www.npmjs.com/package/comics-now"><img src="https://img.shields.io/npm/v/comics-now.svg?color=cb3837&logo=npm" alt="npm version"></a>
   <a href="#quick-start-60-seconds"><img src="https://img.shields.io/badge/docker-ready-blue.svg?logo=docker" alt="Docker Ready"></a>
   <a href="https://github.com/ComicsNow/comics-now/pkgs/container/comics-now"><img src="https://img.shields.io/badge/ghcr.io-comics--now-2496ED.svg?logo=github" alt="GHCR Image"></a>
+  <a href="https://github.com/ComicsNow/comics-now/actions/workflows/npm-publish.yml"><img src="https://github.com/ComicsNow/comics-now/actions/workflows/npm-publish.yml/badge.svg" alt="npm publish"></a>
   <a href="https://github.com/ComicsNow/comics-now/actions/workflows/docker-publish.yml"><img src="https://github.com/ComicsNow/comics-now/actions/workflows/docker-publish.yml/badge.svg" alt="Build Status"></a>
   <a href="https://github.com/ComicsNow/comics-now/actions/workflows/codeql.yml"><img src="https://github.com/ComicsNow/comics-now/actions/workflows/codeql.yml/badge.svg" alt="CodeQL Status"></a>
   <a href="https://ko-fi.com/comicsnow"><img src="https://img.shields.io/badge/Ko--fi-Support-FF5E5B?logo=ko-fi&logoColor=white" alt="Support on Ko-fi"></a>
@@ -52,7 +54,22 @@ Most digital comic servers were built a decade ago as basic file browsers. **Com
 
 ## 🚀 Quick Start (60 Seconds)
 
-### Option 1: Docker CLI (Fastest)
+### Option 1: Run Instantly with `npx` (No Setup Required)
+
+```bash
+# Point directly to your comic books folder
+npx comics-now --comics /path/to/your/comics --port 3000
+```
+
+Or install globally:
+```bash
+npm install -g comics-now
+comics-now --comics /path/to/your/comics
+```
+
+---
+
+### Option 2: Docker CLI
 
 ```bash
 docker run -d \
