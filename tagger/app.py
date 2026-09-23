@@ -57,7 +57,7 @@ def check_comic_info_completeness(cbz_path):
       is_incomplete: bool
       reason: str or None
     """
-    import xml.etree.ElementTree as ET
+    import defusedxml.ElementTree as ET
     if not os.path.exists(cbz_path):
         return True, "File not found"
     if not zipfile.is_zipfile(cbz_path):
@@ -488,7 +488,7 @@ def process_single_cbz_file(file_path, comicvine_api_key, google_books_api_key=N
     cover_tmp_dir = None
     
     # Check if there is an existing persistent session cover we can reuse
-    session_id = hashlib.md5(file_path.encode('utf-8')).hexdigest()
+    session_id = hashlib.sha256(file_path.encode('utf-8')).hexdigest()
     persistent_cover_dir = os.path.join(UPLOAD_FOLDER, session_id)
     persistent_cover_path = os.path.join(persistent_cover_dir, f"cover_{filename}.jpg")
     
@@ -1143,7 +1143,7 @@ def load_local_file():
         return jsonify({"error": "Only .cbz files are supported."}), 400
 
     filename = os.path.basename(file_path)
-    session_id = hashlib.md5(file_path.encode('utf-8')).hexdigest()
+    session_id = hashlib.sha256(file_path.encode('utf-8')).hexdigest()
     session_dir = os.path.join(UPLOAD_FOLDER, session_id)
     os.makedirs(session_dir, exist_ok=True)
     
