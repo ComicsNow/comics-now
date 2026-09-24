@@ -1,4 +1,5 @@
 import os
+import re
 import uuid
 import shutil
 import zipfile
@@ -7,6 +8,7 @@ import time
 import datetime
 import json
 import hashlib
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from flask import Flask, render_template, request, jsonify, send_file, Response
 from werkzeug.utils import secure_filename
 
@@ -459,7 +461,6 @@ def process_single_cbz_file(file_path, comicvine_api_key, google_books_api_key=N
         pass
     
     active_sources = enabled_sources if enabled_sources else ["src-comicvine", "src-metron-gcd", "src-lcg", "src-goodreads", "src-blackwells", "src-waterstones"]
-    api_failed = False
     
     metadata = None
     source_url = None
@@ -533,7 +534,6 @@ def process_single_cbz_file(file_path, comicvine_api_key, google_books_api_key=N
                 source_url = src
     except Exception as resolve_err:
         print(f"[-] Parallel search failed for {filename}: {resolve_err}")
-        api_failed = True
     finally:
         domain_limiter.clear_thread_callback()
         if created_tmp_dir and cover_tmp_dir:
@@ -1125,7 +1125,8 @@ def browse_files():
             "cbz_files": cbz_files
         })
     except Exception as e:
-        return jsonify({"error": f"Failed to read directory: {str(e)}"}), 500
+        print(f"[-] Error reading directory: {e}")
+        return jsonify({"error": "Failed to read directory"}), 500
 
 
 @app.route('/load-local', methods=['POST'])
@@ -1199,9 +1200,10 @@ def load_local_file():
             "existing_metadata": existing_meta
         })
     except Exception as e:
+        print(f"[-] Error extracting cover: {e}")
         if not cover_exists:
             shutil.rmtree(session_dir, ignore_errors=True)
-        return jsonify({"error": f"Failed to extract cover: {str(e)}"}), 500
+        return jsonify({"error": "Failed to extract cover"}), 500
 
 @app.route('/search', methods=['POST'])
 def search_metadata():
@@ -1375,7 +1377,8 @@ def tag_comic():
             "download_url": f"/download/{session_id}"
         })
     except Exception as e:
-        return jsonify({"error": f"Tagging failed: {str(e)}"}), 500
+        print(f"[-] Error during tagging: {e}")
+        return jsonify({"error": "Tagging failed"}), 500
 
 
 @app.route('/batch-tag', methods=['POST'])
@@ -1503,7 +1506,8 @@ def batch_tag_folder():
         return Response(generate(), mimetype='text/event-stream')
         
     except Exception as e:
-        return jsonify({"error": f"Batch process initialization failed: {str(e)}"}), 500
+        print(f"[-] Batch process error: {e}")
+        return jsonify({"error": "Batch process initialization failed"}), 500
 
 
 @app.route('/scheduler-info', methods=['GET'])
@@ -1793,7 +1797,8 @@ def library_enhance_folder():
                     
         return Response(generate(), mimetype='text/event-stream')
     except Exception as e:
-        return jsonify({"error": f"Library enhance initialization failed: {str(e)}"}), 500
+        print(f"[-] Library enhance error: {e}")
+        return jsonify({"error": "Library enhance initialization failed"}), 500
 
 
 @app.route('/download/<session_id>', methods=['GET'])
@@ -1829,12 +1834,13 @@ def cleanup_temp():
                         os.unlink(file_path)
                     elif os.path.isdir(file_path):
                         shutil.rmtree(file_path)
-                except Exception as e:
+                except Exception:
                     pass
         sessions.clear()
         return jsonify({"success": True})
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        print(f"[-] Cleanup error: {e}")
+        return jsonify({"error": "Cleanup failed"}), 500
 
 
 def start_scheduler():
@@ -1921,7 +1927,8 @@ def api_tag_file():
         
         return jsonify(res)
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        print(f"[-] Error tagging file: {e}")
+        return jsonify({"error": "File tagging failed"}), 500
 
 
 @app.route('/api/tag-file-stream', methods=['POST'])
@@ -2030,7 +2037,8 @@ def api_apply_tag():
         mark_as_enhanced(file_path, [metadata.get("source_url") or "Unknown"])
         return jsonify({"success": True})
     except Exception as e:
-        return jsonify({"error": f"Failed to apply tag: {str(e)}"}), 500
+        print(f"[-] Error applying tag: {e}")
+        return jsonify({"error": "Failed to apply tag"}), 500
 
 
 @app.route('/api/search', methods=['POST'])
@@ -2044,7 +2052,6 @@ def api_search_external():
     try:
         results = []
         if source == "all":
-            import concurrent.futures
             sources_to_run = [
                 ("gcd", lambda: search_gcd_multi(query)),
                 ("lcg", lambda: search_lcg_multi(query)),
@@ -2064,9 +2071,9 @@ def api_search_external():
             if metron_user and metron_pass:
                 sources_to_run.append(("metron", lambda: search_metron_multi(query, metron_user, metron_pass)))
 
-            with concurrent.futures.ThreadPoolExecutor(max_workers=min(len(sources_to_run), 8)) as executor:
+            with ThreadPoolExecutor(max_workers=min(len(sources_to_run), 8)) as executor:
                 future_to_src = {executor.submit(fn): src_name for src_name, fn in sources_to_run}
-                for future in concurrent.futures.as_completed(future_to_src):
+                for future in as_completed(future_to_src):
                     src_name = future_to_src[future]
                     try:
                         res = future.result()
@@ -2162,7 +2169,8 @@ def api_search_external():
 
         return jsonify(normalized)
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        print(f"[-] Search error: {e}")
+        return jsonify({"error": "Search failed"}), 500
 
 
 @app.route('/api/homepage', methods=['GET'])
@@ -2217,8 +2225,13 @@ def get_logs():
 
 @app.route('/api/logs/<log_id>', methods=['GET'])
 def get_log_detail(log_id):
-    filename = f"scan_log_{log_id}.json"
-    path = os.path.join(LOGS_DIR, filename)
+    if not re.match(r'^[a-zA-Z0-9_\-]+$', log_id):
+        return jsonify({"error": "Invalid log identifier"}), 400
+    safe_filename = secure_filename(f"scan_log_{log_id}.json")
+    resolved_logs_dir = os.path.abspath(LOGS_DIR)
+    path = os.path.abspath(os.path.join(resolved_logs_dir, safe_filename))
+    if not path.startswith(resolved_logs_dir + os.sep):
+        return jsonify({"error": "Access denied"}), 403
     if not os.path.exists(path):
         return jsonify({"error": "Log not found"}), 404
     try:
@@ -2226,20 +2239,27 @@ def get_log_detail(log_id):
             data = json.load(file_obj)
         return jsonify({"success": True, "log": data})
     except Exception as e:
-        return jsonify({"error": f"Failed to read log: {str(e)}"}), 500
+        print(f"[-] Error reading log {log_id}: {e}")
+        return jsonify({"error": "Failed to read log"}), 500
 
 
 @app.route('/api/logs/<log_id>', methods=['DELETE'])
 def delete_log(log_id):
-    filename = f"scan_log_{log_id}.json"
-    path = os.path.join(LOGS_DIR, filename)
+    if not re.match(r'^[a-zA-Z0-9_\-]+$', log_id):
+        return jsonify({"error": "Invalid log identifier"}), 400
+    safe_filename = secure_filename(f"scan_log_{log_id}.json")
+    resolved_logs_dir = os.path.abspath(LOGS_DIR)
+    path = os.path.abspath(os.path.join(resolved_logs_dir, safe_filename))
+    if not path.startswith(resolved_logs_dir + os.sep):
+        return jsonify({"error": "Access denied"}), 403
     if not os.path.exists(path):
         return jsonify({"error": "Log not found"}), 404
     try:
         os.remove(path)
         return jsonify({"success": True, "message": "Log deleted successfully"})
     except Exception as e:
-        return jsonify({"error": f"Failed to delete log: {str(e)}"}), 500
+        print(f"[-] Error deleting log {log_id}: {e}")
+        return jsonify({"error": "Failed to delete log"}), 500
 
 
 @app.route('/api/logs', methods=['DELETE'])
@@ -2253,7 +2273,8 @@ def clear_all_logs():
                     deleted_count += 1
         return jsonify({"success": True, "message": f"Successfully deleted {deleted_count} logs"})
     except Exception as e:
-        return jsonify({"error": f"Failed to clear logs: {str(e)}"}), 500
+        print(f"[-] Error clearing logs: {e}")
+        return jsonify({"error": "Failed to clear logs"}), 500
 
 
 @app.route('/api/enhanced-comics/clear', methods=['POST'])
@@ -2272,7 +2293,8 @@ def clear_enhanced_comics():
         
         return jsonify({"success": True, "message": "Successfully cleared all enhanced comics from tracking database and disabled legacy XML fallback."})
     except Exception as e:
-        return jsonify({"error": f"Failed to clear tracking database: {str(e)}"}), 500
+        print(f"[-] Error clearing tracking DB: {e}")
+        return jsonify({"error": "Failed to clear tracking database"}), 500
 
 
 def _env_flag(name, default=False):

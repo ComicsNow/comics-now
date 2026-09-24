@@ -76,8 +76,8 @@ def clean_format_and_edition(text: str) -> str:
     # 5. Clean whitespace & trailing/leading/repeated delimiters
     s = re.sub(r'\s*[:;\-–—|/,]+\s*[:;\-–—|/,]+', ' - ', s)
     s = re.sub(r'\s+', ' ', s).strip()
-    s = re.sub(r'[\s,:;/|\-\u2010-\u2015]+$', '', s).strip()
-    s = re.sub(r'^[\s,:;/|\-\u2010-\u2015]+', '', s).strip()
+    s = s.rstrip(' ,:;/|-–—\u2010\u2011\u2012\u2013\u2014\u2015').strip()
+    s = s.lstrip(' ,:;/|-–—\u2010\u2011\u2012\u2013\u2014\u2015').strip()
     return s
 
 
@@ -282,7 +282,7 @@ def is_english_text(text: str) -> bool:
     """
     if not text:
         return True
-    clean = re.sub(r'<[^>]+>', ' ', str(text))
+    clean = re.sub(r'<[^<>]+>', ' ', str(text))
     words = [w.lower() for w in re.findall(r'\b[a-zA-Z\u00C0-\u017F]+\b', clean)]
     if len(words) < 5:
         return True
@@ -312,8 +312,9 @@ def clean_description(desc: str) -> str:
     s = str(desc)
 
     # 1. Strip HTML tags and normalize entities
-    s = re.sub(r'<[^>]+>', ' ', s)
-    s = s.replace('&quot;', '"').replace('&#39;', "'").replace('&amp;', '&').replace('&lt;', '<').replace('&gt;', '>')
+    s = re.sub(r'<[^<>]+>', ' ', s)
+    _entity_map = {'&quot;': '"', '&#39;': "'", '&lt;': '<', '&gt;': '>', '&amp;': '&'}
+    s = re.sub(r'&(?:quot|#39|lt|gt|amp);', lambda m: _entity_map.get(m.group(0), m.group(0)), s)
 
     # 2. Spec table dumps & blocks (glued or line-separated)
     s = re.sub(
@@ -508,7 +509,7 @@ def normalize_metadata(meta, codex=None):
     series_clean = meta["series"] or ""
 
     # Always strip unambiguous "#N" patterns (e.g. "Batman #45" → "Batman")
-    m_hash = re.search(r'\s*#(\d+)\s*$', series_clean)
+    m_hash = re.search(r'#(\d+)\s*$', series_clean)
     if m_hash:
         if not vol_found and not meta.get("number"):
             meta["number"] = m_hash.group(1)
@@ -567,12 +568,10 @@ def normalize_metadata(meta, codex=None):
 
 
 def calculate_similarity(string1, string2):
-    import difflib
     if not string1 or not string2:
         return 0.0
 
     def clean(s):
-        import re
         s = s.lower()
         if s.endswith('.cbz'):
             s = s[:-4]
