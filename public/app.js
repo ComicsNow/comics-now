@@ -232,7 +232,8 @@ function initEnvironment() {
 async function registerServiceWorker(config) {
   // 3) Register the service worker for this mount
   if ('serviceWorker' in navigator) {
-    if (['localhost', '127.0.0.1'].includes(location.hostname)) {
+    if (location.port === '5173') {
+      // Vite dev server - unregister to avoid caching during development
       const regs = await navigator.serviceWorker.getRegistrations();
       regs.forEach(reg => reg.unregister());
     } else {
@@ -244,10 +245,16 @@ async function registerServiceWorker(config) {
         registration.update();
         registration.addEventListener('updatefound', () => {
           const newWorker = registration.installing;
-          newWorker.addEventListener('statechange', () => {});
+          if (newWorker) {
+            newWorker.addEventListener('statechange', () => {
+              if (newWorker.state === 'activated') {
+                console.log('[SW] Service worker updated and active.');
+              }
+            });
+          }
         });
       } catch (error) {
-        // Silently fail
+        console.warn('[SW] Registration failed:', error);
       }
     }
   }

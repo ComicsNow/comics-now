@@ -44,7 +44,46 @@ function createStaticRouter({ getConfig, getComicsDirectories, getPublicLibrarie
 
   router.get('/service-worker.js', (req, res) => {
     res.set('Cache-Control', 'no-store');
-    res.sendFile(path.join(PUBLIC_DIR, 'service-worker.js'));
+    try {
+      let swContent = fs.readFileSync(path.join(PUBLIC_DIR, 'service-worker.js'), 'utf-8');
+
+      // Determine build mtime to auto-bump cache version on build
+      let buildMtime = '1';
+      const distIndexPath = path.join(distDir, 'index.html');
+      if (fs.existsSync(distIndexPath)) {
+        buildMtime = String(Math.floor(fs.statSync(distIndexPath).mtimeMs));
+      }
+
+      // Discover any assets in dist/assets
+      const distAssetsDir = path.join(distDir, 'assets');
+      const distAssets = fs.existsSync(distAssetsDir)
+        ? fs.readdirSync(distAssetsDir).filter(f => !f.endsWith('.map')).map(f => `assets/${f}`)
+        : [];
+
+      // Replace CACHE_VERSION with dynamic timestamp
+      swContent = swContent.replace(
+        /const CACHE_VERSION = ['"][^'"]+['"];/,
+        `const CACHE_VERSION = 'v9.0-${buildMtime}';`
+      );
+
+      // Inject discovered distAssets into ASSET_PATHS if not already present
+      if (distAssets.length > 0) {
+        swContent = swContent.replace(
+          /const ASSET_PATHS = \[([\s\S]*?)\];/,
+          (match, p1) => {
+            const existing = p1.split(',').map(s => s.trim().replace(/['"]/g, '')).filter(Boolean);
+            const combined = Array.from(new Set([...distAssets, ...existing]));
+            return `const ASSET_PATHS = ${JSON.stringify(combined, null, 2)};`;
+          }
+        );
+      }
+
+      res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
+      res.send(swContent);
+    } catch (e) {
+      log('ERROR', 'SERVER', `Failed to serve dynamic service-worker.js: ${e.message}`);
+      res.sendFile(path.join(PUBLIC_DIR, 'service-worker.js'));
+    }
   });
 
   router.get('/favicon.ico', (req, res) => {
