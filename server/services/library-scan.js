@@ -3,7 +3,7 @@ const path = require('path');
 const { dbGet, dbRun, dbAll } = require('../db');
 const { log } = require('../logger');
 const { getConfig, getScanIntervalMs, getLibraries } = require('../config');
-const { getComicInfoFromArchive, normalizePublisher, cleanDescription, splitVolumeSeriesAndTitle } = require('./metadata');
+const { getComicInfoFromArchive, normalizePublisher, cleanDescription, splitVolumeSeriesAndTitle, isTitleSameAsSeries } = require('./metadata');
 const { createId, t0, ms, pMap, trimObjectStrings } = require('../utils');
 const {
   THUMBNAILS_DIRECTORY,
@@ -255,6 +255,9 @@ async function scanLibrary(force = false) {
           if (!info.Volume) {
             info.Volume = volSplit.volume;
           }
+        }
+        if (info.Title && (isTitleSameAsSeries(info.Title, info.Series) || (!info.Series && isTitleSameAsSeries(info.Title, '')))) {
+          info.Title = '';
         }
         const fileStats = wasConverted ? await fs.promises.stat(filePath) : stats;
 

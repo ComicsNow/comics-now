@@ -187,6 +187,56 @@ function createDisplayField() {
   return document.createElement('div');
 }
 
+function isTitleSameAsSeries(title, series) {
+  if (!title) return false;
+  let tRaw = String(title).trim();
+  tRaw = tRaw.replace(/[\(\[\{]\s*(?:(?:the|a|an)\s+)?(?:trade\s+paperback|digital(?:\s+edition)?|paperback(?:\s*\/\s*softback)?|hardcover|hardback(?:\s*\/\s*hardcover)?|softcover|graphic\s+novel|tpb|tp|hb|hc|sc|gn)\s*[\)\]\}]/gi, ' ');
+  tRaw = tRaw.replace(/(?:^|[\s,:;/|\-\u2010-\u2015]+)(?:(?:the|a|an)\s+)?(?:trade\s+paperback|digital\s+edition|paperback(?:\s*\/\s*softback)?|hardcover|hardback(?:\s*\/\s*hardcover)?|softcover|graphic\s+novel|tpb|tp|hb|hc|sc|gn)(?=$|[\s,:;/|\-\u2010-\u2015]+)/gi, ' ');
+  tRaw = tRaw.replace(/\s+/g, ' ').trim();
+  if (!tRaw) return true;
+
+  if (/^(?:#|(?:issue|no\.?|vol(?:ume)?\.?|pt\.?|part|book|bk\.?)\s*#?)\s*\d*\s*$/i.test(tRaw)) {
+    return true;
+  }
+
+  if (!series) return false;
+  let sRaw = String(series).trim();
+  sRaw = sRaw.replace(/[\(\[\{]\s*(?:(?:the|a|an)\s+)?(?:trade\s+paperback|digital(?:\s+edition)?|paperback(?:\s*\/\s*softback)?|hardcover|hardback(?:\s*\/\s*hardcover)?|softcover|graphic\s+novel|tpb|tp|hb|hc|sc|gn)\s*[\)\]\}]/gi, ' ');
+  sRaw = sRaw.replace(/(?:^|[\s,:;/|\-\u2010-\u2015]+)(?:(?:the|a|an)\s+)?(?:trade\s+paperback|digital\s+edition|paperback(?:\s*\/\s*softback)?|hardcover|hardback(?:\s*\/\s*hardcover)?|softcover|graphic\s+novel|tpb|tp|hb|hc|sc|gn)(?=$|[\s,:;/|\-\u2010-\u2015]+)/gi, ' ');
+  sRaw = sRaw.replace(/\s+/g, ' ').trim();
+  if (!sRaw) return false;
+
+  if (tRaw.toLowerCase() === sRaw.toLowerCase()) return true;
+
+  const escapedS = sRaw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const directPattern = new RegExp(
+    `^${escapedS}[:\\s\\-_–—]*(?:#|(?:issue|no\\.?|vol(?:ume)?\\.?|pt\\.?|part|book|bk\\.?)\\s*#?)?\\s*\\d+(?:\\s*(?:of|\\/)\\s*\\d+)?\\s*(?:\\(\\d{4}\\))?\\s*[)\\]}]*$`,
+    'i'
+  );
+  if (directPattern.test(tRaw)) return true;
+
+  const normS = sRaw.toLowerCase().replace(/[^\w\s]/g, ' ').replace(/\s+/g, ' ').trim();
+  const normT = tRaw.toLowerCase().replace(/[^\w\s]/g, ' ').replace(/\s+/g, ' ').trim();
+
+  if (normT === normS) return true;
+
+  if (normT.startsWith(normS)) {
+    const rem = normT.slice(normS.length).trim();
+    if (/^(?:#|(?:issue|no|vol|volume|pt|part|book|bk)\s*#?)?\s*\d+(?:\s*(?:of|\/)\s*\d+)?(?:\s*\d{4})?$/i.test(rem)) {
+      return true;
+    }
+  }
+
+  if (normS.startsWith(normT)) {
+    const rem = normS.slice(normT.length).trim();
+    if (/^(?:#|(?:issue|no|vol|volume|pt|part|book|bk)\s*#?)?\s*\d+(?:\s*(?:of|\/)\s*\d+)?(?:\s*\d{4})?$/i.test(rem)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 function renderMetadataDisplay(metadata, clearForm = true) {
   if (clearForm) {
     global.metadataForm.innerHTML = '';
@@ -212,6 +262,11 @@ function renderMetadataDisplay(metadata, clearForm = true) {
   };
 
   const merged = isAdmin ? { ...defaults, ...(metadata || {}) } : (metadata || {});
+
+  // Rule: If Title is the same as Series (even with issue numbers, #3, 3, volume suffixes), leave it blank!
+  if (merged.Title && (isTitleSameAsSeries(merged.Title, merged.Series) || (!merged.Series && isTitleSameAsSeries(merged.Title, '')))) {
+    merged.Title = '';
+  }
 
   // Which keys should be chip inputs
   const chipFields = new Set(['Characters', 'Teams', 'Locations', 'Genre']);
@@ -339,7 +394,8 @@ export {
   createFormRow,
   createChipInputRow,
   createDisplayField,
-  renderMetadataDisplay
+  renderMetadataDisplay,
+  isTitleSameAsSeries
 };
 
 state.loadMetadata = loadMetadata;
@@ -347,6 +403,7 @@ state.createFormRow = createFormRow;
 state.createChipInputRow = createChipInputRow;
 state.createDisplayField = createDisplayField;
 state.renderMetadataDisplay = renderMetadataDisplay;
+state.isTitleSameAsSeries = isTitleSameAsSeries;
 
 if (typeof window !== 'undefined') {
   window.loadMetadata = loadMetadata;
@@ -354,5 +411,6 @@ if (typeof window !== 'undefined') {
   window.createChipInputRow = createChipInputRow;
   window.createDisplayField = createDisplayField;
   window.renderMetadataDisplay = renderMetadataDisplay;
+  window.isTitleSameAsSeries = isTitleSameAsSeries;
 }
 

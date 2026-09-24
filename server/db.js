@@ -274,6 +274,30 @@ async function initializeDatabase() {
 
     await dbRun('COMMIT');
     log('INFO', 'DB', 'Database initialization complete');
+
+    // Title vs Series cleanup migration: If Title matches Series (including issue numbers, #3, etc.), set Title to '' in comics.metadata
+    try {
+      const { isTitleSameAsSeries } = require('./services/metadata');
+      const rows = db.prepare("SELECT id, series, metadata FROM comics WHERE metadata LIKE '%\"Title\":%'").all();
+      const updateStmt = db.prepare("UPDATE comics SET metadata = ? WHERE id = ?");
+      let cleanedCount = 0;
+      for (const row of rows) {
+        if (!row.metadata) continue;
+        try {
+          const m = JSON.parse(row.metadata);
+          if (m.Title && (isTitleSameAsSeries(m.Title, m.Series || row.series) || (!m.Series && !row.series && isTitleSameAsSeries(m.Title, '')))) {
+            m.Title = '';
+            updateStmt.run(JSON.stringify(m), row.id);
+            cleanedCount++;
+          }
+        } catch {}
+      }
+      if (cleanedCount > 0) {
+        log('INFO', 'DB', `Cleaned redundant Title from metadata for ${cleanedCount} comic(s)`);
+      }
+    } catch (e) {
+      log('WARN', 'DB', `Title cleanup migration error: ${e.message}`);
+    }
   } catch (err) {
     await dbRun('ROLLBACK').catch(() => {});
     log('ERROR', 'DB', `Database initialization failed: ${err.message}`);

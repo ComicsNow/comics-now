@@ -59,7 +59,11 @@ async function getComicInfoFromArchive(comicPath) {
       const xml = await fs.promises.readFile(sidecarPath, 'utf-8');
       const result = await parser.parseStringPromise(xml);
       log('INFO', 'META', `📄 Read ComicInfo.xml metadata from sidecar for ${path.basename(comicPath)}`);
-      return trimObjectStrings(result.ComicInfo || {});
+      const info = trimObjectStrings(result.ComicInfo || {});
+      if (info.Title && (isTitleSameAsSeries(info.Title, info.Series) || (!info.Series && isTitleSameAsSeries(info.Title, '')))) {
+        info.Title = '';
+      }
+      return info;
     } catch (err) {
       log('ERROR', 'META', `Failed to read ComicInfo.xml sidecar from ${path.basename(sidecarPath)}: ${err.message}`);
     }
@@ -78,7 +82,11 @@ async function getComicInfoFromArchive(comicPath) {
       const xml = buffer.toString('utf-8');
       try {
         const result = await parser.parseStringPromise(xml);
-        return trimObjectStrings(result.ComicInfo || {});
+        const info = trimObjectStrings(result.ComicInfo || {});
+        if (info.Title && (isTitleSameAsSeries(info.Title, info.Series) || (!info.Series && isTitleSameAsSeries(info.Title, '')))) {
+          info.Title = '';
+        }
+        return info;
       } catch {
         return {};
       }
@@ -488,6 +496,62 @@ function splitVolumeSeriesAndTitle(series, title) {
 }
 
 /**
+ * Determines whether a title is redundant with the series name.
+ * If Title is the same as Series (even with issue numbers, #3, 3, volume suffixes, or format tags),
+ * Title must be left blank.
+ *
+ * @param {string} title 
+ * @param {string} series 
+ * @returns {boolean}
+ */
+function isTitleSameAsSeries(title, series) {
+  if (!title) return false;
+  const tRaw = cleanFormatAndEdition(String(title)).trim();
+  if (!tRaw) return true; // Title was just a format tag (e.g. "HC", "TPB") -> blank it!
+
+  // If title is just a generic issue/volume label without subtitle (e.g. "Volume", "Vol. 1", "Issue 3", "#3")
+  if (/^(?:#|(?:issue|no\.?|vol(?:ume)?\.?|pt\.?|part|book|bk\.?)\s*#?)\s*\d*\s*$/i.test(tRaw)) {
+    return true;
+  }
+
+  if (!series) return false;
+  const sRaw = cleanFormatAndEdition(String(series)).trim();
+  if (!sRaw) return false;
+
+  if (tRaw.toLowerCase() === sRaw.toLowerCase()) return true;
+
+  // Direct regex check on raw strings
+  const escapedS = sRaw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const directPattern = new RegExp(
+    `^${escapedS}[:\\s\\-_–—]*(?:#|(?:issue|no\\.?|vol(?:ume)?\\.?|pt\\.?|part|book|bk\\.?)\\s*#?)?\\s*\\d+(?:\\s*(?:of|\\/)\\s*\\d+)?\\s*(?:\\(\\d{4}\\))?\\s*[)\\]}]*$`,
+    'i'
+  );
+  if (directPattern.test(tRaw)) return true;
+
+  // Normalized alphanumeric comparison
+  const normS = sRaw.toLowerCase().replace(/[^\w\s]/g, ' ').replace(/\s+/g, ' ').trim();
+  const normT = tRaw.toLowerCase().replace(/[^\w\s]/g, ' ').replace(/\s+/g, ' ').trim();
+
+  if (normT === normS) return true;
+
+  if (normT.startsWith(normS)) {
+    const rem = normT.slice(normS.length).trim();
+    if (/^(?:#|(?:issue|no|vol|volume|pt|part|book|bk)\s*#?)?\s*\d+(?:\s*(?:of|\/)\s*\d+)?(?:\s*\d{4})?$/i.test(rem)) {
+      return true;
+    }
+  }
+
+  if (normS.startsWith(normT)) {
+    const rem = normS.slice(normT.length).trim();
+    if (/^(?:#|(?:issue|no|vol|volume|pt|part|book|bk)\s*#?)?\s*\d+(?:\s*(?:of|\/)\s*\d+)?(?:\s*\d{4})?$/i.test(rem)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+/**
  * Builds a ComicInfo.xml string from a metadata object
  * @param {object} metadataObj 
  * @returns {string|null} XML string or null if no valid metadata
@@ -543,8 +607,8 @@ function buildComicInfoXml(metadataObj) {
     }
   }
 
-  // Rule: If Title and Series match, do NOT add Title and keep Series
-  if (safeObj.Title && safeObj.Series && String(safeObj.Title).trim().toLowerCase() === String(safeObj.Series).trim().toLowerCase()) {
+  // Rule: If Title is the same as Series (even with issue numbers, #3, 3, volume, or format tags), do NOT add Title and keep Series
+  if (safeObj.Title && (isTitleSameAsSeries(safeObj.Title, safeObj.Series) || (!safeObj.Series && isTitleSameAsSeries(safeObj.Title, '')))) {
     delete safeObj.Title;
   }
 
@@ -745,6 +809,7 @@ module.exports = {
   cleanFormatAndEdition,
   normalizePublisher,
   cleanDescription,
-  splitVolumeSeriesAndTitle
+  splitVolumeSeriesAndTitle,
+  isTitleSameAsSeries
 };
 

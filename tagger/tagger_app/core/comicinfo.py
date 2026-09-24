@@ -13,6 +13,7 @@ from tagger_app.core.metadata import (
     clean_format_and_edition,
     normalize_publisher,
     clean_description,
+    is_title_same_as_series,
 )
 
 
@@ -104,14 +105,14 @@ def generate_comic_info_xml(metadata, enabled_fields=None):
     title_val = clean_format_and_edition(_clean_str(metadata.get("title") or metadata.get("issue_title")))
     series_val = clean_format_and_edition(_clean_str(metadata.get("series")))
     
-    # Rule: If the title and series match, do NOT add Title; keep Series
-    if title_val and series_val and title_val.strip().lower() == series_val.strip().lower():
+    # Rule: If the title and series match (including issue numbers, #3, 3, volume suffixes, or format tags), do NOT add Title; keep Series
+    if title_val and (is_title_same_as_series(title_val, series_val) or (not series_val and is_title_same_as_series(title_val, ""))):
+        title_val = ""
+
+    if series_val:
         ET.SubElement(root, "Series").text = series_val
-    else:
-        if title_val:
-            ET.SubElement(root, "Title").text = title_val
-        if series_val:
-            ET.SubElement(root, "Series").text = series_val
+    if title_val:
+        ET.SubElement(root, "Title").text = title_val
         
     num_val = _clean_str(metadata.get("number") or metadata.get("issue_number") or metadata.get("issue"))
     if num_val:
