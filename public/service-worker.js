@@ -3,20 +3,24 @@
 
 const SCOPE_URL = new URL(self.registration.scope);
 const BASE_PATH = SCOPE_URL.pathname;
-const CACHE_VERSION = 'v8.8';
+const CACHE_VERSION = 'v9.0';
 const CACHE_NAME = `comics-now-${CACHE_VERSION}-${BASE_PATH}`;
 const DOWNLOADS_CACHE_NAME = 'comics-now-downloads';
 
 // Assets relative to the scope. DO NOT start with "/" (root) here.
 const ASSET_PATHS = [
   'index.html',
+  'assets/index.js',
+  'assets/index.css',
+  'assets/background.png',
   'app.js',
   'style.css',
   'tailwind.css',
   'jszip.min.js',
   'manifest.json',
   'icons/icon-192x192.png',
-  'icons/icon-512x512.png'
+  'icons/icon-512x512.png',
+  'favicon.ico'
 ];
 
 // Build absolute URLs for caching within this scope
@@ -36,9 +40,18 @@ function isApi(url) {
 self.addEventListener('install', event => {
   event.waitUntil(
     caches.open(CACHE_NAME)
-      .then(cache => {
-        return Promise.allSettled(
-          ASSET_URLS.map(url => cache.add(url).catch(() => {}))
+      .then(async cache => {
+        await Promise.allSettled(
+          ASSET_URLS.map(async url => {
+            try {
+              const res = await fetch(url, { cache: 'reload' });
+              if (res.ok) {
+                await cache.put(url, res);
+              }
+            } catch (err) {
+              console.warn('[SW] Pre-cache failed for', url, err);
+            }
+          })
         );
       })
       .then(() => self.skipWaiting())
@@ -125,11 +138,17 @@ self.addEventListener('fetch', event => {
   // Navigations (HTML): network-first, fallback to cached app shell
   if (req.mode === 'navigate' || (req.headers.get('accept') || '').includes('text/html')) {
     event.respondWith((async () => {
+      const cache = await caches.open(CACHE_NAME);
       try {
-        return await fetch(req, { cache: 'no-store' });
+        const net = await fetch(req, { cache: 'no-store' });
+        if (net.ok && url.origin === self.location.origin) {
+          cache.put(new URL('index.html', self.registration.scope).toString(), net.clone());
+        }
+        return net;
       } catch (err) {
-        const cache = await caches.open(CACHE_NAME);
-        const shell = await cache.match(new URL('index.html', self.registration.scope).toString());
+        const shell = await cache.match(new URL('index.html', self.registration.scope).toString()) ||
+                      await cache.match(new URL('./index.html', self.registration.scope).toString()) ||
+                      await cache.match(req);
         if (shell) return shell;
         return new Response('Offline - No cached app available', { status: 503, statusText: 'Offline' });
       }
@@ -137,12 +156,14 @@ self.addEventListener('fetch', event => {
     return;
   }
 
-  // Static assets inside scope: network-first for JS (to get updates), cache-first for other assets
+  // Static assets inside scope: network-first for JS & CSS (to get updates), cache-first for other assets
   event.respondWith((async () => {
     const cache = await caches.open(CACHE_NAME);
 
-    // For JavaScript files, always try network first to get updates
-    if (url.pathname.endsWith('.js')) {
+    // For JavaScript & CSS files, try network first to get updates, then cache
+    if (url.pathname.endsWith('.js') || url.pathname.endsWith('.css')) {
+      const isJs = url.pathname.endsWith('.js');
+      const isCss = url.pathname.endsWith('.css');
       try {
         const net = await fetch(req, { cache: 'no-store' });
         if (net.ok && url.origin === self.location.origin) {
@@ -153,15 +174,46 @@ self.addEventListener('fetch', event => {
         // Fallback to cache when offline
         const hit = await cache.match(req);
         if (hit) return hit;
-        return new Response('Offline - Asset not cached', {
+
+        // Scope-relative URL fallback (e.g. /comics-sutherlandgrove/assets/index.js -> ./assets/index.js)
+        const relUrl = new URL(url.pathname.replace(BASE_PATH, ''), self.registration.scope).toString();
+        const relHit = await cache.match(relUrl);
+        if (relHit) return relHit;
+
+        // Offline resilience fallback:
+        // If a hashed asset or index bundle was requested, search for any matching cached asset
+        const cacheKeys = await cache.keys();
+        for (const key of cacheKeys) {
+          const keyUrl = new URL(key.url);
+          if (isJs && keyUrl.pathname.endsWith('.js')) {
+            if (
+              (url.pathname.includes('/assets/') && keyUrl.pathname.includes('/assets/')) ||
+              (url.pathname.includes('index') && keyUrl.pathname.includes('index'))
+            ) {
+              const cachedJs = await cache.match(key);
+              if (cachedJs) return cachedJs;
+            }
+          }
+          if (isCss && keyUrl.pathname.endsWith('.css')) {
+            if (
+              (url.pathname.includes('/assets/') && keyUrl.pathname.includes('/assets/')) ||
+              (url.pathname.includes('index') && keyUrl.pathname.includes('index'))
+            ) {
+              const cachedCss = await cache.match(key);
+              if (cachedCss) return cachedCss;
+            }
+          }
+        }
+
+        return new Response(`Offline - Asset not cached (${url.pathname})`, {
           status: 503,
           statusText: 'Offline',
-          headers: { 'Content-Type': 'text/javascript' }
+          headers: { 'Content-Type': isJs ? 'text/javascript' : (isCss ? 'text/css' : 'text/plain') }
         });
       }
     }
 
-    // For other static assets (CSS, images): cache-first
+    // For other static assets (images, icons, etc.): cache-first
     const hit = await cache.match(req);
     if (hit) return hit;
 
@@ -172,17 +224,10 @@ self.addEventListener('fetch', event => {
       }
       return net;
     } catch (err) {
-      // For critical assets, try alternative cache keys
-      if (url.pathname.endsWith('.css')) {
-        const cacheKeys = await cache.keys();
-        for (const key of cacheKeys) {
-          const keyUrl = new URL(key.url);
-          if (keyUrl.pathname === url.pathname) {
-            const cachedResponse = await cache.match(key);
-            if (cachedResponse) return cachedResponse;
-          }
-        }
-      }
+      // Scope-relative URL fallback
+      const relUrl = new URL(url.pathname.replace(BASE_PATH, ''), self.registration.scope).toString();
+      const relHit = await cache.match(relUrl);
+      if (relHit) return relHit;
 
       return new Response('Offline - Asset not cached', {
         status: 503,
