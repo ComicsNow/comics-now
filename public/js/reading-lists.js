@@ -2,10 +2,24 @@
  * Reading Lists - Frontend functionality for managing reading lists
  */
 import { state, escapeHtml } from './globals.js';
+import {
+  saveReadingListsCacheToDB,
+  loadReadingListsCacheFromDB,
+  saveReadingListDetailCacheToDB,
+  loadReadingListDetailCacheFromDB
+} from './offline/db-library-cache.js';
 
 // State for the "Add to Reading List" modal
 let pendingComicIds = [];
 let selectedListIds = new Set();
+
+/**
+ * Check if the browser is currently offline
+ * @returns {boolean}
+ */
+export function isOffline() {
+  return typeof navigator !== 'undefined' && navigator && navigator.onLine === false;
+}
 
 // ============================================================================
 // API FUNCTIONS
@@ -26,10 +40,50 @@ function getBaseUrl() {
 }
 
 /**
+ * Background pre-caching of details for all reading lists
+ * @param {Array} lists - Array of reading lists
+ */
+async function precacheAllReadingListDetails(lists) {
+  if (!lists || !Array.isArray(lists) || lists.length === 0) return;
+  const baseUrl = getBaseUrl();
+  for (const list of lists) {
+    if (!list || !list.id) continue;
+    try {
+      const response = await fetch(`${baseUrl}/api/v1/reading-lists/${list.id}`);
+      if (response.ok) {
+        const data = await response.json();
+        if (data && data.ok) {
+          await saveReadingListDetailCacheToDB(list.id, data);
+        }
+      }
+    } catch (e) {
+      // Ignore background precaching fetch failures
+    }
+  }
+}
+
+/**
  * Fetch all reading lists for current user
  * @returns {Promise<Array>} Array of reading lists with stats
  */
 async function fetchReadingLists() {
+  // If explicitly offline, load immediately from cache
+  if (isOffline()) {
+    try {
+      const cached = await loadReadingListsCacheFromDB();
+      if (cached && Array.isArray(cached)) {
+        const setCached = state.setCachedReadingLists || window.setCachedReadingLists || state.LibrarySmartLists?.setCachedReadingLists;
+        if (typeof setCached === 'function') {
+          setCached(cached);
+        }
+        return cached;
+      }
+    } catch (cacheErr) {
+      console.warn('[Reading Lists] Error loading offline cache:', cacheErr);
+    }
+    return [];
+  }
+
   try {
     const baseUrl = getBaseUrl();
     const response = await fetch(`${baseUrl}/api/v1/reading-lists`);
@@ -40,11 +94,27 @@ async function fetchReadingLists() {
       if (typeof setCached === 'function') {
         setCached(lists);
       }
+      // Save lists to offline cache in background
+      saveReadingListsCacheToDB(lists).catch(err => console.warn('[Reading Lists] Failed to cache lists:', err));
+      // Pre-cache item details for all lists so they are available offline
+      precacheAllReadingListDetails(lists).catch(err => console.warn('[Reading Lists] Precache error:', err));
       return lists;
     }
     throw new Error(data.message || 'Failed to fetch reading lists');
   } catch (error) {
-    console.error('[Reading Lists] Error fetching lists:', error);
+    console.warn('[Reading Lists] Fetch error, falling back to offline cache:', error);
+    try {
+      const cached = await loadReadingListsCacheFromDB();
+      if (cached && Array.isArray(cached)) {
+        const setCached = state.setCachedReadingLists || window.setCachedReadingLists || state.LibrarySmartLists?.setCachedReadingLists;
+        if (typeof setCached === 'function') {
+          setCached(cached);
+        }
+        return cached;
+      }
+    } catch (cacheErr) {
+      console.warn('[Reading Lists] Error loading offline cache:', cacheErr);
+    }
     return [];
   }
 }
@@ -57,6 +127,11 @@ async function fetchReadingLists() {
  * @returns {Promise<string>} Created list ID
  */
 async function createReadingList(name, description = '', comicIds = []) {
+  if (isOffline()) {
+    alert('Reading list editing is not available while offline.');
+    throw new Error('Reading list editing is not available while offline.');
+  }
+
   try {
     const baseUrl = getBaseUrl();
     const response = await fetch(`${baseUrl}/api/v1/reading-lists`, {
@@ -82,6 +157,11 @@ async function createReadingList(name, description = '', comicIds = []) {
  * @returns {Promise<boolean>} Success status
  */
 async function addComicsToList(listId, comicIds) {
+  if (isOffline()) {
+    alert('Reading list editing is not available while offline.');
+    throw new Error('Reading list editing is not available while offline.');
+  }
+
   try {
     const baseUrl = getBaseUrl();
     const response = await fetch(`${baseUrl}/api/v1/reading-lists/${listId}/comics`, {
@@ -106,16 +186,36 @@ async function addComicsToList(listId, comicIds) {
  * @returns {Promise<Object>} List details with comics
  */
 async function getReadingListDetails(listId) {
+  if (isOffline()) {
+    try {
+      const cached = await loadReadingListDetailCacheFromDB(listId);
+      if (cached) {
+        return cached;
+      }
+    } catch (e) {
+      console.warn('[Reading Lists] Error loading offline detail cache:', e);
+    }
+    throw new Error('Reading list details not available offline.');
+  }
+
   try {
     const baseUrl = getBaseUrl();
     const response = await fetch(`${baseUrl}/api/v1/reading-lists/${listId}`);
     const data = await response.json();
     if (data.ok) {
+      // Cache details for offline use
+      saveReadingListDetailCacheToDB(listId, data).catch(err => console.warn('[Reading Lists] Failed to cache details:', err));
       return data;
     }
     throw new Error(data.message || 'Failed to load reading list details');
   } catch (error) {
-    console.error('[Reading Lists] Error fetching details:', error);
+    console.warn('[Reading Lists] Error fetching details, checking offline cache:', error);
+    try {
+      const cached = await loadReadingListDetailCacheFromDB(listId);
+      if (cached) {
+        return cached;
+      }
+    } catch (e) {}
     throw error;
   }
 }
@@ -127,6 +227,11 @@ async function getReadingListDetails(listId) {
  * @returns {Promise<boolean>} Success status
  */
 async function markListAsRead(listId, read) {
+  if (isOffline()) {
+    alert('Marking reading lists as read is not available while offline.');
+    throw new Error('Marking reading lists as read is not available while offline.');
+  }
+
   try {
     const baseUrl = getBaseUrl();
     const response = await fetch(`${baseUrl}/api/v1/reading-lists/${listId}/mark-read`, {
@@ -152,6 +257,11 @@ async function markListAsRead(listId, read) {
  * @returns {Promise<Object>} Result object with ok status
  */
 async function removeComicsFromList(listId, comicIds) {
+  if (isOffline()) {
+    alert('Reading list editing is not available while offline.');
+    throw new Error('Reading list editing is not available while offline.');
+  }
+
   try {
     const baseUrl = getBaseUrl();
     const response = await fetch(`${baseUrl}/api/v1/reading-lists/${listId}/comics`, {
@@ -174,6 +284,11 @@ async function removeComicsFromList(listId, comicIds) {
  * @returns {Promise<Object>} Result object with ok status
  */
 async function reorderComics(listId, comicOrder) {
+  if (isOffline()) {
+    alert('Reading list editing is not available while offline.');
+    throw new Error('Reading list editing is not available while offline.');
+  }
+
   try {
     const baseUrl = getBaseUrl();
     const response = await fetch(`${baseUrl}/api/v1/reading-lists/${listId}/reorder`, {
@@ -266,6 +381,11 @@ async function exportSingleList(listId, listName) {
  * @returns {Promise<Object>} Result with imported/skipped counts
  */
 async function importLists(listsData) {
+  if (isOffline()) {
+    alert('Importing reading lists is not available while offline.');
+    throw new Error('Importing reading lists is not available while offline.');
+  }
+
   try {
     const baseUrl = getBaseUrl();
     const response = await fetch(`${baseUrl}/api/v1/reading-lists/import`, {
@@ -290,6 +410,11 @@ async function importLists(listsData) {
  * @param {Array<string>} comicIds - Comic IDs to add to lists
  */
 async function openAddToListModal(comicIds) {
+  if (isOffline()) {
+    alert('Reading list editing is not available while offline.');
+    return;
+  }
+
   if (!comicIds || comicIds.length === 0) {
     return;
   }
@@ -367,6 +492,11 @@ async function refreshAddToListModal() {
  * Handle creating a new list from the modal
  */
 async function handleCreateNewList() {
+  if (isOffline()) {
+    alert('Reading list editing is not available while offline.');
+    return;
+  }
+
   const name = prompt('Enter a name for your reading list:');
   if (!name || !name.trim()) {
     return;
@@ -394,6 +524,11 @@ async function handleCreateNewList() {
  * Handle saving selected lists
  */
 async function handleSaveToLists() {
+  if (isOffline()) {
+    alert('Reading list editing is not available while offline.');
+    return;
+  }
+
   if (selectedListIds.size === 0) {
     alert('Please select at least one reading list');
     return;
@@ -467,6 +602,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 const ReadingLists = {
   fetchReadingLists,
+  getReadingLists: fetchReadingLists,
   createReadingList,
   addComicsToList,
   getReadingListDetails,
@@ -477,7 +613,8 @@ const ReadingLists = {
   exportSingleList,
   importLists,
   openAddToListModal,
-  closeAddToListModal
+  closeAddToListModal,
+  isOffline
 };
 
 export {
@@ -496,8 +633,12 @@ export {
   ReadingLists
 };
 
+// Aliases for compatibility
+ReadingLists.getReadingLists = fetchReadingLists;
+
 state.ReadingLists = ReadingLists;
 
 if (typeof window !== 'undefined') {
   window.ReadingLists = ReadingLists;
 }
+
