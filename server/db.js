@@ -172,6 +172,9 @@ async function initializeDatabase() {
       lastSeen INTEGER
     )`);
 
+    // Seed default system user
+    await dbRun(`INSERT OR IGNORE INTO users (userId, email, role) VALUES ('default-user', 'local@localhost', 'admin')`);
+
     await dbRun(`CREATE TABLE IF NOT EXISTS progress (
       comicId TEXT NOT NULL,
       userId TEXT NOT NULL,

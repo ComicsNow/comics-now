@@ -1,9 +1,6 @@
-const { resolveReadingModes, initializeDatabase } = require('../server/db');
+const { resolveReadingModes } = require('../server/db');
 
 describe('Hierarchical Preference Resolution', () => {
-  beforeAll(async () => {
-    await initializeDatabase();
-  });
 
   const comicsRoots = ['/library1', '/library2'];
   

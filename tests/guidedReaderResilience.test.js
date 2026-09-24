@@ -1,13 +1,9 @@
-const { dbRun, dbGet, dbAll, initializeDatabase } = require('../server/db');
+const { dbRun, dbGet, dbAll } = require('../server/db');
 const guidedReader = require('../server/services/guided-reader');
 const panelDetector = require('../server/services/panel-detector');
 
 describe('Guided Reader Resilience and Timeout Handling', () => {
   const testComicId = 'test-guided-resilience-comic-id';
-
-  beforeAll(async () => {
-    await initializeDatabase();
-  });
 
   beforeEach(async () => {
     // Ensure clean state for test comic

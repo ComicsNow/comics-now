@@ -46,6 +46,7 @@ tagger/uploads/
 # Test files and test generated folders
 test-results/
 coverage/
+.test-data/
 
 # pnpm files
 pnpm-lock.yaml
