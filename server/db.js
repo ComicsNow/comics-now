@@ -347,12 +347,39 @@ async function setReadingPreference(userId, preferenceType, targetId, mangaMode,
  */
 async function getAllReadingPreferences(userId) {
   try {
-    const prefs = await dbAll(
-      `SELECT preferenceType, targetId, mangaMode, continuousMode FROM user_reading_preferences
-       WHERE userId = ?`,
-      [userId]
-    );
-    return prefs;
+    let query = `SELECT preferenceType, targetId, mangaMode, continuousMode FROM user_reading_preferences`;
+    let params = [];
+    if (userId && userId !== 'default-user') {
+      query += ` WHERE userId IN (?, 'default-user')
+                 ORDER BY CASE WHEN userId = ? THEN 1 ELSE 0 END ASC`;
+      params.push(userId, userId);
+    } else if (userId) {
+      query += ` WHERE userId = ?`;
+      params.push(userId);
+    }
+    const rows = await dbAll(query, params);
+
+    const merged = new Map();
+    for (const r of rows) {
+      const key = `${r.preferenceType}:${r.targetId}`;
+      const existing = merged.get(key);
+      if (existing) {
+        merged.set(key, {
+          preferenceType: r.preferenceType,
+          targetId: r.targetId,
+          mangaMode: r.mangaMode !== null && r.mangaMode !== undefined ? r.mangaMode : existing.mangaMode,
+          continuousMode: r.continuousMode !== null && r.continuousMode !== undefined ? r.continuousMode : existing.continuousMode
+        });
+      } else {
+        merged.set(key, {
+          preferenceType: r.preferenceType,
+          targetId: r.targetId,
+          mangaMode: r.mangaMode,
+          continuousMode: r.continuousMode
+        });
+      }
+    }
+    return Array.from(merged.values());
   } catch (error) {
     log('ERROR', 'READING_PREFS', `Failed to get all reading preferences: ${error.message}`);
     return [];
@@ -364,14 +391,19 @@ async function getAllReadingPreferences(userId) {
  * @param {number|null} userId - If provided, gets preferences for a specific user.
  */
 async function getReadingPrefMaps(userId = null) {
-  let query = `SELECT preferenceType, targetId, mangaMode, continuousMode FROM user_reading_preferences`;
+  let query = `SELECT userId, preferenceType, targetId, mangaMode, continuousMode FROM user_reading_preferences`;
   let params = [];
-  if (userId) {
+  if (userId && userId !== 'default-user') {
+    query += ` WHERE userId IN (?, 'default-user')
+               ORDER BY CASE WHEN userId = ? THEN 1 ELSE 0 END ASC`;
+    params.push(userId, userId);
+  } else if (userId) {
     query += ` WHERE userId = ?`;
     params.push(userId);
   } else {
     // If no userId, get all rows where at least one preference is explicitly set
-    query += ` WHERE mangaMode IS NOT NULL OR continuousMode IS NOT NULL`;
+    query += ` WHERE mangaMode IS NOT NULL OR continuousMode IS NOT NULL
+               ORDER BY CASE WHEN userId = 'default-user' THEN 0 ELSE 1 END ASC`;
   }
   
   const rows = await dbAll(query, params);
@@ -385,10 +417,21 @@ async function getReadingPrefMaps(userId = null) {
 
   for (const pref of rows) {
     if (prefMaps[pref.preferenceType]) {
-      prefMaps[pref.preferenceType].set(pref.targetId, {
-        mangaMode: pref.mangaMode === 1 ? true : (pref.mangaMode === 0 ? false : null),
-        continuousMode: pref.continuousMode === 1 ? true : (pref.continuousMode === 0 ? false : null)
-      });
+      const existing = prefMaps[pref.preferenceType].get(pref.targetId);
+      const newManga = pref.mangaMode === 1 ? true : (pref.mangaMode === 0 ? false : null);
+      const newContinuous = pref.continuousMode === 1 ? true : (pref.continuousMode === 0 ? false : null);
+
+      if (existing) {
+        prefMaps[pref.preferenceType].set(pref.targetId, {
+          mangaMode: newManga !== null ? newManga : existing.mangaMode,
+          continuousMode: newContinuous !== null ? newContinuous : existing.continuousMode
+        });
+      } else {
+        prefMaps[pref.preferenceType].set(pref.targetId, {
+          mangaMode: newManga,
+          continuousMode: newContinuous
+        });
+      }
     }
   }
   

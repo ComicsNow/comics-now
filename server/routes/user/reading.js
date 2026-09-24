@@ -50,11 +50,22 @@ module.exports = function attach(router, deps) {
       let hasAnyMangaMode = false;
 
       for (const dir of directories) {
-        const pref = await dbGet(
-          `SELECT mangaMode FROM user_reading_preferences
-           WHERE userId = ? AND preferenceType = 'library' AND targetId = ?`,
-          [userId, dir]
-        );
+        let pref;
+        if (userId && userId !== 'default-user') {
+          pref = await dbGet(
+            `SELECT mangaMode FROM user_reading_preferences
+             WHERE userId IN (?, 'default-user') AND preferenceType = 'library' AND targetId = ?
+             ORDER BY CASE WHEN userId = ? THEN 1 ELSE 0 END DESC
+             LIMIT 1`,
+            [userId, dir, userId]
+          );
+        } else {
+          pref = await dbGet(
+            `SELECT mangaMode FROM user_reading_preferences
+             WHERE userId = ? AND preferenceType = 'library' AND targetId = ?`,
+            [userId, dir]
+          );
+        }
 
         if (pref && pref.mangaMode === 1) {
           hasAnyMangaMode = true;
@@ -142,11 +153,22 @@ module.exports = function attach(router, deps) {
       let hasAnyContinuousMode = false;
 
       for (const dir of directories) {
-        const pref = await dbGet(
-          `SELECT continuousMode FROM user_reading_preferences
-           WHERE userId = ? AND preferenceType = 'library' AND targetId = ?`,
-          [userId, dir]
-        );
+        let pref;
+        if (userId && userId !== 'default-user') {
+          pref = await dbGet(
+            `SELECT continuousMode FROM user_reading_preferences
+             WHERE userId IN (?, 'default-user') AND preferenceType = 'library' AND targetId = ?
+             ORDER BY CASE WHEN userId = ? THEN 1 ELSE 0 END DESC
+             LIMIT 1`,
+            [userId, dir, userId]
+          );
+        } else {
+          pref = await dbGet(
+            `SELECT continuousMode FROM user_reading_preferences
+             WHERE userId = ? AND preferenceType = 'library' AND targetId = ?`,
+            [userId, dir]
+          );
+        }
 
         if (pref && pref.continuousMode === 1) {
           hasAnyContinuousMode = true;
@@ -224,11 +246,22 @@ module.exports = function attach(router, deps) {
       const results = [];
 
       for (const dir of directories) {
-        const pref = await dbGet(
-          `SELECT mangaMode, continuousMode FROM user_reading_preferences
-           WHERE userId = ? AND preferenceType = 'library' AND targetId = ?`,
-          [userId, dir]
-        );
+        let pref;
+        if (userId && userId !== 'default-user') {
+          pref = await dbGet(
+            `SELECT mangaMode, continuousMode FROM user_reading_preferences
+             WHERE userId IN (?, 'default-user') AND preferenceType = 'library' AND targetId = ?
+             ORDER BY CASE WHEN userId = ? THEN 1 ELSE 0 END DESC
+             LIMIT 1`,
+            [userId, dir, userId]
+          );
+        } else {
+          pref = await dbGet(
+            `SELECT mangaMode, continuousMode FROM user_reading_preferences
+             WHERE userId = ? AND preferenceType = 'library' AND targetId = ?`,
+            [userId, dir]
+          );
+        }
 
         results.push({
           path: dir,
