@@ -39,19 +39,19 @@ export async function refreshUsersList() {
 
     usersListDiv.innerHTML = users.map(user => `
       <div class="user-card bg-gray-800/50 rounded-lg p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border border-gray-700/50 hover:border-purple-500/50 transition-all group cursor-pointer" data-user-id="${escapeHtml(user.userId)}" data-user-email="${escapeHtml(user.email)}" data-user-role="${escapeHtml(user.role)}">
-        <div class="flex-1 space-y-1">
-          <div class="flex items-center gap-3 mb-1">
-            <div class="p-2 rounded-full bg-purple-600/10 text-purple-400">
+        <div class="flex-1 min-w-0 space-y-1">
+          <div class="flex flex-wrap items-center gap-2 mb-1 min-w-0">
+            <div class="p-2 rounded-full bg-purple-600/10 text-purple-400 flex-shrink-0">
               <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
               </svg>
             </div>
-            <span class="text-white font-bold text-lg">${escapeHtml(user.email)}</span>
-            <span class="px-2.5 py-0.5 text-xs font-bold rounded-full uppercase tracking-wider ${user.role === 'admin' ? 'bg-purple-600 text-white' : 'bg-gray-700 text-gray-300'}">
+            <span class="text-white font-bold text-base sm:text-lg break-all sm:break-words">${escapeHtml(user.email)}</span>
+            <span class="px-2.5 py-0.5 text-xs font-bold rounded-full uppercase tracking-wider ${user.role === 'admin' ? 'bg-purple-600 text-white' : 'bg-gray-700 text-gray-300'} flex-shrink-0">
               ${escapeHtml(user.role)}
             </span>
           </div>
-          <div class="text-sm text-gray-400 space-y-1 pl-10">
+          <div class="text-sm text-gray-400 space-y-1 pl-0 sm:pl-10">
             <div class="flex items-center gap-2">
               <span class="text-gray-500 text-xs uppercase tracking-tight">Registered:</span>
               <span class="text-gray-300">${formatTimestamp(user.created)}</span>
@@ -60,7 +60,7 @@ export async function refreshUsersList() {
               <span class="text-gray-500 text-xs uppercase tracking-tight">Last seen:</span>
               <span class="text-gray-300">${formatTimestamp(user.lastSeen)}</span>
             </div>
-            <div class="text-xs text-gray-600 font-mono mt-1 opacity-60">
+            <div class="text-xs text-gray-500 font-mono mt-1 break-all">
               ID: ${escapeHtml(user.userId)}
             </div>
           </div>
