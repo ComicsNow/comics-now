@@ -60,18 +60,17 @@ export async function refreshUsersList() {
               <span class="text-gray-500 text-xs uppercase tracking-tight">Last seen:</span>
               <span class="text-gray-300">${formatTimestamp(user.lastSeen)}</span>
             </div>
-            <div class="text-xs text-gray-500 font-mono mt-1 break-all">
-              ID: ${escapeHtml(user.userId)}
+            <div class="pt-2">
+              <button type="button" class="user-permissions-btn inline-flex items-center gap-2 px-3 py-1.5 text-xs font-semibold rounded-lg bg-purple-600/30 text-purple-200 hover:bg-purple-600/50 border border-purple-500/50 shadow-sm transition-all" title="Edit Permissions">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 text-purple-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                </svg>
+                <span>Edit Permissions</span>
+              </button>
             </div>
           </div>
         </div>
-        <div class="flex flex-wrap items-center gap-2 self-start sm:self-auto pl-10 sm:pl-0">
-          <button class="user-permissions-btn px-3 py-1.5 text-xs font-semibold rounded-lg bg-purple-600/20 text-purple-300 hover:bg-purple-600/40 border border-purple-500/30 transition-colors flex items-center gap-1.5" title="Edit Permissions">
-            <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-            </svg>
-            <span>Edit Permissions</span>
-          </button>
+        <div class="flex flex-wrap items-center gap-2 self-start sm:self-auto pl-0 sm:pl-0">
           <button class="user-stats-btn px-3 py-1.5 text-xs font-semibold rounded-lg bg-blue-600/20 text-blue-300 hover:bg-blue-600/40 border border-blue-500/30 transition-colors flex items-center gap-1.5" title="View Reading Stats">
             <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />

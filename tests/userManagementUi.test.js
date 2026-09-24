@@ -87,6 +87,10 @@ describe('User Management Settings UI', () => {
     expect(userPermBtn).not.toBeNull();
     expect(userPermBtn.textContent).toContain('Edit Permissions');
 
+    // Verify that ID string is replaced and not rendered in card body
+    expect(cards[0].textContent).not.toContain('ID: admin-1');
+    expect(cards[1].textContent).not.toContain('ID: user-2');
+
     // Clicking Edit Permissions button on admin user invokes showUserAccessView
     adminPermBtn.click();
     expect(env.state.showUserAccessView).toHaveBeenCalledWith('admin-1', 'admin@example.com', 'admin');
