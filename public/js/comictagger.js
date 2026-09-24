@@ -66,7 +66,10 @@ async function checkPendingMatch() {
       const existingIndicator = document.getElementById('ct-pending-indicator');
       if (existingIndicator) existingIndicator.remove();
       if (ctMatchesBadge) ctMatchesBadge.classList.add('hidden');
+      if (ctApplyBtn) ctApplyBtn.disabled = true;
+      if (ctSkipBtn) ctSkipBtn.disabled = true;
     }
+    return pending;
   } catch (error) {}
 }
 
@@ -337,8 +340,9 @@ async function ctSyncLogsAndState() {
       if (pending && pending.isRunning !== undefined) {
         setScanRunningUI(!!pending.isRunning);
       }
-      if (pending && pending.waitingForResponse) {
-        checkPendingMatch();
+      checkPendingMatch();
+      if (pending && pending.waitingForResponse && ctTabMatches && ctTabMatches.classList.contains('active')) {
+        debouncedFetchPendingMatchDetails();
       }
     }
   } catch (_) {}
@@ -467,6 +471,8 @@ function clearCtMatches() {
   if (noMatchesDiv) noMatchesDiv.classList.remove('hidden');
   if (matchTable) matchTable.classList.add('hidden');
   if (ctMatchesBadge) ctMatchesBadge.classList.add('hidden');
+  const existingIndicator = document.getElementById('ct-pending-indicator');
+  if (existingIndicator) existingIndicator.remove();
   lastRenderedFileName = null;
 }
 
@@ -557,6 +563,10 @@ async function fetchPendingMatchDetails(isManual = false) {
     const details = await detailsRes.json();
 
     if (!details.waitingForResponse) {
+      clearCtMatches();
+      const existingIndicator = document.getElementById('ct-pending-indicator');
+      if (existingIndicator) existingIndicator.remove();
+      if (ctMatchesBadge) ctMatchesBadge.classList.add('hidden');
       return;
     }
 
@@ -960,6 +970,10 @@ async function cancelCtScan() {
   }
   try {
     await fetch(`${global.API_BASE_URL}/api/v1/comictagger/cancel`, { method: 'POST' });
+    await checkPendingMatch();
+    if (ctTabMatches && ctTabMatches.classList.contains('active')) {
+      debouncedFetchPendingMatchDetails();
+    }
   } catch (err) {
     console.error('Failed to cancel scan:', err);
   } finally {

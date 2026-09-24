@@ -291,7 +291,7 @@ ctTabMatches?.addEventListener('click', () => {
   switchCtTab(ctTabMatches, ctContentMatches, '/comictagger/matches');
   if (ctMatchesBadge) ctMatchesBadge.classList.add('hidden');
   const fetchPendingMatchDetailsFn = state.fetchPendingMatchDetails || window.fetchPendingMatchDetails;
-  if (typeof fetchPendingMatchDetailsFn === 'function') fetchPendingMatchDetailsFn();
+  if (typeof fetchPendingMatchDetailsFn === 'function') fetchPendingMatchDetailsFn(true);
 });
 
 ctTabSettings?.addEventListener('click', () => {
