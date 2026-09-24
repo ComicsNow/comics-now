@@ -1,7 +1,7 @@
 const { spawn } = require('child_process');
 const path = require('path');
 const { log, ctLog } = require('../logger');
-const { getConfig, getTaggerServiceUrl } = require('../config');
+const { getTaggerServiceUrl } = require('../config');
 
 let taggerChild = null;
 
@@ -20,7 +20,6 @@ async function isWorkerOnline(url) {
 }
 
 async function startTaggerWorker() {
-  const config = getConfig();
   const serviceUrl = getTaggerServiceUrl() || 'http://127.0.0.1:5000';
 
   if (await isWorkerOnline(serviceUrl)) {

@@ -126,7 +126,6 @@ async function runComicTagger() {
         let decision = null;
         let awaitingUserInput = false;
         let userChoiceResolver = null;
-        let processExited = false;
         let collectingMatches = false;
         let collectedMatches = [];
         let autoSelectedMatch = null;
@@ -327,7 +326,6 @@ async function runComicTagger() {
         });
 
         currentProcess.on('close', async (code) => {
-          processExited = true;
           if (stdoutRemainder) handleLine(stdoutRemainder);
           if (stderrRemainder) handleLine(stderrRemainder);
 

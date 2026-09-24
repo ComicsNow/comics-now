@@ -82,8 +82,6 @@ function closeSettingsModal() {
   }
 }
 
-let initialMetadataStorage = 'archive';
-
 async function fetchSettings() {
   try {
     const response = await fetch(`${global.API_BASE_URL}/api/v1/settings`);
@@ -102,7 +100,6 @@ async function fetchSettings() {
     const metadataStorageSelect = document.getElementById('metadata-storage-select');
     if (metadataStorageSelect && data.metadataStorage) {
       metadataStorageSelect.value = data.metadataStorage;
-      initialMetadataStorage = data.metadataStorage;
     }
 
     // Gate the XML Sidecar option on Tag Comics Now being configured

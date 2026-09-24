@@ -467,7 +467,6 @@ function clearCtMatches() {
   if (noMatchesDiv) noMatchesDiv.classList.remove('hidden');
   if (matchTable) matchTable.classList.add('hidden');
   if (ctMatchesBadge) ctMatchesBadge.classList.add('hidden');
-  lastRenderedMatchesHash = null;
   lastRenderedFileName = null;
 }
 
@@ -482,7 +481,6 @@ function closeCTModal() {
     clearInterval(ctSyncInterval);
     ctSyncInterval = null;
   }
-  lastRenderedMatchesHash = null;
 
   if (global.router && getRelativePath().startsWith('/comictagger')) {
     const path = global.getPathForCurrentView ? global.getPathForCurrentView() : '/';
@@ -538,7 +536,6 @@ async function fetchCtSettings() {
   } catch {}
 }
 
-let lastRenderedMatchesHash = null;
 let lastRenderedFileName = null;
 let isFetchingCtDetails = false;
 let ctFetchDebounceTimer = null;
