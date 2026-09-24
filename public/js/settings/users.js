@@ -65,12 +65,27 @@ export async function refreshUsersList() {
             </div>
           </div>
         </div>
-        <div class="flex items-center gap-2 self-start sm:self-auto pl-10 sm:pl-0">
-          <button class="user-stats-btn px-3 py-1.5 text-xs font-semibold rounded-lg bg-blue-600/20 text-blue-300 hover:bg-blue-600/40 transition-colors">Stats</button>
+        <div class="flex flex-wrap items-center gap-2 self-start sm:self-auto pl-10 sm:pl-0">
+          <button class="user-permissions-btn px-3 py-1.5 text-xs font-semibold rounded-lg bg-purple-600/20 text-purple-300 hover:bg-purple-600/40 border border-purple-500/30 transition-colors flex items-center gap-1.5" title="Edit Permissions">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+            </svg>
+            <span>Edit Permissions</span>
+          </button>
+          <button class="user-stats-btn px-3 py-1.5 text-xs font-semibold rounded-lg bg-blue-600/20 text-blue-300 hover:bg-blue-600/40 border border-blue-500/30 transition-colors flex items-center gap-1.5" title="View Reading Stats">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+            </svg>
+            <span>Stats</span>
+          </button>
           ${user.role !== 'admin'
-            ? `<button class="user-impersonate-btn px-3 py-1.5 text-xs font-semibold rounded-lg bg-amber-500/20 text-amber-300 hover:bg-amber-500/40 transition-colors">Login as</button>
-               <span class="text-purple-400 text-sm hidden sm:inline group-hover:translate-x-1 transition-transform">Manage Access →</span>`
-            : '<span class="text-gray-500 italic text-sm">Full Admin Access</span>'}
+            ? `<button class="user-impersonate-btn px-3 py-1.5 text-xs font-semibold rounded-lg bg-amber-500/20 text-amber-300 hover:bg-amber-500/40 border border-amber-500/30 transition-colors flex items-center gap-1.5" title="Log in as user">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />
+                </svg>
+                <span>Login as</span>
+              </button>`
+            : ''}
         </div>
       </div>
     `).join('');
@@ -88,6 +103,18 @@ export async function refreshUsersList() {
           showUserAccess(userId, userEmail, userRole);
         }
       });
+
+      // Edit Permissions button
+      const permBtn = card.querySelector('.user-permissions-btn');
+      if (permBtn) {
+        permBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const showUserAccess = state.showUserAccessView || window.showUserAccessView;
+          if (typeof showUserAccess === 'function') {
+            showUserAccess(userId, userEmail, userRole);
+          }
+        });
+      }
 
       // Stats button
       const statsBtn = card.querySelector('.user-stats-btn');
