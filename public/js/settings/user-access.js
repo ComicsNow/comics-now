@@ -37,25 +37,25 @@ export async function showUserAccessView(userId, userEmail, userRole) {
           </svg>
           Back to Users
         </button>
-        <div class="flex items-center">
-          <div class="bg-purple-600/20 p-2 rounded-lg mr-3">
+        <div class="flex items-center min-w-0">
+          <div class="bg-purple-600/20 p-2 rounded-lg mr-3 flex-shrink-0">
             <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
             </svg>
           </div>
-          <div>
-            <h3 class="text-xl font-bold text-white">Library Access for ${escapeHtml(userEmail)}</h3>
-            <p class="text-sm text-gray-400">Configure content permissions</p>
+          <div class="min-w-0 flex-1">
+            <h3 class="text-base sm:text-xl font-bold text-white break-all sm:break-words leading-tight">Library Access for ${escapeHtml(userEmail)}</h3>
+            <p class="text-xs sm:text-sm text-gray-400 truncate">Configure content permissions</p>
           </div>
         </div>
       </div>
     </div>
 
-    <div id="access-status" class="text-sm text-purple-400 mb-4 pl-14"></div>
+    <div id="access-status" class="text-sm text-purple-400 mb-4 pl-0 sm:pl-14 break-words"></div>
 
     <div class="space-y-6">
       <!-- Collapsible Guide -->
-      <div class="pl-14">
+      <div class="pl-0 sm:pl-14">
         <button id="access-guide-toggle" class="text-xs font-bold uppercase tracking-widest text-purple-400 hover:text-purple-300 transition-colors flex items-center gap-2" aria-expanded="false">
           <span>How to Use Library Access</span>
           <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -352,9 +352,34 @@ export function createTreeNode(type, value, nodeInfo, accessMap, parentNodeDiv, 
     childCheckbox.dataset.accessMode = 'child';
     childCheckbox.title = 'Child access (all descendants)';
 
-    checkboxesContainer.appendChild(directCheckbox);
-    checkboxesContainer.appendChild(recursiveCheckbox);
-    checkboxesContainer.appendChild(childCheckbox);
+    // Create labeled checkbox pills
+    const directLabel = document.createElement('label');
+    directLabel.className = 'flex items-center gap-1 cursor-pointer bg-blue-950/60 hover:bg-blue-900/80 border border-blue-700/60 rounded px-1.5 py-0.5 text-blue-300 text-[11px] font-bold select-none flex-shrink-0';
+    directLabel.title = 'Direct access (this item only)';
+    directLabel.appendChild(directCheckbox);
+    const directText = document.createElement('span');
+    directText.textContent = 'D';
+    directLabel.appendChild(directText);
+
+    const recursiveLabel = document.createElement('label');
+    recursiveLabel.className = 'flex items-center gap-1 cursor-pointer bg-amber-950/60 hover:bg-amber-900/80 border border-amber-700/60 rounded px-1.5 py-0.5 text-amber-300 text-[11px] font-bold select-none flex-shrink-0';
+    recursiveLabel.title = 'Recursive (select all siblings at this level)';
+    recursiveLabel.appendChild(recursiveCheckbox);
+    const recursiveText = document.createElement('span');
+    recursiveText.textContent = 'R';
+    recursiveLabel.appendChild(recursiveText);
+
+    const childLabel = document.createElement('label');
+    childLabel.className = 'flex items-center gap-1 cursor-pointer bg-purple-950/60 hover:bg-purple-900/80 border border-purple-700/60 rounded px-1.5 py-0.5 text-purple-300 text-[11px] font-bold select-none flex-shrink-0';
+    childLabel.title = 'Child access (all descendants)';
+    childLabel.appendChild(childCheckbox);
+    const childText = document.createElement('span');
+    childText.textContent = 'C';
+    childLabel.appendChild(childText);
+
+    checkboxesContainer.appendChild(directLabel);
+    checkboxesContainer.appendChild(recursiveLabel);
+    checkboxesContainer.appendChild(childLabel);
     header.appendChild(checkboxesContainer);
 
     // Add event listener to recursive checkbox to select all siblings
@@ -424,14 +449,10 @@ export function createTreeNode(type, value, nodeInfo, accessMap, parentNodeDiv, 
       }
     });
 
-    // Add labels for the checkboxes
-    const labelsContainer = document.createElement('div');
-    labelsContainer.className = 'flex flex-col text-xs text-gray-500';
-    labelsContainer.innerHTML = '<span>D</span><span>R</span><span>C</span>';
-    header.appendChild(labelsContainer);
-
   } else {
     // Single checkbox for leaf nodes or nodes without children
+    const leafContainer = document.createElement('div');
+    leafContainer.className = 'flex items-center flex-shrink-0';
     const checkbox = document.createElement('input');
     checkbox.type = 'checkbox';
     checkbox.checked = isDirectChecked || isChildChecked;
@@ -439,7 +460,8 @@ export function createTreeNode(type, value, nodeInfo, accessMap, parentNodeDiv, 
     checkbox.dataset.accessType = type;
     checkbox.dataset.accessValue = value;
     checkbox.dataset.accessMode = 'both';
-    header.appendChild(checkbox);
+    leafContainer.appendChild(checkbox);
+    header.appendChild(leafContainer);
 
     checkbox.addEventListener('change', () => {
       if (!checkbox.checked) {
@@ -450,7 +472,7 @@ export function createTreeNode(type, value, nodeInfo, accessMap, parentNodeDiv, 
 
   // Label
   const label = document.createElement('label');
-  label.className = 'flex-1 text-white cursor-pointer text-sm';
+  label.className = 'flex-1 text-white cursor-pointer text-xs sm:text-sm min-w-0 break-all sm:break-words leading-snug';
   if (type === 'root_folder') {
     label.textContent = value;
   } else if (type === 'publisher' || type === 'series') {
@@ -465,13 +487,13 @@ export function createTreeNode(type, value, nodeInfo, accessMap, parentNodeDiv, 
   // Expand icon (only for non-leaf nodes with children)
   if (hasChildren && !isLeaf) {
     const expandIcon = document.createElement('span');
-    expandIcon.className = 'text-gray-400 transition-transform cursor-pointer';
+    expandIcon.className = 'text-gray-400 transition-transform cursor-pointer flex-shrink-0';
     expandIcon.innerHTML = '▼';
     header.appendChild(expandIcon);
 
-    // Toggle expansion on header click
+    // Toggle expansion on header click (ignore clicks on checkboxes or their label pills)
     header.addEventListener('click', (e) => {
-      if (e.target.tagName !== 'INPUT') {
+      if (e.target.tagName !== 'INPUT' && !e.target.closest('label.cursor-pointer')?.querySelector('input')) {
         const childrenContainer = nodeDiv.querySelector('.children-container');
         if (childrenContainer) {
           childrenContainer.classList.toggle('hidden');

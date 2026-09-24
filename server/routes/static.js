@@ -54,9 +54,18 @@ function createStaticRouter({ getConfig, getComicsDirectories, getPublicLibrarie
 
   router.get('/index.html', sendAppShell);
 
-  router.use(express.static(STATIC_DIR, { index: false }));
+  const staticOptions = {
+    index: false,
+    setHeaders: (res, filePath) => {
+      if (filePath.endsWith('.js') || filePath.endsWith('.css') || filePath.endsWith('.html')) {
+        res.setHeader('Cache-Control', 'no-cache, must-revalidate');
+      }
+    }
+  };
+
+  router.use(express.static(STATIC_DIR, staticOptions));
   if (STATIC_DIR !== PUBLIC_DIR) {
-    router.use(express.static(PUBLIC_DIR, { index: false }));
+    router.use(express.static(PUBLIC_DIR, staticOptions));
   }
   router.use('/thumbnails', express.static(THUMBNAILS_DIRECTORY, { maxAge: '1y', immutable: true }));
   router.get('/thumbnails/:filename', async (req, res, next) => {

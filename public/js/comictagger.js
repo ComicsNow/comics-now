@@ -169,12 +169,20 @@ function updateCtProgressFromLog(message) {
   }
 }
 
+function formatLogTime(isoString) {
+  if (!isoString) return '';
+  const str = String(isoString).trim();
+  const m = str.match(/T?(\d{2}:\d{2}:\d{2})/);
+  if (m) return m[1];
+  return str;
+}
+
 function formatCtLogMessage(timestamp, message) {
   const line = document.createElement('div');
-  line.className = 'ct-log-line py-0.5 font-mono text-sm';
+  line.className = 'ct-log-line py-0.5 font-mono text-xs sm:text-sm';
 
   if (/^[━─]+$/.test(message)) {
-    line.className = 'ct-log-separator border-b border-gray-700 my-1';
+    line.className = 'ct-log-separator border-b border-gray-700/60 my-1';
     return line;
   }
 
@@ -185,16 +193,17 @@ function formatCtLogMessage(timestamp, message) {
   // Check for live step progress "↳ [Source] ..."
   const streamStepMatch = /^\s*↳\s*\[(.*?)\]\s*(.*)$/.exec(message);
   if (streamStepMatch) {
-    line.className = 'ct-log-line py-0.5 font-mono text-xs pl-4 flex flex-wrap items-baseline gap-1.5 max-w-full break-words';
+    line.className = 'ct-log-line py-1 font-mono text-xs pl-2 sm:pl-3 flex flex-wrap items-baseline gap-x-2 gap-y-1 border-b border-gray-800/30';
     const src = streamStepMatch[1];
     const subMsg = streamStepMatch[2];
 
     const timeSpan = document.createElement('span');
-    timeSpan.className = 'text-gray-600 mr-1 text-[11px] flex-shrink-0';
-    timeSpan.textContent = `[${timestamp}]`;
+    timeSpan.className = 'text-gray-500 text-[11px] font-mono select-none flex-shrink-0';
+    timeSpan.textContent = `[${formatLogTime(timestamp)}]`;
+    timeSpan.title = timestamp;
 
     const arrowSpan = document.createElement('span');
-    arrowSpan.className = 'text-gray-500 font-bold flex-shrink-0';
+    arrowSpan.className = 'text-gray-500 font-bold select-none text-[11px] flex-shrink-0';
     arrowSpan.textContent = '↳';
 
     const srcBadge = document.createElement('span');
@@ -202,23 +211,21 @@ function formatCtLogMessage(timestamp, message) {
     srcBadge.textContent = src;
 
     const msgSpan = document.createElement('span');
-    msgSpan.style.wordBreak = 'break-word';
-    msgSpan.style.overflowWrap = 'anywhere';
     if (/Rate defense|cooldown|waiting/i.test(subMsg)) {
       line.dataset.logType = 'rate-defense';
-      msgSpan.className = 'text-amber-400 flex items-center gap-1 min-w-0 break-words flex-1';
-      msgSpan.innerHTML = `<span>⏳</span> <span>${escapeHtml(subMsg)}</span>`;
+      msgSpan.className = 'text-amber-400 break-words min-w-[180px] flex-1 flex items-center gap-1.5 leading-snug';
+      msgSpan.innerHTML = `<span class="flex-shrink-0">⏳</span> <span>${escapeHtml(subMsg)}</span>`;
     } else if (/Candidate found|Match found|High-confidence|Early exit/i.test(subMsg)) {
-      msgSpan.className = 'text-emerald-400 font-semibold min-w-0 break-words flex-1';
+      msgSpan.className = 'text-emerald-400 font-semibold break-words min-w-[180px] flex-1 leading-snug';
       msgSpan.textContent = `✓ ${subMsg}`;
     } else if (/No match found/i.test(subMsg)) {
-      msgSpan.className = 'text-gray-400 min-w-0 break-words flex-1';
+      msgSpan.className = 'text-gray-400 break-words min-w-[180px] flex-1 leading-snug';
       msgSpan.textContent = `✗ ${subMsg}`;
     } else if (/Search failed|Error/i.test(subMsg)) {
-      msgSpan.className = 'text-red-400 min-w-0 break-words flex-1';
+      msgSpan.className = 'text-red-400 break-words min-w-[180px] flex-1 leading-snug';
       msgSpan.textContent = `✗ ${subMsg}`;
     } else {
-      msgSpan.className = 'text-teal-300 min-w-0 break-words flex-1';
+      msgSpan.className = 'text-teal-300 break-words min-w-[180px] flex-1 leading-snug';
       msgSpan.textContent = subMsg;
     }
 
@@ -257,14 +264,15 @@ function formatCtLogMessage(timestamp, message) {
     if (!message.includes('➜') && !message.includes('→')) icon = '➜ ';
   }
 
+  line.className = 'ct-log-line py-1 font-mono text-xs sm:text-sm flex flex-wrap items-baseline gap-x-2 gap-y-0.5 border-b border-gray-800/20';
+
   const timeSpan = document.createElement('span');
-  timeSpan.className = 'text-gray-600 mr-2 text-xs flex-shrink-0';
-  timeSpan.textContent = `[${timestamp}]`;
+  timeSpan.className = 'text-gray-500 text-[11px] font-mono select-none flex-shrink-0';
+  timeSpan.textContent = `[${formatLogTime(timestamp)}]`;
+  timeSpan.title = timestamp;
 
   const msgSpan = document.createElement('span');
-  msgSpan.className = colorClass + (bold ? ' font-semibold' : '') + ' break-words';
-  msgSpan.style.wordBreak = 'break-word';
-  msgSpan.style.overflowWrap = 'anywhere';
+  msgSpan.className = colorClass + (bold ? ' font-semibold' : '') + ' break-words flex-1 min-w-[200px] leading-snug';
 
   const hasIcon = /^[✓✗⚠⊘❯ⓘ➜→⏳📊]/.test(message);
   msgSpan.textContent = (hasIcon ? '' : icon) + message;
