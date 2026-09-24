@@ -9,7 +9,12 @@ import {
 import {
   saveLibraryCacheToDB,
   loadLibraryCacheFromDB,
-  clearLibraryCacheFromDB
+  clearLibraryCacheFromDB,
+  saveReadingListsCacheToDB,
+  loadReadingListsCacheFromDB,
+  saveReadingListDetailCacheToDB,
+  loadReadingListDetailCacheFromDB,
+  deleteReadingListDetailCacheFromDB
 } from './db-library-cache.js';
 import {
   saveComicToDB,
@@ -46,6 +51,11 @@ export const OfflineDB = {
   saveLibraryCacheToDB,
   loadLibraryCacheFromDB,
   clearLibraryCacheFromDB,
+  saveReadingListsCacheToDB,
+  loadReadingListsCacheFromDB,
+  saveReadingListDetailCacheToDB,
+  loadReadingListDetailCacheFromDB,
+  deleteReadingListDetailCacheFromDB,
   saveComicToDB,
   getComicFromDB,
   getAllDownloadedComics,

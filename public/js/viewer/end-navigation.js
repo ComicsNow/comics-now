@@ -158,8 +158,16 @@ const global = new Proxy(typeof window !== 'undefined' ? window : globalThis, {
 
       const nextItem = details.items[nextIndex];
 
-      // Get the full comic object from library or fallback API fetch
+      // Get the full comic object from library or fallback offline/API fetch
       let nextComic = global.getComicById?.(nextItem.comicId);
+      if (!nextComic && typeof global.getOfflineComicRecordById === 'function') {
+        try {
+          const rec = await global.getOfflineComicRecordById(nextItem.comicId);
+          if (rec && rec.comicInfo) {
+            nextComic = rec.comicInfo;
+          }
+        } catch (e) {}
+      }
       if (!nextComic) {
         try {
           const baseUrl = typeof window !== 'undefined' && window.getBaseUrl ? window.getBaseUrl() : '';

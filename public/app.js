@@ -619,15 +619,26 @@ async function refreshReadingListModal() {
   const listsContainer = document.getElementById('reading-lists-container');
   if (!listsContainer) return;
 
+  const isOffline = typeof navigator !== 'undefined' && navigator && navigator.onLine === false;
+  if (isOffline) {
+    isListEditMode = false;
+  }
+
   // Handle Edit Mode buttons visibility
   const editBtn = document.getElementById('edit-reading-lists-btn');
   const saveBtn = document.getElementById('save-reading-lists-order-btn');
   const cancelBtn = document.getElementById('cancel-reading-lists-edit-btn');
   const buttonsSection = document.querySelector('#reading-list-modal .mb-6.space-y-2');
+  const createBtn = document.getElementById('create-reading-list-btn');
+  const importBtn = document.getElementById('import-lists-btn');
+  const offlineBadge = document.getElementById('reading-list-offline-badge');
 
-  if (editBtn) editBtn.classList.toggle('hidden', isListEditMode);
+  if (offlineBadge) offlineBadge.classList.toggle('hidden', !isOffline);
+  if (editBtn) editBtn.classList.toggle('hidden', isListEditMode || isOffline);
   if (saveBtn) saveBtn.classList.toggle('hidden', !isListEditMode);
   if (cancelBtn) cancelBtn.classList.toggle('hidden', !isListEditMode);
+  if (createBtn) createBtn.classList.toggle('hidden', isOffline);
+  if (importBtn) importBtn.classList.toggle('hidden', isOffline);
   if (buttonsSection) buttonsSection.classList.toggle('hidden', isListEditMode);
 
   // Show loading state
@@ -638,7 +649,9 @@ async function refreshReadingListModal() {
     const lists = await global.ReadingLists.fetchReadingLists();
 
     if (lists.length === 0) {
-      listsContainer.innerHTML = '<p class="text-sm text-gray-400 text-center py-4">No reading lists yet. Create one to get started!</p>';
+      listsContainer.innerHTML = isOffline
+        ? '<p class="text-sm text-gray-400 text-center py-4">No cached reading lists available offline.</p>'
+        : '<p class="text-sm text-gray-400 text-center py-4">No reading lists yet. Create one to get started!</p>';
     } else {
       listsContainer.innerHTML = '';
 
@@ -681,7 +694,7 @@ async function refreshReadingListModal() {
                 </div>
               </div>
             </div>
-            <button class="text-gray-600 hover:text-red-400 transition-colors p-1 delete-list-btn ${isListEditMode ? 'hidden' : ''}" data-list-id="${escapeHtml(list.id)}" title="Delete List">
+            <button class="text-gray-600 hover:text-red-400 transition-colors p-1 delete-list-btn ${isListEditMode || isOffline ? 'hidden' : ''}" data-list-id="${escapeHtml(list.id)}" title="Delete List">
               <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
               </svg>
@@ -701,13 +714,15 @@ async function refreshReadingListModal() {
 
           <!-- Action Icons -->
           <div class="flex gap-2 items-center mt-2 ${isListEditMode ? 'opacity-50 pointer-events-none' : ''}">
-            <button class="flex-1 flex items-center justify-center gap-2 bg-gray-700 hover:bg-gray-600 text-white text-xs font-bold py-2 px-3 rounded-lg transition-colors read-toggle-btn"
-                    data-list-id="${escapeHtml(list.id)}"
-                    data-current-status="${allRead}"
-                    title="${allRead ? 'Mark as unread' : 'Mark as read'}">
-              <span class="opacity-70">${allRead ? '↩' : ICONS.READ}</span>
-              <span>${allRead ? 'Unread' : 'Read'}</span>
-            </button>
+            ${isOffline ? '' : `
+              <button class="flex-1 flex items-center justify-center gap-2 bg-gray-700 hover:bg-gray-600 text-white text-xs font-bold py-2 px-3 rounded-lg transition-colors read-toggle-btn"
+                      data-list-id="${escapeHtml(list.id)}"
+                      data-current-status="${allRead}"
+                      title="${allRead ? 'Mark as unread' : 'Mark as read'}">
+                <span class="opacity-70">${allRead ? '↩' : ICONS.READ}</span>
+                <span>${allRead ? 'Unread' : 'Read'}</span>
+              </button>
+            `}
 
             <button class="flex-1 flex items-center justify-center gap-2 bg-gray-700 hover:bg-gray-600 text-white text-xs font-bold py-2 px-3 rounded-lg transition-colors download-list-btn"
                     data-list-id="${escapeHtml(list.id)}"
@@ -811,14 +826,20 @@ async function refreshReadingListModal() {
           playBtn.addEventListener('click', async (e) => {
             e.stopPropagation();
 
-            // Check if library is loaded
-            if (!global.library || Object.keys(global.library).length === 0) {
+            const isOffline = typeof navigator !== 'undefined' && navigator.onLine === false;
+            // Check if library is loaded (when online)
+            if (!isOffline && (!global.library || Object.keys(global.library).length === 0)) {
               alert('Library is still loading. Check the status badge at the top - it will show "Ready" when comics are available. Try again in a moment.');
               return;
             }
 
             try {
               const details = await global.ReadingLists.getReadingListDetails(list.id);
+
+              if (!details || !details.items || details.items.length === 0) {
+                alert('No comics in this reading list.');
+                return;
+              }
 
               // Find first unread or in-progress comic
               let firstComic = details.items.find(item => {
@@ -833,13 +854,22 @@ async function refreshReadingListModal() {
               }
 
               if (firstComic) {
-                // Find the comic in the library
-                const comic = typeof global.getComicById === 'function' ? global.getComicById(firstComic.comicId) : null;
+                // Find the comic in the library or offline storage
+                let comic = typeof global.getComicById === 'function' ? global.getComicById(firstComic.comicId) : null;
+                if (!comic && typeof global.getOfflineComicRecordById === 'function') {
+                  try {
+                    const offlineRec = await global.getOfflineComicRecordById(firstComic.comicId);
+                    if (offlineRec && offlineRec.comicInfo) {
+                      comic = offlineRec.comicInfo;
+                    }
+                  } catch (recErr) {}
+                }
+
                 if (comic && typeof global.openComicViewer === 'function') {
                   global.openComicViewer(comic, { readingListId: list.id, readingListName: list.name });
                   closeReadingListModal(); // Close modal after opening comic
                 } else {
-                  alert('Could not find comic in library. The comic may have been moved or deleted.');
+                  alert('Could not find comic in library. The comic may have been moved or deleted, or needs to be downloaded for offline reading.');
                 }
               }
             } catch (error) {
@@ -859,6 +889,11 @@ async function refreshReadingListModal() {
  * Create a new reading list
  */
 async function createReadingList() {
+  if (typeof navigator !== 'undefined' && navigator && navigator.onLine === false) {
+    alert('Reading list editing is not available while offline.');
+    return;
+  }
+
   const name = prompt('Enter a name for your reading list:');
 
   if (!name || name.trim() === '') {
@@ -886,6 +921,11 @@ async function createReadingList() {
 async function deleteReadingList(listId) {
   if (!listId) return;
 
+  if (typeof navigator !== 'undefined' && navigator && navigator.onLine === false) {
+    alert('Reading list editing is not available while offline.');
+    return;
+  }
+
   try {
     // Get base URL
     const baseTag = document.querySelector('base');
@@ -898,6 +938,9 @@ async function deleteReadingList(listId) {
 
     const data = await response.json();
     if (data.ok) {
+      if (typeof global.deleteReadingListDetailCacheFromDB === 'function') {
+        global.deleteReadingListDetailCacheFromDB(listId).catch(() => {});
+      }
       await refreshReadingListModal();
     } else {
       throw new Error(data.message || 'Failed to delete list');
@@ -916,6 +959,8 @@ async function deleteReadingList(listId) {
 async function showReadingListDetail(listId, listName) {
   const modalContent = document.getElementById('reading-lists-container').parentElement;
   if (!modalContent) return;
+
+  const isOffline = typeof navigator !== 'undefined' && navigator && navigator.onLine === false;
 
   // Hide main list view
   document.getElementById('reading-lists-container').classList.add('hidden');
@@ -942,6 +987,7 @@ async function showReadingListDetail(listId, listName) {
             <span>Reading List Detail</span>
             <span class="w-1 h-1 rounded-full bg-gray-700"></span>
             <span id="list-item-count-badge">Loading...</span>
+            ${isOffline ? '<span class="w-1 h-1 rounded-full bg-gray-700"></span><span class="text-amber-400 font-semibold">Offline</span>' : ''}
           </div>
         </div>
       </div>
@@ -957,7 +1003,7 @@ async function showReadingListDetail(listId, listName) {
           <span>📤</span>
           <span class="hidden sm:inline">Export</span>
         </button>
-        <button id="edit-list-btn" class="bg-gray-700 hover:bg-gray-600 text-white font-bold py-2.5 px-4 rounded-lg transition-all border border-gray-600 shadow-lg flex items-center gap-2">
+        <button id="edit-list-btn" class="bg-gray-700 hover:bg-gray-600 text-white font-bold py-2.5 px-4 rounded-lg transition-all border border-gray-600 shadow-lg flex items-center gap-2 ${isOffline ? 'hidden' : ''}">
           <span>✏️</span>
           <span class="hidden sm:inline">Edit</span>
         </button>
@@ -1035,9 +1081,18 @@ async function showReadingListDetail(listId, listName) {
         comicsContainer.className = 'grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4';
       }
 
-      details.items.forEach((item, index) => {
-        const comic = typeof global.getComicById === 'function' ? global.getComicById(item.comicId) : null;
-        if (!comic) return; // Skip if comic not found in library
+      for (let index = 0; index < details.items.length; index++) {
+        const item = details.items[index];
+        let comic = typeof global.getComicById === 'function' ? global.getComicById(item.comicId) : null;
+        if (!comic && typeof global.getOfflineComicRecordById === 'function') {
+          try {
+            const offlineRec = await global.getOfflineComicRecordById(item.comicId);
+            if (offlineRec && offlineRec.comicInfo) {
+              comic = offlineRec.comicInfo;
+            }
+          } catch (e) {}
+        }
+        if (!comic) continue; // Skip if comic not found
 
         const comicDiv = document.createElement('div');
         comicDiv.dataset.comicId = item.comicId;
@@ -1091,7 +1146,7 @@ async function showReadingListDetail(listId, listName) {
               <button class="download-comic-btn ${isEditMode ? 'hidden' : ''} block sm:hidden flex-shrink-0 text-gray-500 hover:text-blue-400 transition-colors p-1.5 hover:bg-blue-500/10 rounded" title="Download comic" data-comic-id="${escapeHtml(item.comicId)}">
                 <span class="text-lg">${ICONS.DOWNLOAD}</span>
               </button>
-              <button class="delete-comic-btn ${isEditMode ? 'hidden' : ''} flex-shrink-0 text-gray-600 hover:text-red-400 transition-colors p-1.5 hover:bg-red-500/10 rounded" title="Remove from list" data-comic-id="${escapeHtml(item.comicId)}">
+              <button class="delete-comic-btn ${isEditMode || isOffline ? 'hidden' : ''} flex-shrink-0 text-gray-600 hover:text-red-400 transition-colors p-1.5 hover:bg-red-500/10 rounded" title="Remove from list" data-comic-id="${escapeHtml(item.comicId)}">
                 <span class="text-lg">🗑</span>
               </button>
             </div>
@@ -1155,7 +1210,7 @@ async function showReadingListDetail(listId, listName) {
                       ${ICONS.DOWNLOAD}
                     </button>
                   ` : ''}
-                  <button class="delete-comic-btn bg-gray-900/80 backdrop-blur p-2 rounded-lg text-red-500 hover:text-red-400 transition-all shadow-xl" title="Remove from list" data-comic-id="${escapeHtml(item.comicId)}">
+                  <button class="delete-comic-btn ${isEditMode || isOffline ? 'hidden' : ''} bg-gray-900/80 backdrop-blur p-2 rounded-lg text-red-500 hover:text-red-400 transition-all shadow-xl" title="Remove from list" data-comic-id="${escapeHtml(item.comicId)}">
                     🗑
                   </button>
                 </div>
@@ -1216,6 +1271,20 @@ async function showReadingListDetail(listId, listName) {
             const currentStatus = markReadBtn.dataset.status;
             const newStatus = currentStatus === 'read' ? 'unread' : 'read';
 
+            if (isOffline) {
+              if (typeof global.updateOfflineReadStatus === 'function') {
+                try {
+                  await global.updateOfflineReadStatus(item.comicId, newStatus);
+                  await renderComics();
+                } catch (err) {
+                  console.warn('Failed to update offline read status:', err);
+                }
+                return;
+              }
+              alert('Updating status is not available while offline.');
+              return;
+            }
+
             try {
               // Call the API to update status
               const response = await fetch(`${global.API_BASE_URL}/api/v1/comics/status`, {
@@ -1256,6 +1325,11 @@ async function showReadingListDetail(listId, listName) {
           deleteBtn.addEventListener('click', async (e) => {
             e.stopPropagation(); // Prevent opening comic
 
+            if (isOffline) {
+              alert('Reading list editing is not available while offline.');
+              return;
+            }
+
             const confirmDelete = confirm(`Remove "${title}" from this reading list?`);
             if (!confirmDelete) return;
 
@@ -1285,10 +1359,12 @@ async function showReadingListDetail(listId, listName) {
         }
 
         comicsContainer.appendChild(comicDiv);
-      });
+      }
     } catch (error) {
       console.error('Failed to load reading list details:', error);
-      document.getElementById('list-detail-comics-container').innerHTML = '<p class="text-sm text-red-400 text-center py-4">Failed to load comics.</p>';
+      document.getElementById('list-detail-comics-container').innerHTML = isOffline
+        ? '<p class="text-sm text-gray-400 text-center py-8">Reading list details are not cached for offline viewing. Please open this list while online to cache it.</p>'
+        : '<p class="text-sm text-red-400 text-center py-4">Failed to load comics.</p>';
     }
   }
 
@@ -1317,6 +1393,10 @@ async function showReadingListDetail(listId, listName) {
 
   // Edit button handler
   document.getElementById('edit-list-btn').addEventListener('click', () => {
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+      alert('Reading list editing is not available while offline.');
+      return;
+    }
     isEditMode = true;
     document.getElementById('edit-list-btn').classList.add('hidden');
     document.getElementById('save-order-btn').classList.remove('hidden');
@@ -1326,6 +1406,10 @@ async function showReadingListDetail(listId, listName) {
 
   // Save button handler
   document.getElementById('save-order-btn').addEventListener('click', async () => {
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+      alert('Reading list editing is not available while offline.');
+      return;
+    }
     try {
       const comicsContainer = document.getElementById('list-detail-comics-container');
       const comicDivs = comicsContainer.querySelectorAll('[data-comic-id]');
@@ -1409,6 +1493,10 @@ document.addEventListener('DOMContentLoaded', () => {
   const fileInput = document.getElementById('import-file-input');
   if (importBtn && fileInput) {
     importBtn.addEventListener('click', () => {
+      if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+        alert('Importing reading lists is not available while offline.');
+        return;
+      }
       fileInput.click();
     });
 
@@ -1471,6 +1559,10 @@ document.addEventListener('DOMContentLoaded', () => {
   const editReadingListsBtn = document.getElementById('edit-reading-lists-btn');
   if (editReadingListsBtn) {
     editReadingListsBtn.addEventListener('click', () => {
+      if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+        alert('Reading list editing is not available while offline.');
+        return;
+      }
       isListEditMode = true;
       refreshReadingListModal();
     });
@@ -1480,6 +1572,10 @@ document.addEventListener('DOMContentLoaded', () => {
   const saveReadingListsOrderBtn = document.getElementById('save-reading-lists-order-btn');
   if (saveReadingListsOrderBtn) {
     saveReadingListsOrderBtn.addEventListener('click', async () => {
+      if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+        alert('Reading list editing is not available while offline.');
+        return;
+      }
       try {
         const listsContainer = document.getElementById('reading-lists-container');
         const listDivs = listsContainer.querySelectorAll('[data-list-id]');
@@ -1527,6 +1623,21 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     });
   }
+
+  // Network state listeners to auto-update reading lists UI
+  window.addEventListener('online', () => {
+    const rModal = document.getElementById('reading-list-modal');
+    if (rModal && !rModal.classList.contains('hidden')) {
+      refreshReadingListModal();
+    }
+  });
+
+  window.addEventListener('offline', () => {
+    const rModal = document.getElementById('reading-list-modal');
+    if (rModal && !rModal.classList.contains('hidden')) {
+      refreshReadingListModal();
+    }
+  });
 });
 
 if (typeof window !== 'undefined' && typeof document !== 'undefined') {

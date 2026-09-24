@@ -229,11 +229,19 @@ function createGuidedDetectionItem(scope, target, label, comics) {
 function createReadingListItem(comics) {
   const comicsArray = Array.isArray(comics) ? comics : [comics];
   if (comicsArray.length === 0) return null;
+  const isOffline = typeof navigator !== 'undefined' && navigator && navigator.onLine === false;
 
   return createMenuItem(`${ICONS.READING_LIST}<span>Add to Reading List</span>`, () => {
+    if (isOffline) {
+      alert('Reading list editing is not available while offline.');
+      return;
+    }
     if (state.ReadingLists && typeof state.ReadingLists.openAddToListModal === 'function') {
       state.ReadingLists.openAddToListModal(comicsArray.map(c => c.id));
     }
+  }, {
+    disabled: isOffline,
+    opacity: isOffline ? '0.5' : null
   });
 }
 
