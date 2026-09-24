@@ -89,8 +89,6 @@ const global = new Proxy(typeof window !== 'undefined' ? window : globalThis, {
   }
 
   function refreshToolbarLabels() {
-    const isMobile = typeof global.isMobileDevice === 'function' && global.isMobileDevice();
-    
     // Orientation
     const orientationLabel = global.isLandscapeOrientation ? LANDSCAPE_ICON_HTML : PORTRAIT_ICON_HTML;
     

@@ -8,13 +8,10 @@ import re
 from bs4 import BeautifulSoup
 
 from tagger_app.core.metadata import (
-    normalize_metadata,
-    calculate_similarity,
     clean_description,
     normalize_publisher,
     score_candidate,
 )
-from tagger_app.core.covers import compare_covers_python
 from tagger_app.core.query import clean_search_query
 from tagger_app.core.cache import tagger_cache
 from tagger_app.core.limiter import domain_limiter

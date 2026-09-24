@@ -511,7 +511,6 @@ const global = new Proxy(typeof window !== 'undefined' ? window : globalThis, {
   let fsLastTapAt = 0;
   let fsLastTapX = 0;
   let fsLastTapY = 0;
-  let fsLastTapTarget = null;
   let lastDoubleTapAt = 0;
   function handleFullscreenPointerUpForDblTap(event) {
     if (event.pointerType === 'mouse' && event.button !== 0) return;
@@ -557,7 +556,6 @@ const global = new Proxy(typeof window !== 'undefined' ? window : globalThis, {
     fsLastTapAt = now;
     fsLastTapX = event.clientX;
     fsLastTapY = event.clientY;
-    fsLastTapTarget = event.target;
   }
   document.addEventListener('pointerup', handleFullscreenPointerUpForDblTap, { capture: true });
 

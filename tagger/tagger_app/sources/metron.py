@@ -4,8 +4,7 @@ Extracted from the legacy tagger.py monolith and optimized for high performance,
 domain rate limiting, and multi-level caching.
 """
 
-from tagger_app.core.metadata import normalize_metadata, calculate_similarity, score_candidate
-from tagger_app.core.covers import compare_covers_python
+from tagger_app.core.metadata import score_candidate
 from tagger_app.core.query import clean_search_query
 from tagger_app.core.cache import tagger_cache
 from tagger_app.core.limiter import domain_limiter

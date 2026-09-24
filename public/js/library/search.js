@@ -149,10 +149,6 @@ export function renderSearchResultsAsFolders(comics) {
     const seriesCount = Object.keys(series).length;
     const comicCount = pubComics.length;
 
-    // Try to find a logo for the publisher
-    const folderName = safeDirName(pubName);
-    const baseUrl = state.API_BASE_URL || window.API_BASE_URL || '';
-
     card.innerHTML = `
       <div class="relative h-48 w-full bg-gray-700 rounded-lg overflow-hidden flex items-center justify-center p-4">
          <div class="text-4xl font-bold text-gray-500 opacity-20 select-none">${pubName.charAt(0).toUpperCase()}</div>

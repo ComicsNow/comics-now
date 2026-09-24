@@ -73,8 +73,8 @@ async function callTaggerEngineWithProgress(serviceUrl, reqBody, abortSignal, on
           if (trimmed.startsWith('data: ')) {
             try {
               const data = JSON.parse(trimmed.slice(6));
-              if (data.type === 'progress' && onProgress) {
-                onProgress(data);
+              if (data.type === 'progress') {
+                onProgress?.(data);
               } else if (data.type === 'result') {
                 finalResult = data.data;
               } else if (data.type === 'error') {
@@ -111,7 +111,6 @@ let ctInterval = null;
 let ctRunning = false;
 let ctCancelled = false;
 let ctAbortController = null;
-let pendingUserChoice = null;
 let userChoiceResolver = null;
 let pendingMatchState = null;
 

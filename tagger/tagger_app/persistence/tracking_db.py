@@ -5,7 +5,6 @@ Extracted from the legacy app.py monolith (architecture review, persistence laye
 """
 import os
 import sqlite3
-import time
 import zipfile
 import xml.etree.ElementTree as ET
 
@@ -13,7 +12,6 @@ from tagger_app.config import DB_TRACKING_PATH
 
 
 def init_tracking_db():
-    import sqlite3
     conn = None
     try:
         conn = sqlite3.connect(DB_TRACKING_PATH)
@@ -35,8 +33,6 @@ def init_tracking_db():
 
 
 def mark_as_enhanced(file_path, sources_list):
-    import sqlite3
-    import time
     if not sources_list:
         return
     conn = None
@@ -81,8 +77,6 @@ def parse_sources_from_cbz_xml(file_path):
     Parses legacy 'Tag Comics Now!' signature notes from the CBZ XML.
     Returns a set of sources found.
     """
-    import zipfile
-    import xml.etree.ElementTree as ET
     sources = set()
     try:
         with zipfile.ZipFile(file_path, 'r') as z:
@@ -110,8 +104,10 @@ def parse_sources_from_cbz_xml(file_path):
                                     sources.add("src-waterstones")
                                 else:
                                     sources.add("unknown")
-    except Exception:
+    except (zipfile.BadZipFile, ET.ParseError, KeyError):
         pass
+    except (OSError, PermissionError) as e:
+        print(f"[-] Warning: Failed to read {file_path} for tracking signatures: {e}")
     return sources
 
 
@@ -151,7 +147,6 @@ def is_already_enhanced(file_path, enabled_sources=None, legacy_xml_fallback=Tru
     for the enabled sources. Utilizes SQLite for near-instant checks and 
     falls back to XML notes signatures (with automatic DB migration) if enabled.
     """
-    import sqlite3
     if not os.path.exists(file_path):
         return False
         

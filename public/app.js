@@ -1004,14 +1004,11 @@ async function showReadingListDetail(listId, listName) {
 
   // Edit mode state
   let isEditMode = false;
-  let originalOrder = [];
-  let currentDetails = null;
 
   // Load comics for this list
   async function renderComics() {
     try {
       const details = await global.ReadingLists.getReadingListDetails(listId);
-      currentDetails = details;
       const comicsContainer = document.getElementById('list-detail-comics-container');
       const countBadge = document.getElementById('list-item-count-badge');
 
@@ -1022,7 +1019,6 @@ async function showReadingListDetail(listId, listName) {
       }
 
       if (countBadge) countBadge.textContent = `${details.items.length} item${details.items.length === 1 ? '' : 's'}`;
-      originalOrder = details.items.map(item => item.comicId);
       comicsContainer.innerHTML = '';
 
       // Set container layout based on view mode

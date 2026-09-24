@@ -106,7 +106,6 @@ def generate_comic_info_xml(metadata, enabled_fields=None):
     
     # Rule: If the title and series match, do NOT add Title; keep Series
     if title_val and series_val and title_val.strip().lower() == series_val.strip().lower():
-        title_val = ""
         ET.SubElement(root, "Series").text = series_val
     else:
         if title_val:
@@ -144,11 +143,13 @@ def generate_comic_info_xml(metadata, enabled_fields=None):
             if len(year_parts) > 1:
                 try:
                     month = str(int(year_parts[1]))
-                except ValueError: pass
+                except ValueError:
+                    pass  # Non-numeric month; fallback to month name matching below
             if len(year_parts) > 2:
                 try:
                     day = str(int(year_parts[2]))
-                except ValueError: pass
+                except ValueError:
+                    pass  # Non-numeric day fallback
         
         if not year:
             match = re.search(r'\b(19|20)\d{2}\b', p_date)

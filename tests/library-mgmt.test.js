@@ -93,7 +93,7 @@ describe('Admin Library Management - Metadata Migration', () => {
     ]);
 
     // Spy on fs methods
-    const existsSpy = jest.spyOn(fs, 'existsSync').mockReturnValue(true);
+    jest.spyOn(fs, 'existsSync').mockReturnValue(true);
     const unlinkSpy = jest.spyOn(fs, 'unlinkSync').mockImplementation(() => {});
     const writeFileSpy = jest.spyOn(fs.promises, 'writeFile').mockResolvedValue();
 
@@ -140,7 +140,7 @@ describe('Admin Library Management - Metadata Migration', () => {
       },
     ]);
 
-    const existsSpy = jest.spyOn(fs, 'existsSync').mockReturnValue(true);
+    jest.spyOn(fs, 'existsSync').mockReturnValue(true);
     const unlinkSpy = jest.spyOn(fs, 'unlinkSync').mockImplementation(() => {});
 
     const req = { body: { mode: 'archive' } };
@@ -174,7 +174,7 @@ describe('Admin Library Management - Metadata Migration', () => {
       },
     ]);
 
-    const existsSpy = jest.spyOn(fs, 'existsSync').mockReturnValue(true);
+    jest.spyOn(fs, 'existsSync').mockReturnValue(true);
     const unlinkSpy = jest.spyOn(fs, 'unlinkSync').mockImplementation(() => {});
 
     const req = { body: { mode: 'db' } };
