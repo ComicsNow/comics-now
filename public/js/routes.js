@@ -218,6 +218,8 @@ function registerRoutes() {
       if (typeof global.getComicById === 'function' && typeof global.openComicViewer === 'function') {
         const result = global.getComicById(params.id, true);
         const folderPath = query.get('folderPath');
+        const readingListId = query.get('readingListId');
+        const readingListName = query.get('readingListName');
         if (result) {
           // Recover context if missing (e.g. on refresh)
           if (result.rootFolder) global.currentRootFolder = result.rootFolder;
@@ -225,7 +227,11 @@ function registerRoutes() {
           if (result.series) global.currentSeries = result.series;
           if (folderPath) global.currentFolderPath = decodeURIComponent(folderPath);
           
-          global.openComicViewer(result.comic);
+          const options = {};
+          if (readingListId) options.readingListId = readingListId;
+          if (readingListName) options.readingListName = decodeURIComponent(readingListName);
+
+          global.openComicViewer(result.comic, options);
         }
       }
     });
@@ -234,6 +240,8 @@ function registerRoutes() {
       if (typeof global.getComicById === 'function' && typeof global.openComicViewer === 'function') {
         const result = global.getComicById(params.id, true);
         const folderPath = query.get('folderPath');
+        const readingListId = query.get('readingListId');
+        const readingListName = query.get('readingListName');
         if (result) {
           // Recover context if missing
           if (result.rootFolder) global.currentRootFolder = result.rootFolder;
@@ -241,7 +249,11 @@ function registerRoutes() {
           if (result.series) global.currentSeries = result.series;
           if (folderPath) global.currentFolderPath = decodeURIComponent(folderPath);
 
-          global.openComicViewer(result.comic);
+          const options = {};
+          if (readingListId) options.readingListId = readingListId;
+          if (readingListName) options.readingListName = decodeURIComponent(readingListName);
+
+          global.openComicViewer(result.comic, options);
           const pageNum = parseInt(params.pageNumber, 10);
           setTimeout(() => {
             if (typeof global.turnToPage === 'function') global.turnToPage(pageNum - 1); 

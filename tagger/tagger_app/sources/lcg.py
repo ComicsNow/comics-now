@@ -63,10 +63,69 @@ def parse_lcg_product_page(html, url):
     if publisher:
         publisher = normalize_publisher(publisher)
 
-    writer = None
-    mc = re.search(r'\bfrom\s+(.+?),\s*published by', raw_desc)
-    if mc:
-        writer = mc.group(1).strip()
+    writers = []
+    pencillers = []
+    colorists = []
+    letterers = []
+    cover_artists = []
+    authors = []
+
+    # 1. Structured credit rows in LCG HTML if present
+    for cred_row in soup.select('.credits-item, .credit-item, .comic-credit, [class*="credit"], [class*="creator"]'):
+        row_text = cred_row.get_text(" ", strip=True)
+        if not row_text:
+            continue
+        r_match = re.search(r'^(Writer|Artist|Penciller|Penciler|Colorist|Cover Artist|Letterer|Editor)[:\s]+(.+)$', row_text, re.I)
+        if r_match:
+            role = r_match.group(1).lower()
+            name = r_match.group(2).strip()
+            if 'writer' in role:
+                if name not in writers: writers.append(name)
+            elif 'artist' in role or 'pencill' in role or 'penciler' in role:
+                if name not in pencillers: pencillers.append(name)
+            elif 'color' in role:
+                if name not in colorists: colorists.append(name)
+            elif 'letter' in role:
+                if name not in letterers: letterers.append(name)
+            elif 'cover' in role:
+                if name not in cover_artists: cover_artists.append(name)
+            if name not in authors:
+                authors.append(name)
+
+    # 2. Check "from <creators>, published by" in raw_desc
+    if not writers and not pencillers:
+        mc = re.search(r'\bfrom\s+(.+?),\s*published by', raw_desc)
+        if mc:
+            creators_raw = mc.group(1).strip()
+            parts = re.split(r'\s+and\s+|\s*,\s*', creators_raw)
+            parsed_parts = []
+            for part in parts:
+                clean_p = part.strip()
+                if not clean_p:
+                    continue
+                role_m = re.search(r'\((.*?)\)', clean_p)
+                p_name = re.sub(r'\(.*?\)', '', clean_p).strip()
+                if role_m:
+                    role = role_m.group(1).lower()
+                    if 'writer' in role:
+                        if p_name not in writers: writers.append(p_name)
+                    elif 'artist' in role or 'pencill' in role or 'penciler' in role:
+                        if p_name not in pencillers: pencillers.append(p_name)
+                    elif 'color' in role:
+                        if p_name not in colorists: colorists.append(p_name)
+                else:
+                    parsed_parts.append(p_name)
+                if p_name not in authors:
+                    authors.append(p_name)
+
+            if not writers and parsed_parts:
+                if len(parsed_parts) == 1:
+                    writers.append(parsed_parts[0])
+                elif len(parsed_parts) == 2:
+                    writers.append(parsed_parts[0])
+                    pencillers.append(parsed_parts[1])
+                else:
+                    writers.extend(parsed_parts)
 
     # "Released <Mon DD, YYYY>" in the details block
     publish_date = None
@@ -81,8 +140,12 @@ def parse_lcg_product_page(html, url):
         "number": number,
         "publisher": publisher,
         "publish_date": publish_date,
-        "writer": writer or "",
-        "authors": [writer] if writer else [],
+        "writer": ", ".join(writers) if writers else "",
+        "penciller": ", ".join(pencillers) if pencillers else None,
+        "colorist": ", ".join(colorists) if colorists else None,
+        "letterer": ", ".join(letterers) if letterers else None,
+        "cover_artist": ", ".join(cover_artists) if cover_artists else None,
+        "authors": authors or writers,
         "description": desc,
         "genres": ["Comics"],
         "source_url": canonical,

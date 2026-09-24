@@ -44,7 +44,6 @@ tagger/uploads/
 !**/scheduler_config.example.json
 
 # Test files and test generated folders
-tests/
 test-results/
 coverage/
 

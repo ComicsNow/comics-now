@@ -534,11 +534,21 @@ module.exports = function attach(router, deps) {
             ? issue.person_credits.map(p => ({ name: p.name, role: String(p.role || '').toLowerCase() }))
             : [];
 
-          const writers    = roles.filter(r => r.role.includes('writer')).map(r => r.name);
-          const pencillers = roles.filter(r => r.role.includes('penciller') || r.role.includes('artist')).map(r => r.name);
+          const writers      = roles.filter(r => r.role.includes('writer')).map(r => r.name);
+          const pencillers   = roles.filter(r => r.role.includes('penciller') || r.role.includes('artist')).map(r => r.name);
+          const inkers       = roles.filter(r => r.role.includes('inker')).map(r => r.name);
+          const colorists    = roles.filter(r => r.role.includes('colorist')).map(r => r.name);
+          const letterers    = roles.filter(r => r.role.includes('letterer')).map(r => r.name);
+          const coverArtists = roles.filter(r => r.role.includes('cover')).map(r => r.name);
+          const editors      = roles.filter(r => r.role.includes('editor')).map(r => r.name);
 
-          if (writers.length)    normalized.Writer    = writers.join(', ');
-          if (pencillers.length) normalized.Penciller = pencillers.join(', ');
+          if (writers.length)      normalized.Writer      = writers.join(', ');
+          if (pencillers.length)   normalized.Penciller   = pencillers.join(', ');
+          if (inkers.length)       normalized.Inker       = inkers.join(', ');
+          if (colorists.length)    normalized.Colorist    = colorists.join(', ');
+          if (letterers.length)    normalized.Letterer    = letterers.join(', ');
+          if (coverArtists.length) normalized.CoverArtist = coverArtists.join(', ');
+          if (editors.length)      normalized.Editor      = editors.join(', ');
 
           const characters = (issue?.character_credits || []).map(c => c.name).join(', ');
           const teams      = (issue?.team_credits || []).map(t => t.name).join(', ');
@@ -604,11 +614,16 @@ module.exports = function attach(router, deps) {
       const number = issue?.issue_number || '';
       const summary = stripHtml(issue?.description || '');
 
-      let writer = '', penciller = '';
+      let writer = '', penciller = '', inker = '', colorist = '', letterer = '', coverArtist = '', editor = '';
       if (Array.isArray(issue?.person_credits)) {
         const roles = issue.person_credits.map(p => ({ name: p.name, role: (p.role || '').toLowerCase() }));
-        writer    = roles.filter(r => r.role.includes('writer')).map(r => r.name).join(', ');
-        penciller = roles.filter(r => r.role.includes('penciller') || r.role.includes('artist')).map(r => r.name).join(', ');
+        writer      = roles.filter(r => r.role.includes('writer')).map(r => r.name).join(', ');
+        penciller   = roles.filter(r => r.role.includes('penciller') || r.role.includes('artist')).map(r => r.name).join(', ');
+        inker       = roles.filter(r => r.role.includes('inker')).map(r => r.name).join(', ');
+        colorist    = roles.filter(r => r.role.includes('colorist')).map(r => r.name).join(', ');
+        letterer    = roles.filter(r => r.role.includes('letterer')).map(r => r.name).join(', ');
+        coverArtist = roles.filter(r => r.role.includes('cover')).map(r => r.name).join(', ');
+        editor      = roles.filter(r => r.role.includes('editor')).map(r => r.name).join(', ');
       }
 
       const characters = (issue?.character_credits || []).map(c => c.name).join(', ');
@@ -622,6 +637,11 @@ module.exports = function attach(router, deps) {
         Summary: summary,
         Writer: writer,
         Penciller: penciller,
+        Inker: inker,
+        Colorist: colorist,
+        Letterer: letterer,
+        CoverArtist: coverArtist,
+        Editor: editor,
         Publisher: publisher,
         Characters: characters,
         Teams: teams,

@@ -49,34 +49,34 @@ const global = new Proxy(typeof window !== 'undefined' ? window : globalThis, {
   /**
    * Get the next comic in the current series.
    * Works regardless of how the user reached this comic — uses viewerReturnContext when
-   * available, otherwise locates the comic in the library by ID. Suppressed when the user
-   * is navigating a reading list (next-in-list takes priority there).
+   * available, otherwise locates the comic in the library by ID.
+   * Lives side-by-side with reading list navigation.
    * @returns {Object|null} Next comic object or null if at end of series / unavailable.
    */
   async function getNextComicInSeries() {
     const currentComic = global.currentComic;
     if (!currentComic) return null;
 
-    // Reading-list path uses next-in-list instead — suppress the in-series suggestion.
-    if (global.viewerReturnContext?.readingListId) return null;
-
-    let rootFolder = global.viewerReturnContext?.rootFolder || null;
-    let publisher = global.viewerReturnContext?.publisher || null;
-    let series = global.viewerReturnContext?.series || null;
+    let rootFolder = global.viewerReturnContext?.rootFolder || currentComic.rootFolder || null;
+    let publisher = global.viewerReturnContext?.publisher || currentComic.publisher || null;
+    let series = global.viewerReturnContext?.series || currentComic.series || null;
 
     if (!rootFolder || !publisher || !series) {
       const found = locateComicInLibrary(currentComic.id);
-      if (!found) return null;
-      rootFolder = found.rootFolder;
-      publisher = found.publisher;
-      series = found.series;
+      if (found) {
+        rootFolder = rootFolder || found.rootFolder;
+        publisher = publisher || found.publisher;
+        series = series || found.series;
+      }
     }
+
+    if (!series) return null;
 
     try {
       const seriesComics = await global.getSeriesComics?.(rootFolder, publisher, series);
       if (!Array.isArray(seriesComics) || seriesComics.length === 0) return null;
 
-      const currentIndex = seriesComics.findIndex(comic => comic && comic.id === currentComic.id);
+      const currentIndex = seriesComics.findIndex(comic => comic && String(comic.id) === String(currentComic.id));
       if (currentIndex === -1) return null;
 
       const nextIndex = currentIndex + 1;
@@ -91,28 +91,61 @@ const global = new Proxy(typeof window !== 'undefined' ? window : globalThis, {
 
   /**
    * Get the next comic in the current reading list
+   * Dynamically tracks real-time list order.
    * @returns {Object|null} Next comic object or null if at end of list
    */
   async function getNextComicInReadingList() {
-    const context = global.viewerReturnContext;
-    if (!context || !context.readingListId) {
-      return null;
-    }
-
     const currentComic = global.currentComic;
     if (!currentComic) {
       return null;
     }
 
+    let readingListId = global.viewerReturnContext?.readingListId || null;
+    let readingListName = global.viewerReturnContext?.readingListName || null;
+
     try {
-      // Fetch reading list details
-      const details = await global.ReadingLists?.getReadingListDetails(context.readingListId);
-      if (!details || !details.items || details.items.length === 0) {
+      // If no readingListId in context, search user's reading lists as a fallback
+      if (!readingListId && global.ReadingLists?.getReadingLists) {
+        try {
+          const res = await global.ReadingLists.getReadingLists();
+          const lists = res?.lists || res || [];
+          for (const l of lists) {
+            const d = await global.ReadingLists.getReadingListDetails(l.id);
+            if (d?.items && Array.isArray(d.items)) {
+              if (d.items.some(item => String(item.comicId) === String(currentComic.id))) {
+                readingListId = l.id;
+                readingListName = l.name;
+                break;
+              }
+            }
+          }
+        } catch (e) {
+          // ignore fallback lookup errors
+        }
+      }
+
+      if (!readingListId) {
         return null;
       }
 
-      // Find current comic index in reading list
-      const currentIndex = details.items.findIndex(item => item.comicId === currentComic.id);
+      // Fetch fresh reading list details to always follow real-time sort order
+      let details = null;
+      if (global.ReadingLists?.getReadingListDetails) {
+        details = await global.ReadingLists.getReadingListDetails(readingListId);
+      } else {
+        const baseUrl = typeof window !== 'undefined' && window.getBaseUrl ? window.getBaseUrl() : '';
+        const response = await fetch(`${baseUrl}/api/v1/reading-lists/${readingListId}`);
+        if (response.ok) {
+          details = await response.json();
+        }
+      }
+
+      if (!details || !details.items || !Array.isArray(details.items) || details.items.length === 0) {
+        return null;
+      }
+
+      // Find current comic index in reading list (items are sorted by sortOrder ASC)
+      const currentIndex = details.items.findIndex(item => String(item.comicId) === String(currentComic.id));
       if (currentIndex === -1) {
         return null;
       }
@@ -125,11 +158,26 @@ const global = new Proxy(typeof window !== 'undefined' ? window : globalThis, {
 
       const nextItem = details.items[nextIndex];
 
-      // Get the full comic object from the library
-      const nextComic = global.getComicById?.(nextItem.comicId);
+      // Get the full comic object from library or fallback API fetch
+      let nextComic = global.getComicById?.(nextItem.comicId);
       if (!nextComic) {
-        return null;
+        try {
+          const baseUrl = typeof window !== 'undefined' && window.getBaseUrl ? window.getBaseUrl() : '';
+          const cResp = await fetch(`${baseUrl}/api/comics/${nextItem.comicId}`);
+          if (cResp.ok) {
+            nextComic = await cResp.json();
+          }
+        } catch (e) {}
       }
+
+      if (!nextComic) {
+        nextComic = { id: nextItem.comicId, name: nextItem.name || 'Next Comic' };
+      }
+
+      nextComic._readingListContext = {
+        readingListId,
+        readingListName: readingListName || details.list?.name || 'Reading List'
+      };
 
       return nextComic;
     } catch (error) {
@@ -165,6 +213,7 @@ const global = new Proxy(typeof window !== 'undefined' ? window : globalThis, {
   /**
    * Updates the end-of-comic navigation UI visibility and click handlers
    * based on the current page index.
+   * Both Next in Series and Next in Reading List live side-by-side.
    */
   async function updateEndOfComicNavigation() {
     const nav = document.getElementById('end-of-comic-navigation');
@@ -195,36 +244,49 @@ const global = new Proxy(typeof window !== 'undefined' ? window : globalThis, {
     nav?.classList.remove('hidden');
     fsNav?.classList.remove('hidden');
 
-    if (nextInList) {
-      const options = {
-        readingListId: global.viewerReturnContext?.readingListId,
-        readingListName: global.viewerReturnContext?.readingListName
-      };
-
-      if (seriesBtn) seriesBtn.classList.add('hidden');
-      if (readingListBtn) {
-        readingListBtn.classList.remove('hidden');
-        readingListBtn.onclick = () => navigateToNextComic(nextInList, options);
-      }
-
-      if (fsSeriesBtn) fsSeriesBtn.classList.add('hidden');
-      if (fsReadingListBtn) {
-        fsReadingListBtn.classList.remove('hidden');
-        fsReadingListBtn.onclick = () => navigateToNextComic(nextInList, options);
-      }
-    } else if (nextInSeries) {
-      if (readingListBtn) readingListBtn.classList.add('hidden');
+    // Next in Series button
+    if (nextInSeries) {
       if (seriesBtn) {
         seriesBtn.classList.remove('hidden');
         seriesBtn.onclick = () => navigateToNextComic(nextInSeries);
       }
-
-      if (fsReadingListBtn) fsReadingListBtn.classList.add('hidden');
       if (fsSeriesBtn) {
         fsSeriesBtn.classList.remove('hidden');
         fsSeriesBtn.onclick = () => navigateToNextComic(nextInSeries);
       }
+    } else {
+      if (seriesBtn) seriesBtn.classList.add('hidden');
+      if (fsSeriesBtn) fsSeriesBtn.classList.add('hidden');
     }
+
+    // Next in Reading List button (lives side-by-side with Next in Series)
+    if (nextInList) {
+      const options = nextInList._readingListContext || {
+        readingListId: global.viewerReturnContext?.readingListId,
+        readingListName: global.viewerReturnContext?.readingListName
+      };
+
+      if (readingListBtn) {
+        readingListBtn.classList.remove('hidden');
+        readingListBtn.onclick = () => navigateToNextComic(nextInList, options);
+      }
+      if (fsReadingListBtn) {
+        fsReadingListBtn.classList.remove('hidden');
+        fsReadingListBtn.onclick = () => navigateToNextComic(nextInList, options);
+      }
+    } else {
+      if (readingListBtn) readingListBtn.classList.add('hidden');
+      if (fsReadingListBtn) fsReadingListBtn.classList.add('hidden');
+    }
+  }
+
+  if (typeof window !== 'undefined') {
+    window.addEventListener('reading-list-reordered', () => {
+      const isLastPage = global.currentPageIndex === (global.getPageCounterTotal?.() - 1);
+      if (isLastPage) {
+        updateEndOfComicNavigation();
+      }
+    });
   }
 
   // Expose functions globally

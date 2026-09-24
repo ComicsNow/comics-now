@@ -298,6 +298,73 @@ async function initializeDatabase() {
     } catch (e) {
       log('WARN', 'DB', `Title cleanup migration error: ${e.message}`);
     }
+
+    // Creator role disambiguation migration:
+    // Resolve Writer vs Penciller/Artist/Colorist/Letterer across existing comics
+    try {
+      const { resolveCreatorRoles } = require('./services/metadata');
+      const rows = db.prepare("SELECT id, series, metadata FROM comics WHERE metadata LIKE '%\"Writer\":%' OR metadata LIKE '%\"writer\":%'").all();
+      const updateStmt = db.prepare("UPDATE comics SET metadata = ? WHERE id = ?");
+      let disambiguatedCount = 0;
+
+      // Cache known artists per series from existing records
+      const seriesArtistMap = new Map();
+      const allSeriesRows = db.prepare("SELECT series, metadata FROM comics WHERE series IS NOT NULL AND (metadata LIKE '%\"Penciller\":%' OR metadata LIKE '%\"penciller\":%' OR metadata LIKE '%\"Inker\":%' OR metadata LIKE '%\"Colorist\":%')").all();
+      for (const sr of allSeriesRows) {
+        if (!sr.metadata || !sr.series) continue;
+        try {
+          const sm = JSON.parse(sr.metadata);
+          const artists = [
+            sm.Penciller, sm.penciller,
+            sm.Inker, sm.inker,
+            sm.Colorist, sm.colorist,
+            sm.Letterer, sm.letterer,
+            sm.CoverArtist, sm.cover_artist
+          ].filter(Boolean);
+          if (artists.length) {
+            const list = seriesArtistMap.get(sr.series) || [];
+            for (const a of artists) {
+              const parts = String(a).split(/[,;&]|\s+and\s+/i);
+              for (const p of parts) {
+                const trimmed = p.trim();
+                if (trimmed && !list.some(existing => existing.toLowerCase() === trimmed.toLowerCase())) {
+                  list.push(trimmed);
+                }
+              }
+            }
+            seriesArtistMap.set(sr.series, list);
+          }
+        } catch {}
+      }
+
+      for (const row of rows) {
+        if (!row.metadata) continue;
+        try {
+          const m = JSON.parse(row.metadata);
+          const origWriter = m.Writer || m.writer || '';
+          const origPenciller = m.Penciller || m.penciller || '';
+          const origColorist = m.Colorist || m.colorist || '';
+
+          const seriesArtists = (row.series && seriesArtistMap.get(row.series)) || [];
+          resolveCreatorRoles(m, seriesArtists);
+
+          const newWriter = m.Writer || m.writer || '';
+          const newPenciller = m.Penciller || m.penciller || '';
+          const newColorist = m.Colorist || m.colorist || '';
+
+          if (newWriter !== origWriter || newPenciller !== origPenciller || newColorist !== origColorist) {
+            updateStmt.run(JSON.stringify(m), row.id);
+            disambiguatedCount++;
+          }
+        } catch {}
+      }
+
+      if (disambiguatedCount > 0) {
+        log('INFO', 'DB', `Disambiguated creator roles for ${disambiguatedCount} comic(s)`);
+      }
+    } catch (e) {
+      log('WARN', 'DB', `Creator role disambiguation migration error: ${e.message}`);
+    }
   } catch (err) {
     await dbRun('ROLLBACK').catch(() => {});
     log('ERROR', 'DB', `Database initialization failed: ${err.message}`);

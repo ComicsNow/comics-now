@@ -13,7 +13,7 @@ from flask import Flask, render_template, request, jsonify, send_file, Response
 from werkzeug.utils import secure_filename
 
 # Tagging logic now lives in the tagger_app package.
-from tagger_app.core.metadata import normalize_metadata, calculate_similarity
+from tagger_app.core.metadata import normalize_metadata, calculate_similarity, resolve_creator_roles
 from tagger_app.core.covers import extract_cover_from_cbz
 from tagger_app.core.limiter import domain_limiter
 from tagger_app.core.comicinfo import read_comic_info_xml, generate_comic_info_xml, write_comic_info_to_cbz, write_comic_info
@@ -177,7 +177,7 @@ def enrich_metadata_from_other_sources(primary_meta, all_candidates, lower_thres
                 unique_sources.append(s_clean)
         primary_meta["source_url"] = ", ".join(unique_sources)
         
-    return primary_meta
+    return resolve_creator_roles(primary_meta)
 
 
 def consolidate_all_candidates(candidates_list):
@@ -281,7 +281,7 @@ def consolidate_all_candidates(candidates_list):
     # Post-process to format source URLs/labels
     results = []
     for cons in consolidated:
-        meta = cons["metadata"]
+        meta = resolve_creator_roles(cons["metadata"])
         score = cons["score"]
         sources = cons["sources"]
 
@@ -684,7 +684,7 @@ def merge_only_missing_fields(existing_meta, new_meta):
         if is_empty:
             merged[key] = val
             
-    return merged
+    return resolve_creator_roles(merged)
 
 def enhance_single_cbz_file(file_path, comicvine_api_key, google_books_api_key=None, metron_user=None, metron_pass=None, lower_threshold=0.80, upper_threshold=0.90, on_progress=None, enabled_fields=None, enabled_sources=None, force_reprocess=False):
     filename = os.path.basename(file_path)

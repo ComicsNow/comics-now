@@ -26,9 +26,9 @@ def parse_blackwells_product_soup(soup, url):
     title = title_tag.get_text(strip=True)
 
     authors = []
-    writer = None
-    colorist = None
-    penciller = None
+    writers = []
+    colorists = []
+    pencillers = []
     inkers = []
 
     author_div = soup.find('p', class_='product__author')
@@ -41,14 +41,19 @@ def parse_blackwells_product_soup(soup, url):
             if role_match:
                 role = role_match.group(1).lower()
                 if 'author' in role or 'writer' in role:
-                    writer = name
+                    if name not in writers:
+                        writers.append(name)
                 elif 'colourist' in role or 'colorist' in role:
-                    colorist = name
-                elif 'artist' in role or 'penciller' in role:
-                    penciller = name
+                    if name not in colorists:
+                        colorists.append(name)
+                elif 'artist' in role or 'penciller' in role or 'illustrator' in role:
+                    if name not in pencillers:
+                        pencillers.append(name)
                 elif 'inker' in role:
-                    inkers.append(name)
-            authors.append(name)
+                    if name not in inkers:
+                        inkers.append(name)
+            if name not in authors:
+                authors.append(name)
 
     if not authors and author_div:
         authors = [a.strip() for a in author_div.get_text(strip=True).split(',') if a.strip()]
@@ -97,9 +102,9 @@ def parse_blackwells_product_soup(soup, url):
     metadata = {
         "title": title,
         "authors": clean_author_names(authors),
-        "writer": writer or (", ".join(authors) if authors else None),
-        "penciller": penciller,
-        "colorist": colorist,
+        "writer": ", ".join(writers) if writers else None,
+        "penciller": ", ".join(pencillers) if pencillers else None,
+        "colorist": ", ".join(colorists) if colorists else None,
         "inker": ", ".join(inkers) if inkers else None,
         "isbn": isbn,
         "publisher": publisher,

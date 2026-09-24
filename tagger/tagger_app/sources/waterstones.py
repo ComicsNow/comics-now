@@ -26,9 +26,29 @@ def parse_waterstones_product_soup(soup, url):
     title = title_tag.get_text(strip=True)
 
     authors = []
+    writers = []
+    pencillers = []
+    colorists = []
+    inkers = []
+
     for author_tag in soup.find_all(attrs={"itemprop": "author"}):
-        a_name = author_tag.get_text(strip=True)
-        a_name = re.sub(r'\(.*?\)', '', a_name).strip()
+        raw_text = author_tag.get_text(strip=True)
+        role_m = re.search(r'\((.*?)\)', raw_text)
+        a_name = re.sub(r'\(.*?\)', '', raw_text).strip()
+        if role_m:
+            role = role_m.group(1).lower()
+            if 'author' in role or 'writer' in role:
+                if a_name not in writers:
+                    writers.append(a_name)
+            elif 'artist' in role or 'penciller' in role or 'illustrator' in role:
+                if a_name not in pencillers:
+                    pencillers.append(a_name)
+            elif 'colourist' in role or 'colorist' in role:
+                if a_name not in colorists:
+                    colorists.append(a_name)
+            elif 'inker' in role:
+                if a_name not in inkers:
+                    inkers.append(a_name)
         if a_name and a_name not in authors:
             authors.append(a_name)
 
@@ -97,7 +117,10 @@ def parse_waterstones_product_soup(soup, url):
     metadata = {
         "title": title,
         "authors": clean_author_names(authors),
-        "writer": ", ".join(authors) if authors else None,
+        "writer": ", ".join(writers) if writers else None,
+        "penciller": ", ".join(pencillers) if pencillers else None,
+        "colorist": ", ".join(colorists) if colorists else None,
+        "inker": ", ".join(inkers) if inkers else None,
         "isbn": isbn,
         "publisher": publisher,
         "publish_date": publish_date,
