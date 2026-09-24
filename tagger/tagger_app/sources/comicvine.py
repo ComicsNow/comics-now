@@ -8,14 +8,11 @@ import requests
 from bs4 import BeautifulSoup
 
 from tagger_app.core.metadata import (
-    normalize_metadata,
-    calculate_similarity,
     clean_author_names,
     clean_description,
     normalize_publisher,
     score_candidate,
 )
-from tagger_app.core.covers import compare_covers_python
 from tagger_app.core.query import clean_search_query
 from tagger_app.core.cache import tagger_cache
 from tagger_app.core.limiter import domain_limiter
@@ -232,7 +229,7 @@ def fetch_comicvine_metadata(comicvine_url, api_key):
     if entity_type == "4000":
         # Issue endpoint - retrieve comprehensive fields
         api_url = f"{base_api_url}/issue/{entity_id}/?api_key={api_key}&format=json&field_list=name,description,issue_number,cover_date,store_date,volume,person_credits,character_credits,team_credits,location_credits,page_count,image"
-        print(f"[*] Querying ComicVine Issue API: {api_url}")
+        print(f"[*] Querying ComicVine Issue API: {base_api_url}/issue/{entity_id}/?api_key=***&format=json")
 
         domain_limiter.wait_for_domain("comicvine.gamespot.com")
         response = requests.get(api_url, headers=headers, timeout=15)
@@ -367,7 +364,7 @@ def fetch_comicvine_metadata(comicvine_url, api_key):
     elif entity_type == "4050":
         # Volume/Series endpoint
         api_url = f"{base_api_url}/volume/{entity_id}/?api_key={api_key}&format=json&field_list=name,description,publisher,start_year,image"
-        print(f"[*] Querying ComicVine Volume API: {api_url}")
+        print(f"[*] Querying ComicVine Volume API: {base_api_url}/volume/{entity_id}/?api_key=***&format=json")
 
         domain_limiter.wait_for_domain("comicvine.gamespot.com")
         response = requests.get(api_url, headers=headers, timeout=15)

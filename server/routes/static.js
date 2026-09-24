@@ -60,25 +60,31 @@ function createStaticRouter({ getConfig, getComicsDirectories, getPublicLibrarie
   }
   router.use('/thumbnails', express.static(THUMBNAILS_DIRECTORY, { maxAge: '1y', immutable: true }));
   router.get('/thumbnails/:filename', async (req, res, next) => {
-    const filename = req.params.filename;
-    const full = path.join(THUMBNAILS_DIRECTORY, filename);
-    if (fs.existsSync(full)) {
-      return res.sendFile(full);
+    const rawFilename = req.params.filename;
+    const safeFilename = path.basename(rawFilename);
+    const resolvedDir = path.resolve(THUMBNAILS_DIRECTORY);
+    const full = path.resolve(resolvedDir, safeFilename);
+    if (!full.startsWith(resolvedDir + path.sep)) {
+      return res.status(403).send('Forbidden');
     }
-    const id = path.basename(filename, path.extname(filename));
+    if (fs.existsSync(full)) {
+      return res.sendFile(safeFilename, { root: resolvedDir });
+    }
+    const id = path.basename(safeFilename, path.extname(safeFilename));
     try {
       const { dbGet, dbRun } = require('../db');
       const { generateThumbnail } = require('../services/library-pages');
-      const comic = await dbGet('SELECT id, path FROM comics WHERE id = ? OR thumbnailPath = ?', [id, filename]);
+      const comic = await dbGet('SELECT id, path FROM comics WHERE id = ? OR thumbnailPath = ?', [id, safeFilename]);
       if (comic && fs.existsSync(comic.path)) {
         const gen = await generateThumbnail(comic.path);
-        if (gen && fs.existsSync(path.join(THUMBNAILS_DIRECTORY, gen))) {
-          await dbRun('UPDATE comics SET thumbnailPath = ? WHERE id = ?', [gen, comic.id]);
-          return res.sendFile(path.join(THUMBNAILS_DIRECTORY, gen));
+        const safeGen = gen ? path.basename(gen) : null;
+        if (safeGen && fs.existsSync(path.join(resolvedDir, safeGen))) {
+          await dbRun('UPDATE comics SET thumbnailPath = ? WHERE id = ?', [safeGen, comic.id]);
+          return res.sendFile(safeGen, { root: resolvedDir });
         }
       }
     } catch (e) {
-      log('ERROR', 'THUMBNAIL', `On-demand thumbnail generation failed for ${filename}: ${e.message}`);
+      log('ERROR', 'THUMBNAIL', `On-demand thumbnail generation failed for ${safeFilename}: ${e.message}`);
     }
     next();
   });

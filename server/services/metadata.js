@@ -303,8 +303,9 @@ function cleanDescription(desc) {
   let s = String(desc);
 
   // 1. Strip HTML tags and normalize entities
-  s = s.replace(/<[^>]+>/g, ' ');
-  s = s.replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>');
+  s = s.replace(/<[^<>]+>/g, ' ');
+  const entityMap = { '&quot;': '"', '&#39;': "'", '&lt;': '<', '&gt;': '>', '&amp;': '&' };
+  s = s.replace(/&(?:quot|#39|lt|gt|amp);/g, m => entityMap[m] || m);
 
   // 1b. Publisher editorial template (BOOM!/Archaia): "WHY WE LOVE IT: ...
   //     WHY YOU'LL LOVE IT: ... WHAT IT'S ABOUT: <real synopsis>". Keep only the
