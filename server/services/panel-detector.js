@@ -383,6 +383,15 @@ function buildHybridWesternSequence(panels, bubbles) {
   return seq;
 }
 
+function withTimeout(promise, ms, message) {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(message)), ms);
+    promise
+      .then(res => { clearTimeout(timer); resolve(res); })
+      .catch(err => { clearTimeout(timer); reject(err); });
+  });
+}
+
 async function processComic(id, comicPath, type, opts = {}) {
   const isCancelled = typeof opts.isCancelled === 'function' ? opts.isCancelled : () => false;
   let pages = await listPages(comicPath);
@@ -397,7 +406,11 @@ async function processComic(id, comicPath, type, opts = {}) {
     if (isCancelled()) throw new Error('Cancelled');
     try {
       if (pagesProcessed % 10 === 0) guidedLogUpdate('processing-pages:' + id, 'INFO', '   ... processing page ' + pagesProcessed + '/' + pages.length);
-      const buffer = await extractPageBuffer(comicPath, pageName);
+      const buffer = await withTimeout(
+        extractPageBuffer(comicPath, pageName),
+        30000,
+        `Page extraction timed out for ${pageName}`
+      );
       const rawPanels = (type === 'manga') ? await detectPanels(buffer, 'manga', 0.1) : await detectPanels(buffer, 'manga', 0.5, 0);
       const panels = sortReadingOrder(rawPanels, type);
       const bubbles = type === 'western' ? await detectBubbles(buffer, type) : [];
