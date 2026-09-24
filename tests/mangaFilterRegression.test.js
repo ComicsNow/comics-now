@@ -5,7 +5,7 @@
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
-const { getReadingPrefMaps, setReadingPreference, resolveReadingModes, dbRun } = require('../server/db');
+const { getReadingPrefMaps, setReadingPreference, resolveReadingModes, dbRun, initializeDatabase } = require('../server/db');
 
 function createModuleSandbox() {
   const state = {
@@ -46,6 +46,10 @@ function createModuleSandbox() {
 }
 
 describe('Manga Smart Filter Regression Tests', () => {
+  beforeAll(async () => {
+    await initializeDatabase();
+  });
+
   describe('Frontend Smartlists Manga Filter Pill Behavior', () => {
     let env;
 
