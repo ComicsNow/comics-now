@@ -2712,6 +2712,17 @@ body.eink-color-mode #bubble-magnifier-img {
     color: var(--paper) !important;
 }
 
+#settings-modal .user-access-title,
+#settings-modal #user-access-view .user-access-title {
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
+    font-size: 1rem !important;
+    text-transform: none !important;
+    letter-spacing: normal !important;
+    word-break: break-all !important;
+    overflow-wrap: anywhere !important;
+    line-height: 1.35 !important;
+}
+
 #settings-modal .border-b,
 #reading-list-modal .border-b,
 #add-to-list-modal .border-b,

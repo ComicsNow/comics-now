@@ -44,8 +44,10 @@ export async function showUserAccessView(userId, userEmail, userRole) {
             </svg>
           </div>
           <div class="min-w-0 flex-1">
-            <h3 class="text-base sm:text-xl font-bold text-white break-all sm:break-words leading-tight">Library Access for ${escapeHtml(userEmail)}</h3>
-            <p class="text-xs sm:text-sm text-gray-400 truncate">Configure content permissions</p>
+            <div class="user-access-title text-sm sm:text-base font-bold text-white break-all leading-snug">
+              Library Access for <span class="text-purple-300 break-all font-semibold">${escapeHtml(userEmail)}</span>
+            </div>
+            <p class="text-xs sm:text-sm text-gray-400 truncate mt-0.5">Configure content permissions</p>
           </div>
         </div>
       </div>
