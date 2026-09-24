@@ -138,6 +138,10 @@ module.exports = function attach(router, deps) {
       }
 
       const metadata = trimObjectStrings(req.body || {});
+      const { isTitleSameAsSeries } = require('../../services/metadata');
+      if (metadata.Title && (isTitleSameAsSeries(metadata.Title, metadata.Series) || (!metadata.Series && isTitleSameAsSeries(metadata.Title, '')))) {
+        metadata.Title = '';
+      }
       const id = createId(cbzPath);
 
       log('INFO', 'META', `📥 Save metadata request for: ${cbzPath} (id=${id})`);

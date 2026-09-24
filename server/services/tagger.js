@@ -239,7 +239,7 @@ async function runComicTagger(options = {}) {
       const isAlreadyComplete = await checkFileSuccess(filePath);
       if (!force && isAlreadyComplete) {
         try {
-          const { getComicInfoFromArchive, normalizePublisher, cleanDescription, splitVolumeSeriesAndTitle } = require('./metadata');
+          const { getComicInfoFromArchive, normalizePublisher, cleanDescription, splitVolumeSeriesAndTitle, isTitleSameAsSeries } = require('./metadata');
           const info = await getComicInfoFromArchive(filePath);
           const rawPub = info.Publisher || existing?.publisher || 'Unknown Publisher';
           const pub = normalizePublisher(rawPub, publisherCodex);
@@ -257,6 +257,9 @@ async function runComicTagger(options = {}) {
             if (!vol) {
               vol = volSplit.volume;
             }
+          }
+          if (title && (isTitleSameAsSeries(title, ser) || (!ser && isTitleSameAsSeries(title, '')))) {
+            title = '';
           }
           const dbMeta = {
             Title: title,
@@ -367,7 +370,7 @@ async function runComicTagger(options = {}) {
           const tagStatus = isSuccessful ? 'successful' : 'failed';
           const newStats = await fs.promises.stat(filePath).catch(() => stats);
           
-          const { getComicInfoFromArchive, normalizePublisher, cleanDescription, splitVolumeSeriesAndTitle } = require('./metadata');
+          const { getComicInfoFromArchive, normalizePublisher, cleanDescription, splitVolumeSeriesAndTitle, isTitleSameAsSeries } = require('./metadata');
           let dbMetaStr = null;
           let rawPub = res.metadata?.publisher || existing?.publisher || 'Unknown Publisher';
           let pub = normalizePublisher(rawPub, publisherCodex);
@@ -389,6 +392,9 @@ async function runComicTagger(options = {}) {
               if (!vol) {
                 vol = volSplit.volume;
               }
+            }
+            if (title && (isTitleSameAsSeries(title, ser) || (!ser && isTitleSameAsSeries(title, '')))) {
+              title = '';
             }
             const dbMeta = {
               Title: title,
@@ -608,7 +614,7 @@ async function applyUserSelection(selections) {
     const newStats = await fs.promises.stat(filePath).catch(() => ({ mtimeMs: Date.now() }));
     
     const id = require('../utils').createId(filePath);
-    const { getComicInfoFromArchive, normalizePublisher, cleanDescription } = require('./metadata');
+    const { getComicInfoFromArchive, normalizePublisher, cleanDescription, isTitleSameAsSeries } = require('./metadata');
     let publisherCodex = [];
     try {
       const pubRows = await db.dbAll("SELECT DISTINCT publisher FROM comics WHERE publisher IS NOT NULL AND publisher != '' AND publisher != 'Unknown Publisher'");
@@ -623,8 +629,12 @@ async function applyUserSelection(selections) {
       const info = await getComicInfoFromArchive(filePath);
       pub = normalizePublisher(info.Publisher || pub, publisherCodex);
       ser = info.Series || ser;
+      let title = info.Title || '';
+      if (title && (isTitleSameAsSeries(title, ser) || (!ser && isTitleSameAsSeries(title, '')))) {
+        title = '';
+      }
       const dbMeta = {
-        Title: info.Title || '',
+        Title: title,
         Series: info.Series || ser,
         Number: info.Number || '',
         Publisher: pub,

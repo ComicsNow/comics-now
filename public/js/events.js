@@ -363,6 +363,15 @@ metadataForm?.addEventListener('submit', async (e) => {
     state.currentMetadata[key] = value;
   }
 
+  const checkTitleSame = state.isTitleSameAsSeries || window.isTitleSameAsSeries;
+  if (typeof checkTitleSame === 'function') {
+    if (state.currentMetadata.Title && (checkTitleSame(state.currentMetadata.Title, state.currentMetadata.Series) || (!state.currentMetadata.Series && checkTitleSame(state.currentMetadata.Title, '')))) {
+      state.currentMetadata.Title = '';
+      const titleInput = metadataForm.querySelector('[name="Title"]');
+      if (titleInput) titleInput.value = '';
+    }
+  }
+
   try {
     const response = await fetch(`${state.API_BASE_URL}/api/v1/comics/info?path=${encodeURIComponent(encodePath(state.currentComic.path))}`, {
       method: 'POST',

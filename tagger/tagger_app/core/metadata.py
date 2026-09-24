@@ -81,6 +81,58 @@ def clean_format_and_edition(text: str) -> str:
     return s
 
 
+def is_title_same_as_series(title: str, series: str) -> bool:
+    """
+    Determines whether a title is redundant with the series name.
+    If Title is the same as Series (even with issue numbers, `#3`, ` 3`, volume suffixes, or format tags),
+    Title must be left blank.
+    """
+    if not title:
+        return False
+    t_raw = clean_format_and_edition(str(title)).strip()
+    if not t_raw:
+        return True  # Title was just a format tag (e.g. "HC", "TPB") -> blank it!
+
+    if not series:
+        return False
+    s_raw = clean_format_and_edition(str(series)).strip()
+    if not s_raw:
+        return False
+
+    if t_raw.lower() == s_raw.lower():
+        return True
+
+    # Direct regex check on raw strings
+    escaped_s = re.escape(s_raw)
+    direct_pattern = (
+        rf"^{escaped_s}[:\s\-_–—]*(?:#|(?:issue|no\.?|vol(?:ume)?\.?|pt\.?|part|book|bk\.?)\s*#?)?\s*"
+        rf"\d+(?:\s*(?:of|\/)\s*\d+)?\s*(?:\(\d{{4}}\))?\s*[)\]}}]*$"
+    )
+    if re.match(direct_pattern, t_raw, re.IGNORECASE):
+        return True
+
+    # Normalized alphanumeric comparison
+    norm_s = re.sub(r"\s+", " ", re.sub(r"[^\w\s]", " ", s_raw.lower())).strip()
+    norm_t = re.sub(r"\s+", " ", re.sub(r"[^\w\s]", " ", t_raw.lower())).strip()
+    if not norm_s or not norm_t:
+        return False
+
+    if norm_t == norm_s:
+        return True
+
+    if norm_t.startswith(norm_s):
+        rem = norm_t[len(norm_s):].strip()
+        if re.match(r"^(?:#|(?:issue|no|vol|volume|pt|part|book|bk)\s*#?)?\s*\d+(?:\s*(?:of|\/)\s*\d+)?(?:\s*\d{4})?$", rem, re.IGNORECASE):
+            return True
+
+    if norm_s.startswith(norm_t):
+        rem = norm_s[len(norm_t):].strip()
+        if re.match(r"^(?:#|(?:issue|no|vol|volume|pt|part|book|bk)\s*#?)?\s*\d+(?:\s*(?:of|\/)\s*\d+)?(?:\s*\d{4})?$", rem, re.IGNORECASE):
+            return True
+
+    return False
+
+
 CANONICAL_PUBLISHER_MAP = {
     "dc": "DC Comics",
     "dc comics": "DC Comics",
@@ -424,6 +476,7 @@ def normalize_metadata(meta, codex=None):
         return meta
 
     # 1. Normalize series / title / issue_title & check for volume patterns
+    original_series = meta.get("series")
     raw_title = clean_format_and_edition(meta.get("title") or "")
     series = clean_format_and_edition(meta.get("series") or "")
     issue_title = clean_format_and_edition(meta.get("issue_title") or "")
@@ -526,6 +579,13 @@ def normalize_metadata(meta, codex=None):
             series_clean = series_clean[:m_trail.start()].strip()
 
     meta["series"] = clean_format_and_edition(series_clean or series)
+
+    # Rule: If title or issue_title is the same as series (even with issue numbers, #3, 3, volume suffixes), leave it blank!
+    final_series = meta.get("series") or ""
+    if original_series and is_title_same_as_series(meta.get("title"), final_series):
+        meta["title"] = ""
+    if is_title_same_as_series(meta.get("issue_title"), final_series):
+        meta["issue_title"] = ""
 
     # 3. Normalize authors / writer
     authors = meta.get("authors")

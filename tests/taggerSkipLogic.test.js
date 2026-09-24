@@ -294,6 +294,56 @@ describe('runComicTagger - Skip & Tagging Logic', () => {
     expect(xml).not.toContain('<Title>');
   });
 
+  test('buildComicInfoXml retains Series and strips Title when Title is Series with issue number or suffix', () => {
+    // Exactly like the user scenario: "Do a Powerbomb Black and White #3" vs "Do a Powerbomb Black and White"
+    const xmlWithHash = metadataService.buildComicInfoXml({
+      Title: 'Do a Powerbomb Black and White #3',
+      Series: 'Do a Powerbomb Black and White',
+      Number: '3',
+      Publisher: 'Image'
+    });
+    expect(xmlWithHash).toContain('<Series>Do a Powerbomb Black and White</Series>');
+    expect(xmlWithHash).toContain('<Number>3</Number>');
+    expect(xmlWithHash).not.toContain('<Title>');
+
+    // With bare digit at the end: "Do a Powerbomb Black and White 3"
+    const xmlWithDigit = metadataService.buildComicInfoXml({
+      Title: 'Do a Powerbomb Black and White 3',
+      Series: 'Do a Powerbomb Black and White',
+      Number: '3',
+      Publisher: 'Image'
+    });
+    expect(xmlWithDigit).toContain('<Series>Do a Powerbomb Black and White</Series>');
+    expect(xmlWithDigit).not.toContain('<Title>');
+
+    // Distinct story title: "The Death of Gwen Stacy"
+    const xmlDistinct = metadataService.buildComicInfoXml({
+      Title: 'The Death of Gwen Stacy',
+      Series: 'The Amazing Spider-Man',
+      Number: '121',
+      Publisher: 'Marvel Comics'
+    });
+    expect(xmlDistinct).toContain('<Series>The Amazing Spider-Man</Series>');
+    expect(xmlDistinct).toContain('<Title>The Death of Gwen Stacy</Title>');
+    expect(xmlDistinct).toContain('<Number>121</Number>');
+  });
+
+  test('isTitleSameAsSeries accurately detects redundant titles', () => {
+    expect(metadataService.isTitleSameAsSeries('Do a Powerbomb Black and White #3', 'Do a Powerbomb Black and White')).toBe(true);
+    expect(metadataService.isTitleSameAsSeries('Do a Powerbomb Black and White 3', 'Do a Powerbomb Black and White')).toBe(true);
+    expect(metadataService.isTitleSameAsSeries('Do a Powerbomb Black and White #03 (of 3)', 'Do a Powerbomb Black and White')).toBe(true);
+    expect(metadataService.isTitleSameAsSeries('Do a Powerbomb Black and White', 'Do a Powerbomb Black and White')).toBe(true);
+    expect(metadataService.isTitleSameAsSeries('Do a Powerbomb TP', 'Do A Powerbomb')).toBe(true);
+    expect(metadataService.isTitleSameAsSeries('HC', 'GoSt')).toBe(true);
+    expect(metadataService.isTitleSameAsSeries('Batman #45', 'Batman')).toBe(true);
+    expect(metadataService.isTitleSameAsSeries('Batman 45', 'Batman')).toBe(true);
+    expect(metadataService.isTitleSameAsSeries('100 Bullets #5', '100 Bullets')).toBe(true);
+    expect(metadataService.isTitleSameAsSeries('100 Bullets 5', '100 Bullets')).toBe(true);
+    expect(metadataService.isTitleSameAsSeries('Batman: Year One', 'Batman')).toBe(false);
+    expect(metadataService.isTitleSameAsSeries('The Death of Gwen Stacy', 'The Amazing Spider-Man')).toBe(false);
+    expect(metadataService.isTitleSameAsSeries('Volume 1: The Court of Owls', 'Batman')).toBe(false);
+  });
+
   test('buildComicInfoXml strips format tags (TPB, HC, HB, Paperback, Digital) from Title and Series', () => {
     const xml = metadataService.buildComicInfoXml({
       Title: 'DC Finest: War – The Big Five (digital)',
