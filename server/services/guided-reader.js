@@ -196,6 +196,9 @@ async function runWorker() {
     state.isRunning = false;
     state.current = null;
     state.lastFinishedAt = Date.now();
+    await dbRun(
+      "UPDATE comics SET guidedViewStatus = 'pending' WHERE guidedViewStatus = 'processing'"
+    ).catch(() => {});
     guidedLog('INFO', `Worker finished. Run duration: ${Math.round((state.lastFinishedAt - state.startedAt) / 1000)}s`);
   }
 }
@@ -246,6 +249,7 @@ async function startRunForScope(type, target) {
 }
 
 function cancelRun() {
+  dbRun("UPDATE comics SET guidedViewStatus = 'pending' WHERE guidedViewStatus = 'processing'").catch(() => {});
   if (!state.isRunning) return false;
   state.isCancelled = true;
   guidedLog('WARN', 'Cancellation requested; finishing current item then stopping');

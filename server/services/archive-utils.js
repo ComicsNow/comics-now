@@ -12,6 +12,11 @@ function isSafeEntry(name) {
     return !parts.includes('..');
 }
 
+function escapeZipGlob(name) {
+    if (typeof name !== 'string') return '';
+    return name.replace(/([\[*?\\])/g, '\\$1');
+}
+
 class ZipReader {
     constructor(zipfile, filePath) {
         this.zipfile = zipfile;
@@ -24,6 +29,23 @@ class ZipReader {
         return Array.from(this.entries.keys());
     }
 
+    getEntry(name) {
+        if (!this.entries) return null;
+        let entry = this.entries.get(name);
+        if (!entry && typeof name === 'string') {
+            const normalized = name.normalize();
+            entry = this.entries.get(normalized);
+            if (!entry) {
+                for (const [k, v] of this.entries.entries()) {
+                    if (k.normalize() === normalized) {
+                        return v;
+                    }
+                }
+            }
+        }
+        return entry || null;
+    }
+
     async readStream(name) {
         if (!isSafeEntry(name)) {
             this.close();
@@ -32,23 +54,14 @@ class ZipReader {
         if (!this.entries) {
             throw new Error('Reader is closed');
         }
-        const entry = this.entries.get(name);
+        const entry = this.getEntry(name);
         if (!entry) {
             this.close();
             throw new Error('Entry not found: ' + name);
         }
-        // If entry name contains non-ASCII characters or glob patterns that unzip CLI misinterprets, use yauzl directly
-        const hasSpecialChars = /[^\x20-\x7E]/.test(name) || /[[*?\]\\]/.test(name);
-        if (hasSpecialChars && this.zipfile) {
-            return new Promise((resolve, reject) => {
-                this.zipfile.openReadStream(entry, (err, stream) => {
-                    if (err) return reject(err);
-                    resolve(stream);
-                });
-            });
-        }
+        const actualName = entry.fileName || name;
         const { spawn } = require('child_process');
-        const child = spawn('unzip', ['-p', '--', this.filePath, name]);
+        const child = spawn('unzip', ['-p', '--', this.filePath, escapeZipGlob(actualName)]);
         return child.stdout;
     }
 
@@ -60,36 +73,58 @@ class ZipReader {
         if (!this.entries) {
             throw new Error('Reader is closed');
         }
-        const entry = this.entries.get(name);
+        const entry = this.getEntry(name);
         if (!entry) {
             this.close();
             throw new Error('Entry not found: ' + name);
         }
+
+        const actualName = entry.fileName || name;
 
         const readWithYauzl = () => {
             return new Promise((resolve, reject) => {
                 if (!this.zipfile) {
                     return reject(new Error('Zipfile closed'));
                 }
+                let settled = false;
+                const timer = setTimeout(() => {
+                    if (!settled) {
+                        settled = true;
+                        reject(new Error('yauzl stream timed out'));
+                    }
+                }, 10000);
                 this.zipfile.openReadStream(entry, (err, stream) => {
-                    if (err) return reject(err);
+                    if (err) {
+                        clearTimeout(timer);
+                        if (!settled) {
+                            settled = true;
+                            reject(err);
+                        }
+                        return;
+                    }
                     const chunks = [];
                     stream.on('data', (chunk) => chunks.push(chunk));
-                    stream.on('end', () => resolve(Buffer.concat(chunks)));
-                    stream.on('error', reject);
+                    stream.on('end', () => {
+                        clearTimeout(timer);
+                        if (!settled) {
+                            settled = true;
+                            resolve(Buffer.concat(chunks));
+                        }
+                    });
+                    stream.on('error', (streamErr) => {
+                        clearTimeout(timer);
+                        if (!settled) {
+                            settled = true;
+                            reject(streamErr);
+                        }
+                    });
                 });
             });
         };
 
-        // If filename contains non-ASCII or glob characters, native unzip -p will fail; use yauzl directly
-        const hasSpecialChars = /[^\x20-\x7E]/.test(name) || /[[*?\]\\]/.test(name);
-        if (hasSpecialChars) {
-            return readWithYauzl();
-        }
-
         return new Promise((resolve, reject) => {
             const { spawn } = require('child_process');
-            const child = spawn('unzip', ['-p', '--', this.filePath, name]);
+            const child = spawn('unzip', ['-p', '--', this.filePath, escapeZipGlob(actualName)]);
             const chunks = [];
             let errorOutput = '';
 
@@ -109,7 +144,7 @@ class ZipReader {
                         const yauzlBuf = await readWithYauzl();
                         resolve(yauzlBuf);
                     } catch (yErr) {
-                        reject(new Error(`unzip failed with code ${code}: ${errorOutput}`));
+                        reject(new Error(`unzip failed with code ${code}: ${errorOutput || yErr.message}`));
                     }
                 }
             });

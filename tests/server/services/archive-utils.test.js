@@ -40,6 +40,24 @@ describe('archive-utils', () => {
             expect(buffer.toString()).toBe('test content\n');
             await archive.close();
         });
+
+        test('getEntry matches Unicode-normalized entries and bracketed names', async () => {
+            const archive = await openArchive(sampleZip);
+            archive.entries.set('caf\u00e9.jpg', { fileName: 'caf\u00e9.jpg' });
+            archive.entries.set('Series [2024]/issue #1 [c2c].jpg', { fileName: 'Series [2024]/issue #1 [c2c].jpg' });
+
+            // Lookup using decomposed Unicode (NFD)
+            const foundUnicode = archive.getEntry('cafe\u0301.jpg');
+            expect(foundUnicode).toBeDefined();
+            expect(foundUnicode.fileName).toBe('caf\u00e9.jpg');
+
+            // Lookup with square brackets
+            const foundBracket = archive.getEntry('Series [2024]/issue #1 [c2c].jpg');
+            expect(foundBracket).toBeDefined();
+            expect(foundBracket.fileName).toBe('Series [2024]/issue #1 [c2c].jpg');
+
+            await archive.close();
+        });
     });
 
     describe('openArchive (RAR Mocked)', () => {
