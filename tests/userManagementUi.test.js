@@ -118,4 +118,100 @@ describe('User Management Settings UI', () => {
     expect(cards[0].querySelector('.user-impersonate-btn')).toBeNull();
     expect(cards[1].querySelector('.user-impersonate-btn')).not.toBeNull();
   });
+
+  test('ensures email wrapping and role pill positioning prevent card overflow on small screens', async () => {
+    env.sandbox.fetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        ok: true,
+        users: [
+          { userId: 'user-long', email: 'an.exceptionally.long.email.address.that.would.overflow@somedomain.example.com', role: 'user', created: 1000, lastSeen: 2000 }
+        ]
+      })
+    });
+
+    await env.sandbox.refreshUsersList();
+
+    const card = document.querySelector('.user-card');
+    expect(card).not.toBeNull();
+
+    // Verify email container has break-all and leading-snug to prevent horizontal blowout
+    const emailSpan = card.querySelector('span.break-all');
+    expect(emailSpan).not.toBeNull();
+    expect(emailSpan.textContent).toBe('an.exceptionally.long.email.address.that.would.overflow@somedomain.example.com');
+    expect(emailSpan.className).toContain('leading-snug');
+
+    // Verify role badge has flex-shrink-0 and ml-auto to stay neatly inside the card boundary
+    const roleBadge = card.querySelector('span.rounded-full');
+    expect(roleBadge).not.toBeNull();
+    expect(roleBadge.className).toContain('flex-shrink-0');
+    expect(roleBadge.className).toContain('ml-auto');
+
+    // Verify header row has min-w-0 flex container
+    const headerRow = card.querySelector('.flex.items-start.justify-between');
+    expect(headerRow).not.toBeNull();
+    expect(headerRow.className).toContain('min-w-0');
+  });
+
+  test('renders user access view with overflow protection and avoids display font h3 tag', async () => {
+    const accessEnv = createModuleSandbox();
+    accessEnv.sandbox.escapeHtml = (str) => str || '';
+    accessEnv.sandbox.formatTimestamp = (ts) => ts ? 'Just now' : 'Never';
+    accessEnv.sandbox.fetch = jest.fn().mockImplementation((url) => {
+      if (url.includes('/library-tree')) {
+        return Promise.resolve({ ok: true, json: async () => ({ tree: {} }) });
+      }
+      return Promise.resolve({ ok: true, json: async () => ({ access: [] }) });
+    });
+
+    const parentDiv = document.createElement('div');
+    const usersListDiv = document.createElement('div');
+    usersListDiv.id = 'users-list';
+    parentDiv.appendChild(usersListDiv);
+    document.body.appendChild(parentDiv);
+
+    accessEnv.sandbox.state.usersListDiv = usersListDiv;
+    accessEnv.loadFile('../public/js/settings/user-access.js');
+
+    await accessEnv.sandbox.showUserAccessView('user-long', 'user.with.very.long.email@corporate-domain.co.uk', 'user');
+
+    const accessView = document.getElementById('user-access-view');
+    expect(accessView).not.toBeNull();
+
+    // Verify it does NOT use an h3 tag (which is overridden by #settings-modal h3 24px uppercase)
+    expect(accessView.querySelector('h3')).toBeNull();
+
+    // Verify it uses .user-access-title with break-all and leading-snug
+    const titleEl = accessView.querySelector('.user-access-title');
+    expect(titleEl).not.toBeNull();
+    expect(titleEl.className).toContain('break-all');
+    expect(titleEl.className).toContain('leading-snug');
+
+    // Verify email span inside title also has break-all
+    const emailSpan = titleEl.querySelector('span');
+    expect(emailSpan).not.toBeNull();
+    expect(emailSpan.className).toContain('break-all');
+    expect(emailSpan.textContent).toContain('user.with.very.long.email@corporate-domain.co.uk');
+  });
+
+  test('verifies public/style.css defines .user-access-title to override uppercase display font and enforce word-break', () => {
+    const cssPath = path.resolve(__dirname, '../public/style.css');
+    const css = fs.readFileSync(cssPath, 'utf8');
+
+    expect(css).toContain('.user-access-title');
+    expect(css).toMatch(/#settings-modal\s+(?:#user-access-view\s+)?\.user-access-title/);
+    expect(css).toContain('word-break: break-all !important');
+    expect(css).toContain('overflow-wrap: anywhere !important');
+    expect(css).toContain('text-transform: none !important');
+  });
+
+  test('verifies public/dist contains valid production bundle when present', () => {
+    const distHtmlPath = path.resolve(__dirname, '../public/dist/index.html');
+    if (fs.existsSync(distHtmlPath)) {
+      const distHtml = fs.readFileSync(distHtmlPath, 'utf8');
+      expect(distHtml).toContain('id="settings-modal"');
+      expect(distHtml).toMatch(/assets\/index-[A-Za-z0-9_-]+\.js/);
+      expect(distHtml).toMatch(/assets\/index-[A-Za-z0-9_-]+\.css/);
+    }
+  });
 });
