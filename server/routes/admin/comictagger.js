@@ -317,8 +317,9 @@ module.exports = function attach(router, deps) {
         return res.json({ waitingForResponse: false });
       }
 
+      const { previewBuffer, ...safePending } = pending;
       const response = {
-        ...pending,
+        ...safePending,
         firstPageUrl: null,
         matches: pending.matches || []
       };

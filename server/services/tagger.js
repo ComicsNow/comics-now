@@ -18,7 +18,11 @@ const db = require('../db');
 const { startTaggerWorker, isWorkerOnline } = require('./tagger-process');
 
 function getScanLibrary() {
-  return require('./library').scanLibrary;
+  try {
+    return require('./library.js').scanLibrary;
+  } catch (e) {
+    return null;
+  }
 }
 
 async function checkFileSuccess(filePath) {
@@ -466,7 +470,7 @@ async function runComicTagger(options = {}) {
         // Background extract and cache the preview image
         (async () => {
           try {
-            const library = require('./library');
+            const library = require('./library.js');
             const pages = await library.getComicPages(absolutePath);
             if (pages && pages.length > 0) {
               const firstPage = pages[0];
@@ -487,8 +491,12 @@ async function runComicTagger(options = {}) {
           choicePromise.then(async (action) => {
             if (action === 'apply') {
               hasChanges = true;
+              pendingMatchState = null;
+            } else if (action === 'skip') {
+              pendingMatchState = null;
+            } else if (action === 'scan_cancelled') {
+              // Retain pendingMatchState so user can review and apply/skip after scan cancellation
             }
-            pendingMatchState = null;
             userChoiceResolver = null;
             resolveLoop();
           }).catch((err) => {
@@ -543,8 +551,12 @@ async function runComicTagger(options = {}) {
     ctLog('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
   } finally {
     ctRunning = false;
-    pendingMatchState = null;
     userChoiceResolver = null;
+    if (ctCancelled && pendingMatchState) {
+      ctLog('ⓘ Scan cancelled. Retaining pending low-confidence match for review.');
+    } else {
+      pendingMatchState = null;
+    }
   }
 }
 
@@ -553,7 +565,7 @@ function getPendingMatch() {
 }
 
 async function applyUserSelection(selections) {
-  if (!pendingMatchState || !userChoiceResolver) {
+  if (!pendingMatchState) {
     ctLog('⚠ ERROR: No tagger run waiting for user selection');
     throw new Error('No tagger run waiting for user selection');
   }
@@ -645,7 +657,15 @@ async function applyUserSelection(selections) {
       ctLog(`⚠ WARNING → Tag applied but missing required tags in final file: ${fileName}`);
     }
     
+    pendingMatchState = null;
+    userChoiceResolver = null;
+
     if (typeof resolver === 'function') resolver('apply');
+
+    if (!ctRunning) {
+      const scan = getScanLibrary();
+      if (scan) scan();
+    }
   } catch (err) {
     ctLog(`✗ Failed to apply selection via tagger engine: ${err.message}`);
     if (typeof resolver === 'function') resolver('error');
@@ -654,7 +674,7 @@ async function applyUserSelection(selections) {
 }
 
 function skipCurrentMatch() {
-  if (!pendingMatchState || !userChoiceResolver) {
+  if (!pendingMatchState) {
     ctLog('⚠ ERROR: No tagger run waiting for user selection');
     throw new Error('No tagger run waiting for user selection');
   }
@@ -665,8 +685,11 @@ function skipCurrentMatch() {
 
   ctLog(`ⓘ Skipping match for: ${fileName}`);
   
+  pendingMatchState = null;
+  userChoiceResolver = null;
+
   const id = require('../utils').createId(filePath);
-  fs.promises.stat(filePath).catch(() => ({ mtimeMs: Date.now() })).then(currentStats => {
+  return fs.promises.stat(filePath).catch(() => ({ mtimeMs: Date.now() })).then(currentStats => {
     return db.dbRun(
       `INSERT INTO comics (id, path, name, publisher, series, libraryMode, tagStatus, updatedAt)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
@@ -766,7 +789,7 @@ function cancelComicTagger() {
     try { ctAbortController.abort(); } catch (e) {}
   }
   if (userChoiceResolver) {
-    userChoiceResolver('skip');
+    userChoiceResolver('scan_cancelled');
   }
   ctLog('🛑 Scan cancellation requested by user...');
   return true;
