@@ -1,8 +1,6 @@
 """ComicVine volume search: resolve_comicvine should query both issues and volumes,
 and volume candidates must carry the must-have fields (series, number, publisher, year).
 """
-import pytest
-
 from tagger_app.sources import comicvine
 
 

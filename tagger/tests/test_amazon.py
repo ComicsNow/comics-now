@@ -1,11 +1,7 @@
 """Unit tests for Amazon metadata source and DOM extraction strategies."""
 from bs4 import BeautifulSoup
-from unittest.mock import patch, MagicMock
-
 from tagger_app.config import get_browser_headers
-from tagger_app.sources.amazon import (
-    parse_amazon_product_soup, search_amazon_multi, resolve_amazon,
-)
+from tagger_app.sources.amazon import parse_amazon_product_soup
 
 
 def test_browser_headers_google_referrer():

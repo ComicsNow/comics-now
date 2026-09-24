@@ -1,5 +1,5 @@
 const { isWorkerOnline } = require('../server/services/tagger-process');
-const { searchExternal, getScanLogsList, getScanLogDetail, clearEnhancedTracking } = require('../server/services/tagger');
+const { searchExternal, getScanLogsList, clearEnhancedTracking } = require('../server/services/tagger');
 
 describe('Tagger Service & Process Tests', () => {
   const originalFetch = global.fetch;

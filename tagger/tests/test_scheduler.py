@@ -6,8 +6,6 @@ scheduler_config.json are not polluted.
 import json
 import datetime
 
-import pytest
-
 from tagger_app.scheduler import state
 
 

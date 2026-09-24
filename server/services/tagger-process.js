@@ -1,6 +1,6 @@
 const { spawn } = require('child_process');
 const path = require('path');
-const { log, ctLog } = require('../logger');
+const { log } = require('../logger');
 const { getTaggerServiceUrl } = require('../config');
 
 let taggerChild = null;

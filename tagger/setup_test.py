@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 import os
 import zipfile
-import requests
 
 COVER_URL = "https://static.wikia.nocookie.net/marvel_dc/images/1/1a/Watchmen_Vol_1_1.jpg"
 CBZ_NAME = "watchmen_tpb.cbz"
