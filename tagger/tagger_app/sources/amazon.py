@@ -48,9 +48,9 @@ def parse_amazon_product_soup(soup, url):
 
     title = None
     authors = []
-    writer = None
-    penciller = None
-    colorist = None
+    writers = []
+    pencillers = []
+    colorists = []
     inkers = []
     publisher = None
     publish_date = None
@@ -124,13 +124,17 @@ def parse_amazon_product_soup(soup, url):
                 if role_m:
                     role = role_m.group(1).lower()
                     if 'author' in role or 'writer' in role:
-                        writer = clean_name
+                        if clean_name not in writers:
+                            writers.append(clean_name)
                     elif 'illustrator' in role or 'artist' in role or 'penciller' in role:
-                        penciller = clean_name
+                        if clean_name not in pencillers:
+                            pencillers.append(clean_name)
                     elif 'color' in role:
-                        colorist = clean_name
+                        if clean_name not in colorists:
+                            colorists.append(clean_name)
                     elif 'ink' in role:
-                        inkers.append(clean_name)
+                        if clean_name not in inkers:
+                            inkers.append(clean_name)
 
     # Description (with expander, noscript, and editorial review fallbacks)
     if not description:
@@ -270,8 +274,8 @@ def parse_amazon_product_soup(soup, url):
 
     # Final cleanup & normalization
     cleaned_authors = clean_author_names(authors)
-    if not writer and cleaned_authors:
-        writer = ', '.join(cleaned_authors)
+    if not writers and cleaned_authors:
+        writers = list(cleaned_authors)
 
     if publisher:
         publisher = normalize_publisher(publisher)
@@ -279,9 +283,9 @@ def parse_amazon_product_soup(soup, url):
     metadata = {
         'title': title,
         'authors': cleaned_authors,
-        'writer': writer,
-        'penciller': penciller,
-        'colorist': colorist,
+        'writer': ', '.join(writers) if writers else None,
+        'penciller': ', '.join(pencillers) if pencillers else None,
+        'colorist': ', '.join(colorists) if colorists else None,
         'inker': ', '.join(inkers) if inkers else None,
         'isbn': isbn,
         'publisher': publisher,

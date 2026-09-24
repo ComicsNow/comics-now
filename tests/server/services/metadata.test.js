@@ -14,7 +14,8 @@ const {
   getComicInfoFromArchive,
   saveMetadataToComic,
   normalizePublisher,
-  cleanDescription
+  cleanDescription,
+  resolveCreatorRoles
 } = require('../../../server/services/metadata');
 
 // Utility helper to create a real ZIP archive with internal ComicInfo.xml
@@ -318,6 +319,37 @@ describe('Metadata Service - Real Integration Tests (No Mock filesystem)', () =>
       const logsAfter = getLogs().slice(beforeCount);
       const hasLog = logsAfter.some(l => l.level === 'ERROR' && l.category === 'META' && l.message.includes('ComicInfo write-back failed'));
       expect(hasLog).toBe(true);
+    });
+  });
+
+  describe('resolveCreatorRoles', () => {
+    it('should prune artists from writers when they appear in both (e.g., Ben Templesmith)', () => {
+      const meta = {
+        Writer: 'James Tynion IV, Ben Templesmith',
+        Penciller: 'Ben Templesmith'
+      };
+      resolveCreatorRoles(meta);
+      expect(meta.Writer).toBe('James Tynion IV');
+      expect(meta.Penciller).toBe('Ben Templesmith');
+    });
+
+    it('should extract artist from summary/description when missing (e.g., Martin Simmonds)', () => {
+      const meta = {
+        Writer: 'James Tynion IV, Martin Simmonds, Letizia Cadonici',
+        Summary: 'Multiple Eisner Award-winning writer JAMES TYNION IV and Eisner Award-nominated artist MARTIN SIMMONDS test the limit, while fan-favorite artist LETIZIA CADONICI joins.'
+      };
+      resolveCreatorRoles(meta);
+      expect(meta.Writer).toBe('James Tynion IV');
+      expect(meta.Penciller).toBe('Martin Simmonds, Letizia Cadonici');
+    });
+
+    it('should disambiguate using seriesArtists known from other issues', () => {
+      const meta = {
+        Writer: 'James Tynion IV, Martin Simmonds'
+      };
+      resolveCreatorRoles(meta, ['Martin Simmonds']);
+      expect(meta.Writer).toBe('James Tynion IV');
+      expect(meta.Penciller).toBe('Martin Simmonds');
     });
   });
 });

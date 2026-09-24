@@ -94,11 +94,16 @@ async function getIssueDetails(cvIssueId) {
   const number = issue.issue_number || '';
   const summary = stripHtml(issue.description || '');
 
-  let writer = '', penciller = '';
+  let writer = '', penciller = '', inker = '', colorist = '', letterer = '', coverArtist = '', editor = '';
   if (Array.isArray(issue.person_credits)) {
     const roles = issue.person_credits.map(p => ({ name: p.name, role: (p.role || '').toLowerCase() }));
     writer = roles.filter(r => r.role.includes('writer')).map(r => r.name).join(', ');
     penciller = roles.filter(r => r.role.includes('penciller') || r.role.includes('artist')).map(r => r.name).join(', ');
+    inker = roles.filter(r => r.role.includes('inker')).map(r => r.name).join(', ');
+    colorist = roles.filter(r => r.role.includes('colorist')).map(r => r.name).join(', ');
+    letterer = roles.filter(r => r.role.includes('letterer')).map(r => r.name).join(', ');
+    coverArtist = roles.filter(r => r.role.includes('cover')).map(r => r.name).join(', ');
+    editor = roles.filter(r => r.role.includes('editor')).map(r => r.name).join(', ');
   }
 
   const characters = (issue.character_credits || []).map(c => c.name).join(', ');
@@ -112,6 +117,11 @@ async function getIssueDetails(cvIssueId) {
     Summary: summary,
     Writer: writer,
     Penciller: penciller,
+    Inker: inker,
+    Colorist: colorist,
+    Letterer: letterer,
+    CoverArtist: coverArtist,
+    Editor: editor,
     Publisher: publisher,
     Characters: characters,
     Teams: teams,

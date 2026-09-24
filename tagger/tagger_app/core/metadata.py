@@ -467,6 +467,107 @@ STANDALONE_VOL_PATTERN = re.compile(
 )
 
 
+def resolve_creator_roles(meta):
+    """
+    Cleans, disambiguates, and resolves creator roles (writer, penciller, inker, colorist, letterer, cover_artist)
+    across metadata dictionaries.
+
+    Prevents:
+    1. Generic 'authors' arrays (from book databases like Goodreads, Google Books, Waterstones)
+       from blindly dumping artists/colorists into 'writer'.
+    2. Duplication where the same person is listed in both 'writer' and 'penciller' when they are only the artist.
+    3. Missing pencillers/artists when the summary or byline explicitly identifies them.
+    """
+    if not isinstance(meta, dict):
+        return meta
+
+    def _to_name_list(val):
+        if not val:
+            return []
+        if isinstance(val, (list, tuple, set)):
+            items = val
+        elif isinstance(val, str):
+            items = [val]
+        else:
+            return []
+        names = []
+        for item in items:
+            for part in re.split(r'[,;&]|\s+and\s+', str(item)):
+                p = part.strip()
+                if p and not any(p.lower() == n.lower() for n in names):
+                    names.append(p)
+        return names
+
+    writers = _to_name_list(meta.get("writer"))
+    pencillers = _to_name_list(meta.get("penciller"))
+    inkers = _to_name_list(meta.get("inker"))
+    colorists = _to_name_list(meta.get("colorist"))
+    letterers = _to_name_list(meta.get("letterer"))
+    cover_artists = _to_name_list(meta.get("cover_artist") or meta.get("CoverArtist"))
+    authors = _to_name_list(meta.get("authors"))
+
+    desc = meta.get("description") or meta.get("summary") or ""
+    if desc:
+        w_pattern = r'\b(?:writer|written by|script(?: by)?)\s+([A-Z][a-zA-Z\.\'\-\s]+?)(?=\s*[\(\,\.\n]| and | & | artist | while |\bjoins\b|\btest\b|$)'
+        a_pattern = r'\b(?:artist|art by|illustrated by|drawn by|penciller|penciler)\s+([A-Z][a-zA-Z\.\'\-\s]+?)(?=\s*[\(\,\.\n]| and | & | writer | while |\bjoins\b|\btest\b|\bexplore\b|$)'
+        c_pattern = r'\b(?:colorist|colors by|colourist|colours by)\s+([A-Z][a-zA-Z\.\'\-\s]+?)(?=\s*[\(\,\.\n]| and | & |\bjoins\b|$)'
+        l_pattern = r'\b(?:letterer|letters by)\s+([A-Z][a-zA-Z\.\'\-\s]+?)(?=\s*[\(\,\.\n]| and | & |\bjoins\b|$)'
+
+        all_pool = writers + pencillers + inkers + colorists + letterers + cover_artists + authors
+
+        for m in re.finditer(w_pattern, desc, re.I):
+            matched = m.group(1).strip()
+            cand = next((n for n in all_pool if n.lower() == matched.lower()), matched)
+            if not any(cand.lower() == w.lower() for w in writers):
+                writers.append(cand)
+
+        for m in re.finditer(a_pattern, desc, re.I):
+            matched = m.group(1).strip()
+            cand = next((n for n in all_pool if n.lower() == matched.lower()), matched)
+            if not any(cand.lower() == p.lower() for p in pencillers):
+                pencillers.append(cand)
+
+        for m in re.finditer(c_pattern, desc, re.I):
+            matched = m.group(1).strip()
+            cand = next((n for n in all_pool if n.lower() == matched.lower()), matched)
+            if not any(cand.lower() == c.lower() for c in colorists):
+                colorists.append(cand)
+
+        for m in re.finditer(l_pattern, desc, re.I):
+            matched = m.group(1).strip()
+            cand = next((n for n in all_pool if n.lower() == matched.lower()), matched)
+            if not any(cand.lower() == l.lower() for l in letterers):
+                letterers.append(cand)
+
+    known_artists = set(p.lower() for p in pencillers + inkers + colorists + letterers + cover_artists)
+
+    # If writers is empty and authors exists, populate writers excluding known artists
+    if not writers and authors:
+        writers = [a for a in authors if a.lower() not in known_artists]
+        if not writers:
+            if len(authors) == 2 and not pencillers:
+                writers = [authors[0]]
+                pencillers = [authors[1]]
+                known_artists.add(authors[1].lower())
+            else:
+                writers = list(authors)
+
+    # If multiple writers and any are known artists, prune them from writers as long as at least one writer remains
+    if len(writers) > 1 and known_artists:
+        filtered = [w for w in writers if w.lower() not in known_artists]
+        if filtered:
+            writers = filtered
+
+    meta["writer"] = ", ".join(writers) if writers else ""
+    meta["penciller"] = ", ".join(pencillers) if pencillers else ""
+    meta["inker"] = ", ".join(inkers) if inkers else ""
+    meta["colorist"] = ", ".join(colorists) if colorists else ""
+    meta["letterer"] = ", ".join(letterers) if letterers else ""
+    meta["cover_artist"] = ", ".join(cover_artists) if cover_artists else ""
+    meta["authors"] = authors or writers
+    return meta
+
+
 def normalize_metadata(meta, codex=None):
     """
     Cleans and maps metadata fields to ensure they align with the frontend keys
@@ -587,22 +688,8 @@ def normalize_metadata(meta, codex=None):
     if is_title_same_as_series(meta.get("issue_title"), final_series):
         meta["issue_title"] = ""
 
-    # 3. Normalize authors / writer
-    authors = meta.get("authors")
-    writer = meta.get("writer")
-
-    if isinstance(authors, str):
-        authors = [a.strip() for a in authors.split(",") if a.strip()]
-    elif not authors:
-        authors = []
-
-    if not writer and authors:
-        writer = ", ".join(authors)
-    elif writer and not authors:
-        authors = [a.strip() for a in writer.split(",") if a.strip()]
-
-    meta["authors"] = authors
-    meta["writer"] = writer or ""
+    # 3. Disambiguate and resolve creator roles (Writer, Penciller, Inker, Colorist, Letterer)
+    resolve_creator_roles(meta)
 
     # 4. Normalize year / publish_date
     year = meta.get("year")

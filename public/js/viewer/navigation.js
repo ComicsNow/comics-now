@@ -289,8 +289,19 @@ const global = new Proxy(typeof window !== 'undefined' ? window : globalThis, {
 
     if (!window._isNavigatingFromRouter && window.router && !isLocal) {
        let navPath = `/comic/${comic.id}`;
+       const params = new URLSearchParams();
        if (global.currentFolderPath) {
-         navPath += `?folderPath=${encodeURIComponent(global.currentFolderPath)}`;
+         params.set('folderPath', global.currentFolderPath);
+       }
+       if (options.readingListId) {
+         params.set('readingListId', options.readingListId);
+       }
+       if (options.readingListName) {
+         params.set('readingListName', options.readingListName);
+       }
+       const qs = params.toString();
+       if (qs) {
+         navPath += `?${qs}`;
        }
        window.router.navigate(navPath, true);
        return;

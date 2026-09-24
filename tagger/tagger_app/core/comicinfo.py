@@ -14,6 +14,7 @@ from tagger_app.core.metadata import (
     normalize_publisher,
     clean_description,
     is_title_same_as_series,
+    resolve_creator_roles,
 )
 
 
@@ -87,6 +88,8 @@ def generate_comic_info_xml(metadata, enabled_fields=None):
     """
     if not metadata or not isinstance(metadata, dict):
         metadata = {}
+    else:
+        metadata = resolve_creator_roles(dict(metadata))
 
     def _clean_str(val):
         if val is None:

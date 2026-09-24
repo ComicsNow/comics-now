@@ -31,7 +31,29 @@ def search_metron_multi(query, user, pwd):
                 continue
 
             domain_limiter.wait_for_domain("metron.cloud")
-            full = m.issue(item.id)
+            writers, pencillers, inkers, colorists, letterers, cover_artists, editors = [], [], [], [], [], [], []
+            for cr in getattr(full, 'credits', []) or []:
+                role_val = getattr(cr, 'role', None)
+                role_name = str(getattr(role_val, 'name', role_val or '')).lower()
+                creator_val = getattr(cr, 'creator', None)
+                creator_name = str(getattr(creator_val, 'name', creator_val or '')).strip()
+                if not creator_name:
+                    continue
+                if 'writer' in role_name or 'script' in role_name:
+                    if creator_name not in writers: writers.append(creator_name)
+                elif 'pencill' in role_name or 'artist' in role_name:
+                    if creator_name not in pencillers: pencillers.append(creator_name)
+                elif 'ink' in role_name:
+                    if creator_name not in inkers: inkers.append(creator_name)
+                elif 'color' in role_name:
+                    if creator_name not in colorists: colorists.append(creator_name)
+                elif 'letter' in role_name:
+                    if creator_name not in letterers: letterers.append(creator_name)
+                elif 'cover' in role_name:
+                    if creator_name not in cover_artists: cover_artists.append(creator_name)
+                elif 'editor' in role_name:
+                    if creator_name not in editors: editors.append(creator_name)
+
             item_meta = {
                 "title": f"{full.series.name if full.series else ''} #{full.number}",
                 "series": full.series.name if full.series else '',
@@ -40,7 +62,14 @@ def search_metron_multi(query, user, pwd):
                 "publish_date": full.store_date or full.cover_date,
                 "cover_image_url": str(full.image) if full.image else None,
                 "source_url": f"https://metron.cloud/issue/{full.id}/",
-                "description": full.desc
+                "description": full.desc,
+                "writer": ", ".join(writers) if writers else None,
+                "penciller": ", ".join(pencillers) if pencillers else None,
+                "inker": ", ".join(inkers) if inkers else None,
+                "colorist": ", ".join(colorists) if colorists else None,
+                "letterer": ", ".join(letterers) if letterers else None,
+                "cover_artist": ", ".join(cover_artists) if cover_artists else None,
+                "editor": ", ".join(editors) if editors else None
             }
             tagger_cache.set_entity("metron_issue", item.id, item_meta)
             out.append(item_meta)

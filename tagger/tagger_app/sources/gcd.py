@@ -38,6 +38,31 @@ def search_gcd_multi(query):
                         if cov and '://' in cov:
                             parts = cov.split('://', 1)
                             cov = parts[0] + '://' + parts[1].replace('//', '/')
+                        writers, pencillers, inkers, colorists, letterers, editors = [], [], [], [], [], []
+                        stories = d.get('story_set') or d.get('stories') or []
+                        import re
+                        for story in stories:
+                            if not isinstance(story, dict):
+                                continue
+                            for w in re.split(r'[;,]', story.get('script') or ''):
+                                w = w.strip()
+                                if w and w not in writers and w.lower() not in ['?', 'unknown']: writers.append(w)
+                            for p in re.split(r'[;,]', story.get('pencils') or ''):
+                                p = p.strip()
+                                if p and p not in pencillers and p.lower() not in ['?', 'unknown']: pencillers.append(p)
+                            for i in re.split(r'[;,]', story.get('inks') or ''):
+                                i = i.strip()
+                                if i and i not in inkers and i.lower() not in ['?', 'unknown']: inkers.append(i)
+                            for c in re.split(r'[;,]', story.get('colors') or ''):
+                                c = c.strip()
+                                if c and c not in colorists and c.lower() not in ['?', 'unknown']: colorists.append(c)
+                            for l in re.split(r'[;,]', story.get('letters') or ''):
+                                l = l.strip()
+                                if l and l not in letterers and l.lower() not in ['?', 'unknown']: letterers.append(l)
+                            for e in re.split(r'[;,]', story.get('editing') or ''):
+                                e = e.strip()
+                                if e and e not in editors and e.lower() not in ['?', 'unknown']: editors.append(e)
+
                         item_meta = {
                             "title": f"{d.get('series_name','')} #{d.get('number','')}",
                             "series": d.get('series_name'),
@@ -45,6 +70,12 @@ def search_gcd_multi(query):
                             "publish_date": d.get("publication_date") or d.get("on_sale_date"),
                             "publisher": d.get("publisher_name"),
                             "description": d.get("notes"),
+                            "writer": ", ".join(writers) if writers else None,
+                            "penciller": ", ".join(pencillers) if pencillers else None,
+                            "inker": ", ".join(inkers) if inkers else None,
+                            "colorist": ", ".join(colorists) if colorists else None,
+                            "letterer": ", ".join(letterers) if letterers else None,
+                            "editor": ", ".join(editors) if editors else None,
                             "source_url": iss_url.replace("/api", ""),
                             "cover_image_url": cov
                         }

@@ -182,6 +182,9 @@ async function reorderComics(listId, comicOrder) {
       body: JSON.stringify({ comicOrder })
     });
     const data = await response.json();
+    if (data.ok && typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('reading-list-reordered', { detail: { listId, comicOrder } }));
+    }
     return data;
   } catch (error) {
     console.error('[Reading Lists] Error reordering comics:', error);
