@@ -142,4 +142,73 @@ describe('archive-utils', () => {
             await expect(getEntryBuffer(sampleZip, '/etc/passwd')).rejects.toThrow('Potential path traversal attempt');
         });
     });
+
+    describe('archive extraction with brackets, globs, and non-ASCII characters', () => {
+        const os = require('os');
+        const { execSync } = require('child_process');
+        let tempDir;
+        let testCbz;
+
+        beforeAll(() => {
+            tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'archive-test-'));
+            const subDirBracket = path.join(tempDir, 'Series [1990][Aircel]');
+            const subDirUnicode = path.join(tempDir, 'Series ƒ');
+            fs.mkdirSync(subDirBracket, { recursive: true });
+            fs.mkdirSync(subDirUnicode, { recursive: true });
+
+            fs.writeFileSync(path.join(subDirBracket, '01.jpg'), 'bracketed entry content');
+            fs.writeFileSync(path.join(subDirUnicode, '04.jpg'), 'unicode hook entry content');
+
+            testCbz = path.join(tempDir, 'test_special.cbz');
+            execSync(`cd "${tempDir}" && zip -q -r "${testCbz}" "Series [1990][Aircel]" "Series ƒ"`);
+        });
+
+        afterAll(() => {
+            if (tempDir && fs.existsSync(tempDir)) {
+                fs.rmSync(tempDir, { recursive: true, force: true });
+            }
+        });
+
+        test('listPages discovers bracketed and non-ASCII page entries', async () => {
+            const pages = await listPages(testCbz);
+            expect(pages).toHaveLength(2);
+            expect(pages.some(p => p.includes('[1990][Aircel]'))).toBe(true);
+            expect(pages.some(p => p.includes('04.jpg'))).toBe(true);
+        });
+
+        test('getEntryBuffer extracts bracketed entry without hanging or glob error', async () => {
+            const pages = await listPages(testCbz);
+            const bracketPage = pages.find(p => p.includes('[1990][Aircel]'));
+            expect(bracketPage).toBeDefined();
+
+            const buffer = await getEntryBuffer(testCbz, bracketPage);
+            expect(buffer).toBeDefined();
+            expect(buffer.toString()).toBe('bracketed entry content');
+        });
+
+        test('getEntryBuffer extracts non-ASCII hook entry without hanging or error', async () => {
+            const pages = await listPages(testCbz);
+            const unicodePage = pages.find(p => p.includes('04.jpg'));
+            expect(unicodePage).toBeDefined();
+
+            const buffer = await getEntryBuffer(testCbz, unicodePage);
+            expect(buffer).toBeDefined();
+            expect(buffer.toString()).toBe('unicode hook entry content');
+        });
+
+        test('readStream successfully streams bracketed entry', async () => {
+            const archive = await openArchive(testCbz);
+            const pages = archive.listEntries();
+            const bracketPage = pages.find(p => p.includes('[1990][Aircel]') && p.endsWith('.jpg'));
+            expect(bracketPage).toBeDefined();
+
+            const stream = await archive.readStream(bracketPage);
+            const chunks = [];
+            for await (const chunk of stream) {
+                chunks.push(chunk);
+            }
+            expect(Buffer.concat(chunks).toString()).toBe('bracketed entry content');
+            archive.close();
+        });
+    });
 });
