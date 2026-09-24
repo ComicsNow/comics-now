@@ -3,8 +3,6 @@
 The DB/log paths are module-level constants; tests monkeypatch them to temp
 locations so nothing touches the real tracking DB or scan_logs/.
 """
-import io
-import os
 import json
 import zipfile
 

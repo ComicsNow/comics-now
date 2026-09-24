@@ -5,8 +5,6 @@ unrelated cover should score clearly lower. Network is mocked.
 """
 import io
 
-import pytest
-
 from tagger_app.core import covers
 
 

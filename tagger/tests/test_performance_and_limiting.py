@@ -2,13 +2,9 @@
 import time
 from unittest.mock import patch, MagicMock
 
-import pytest
-
-from tagger_app.core.limiter import DomainRateLimiter, domain_limiter
+from tagger_app.core.limiter import DomainRateLimiter
 from tagger_app.core.cache import TaggerCache, tagger_cache
-from tagger_app.sources.registry import SOURCES, SourceContext
-from tagger_app.sources import comicvine, metron, gcd, lcg, goodreads, blackwells, waterstones
-import tagger_app
+from tagger_app.sources import comicvine, gcd
 
 
 def test_domain_rate_limiter_spacing():

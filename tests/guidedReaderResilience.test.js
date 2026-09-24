@@ -1,4 +1,4 @@
-const { dbRun, dbGet, dbAll } = require('../server/db');
+const { dbRun, dbGet } = require('../server/db');
 const guidedReader = require('../server/services/guided-reader');
 const panelDetector = require('../server/services/panel-detector');
 

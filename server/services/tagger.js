@@ -1,6 +1,6 @@
 const fs = require('fs');
 const path = require('path');
-const { ctLog, log } = require('../logger');
+const { ctLog } = require('../logger');
 const {
   getConfig,
   getTaggerServiceUrl,

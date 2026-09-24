@@ -6,9 +6,9 @@ behavior rather than real network results.
 import pytest
 
 from tagger_app.sources import (
-    registry, comicvine, metron, gcd, lcg, goodreads, blackwells, waterstones, googlebooks, amazon,
+    comicvine, metron, gcd, lcg, goodreads, blackwells, waterstones, googlebooks, amazon,
 )
-from tagger_app.sources.registry import SOURCES, SourceContext
+from tagger_app.sources.registry import SOURCES
 
 
 # --------------------------------------------------------------- enablement
