@@ -4,6 +4,7 @@ on:
   push:
     branches: ['main']
     tags: ['v*']
+  workflow_dispatch:
 
 env:
   REGISTRY: ghcr.io
@@ -20,24 +21,36 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
       - name: Log in to the Container registry
-        run: |
-          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ${{ env.REGISTRY }} -u ${{ github.actor }} --password-stdin
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata (tags, labels) for Docker
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=raw,value=latest
+            type=ref,event=tag
+            type=semver,pattern={{version}}
 
       - name: Build and push Docker image
-        run: |
-          # Lowercase the repository name (required by GHCR)
-          IMAGE_LOWER=$(echo "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}" | tr '[:upper:]' '[:lower:]')
-          
-          # Build the Docker image
-          docker build -t "$IMAGE_LOWER:latest" .
-          
-          # Push latest tag
-          docker push "$IMAGE_LOWER:latest"
-          
-          # If tagged commit, tag and push as tag version
-          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
-            TAG_NAME=$(echo "${{ github.ref }}" | sed -e 's,.*/\(.*\),\1,')
-            docker tag "$IMAGE_LOWER:latest" "$IMAGE_LOWER:$TAG_NAME"
-            docker push "$IMAGE_LOWER:$TAG_NAME"
-          fi
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

@@ -60,6 +60,9 @@
     "url": "https://github.com/ComicsNow/comics-now/issues"
   },
   "license": "AGPL-3.0",
+  "engines": {
+    "node": ">=20.0.0"
+  },
   "dependencies": {
     "@eslint/js": "^9.39.5",
     "archiver": "^5.3.2",
