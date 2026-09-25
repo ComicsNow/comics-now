@@ -81,26 +81,6 @@ async function dbRun(sql, params = []) {
   }
 }
 
-async function runMigrations() {
-  await dbRun(`CREATE TABLE IF NOT EXISTS migrations (name TEXT PRIMARY KEY, applied_at INTEGER)`);
-  
-  const migrationsDir = path.join(__dirname, 'migrations');
-  if (!fs.existsSync(migrationsDir)) return;
-
-  const files = fs.readdirSync(migrationsDir).filter(f => f.endsWith('.js')).sort();
-  
-  for (const file of files) {
-    const migrationName = file;
-    const alreadyApplied = await dbGet(`SELECT 1 FROM migrations WHERE name = ?`, [migrationName]);
-    
-    if (!alreadyApplied) {
-      log('INFO', 'DB', `Applying migration: ${migrationName}`);
-      const migration = require(path.join(migrationsDir, file));
-      await migration.up(dbRun, dbGet, dbAll);
-      await dbRun(`INSERT INTO migrations (name, applied_at) VALUES (?, ?)`, [migrationName, Date.now()]);
-    }
-  }
-}
 
 async function initializeDatabase() {
   log('INFO', 'DB', 'Initializing database...');
@@ -264,8 +244,6 @@ async function initializeDatabase() {
       ts INTEGER DEFAULT (strftime('%s', 'now') * 1000)
     )`);
 
-    // Run incremental migrations
-    await runMigrations();
 
     // Final step: Create/ensure all indexes exist
     // This is done last to ensure any table reconstructions (migrations) have finished
