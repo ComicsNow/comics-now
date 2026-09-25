@@ -161,8 +161,8 @@ def test_gcd_query_cache():
         assert mock_get.call_count == count_first
 
 
-def test_tiered_early_exit_skips_tier2():
-    """Verify that high-confidence Tier 1 match with complete metadata skips Tier 2 scrapers."""
+def test_all_enabled_sources_queried_regardless_of_score():
+    """Verify that all enabled sources are queried regardless of high-confidence Tier 1 score."""
     from app import query_all_sources_sequentially
 
     # Mock Tier 1 (ComicVine) returning high confidence complete match
@@ -187,11 +187,16 @@ def test_tiered_early_exit_skips_tier2():
          patch("tagger_app.sources.metron.resolve_metron", return_value=[]), \
          patch("tagger_app.sources.gcd.resolve_gcd", return_value=[]), \
          patch("tagger_app.sources.lcg.resolve_lcg", return_value=[]), \
-         patch("tagger_app.sources.goodreads.resolve_goodreads", side_effect=mock_goodreads_resolve):
+         patch("tagger_app.sources.goodreads.resolve_goodreads", side_effect=mock_goodreads_resolve), \
+         patch("tagger_app.sources.blackwells.resolve_blackwells", return_value=[]), \
+         patch("tagger_app.sources.waterstones.resolve_waterstones", return_value=[]), \
+         patch("tagger_app.sources.googlebooks.resolve_googlebooks", return_value=[]), \
+         patch("tagger_app.sources.amazon.resolve_amazon", return_value=[]):
 
         results = query_all_sources_sequentially("Watchmen #01 (1986).cbz", comicvine_api_key="mock_key")
         assert len(results) >= 1
         best_meta, best_score, best_src = results[0]
         assert best_score >= 0.92
-        # Verify Tier 2 was skipped
-        assert tier2_called["called"] is False
+        # Verify Tier 2 is queried unconditionally to contribute its fields
+        assert tier2_called["called"] is True
+

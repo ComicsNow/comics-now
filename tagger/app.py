@@ -13,7 +13,9 @@ from flask import Flask, render_template, request, jsonify, send_file, Response
 from werkzeug.utils import secure_filename
 
 # Tagging logic now lives in the tagger_app package.
-from tagger_app.core.metadata import normalize_metadata, calculate_similarity, resolve_creator_roles
+from tagger_app.core.metadata import (
+    normalize_metadata, calculate_similarity, resolve_creator_roles, merge_best_metadata_fields,
+)
 from tagger_app.core.covers import extract_cover_from_cbz
 from tagger_app.core.limiter import domain_limiter
 from tagger_app.core.comicinfo import read_comic_info_xml, generate_comic_info_xml, write_comic_info_to_cbz, write_comic_info
@@ -97,105 +99,76 @@ def check_comic_info_completeness(cbz_path):
         return True, f"Error parsing ComicInfo.xml: {str(e)}"
 
 
-def enrich_metadata_from_other_sources(primary_meta, all_candidates, lower_threshold):
+def enrich_metadata_from_other_sources(primary_meta, all_candidates, lower_threshold, codex=None):
     """
-    Enriches the primary_meta dictionary by filling in empty or missing fields
-    from other high-confidence candidates in the list (score >= lower_threshold).
+    Enriches primary_meta by evaluating and taking the best field values
+    across all matching high-confidence candidates in all_candidates (score >= lower_threshold).
     """
-    enrich_fields = [
-        "publisher", "publish_date", "description", "isbn", "genres", "pages", 
-        "authors", "series", "number", "year", "month", "day",
-        "writer", "penciller", "inker", "colorist", "letterer", "cover_artist", "editor", "volume",
-        "characters", "teams", "locations"
-    ]
-    
-    def is_value_empty(val):
-        if val is None:
-            return True
-        if isinstance(val, str) and not val.strip():
-            return True
-        if isinstance(val, (list, set, tuple)) and len(val) == 0:
-            return True
-        return False
+    if not primary_meta:
+        return primary_meta
+    if not all_candidates:
+        return primary_meta
 
-    # Collect unique sources
-    sources = []
-    primary_src = primary_meta.get("source_url")
-    if primary_src:
-        sources.append(primary_src)
+    matching_candidates = [{"metadata": dict(primary_meta), "score": 1.0, "source": primary_meta.get("source_url", "")}]
 
     for cand in all_candidates:
-        cand_meta = cand.get("metadata") or cand
-        # In unique_candidates format, score is out of 100.
-        cand_score = cand.get("score") if cand.get("score") is not None else (cand.get("confidence") or 0)
-        
-        # Normalize score to 0-1 scale if needed
+        cand_meta = cand.get("metadata") if isinstance(cand, dict) and "metadata" in cand else cand
+        if not cand_meta or not isinstance(cand_meta, dict):
+            continue
+
+        cand_score = cand.get("score") if isinstance(cand, dict) and cand.get("score") is not None else (cand.get("confidence") or 0)
         if cand_score > 1.0:
             cand_score /= 100.0
-            
+
         if cand_score < lower_threshold:
             continue
-            
-        # Avoid merging with ourselves
-        if cand_meta.get("source_url") == primary_meta.get("source_url"):
+
+        # Avoid merging identical candidates
+        if cand_meta.get("source_url") and cand_meta.get("source_url") == primary_meta.get("source_url"):
             continue
-            
-        # Ensure series/title match
+
+        # Match series
         p_series = primary_meta.get("series") or primary_meta.get("title") or ""
         c_series = cand_meta.get("series") or cand_meta.get("title") or ""
         if calculate_similarity(p_series, c_series) < 0.85:
             continue
-            
-        # Ensure issue numbers match if both are specified
+
+        # Match issue numbers if both specified
         p_num = primary_meta.get("number") or primary_meta.get("issue_number")
         c_num = cand_meta.get("number") or cand_meta.get("issue_number")
         if p_num and c_num and str(p_num).strip() != str(c_num).strip():
             continue
-            
-        enriched_any = False
-        for field in enrich_fields:
-            if is_value_empty(primary_meta.get(field)) and not is_value_empty(cand_meta.get(field)):
-                print(f"[+] Enriching field '{field}' in '{primary_meta.get('title')}' from: {cand_meta.get('source_url') or 'other candidate source'}")
-                primary_meta[field] = cand_meta[field]
-                enriched_any = True
-                
-        if enriched_any:
-            src_val = cand_meta.get("source_url") or cand.get("source")
-            if src_val and src_val not in sources:
-                sources.append(src_val)
-                
-    # Clean up and join sources
-    if sources:
-        unique_sources = []
-        for s in sources:
-            s_clean = s
-            if s.startswith("http"):
-                parts = s.split("/")
-                if len(parts) > 2:
-                    s_clean = parts[2].replace("www.", "")
-            if s_clean not in unique_sources:
-                unique_sources.append(s_clean)
-        primary_meta["source_url"] = ", ".join(unique_sources)
-        
-    return resolve_creator_roles(primary_meta)
+
+        matching_candidates.append(cand)
+
+    merged = merge_best_metadata_fields(matching_candidates, existing_meta=primary_meta, codex=codex)
+    return merged
 
 
-def consolidate_all_candidates(candidates_list):
+def consolidate_all_candidates(candidates_list, codex=None):
     """
     Consolidates a list of candidates from multiple sources.
     Candidates that refer to the same comic (similar series name and matching issue number)
-    are grouped together. In each group, the highest-scoring candidate is chosen as primary,
-    and enriched with empty/missing fields from all other candidates in the group.
+    are grouped together. In each group, the metadata fields are synthesized across all
+    group candidates using field-by-field best selection (merge_best_metadata_fields).
     Returns a sorted list of consolidated (metadata_dict, score, source_url) candidates.
     """
     if not candidates_list:
         return []
 
-    # Sort candidates by score descending first
+    # Normalize incoming items
     normalized_list = []
     for item in candidates_list:
-        if isinstance(item, tuple) and len(item) == 3:
-            meta, score, src = item
+        if isinstance(item, tuple) and len(item) >= 2:
+            meta = item[0]
+            score = item[1]
+            src = item[2] if len(item) > 2 else meta.get("source_url", "")
+        elif isinstance(item, dict):
+            meta = item.get("metadata") or item
+            score = item.get("score", 0.0)
+            if score > 1.0:
+                score /= 100.0
+            src = item.get("matching_url") or item.get("source") or meta.get("source_url", "")
         else:
             continue
         normalized_list.append({
@@ -204,99 +177,45 @@ def consolidate_all_candidates(candidates_list):
             "source": src
         })
 
-    # Sort by score descending
+    # Sort by score descending so the strongest match leads each group
     normalized_list.sort(key=lambda x: x["score"], reverse=True)
 
-    consolidated = []
-
-    def is_value_empty(val):
-        if val is None:
-            return True
-        if isinstance(val, str) and not val.strip():
-            return True
-        if isinstance(val, (list, set, tuple)) and len(val) == 0:
-            return True
-        return False
-
-    enrich_fields = [
-        "publisher", "publish_date", "description", "isbn", "genres", "pages", 
-        "authors", "series", "number", "year", "month", "day",
-        "writer", "penciller", "inker", "colorist", "letterer", "cover_artist", "editor", "volume",
-        "characters", "teams", "locations"
-    ]
+    grouped_candidates = []
 
     for cand in normalized_list:
         meta = cand["metadata"]
-        score = cand["score"]
-        src = cand["source"]
-
-        # Check if this candidate matches any already consolidated group
-        matched_idx = -1
-        for idx, cons in enumerate(consolidated):
-            cons_meta = cons["metadata"]
+        matched_group_idx = -1
+        for idx, group in enumerate(grouped_candidates):
+            leader_meta = group[0]["metadata"]
 
             # Match series/title
-            p_series = cons_meta.get("series") or cons_meta.get("title") or ""
+            p_series = leader_meta.get("series") or leader_meta.get("title") or ""
             c_series = meta.get("series") or meta.get("title") or ""
 
             if calculate_similarity(p_series, c_series) < 0.85:
                 continue
 
-            # Match issue numbers
-            p_num = cons_meta.get("number") or cons_meta.get("issue_number")
+            # Match issue numbers if both specify one
+            p_num = leader_meta.get("number") or leader_meta.get("issue_number")
             c_num = meta.get("number") or meta.get("issue_number")
             if p_num and c_num and str(p_num).strip() != str(c_num).strip():
                 continue
 
-            matched_idx = idx
+            matched_group_idx = idx
             break
 
-        if matched_idx >= 0:
-            # Merge fields into the existing consolidated group primary candidate
-            cons_meta = consolidated[matched_idx]["metadata"]
-            cons_sources = consolidated[matched_idx]["sources"]
-
-            # Enrich empty fields of primary with non-empty fields from cand
-            for field in enrich_fields:
-                if is_value_empty(cons_meta.get(field)) and not is_value_empty(meta.get(field)):
-                    cons_meta[field] = meta[field]
-
-            # Accumulate source URL/label
-            src_val = meta.get("source_url") or src
-            if src_val and src_val not in cons_sources:
-                cons_sources.append(src_val)
+        if matched_group_idx >= 0:
+            grouped_candidates[matched_group_idx].append(cand)
         else:
-            # Start a new consolidated group
-            src_list = []
-            src_val = meta.get("source_url") or src
-            if src_val:
-                src_list.append(src_val)
-            # Make a copy to avoid mutating the original dict in place inappropriately
-            consolidated.append({
-                "metadata": dict(meta),
-                "score": score,
-                "sources": src_list
-            })
+            grouped_candidates.append([cand])
 
-    # Post-process to format source URLs/labels
+    # Synthesize best metadata field-by-field for each group
     results = []
-    for cons in consolidated:
-        meta = resolve_creator_roles(cons["metadata"])
-        score = cons["score"]
-        sources = cons["sources"]
-
-        unique_sources = []
-        for s in sources:
-            s_clean = s
-            if s.startswith("http"):
-                parts = s.split("/")
-                if len(parts) > 2:
-                    s_clean = parts[2].replace("www.", "")
-            if s_clean not in unique_sources:
-                unique_sources.append(s_clean)
-
-        meta["source_url"] = ", ".join(unique_sources)
-        results.append((meta, score, meta["source_url"]))
+    for group in grouped_candidates:
+        best_score = max(c["score"] for c in group)
+        merged_meta = merge_best_metadata_fields(group, codex=codex)
+        source_url = merged_meta.get("source_url") or group[0]["source"]
+        results.append((merged_meta, best_score, source_url))
 
     # Sort results by score descending
     results.sort(key=lambda x: x[1], reverse=True)
@@ -319,13 +238,10 @@ def query_all_sources_sequentially(filename, cover_path=None, comicvine_api_key=
                                    google_books_api_key=None,
                                    metron_user=None, metron_pass=None,
                                    enabled_sources=None, on_progress=None,
-                                   existing_meta=None):
+                                   existing_meta=None, publisher_codex=None):
     """
-    Queries enabled sources in tiered order with early-exit optimization:
-    Tier 1: Authoritative comic databases (ComicVine, Metron, GCD, LCG).
-    If a Tier 1 match achieves high confidence (>= 92%) with complete core metadata,
-    early-exits immediately to skip heavy web scrapers.
-    Tier 2: Retailers / book databases (Goodreads, Blackwell's, Waterstones, Google Books) as fallback.
+    Queries all enabled sources unconditionally to gather metadata across providers.
+    All candidates are synthesized using field-by-field best metadata selection.
     """
     def progress(source_name, msg):
         if on_progress:
@@ -345,12 +261,8 @@ def query_all_sources_sequentially(filename, cover_path=None, comicvine_api_key=
 
     raw_candidates = []
 
-    # Partition sources into Tier 1 (Comic DBs) and Tier 2 (Book Retailers/Scrapers)
-    tier1_sources = [s for s in SOURCES if getattr(s, "tier", 1) == 1]
-    tier2_sources = [s for s in SOURCES if getattr(s, "tier", 1) > 1]
-
-    # 1. Execute Tier 1 sources
-    for source in tier1_sources:
+    # Execute all enabled sources unconditionally
+    for source in SOURCES:
         if not source.is_enabled(enabled_sources):
             progress(source.label, "Skipped (Disabled)")
             continue
@@ -377,44 +289,8 @@ def query_all_sources_sequentially(filename, cover_path=None, comicvine_api_key=
             print(f"[-] {source.label} search failed: {e}")
             progress(source.label, f"Search failed: {str(e)}")
 
-    # Check if Tier 1 found a high-confidence match with complete fields
-    consolidated_tier1 = consolidate_all_candidates(raw_candidates)
-    if consolidated_tier1:
-        best_meta, best_score, best_src = consolidated_tier1[0]
-        if best_score >= 0.92 and _has_core_metadata_fields(best_meta):
-            print(f"[+] Early exit: Tier 1 high-confidence match ({round(best_score * 100, 1)}%) with complete metadata. Skipping Tier 2 scrapers.")
-            return consolidated_tier1
-
-    # 2. Execute Tier 2 sources if Tier 1 lacked a confident complete match
-    for source in tier2_sources:
-        if not source.is_enabled(enabled_sources):
-            progress(source.label, "Skipped (Disabled)")
-            continue
-
-        progress(source.label, source.search_message)
-        try:
-            res = source.resolve(filename, ctx, lambda m, _label=source.label: progress(_label, m))
-            if res:
-                raw_candidates.extend(res)
-                valid = [c for c in res if isinstance(c, (tuple, list)) and len(c) >= 2 and c[1] >= 0.50]
-                if valid:
-                    best = max(valid, key=lambda x: x[1])
-                    pct = round(best[1] * 100, 1)
-                    title_info = (best[0].get("title") or best[0].get("series") or "") if isinstance(best[0], dict) else ""
-                    if title_info:
-                        progress(source.label, f"Match found at {pct}% ({title_info})")
-                    else:
-                        progress(source.label, f"Match found at {pct}%")
-                else:
-                    progress(source.label, "No match found")
-            else:
-                progress(source.label, "No match found")
-        except Exception as e:
-            print(f"[-] {source.label} search failed: {e}")
-            progress(source.label, f"Search failed: {str(e)}")
-
-    # Consolidate all candidates across both tiers
-    consolidated = consolidate_all_candidates(raw_candidates)
+    # Consolidate all candidates across sources using field-by-field best selection
+    consolidated = consolidate_all_candidates(raw_candidates, codex=publisher_codex)
     return consolidated
 
 
@@ -460,7 +336,7 @@ def process_single_cbz_file(file_path, comicvine_api_key, google_books_api_key=N
     except Exception:
         pass
     
-    active_sources = enabled_sources if enabled_sources else ["src-comicvine", "src-metron-gcd", "src-lcg", "src-goodreads", "src-blackwells", "src-waterstones"]
+    active_sources = enabled_sources if enabled_sources else ["src-comicvine", "src-metron", "src-gcd", "src-lcg", "src-goodreads", "src-blackwells", "src-waterstones"]
     
     metadata = None
     source_url = None
@@ -710,7 +586,7 @@ def enhance_single_cbz_file(file_path, comicvine_api_key, google_books_api_key=N
     except Exception as read_err:
         print(f"[-] Failed to read existing ComicInfo.xml for {filename}: {read_err}")
         
-    active_sources = enabled_sources if enabled_sources else ["src-comicvine", "src-metron-gcd", "src-lcg", "src-goodreads"]
+    active_sources = enabled_sources if enabled_sources else ["src-comicvine", "src-metron", "src-gcd", "src-lcg", "src-goodreads"]
     api_failed = False
         
     metadata = None
