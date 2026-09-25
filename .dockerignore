@@ -1,5 +1,8 @@
 node_modules
 .git
+config.json
+.env
+.env.*
 *.db
 *.db-*
 *.db.bak*
@@ -26,4 +29,6 @@ tagger/__pycache__
 pnpm-lock.yaml
 pnpm-workspace.yaml
 .pnpm-store
+thumbnails
+data
 

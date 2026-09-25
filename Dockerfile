@@ -1,7 +1,7 @@
 # Build stage
 FROM node:20-bookworm AS builder
 
-# Install system dependencies for building native modules and comictagger
+# Install system dependencies for building native modules
 RUN apt-get update && apt-get install -y \
     python3 \
     python3-pip \
@@ -24,10 +24,10 @@ RUN npm run build
 # Prune development dependencies to keep the image lightweight
 RUN npm prune --omit=dev
 
-# Install ComicTagger in a virtual environment
+# Install Python dependencies for internal tagger in a virtual environment
 RUN python3 -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
-RUN pip install --no-cache-dir comictagger
+RUN pip install --no-cache-dir -r tagger/requirements.txt
 
 # Runtime stage
 FROM node:20-bookworm-slim
@@ -56,11 +56,11 @@ ENV PATH="/opt/venv/bin:$PATH"
 ENV NODE_ENV=production
 ENV DATA_DIR=/app/data
 
-# Create data directory and set permissions
-RUN mkdir -p /app/data && chown 1000:1000 /app/data
-USER node
+# Ensure data directory exists and entrypoint is executable
+RUN mkdir -p /app/data && chown 1000:1000 /app/data && chmod +x /app/docker-entrypoint.sh
 
 # Expose the default port
 EXPOSE 3000
 
+ENTRYPOINT ["/app/docker-entrypoint.sh"]
 CMD ["npm", "start"]
