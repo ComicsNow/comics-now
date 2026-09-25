@@ -92,8 +92,12 @@ def parse_sources_from_cbz_xml(file_path):
                             if "Tag Comics Now!" in line:
                                 if "comicvine" in line.lower():
                                     sources.add("src-comicvine")
-                                elif "metron" in line.lower() or "gcd" in line.lower() or "comics.org" in line.lower():
-                                    sources.add("src-metron-gcd")
+                                elif "metron" in line.lower():
+                                    sources.add("src-metron")
+                                    if "gcd" in line.lower() or "comics.org" in line.lower():
+                                        sources.add("src-gcd")
+                                elif "gcd" in line.lower() or "comics.org" in line.lower() or "grandcomic" in line.lower():
+                                    sources.add("src-gcd")
                                 elif "leagueof" in line.lower() or "lcg" in line.lower():
                                     sources.add("src-lcg")
                                 elif "goodreads" in line.lower():
@@ -102,6 +106,10 @@ def parse_sources_from_cbz_xml(file_path):
                                     sources.add("src-blackwells")
                                 elif "waterstones" in line.lower():
                                     sources.add("src-waterstones")
+                                elif "amazon" in line.lower():
+                                    sources.add("src-amazon")
+                                elif "googlebooks" in line.lower() or "google" in line.lower():
+                                    sources.add("src-googlebooks")
                                 else:
                                     sources.add("unknown")
     except (zipfile.BadZipFile, ET.ParseError, KeyError):
@@ -117,11 +125,15 @@ def check_sources_match(has_sources, enabled_sources):
         
     source_keywords = {
         "src-comicvine": ["comicvine", "src-comicvine"],
+        "src-metron": ["metron", "src-metron", "src-metron-gcd"],
+        "src-gcd": ["gcd", "comics.org", "grandcomicbookdatabase", "src-gcd", "src-metron-gcd"],
         "src-metron-gcd": ["metron", "gcd", "comics.org", "grandcomicbookdatabase", "src-metron-gcd"],
         "src-lcg": ["leagueofcomicgeeks", "lcg", "src-lcg"],
         "src-goodreads": ["goodreads", "src-goodreads"],
         "src-blackwells": ["blackwells", "src-blackwells"],
-        "src-waterstones": ["waterstones", "src-waterstones"]
+        "src-waterstones": ["waterstones", "src-waterstones"],
+        "src-googlebooks": ["googlebooks", "google", "src-googlebooks"],
+        "src-amazon": ["amazon", "src-amazon"],
     }
     
     for src in enabled_sources:
@@ -131,8 +143,11 @@ def check_sources_match(has_sources, enabled_sources):
             elif "blackwells" in src_key: src_key = "src-blackwells"
             elif "waterstones" in src_key: src_key = "src-waterstones"
             elif "comicvine" in src_key: src_key = "src-comicvine"
-            elif "metron" in src_key or "gcd" in src_key: src_key = "src-metron-gcd"
+            elif "metron" in src_key: src_key = "src-metron"
+            elif "gcd" in src_key or "comics.org" in src_key: src_key = "src-gcd"
             elif "lcg" in src_key or "leagueof" in src_key: src_key = "src-lcg"
+            elif "amazon" in src_key: src_key = "src-amazon"
+            elif "google" in src_key: src_key = "src-googlebooks"
             
         keywords = source_keywords.get(src_key, [src_key])
         has_source = any(any(kw in hs for kw in keywords) for hs in has_sources)

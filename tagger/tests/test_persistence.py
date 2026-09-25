@@ -31,9 +31,16 @@ def _make_cbz(path, notes=None):
 def test_check_sources_match_alias_and_miss():
     assert tracking_db.check_sources_match({"src-comicvine"}, ["comicvine"]) is True
     assert tracking_db.check_sources_match({"src-comicvine"}, ["src-metron"]) is False
+    assert tracking_db.check_sources_match({"src-gcd"}, ["src-gcd"]) is True
+    assert tracking_db.check_sources_match({"src-gcd"}, ["src-metron"]) is False
+    assert tracking_db.check_sources_match({"src-metron"}, ["src-gcd"]) is False
+    # Legacy src-metron-gcd satisfies both
+    assert tracking_db.check_sources_match({"src-metron-gcd"}, ["src-gcd"]) is True
+    assert tracking_db.check_sources_match({"src-metron-gcd"}, ["src-metron"]) is True
     # empty enabled means "any recorded source counts"
     assert tracking_db.check_sources_match({"src-lcg"}, []) is True
     assert tracking_db.check_sources_match(set(), []) is False
+
 
 
 # --------------------------------------------------------------- mark/is_already_enhanced
