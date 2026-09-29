@@ -23,22 +23,46 @@ module.exports = function attach(router, deps) {
     getComicInfoFromArchive
   } = deps;
 
+  const { THUMBNAILS_DIRECTORY, GUIDED_VIEW_DIR } = require('../../constants');
+  const { formatComicFilename, updateComicIdentity } = require('../../services/organization');
+
   router.post('/api/v1/rename-cbz', async (req, res) => {
     try {
+      const body = req.body || {};
       const comicsLocation = getConfig().comicsLocation;
 
-      if (!fs.existsSync(comicsLocation)) {
-        return res.status(404).json({ ok: false, message: 'Scan directory not found' });
+      // Two scopes:
+      //  - Inbox (Operations tab): rename comics in comicsLocation. No confirmation.
+      //  - Whole library (Name tab): rename an entire library chosen via `libraryPath`.
+      //    Destructive across a full library, so it requires the typed confirmation.
+      const libraryPath = typeof body.libraryPath === 'string' ? body.libraryPath.trim() : '';
+      let targetDir = comicsLocation;
+      if (libraryPath) {
+        const validDirs = deps.getComicsDirectories ? deps.getComicsDirectories() : [];
+        if (!validDirs.includes(libraryPath)) {
+          return res.status(400).json({ ok: false, message: 'Unknown library path' });
+        }
+        if (body.confirmation !== 'i want to do this') {
+          return res.status(400).json({
+            ok: false,
+            message: 'Confirmation phrase "i want to do this" required for a whole-library rename.'
+          });
+        }
+        targetDir = libraryPath;
       }
 
-      log('INFO', 'RENAME', `Starting rename operation in ${comicsLocation}`);
-      renameLog(`Starting rename operation in ${comicsLocation}`);
+      if (!targetDir || !fs.existsSync(targetDir)) {
+        return res.status(404).json({ ok: false, message: 'Target directory not found' });
+      }
+
+      log('INFO', 'RENAME', `Starting rename operation in ${targetDir}`);
+      renameLog(`Starting rename operation in ${targetDir}`);
 
       const allowedFormats = deps.getAllowedFormats ? deps.getAllowedFormats() : 'cbz';
-      
+
       const comics = await dbAll(
         `SELECT id, path, name, metadata FROM comics WHERE tagStatus = 'successful' AND path LIKE ?`,
-        [`${comicsLocation}%`]
+        [`${targetDir}%`]
       );
 
       const files = comics.filter(c => {
@@ -60,6 +84,8 @@ module.exports = function attach(router, deps) {
       let renamed = 0;
       let errors = 0;
       const results = [];
+
+      const namingRules = (deps.getNamingRules || require('../../config').getNamingRules)();
 
       for (const comicRecord of files) {
         const file = comicRecord.name;
@@ -86,43 +112,16 @@ module.exports = function attach(router, deps) {
             continue;
           }
 
-          const series = info.Series;
-          const publisher = info.Publisher;
-          const coverDate = info.CoverDate || info['Cover Date'];
-          const year = info.Year || (coverDate ? coverDate.toString().substring(0, 4) : null);
-
-          if (!series || !publisher || !year) {
-            renameLog(`✗ Error: ${file} - Missing required tags (Series, Publisher, or Year/CoverDate)`);
-            results.push({ file, success: false, error: 'Missing required tags (Series, Publisher, or Year/CoverDate)' });
+          const ext = path.extname(filePath);
+          let newName;
+          try {
+            newName = formatComicFilename(info, namingRules, ext);
+          } catch (err) {
+            renameLog(`✗ Error: ${file} - ${err.message}`);
+            results.push({ file, success: false, error: err.message });
             errors++;
             continue;
           }
-
-          let formatted_issue = '';
-          if (info.Number != null && info.Number !== '') {
-            formatted_issue = info.Number.toString();
-            if (/^[0-9]+$/.test(formatted_issue)) {
-              formatted_issue = formatted_issue.padStart(2, '0');
-            }
-          }
-
-          const ext = path.extname(filePath);
-          let newName = '';
-          if (formatted_issue) {
-            newName += `${formatted_issue} `;
-          }
-          newName += series;
-          if (info.Title) {
-            newName += ` - ${info.Title}`;
-          }
-          newName += ` [${publisher}] (${year})`;
-          if (info.PageCount) {
-            newName += ` #${info.PageCount}`;
-          }
-          newName += ext;
-
-          // Safe filename: replace '/' with '-'
-          newName = newName.replace(/\//g, '-');
 
           const dir = path.dirname(filePath);
           const newFilePath = path.join(dir, newName);
@@ -137,27 +136,19 @@ module.exports = function attach(router, deps) {
               continue;
             }
 
-            fs.renameSync(filePath, newFilePath);
-
-            // Move the adjacent ComicInfo.xml sidecar alongside the renamed comic
-            const oldSidecar = path.join(dir, path.basename(filePath, ext) + '.ComicInfo.xml');
-            if (fs.existsSync(oldSidecar)) {
-              const newSidecar = path.join(dir, path.basename(newFilePath, ext) + '.ComicInfo.xml');
-              try {
-                fs.renameSync(oldSidecar, newSidecar);
-                renameLog(`  ↳ Renamed sidecar: ${path.basename(newSidecar)}`);
-              } catch (sErr) {
-                renameLog(`  ↳ ⚠ Failed to rename sidecar: ${sErr.message}`);
-              }
-            }
-
-            // Update database record immediately to preserve metadata and progress
             const oldId = comicRecord.id;
             const newId = createId(newFilePath);
-            await dbRun(
-              'UPDATE comics SET id = ?, path = ?, name = ? WHERE id = ?',
-              [newId, newFilePath, newName, oldId]
-            );
+
+            await updateComicIdentity({
+              dbRun,
+              oldId,
+              newId,
+              oldPath: filePath,
+              newPath: newFilePath,
+              newName,
+              thumbnailsDir: THUMBNAILS_DIRECTORY,
+              guidedViewDir: GUIDED_VIEW_DIR
+            });
 
             renamed++;
             renameLog(`✓ Renamed: ${newName}`);

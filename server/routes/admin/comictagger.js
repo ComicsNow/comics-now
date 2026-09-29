@@ -392,4 +392,71 @@ module.exports = function attach(router, deps) {
       res.json({ matches: req.body.matches || [] });
     }
   });
+
+  // Naming & Folder Organization Rules
+  router.get('/api/v1/comictagger/naming-rules', (req, res) => {
+    const fn = deps.getNamingRules || require('../../config').getNamingRules;
+    const { DEFAULT_NAMING_RULES } = require('../../services/organization');
+    res.json({ ok: true, rules: fn ? fn() : DEFAULT_NAMING_RULES });
+  });
+
+  router.post('/api/v1/comictagger/naming-rules', async (req, res) => {
+    try {
+      const { rules } = req.body || {};
+      if (!rules || !Array.isArray(rules.tokens)) {
+        return res.status(400).json({ ok: false, error: 'Invalid naming rules format' });
+      }
+      const setFn = deps.setNamingRules || require('../../config').setNamingRules;
+      const saveFn = deps.saveSetting || require('../../settings').saveSetting;
+      if (setFn) setFn(rules);
+      if (saveFn) await saveFn('namingRules', rules);
+      res.json({ ok: true });
+    } catch (e) {
+      res.status(500).json({ ok: false, error: e.message });
+    }
+  });
+
+  router.get('/api/v1/comictagger/folder-rules', (req, res) => {
+    const fn = deps.getFolderRules || require('../../config').getFolderRules;
+    const { DEFAULT_FOLDER_RULES } = require('../../services/organization');
+    res.json({ ok: true, rules: fn ? fn() : DEFAULT_FOLDER_RULES });
+  });
+
+  router.post('/api/v1/comictagger/folder-rules', async (req, res) => {
+    try {
+      const { rules } = req.body || {};
+      if (!rules || !Array.isArray(rules.hierarchy)) {
+        return res.status(400).json({ ok: false, error: 'Invalid folder rules format' });
+      }
+      const setFn = deps.setFolderRules || require('../../config').setFolderRules;
+      const saveFn = deps.saveSetting || require('../../settings').saveSetting;
+      if (setFn) setFn(rules);
+      if (saveFn) await saveFn('folderRules', rules);
+      res.json({ ok: true });
+    } catch (e) {
+      res.status(500).json({ ok: false, error: e.message });
+    }
+  });
+
+  router.post('/api/v1/comictagger/naming-preview', (req, res) => {
+    try {
+      const { metadata = {}, rules } = req.body || {};
+      const { formatComicFilename, DEFAULT_NAMING_RULES } = require('../../services/organization');
+      const filename = formatComicFilename(metadata, rules || DEFAULT_NAMING_RULES, '.cbz');
+      res.json({ ok: true, filename });
+    } catch (e) {
+      res.status(400).json({ ok: false, error: e.message });
+    }
+  });
+
+  router.post('/api/v1/comictagger/folder-preview', (req, res) => {
+    try {
+      const { metadata = {}, rules } = req.body || {};
+      const { formatFolderPath, DEFAULT_FOLDER_RULES } = require('../../services/organization');
+      const folderPath = formatFolderPath(metadata, rules || DEFAULT_FOLDER_RULES);
+      res.json({ ok: true, folderPath });
+    } catch (e) {
+      res.status(400).json({ ok: false, error: e.message });
+    }
+  });
 };

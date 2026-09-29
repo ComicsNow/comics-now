@@ -511,7 +511,10 @@ async function fetchCtSettings() {
     const data = await res.json();
     
     if (ctScheduleInput) ctScheduleInput.value = data.minutes || 0;
-    
+
+    const scanFolderInput = document.getElementById('ct-scan-folder-input');
+    if (scanFolderInput) scanFolderInput.value = data.comicsLocation || '';
+
     const storageInput = document.getElementById('ct-storage-input');
     if (storageInput) storageInput.value = data.metadataStorage || 'archive';
     
@@ -690,6 +693,8 @@ function renderComicPreview(url, fileName) {
 
 async function saveCtSettings() {
   const schedule = parseInt(ctScheduleInput?.value, 10) || 0;
+  const scanFolderInput = document.getElementById('ct-scan-folder-input');
+  const comicsLocation = scanFolderInput ? scanFolderInput.value.trim() : '';
   const storageInput = document.getElementById('ct-storage-input');
   const metadataStorage = storageInput ? storageInput.value : 'archive';
   
@@ -735,6 +740,7 @@ async function saveCtSettings() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         minutes: schedule,
+        comicsLocation,
         metadataStorage,
         upperThreshold,
         lowerThreshold,

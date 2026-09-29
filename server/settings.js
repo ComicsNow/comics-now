@@ -98,6 +98,18 @@ async function loadSettings() {
         const { setMetronPassword } = require('./config');
         setMetronPassword(val, true);
       }
+      if (row.key === 'namingRules') {
+        let val;
+        try { val = JSON.parse(row.value); } catch { val = row.value; }
+        const { setNamingRules } = require('./config');
+        setNamingRules(val, true);
+      }
+      if (row.key === 'folderRules') {
+        let val;
+        try { val = JSON.parse(row.value); } catch { val = row.value; }
+        const { setFolderRules } = require('./config');
+        setFolderRules(val, true);
+      }
     }
     log('INFO', 'SERVER', 'Settings loaded from DB.');
   } catch (err) {

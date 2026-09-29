@@ -67,7 +67,7 @@ describe('Admin Rename Route', () => {
     ]);
 
     const req = {
-      body: {}
+      body: { confirmation: 'i want to do this' }
     };
     const res = {
       json: jest.fn(),
