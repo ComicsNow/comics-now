@@ -278,6 +278,7 @@ const global = new Proxy(typeof window !== 'undefined' ? window : globalThis, {
     if (typeof global.setOrientationMode === 'function') {
       global.setOrientationMode(global.isLandscapeOrientation ? 'landscape' : 'portrait');
     }
+    global.initPagePreviews?.();
     global.debugLog?.('UI', 'Viewer controls initialized');
   }
 
