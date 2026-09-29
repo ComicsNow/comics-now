@@ -67,8 +67,10 @@ const global = new Proxy(typeof window !== 'undefined' ? window : globalThis, {
       }
     }
 
-    // Fallback to API URL
-    const url = `${global.API_BASE_URL}/api/v1/comics/pages/image?path=${encodeURIComponent(global.encodePath(global.currentComic.path))}&page=${encodeURIComponent(pageName)}`;
+    // Fallback to API URL. Request a full-resolution WebP (fmt=webp): keeps WebP
+    // compression for bandwidth while preserving original pixel dimensions, so
+    // fullscreen guided-view / speech-bubble zoom coordinates stay accurate.
+    const url = `${global.API_BASE_URL}/api/v1/comics/pages/image?path=${encodeURIComponent(global.encodePath(global.currentComic.path))}&page=${encodeURIComponent(pageName)}&fmt=webp`;
     global.pageUrlCache?.set(pageName, url);
     return url;
   }

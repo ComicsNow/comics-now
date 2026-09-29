@@ -1,10 +1,13 @@
 const fs = require('fs');
 const path = require('path');
 
+// Collapses concurrent transcodes of the same page (e.g. preload bursts) into a
+// single sharp run. Keyed by WebP cache key; entries are removed once settled.
+const inFlightTranscodes = new Map();
 
 /**
  * User Pages Routes
- * 
+ *
  * Handles comic page listing, image serving, and downloads.
  */
 module.exports = function attach(router, deps) {
@@ -138,6 +141,87 @@ module.exports = function attach(router, deps) {
       if (!p || !pageName || !fs.existsSync(p)) return res.status(404).end();
 
       const { getEntryBuffer } = require('../../services/archive-utils');
+      const {
+        getPageCacheKey,
+        getPageCacheBuffer,
+        setPageCacheBuffer
+      } = require('../../services/page-cache');
+
+      const rawW = parseInt(getQueryParamString(req.query.w), 10);
+      const targetWidth = (!isNaN(rawW) && rawW > 0) ? Math.min(rawW, 2400) : null;
+      // fmt=webp requests a full-resolution WebP (no resize). The fullscreen reader
+      // uses this so img.naturalWidth == original width, keeping guided-view /
+      // speech-bubble coordinates accurate. Thumbnails still use w= to downscale.
+      const wantsFullWebp = getQueryParamString(req.query.fmt) === 'webp';
+      // Never transcode animated GIFs — a single WebP frame would kill the animation.
+      const isAnimated = /\.gif$/i.test(pageName);
+
+      if ((targetWidth || wantsFullWebp) && !isAnimated) {
+        let mtimeMs = 0;
+        try {
+          const stat = await fs.promises.stat(p);
+          mtimeMs = Math.floor(stat.mtimeMs);
+        } catch {}
+        // Full-res WebP gets its own cache slot ('full') distinct from any width.
+        const cacheWidthToken = targetWidth || 'full';
+        const webpCacheKey = getPageCacheKey(p, mtimeMs, pageName, cacheWidthToken);
+
+        // Fast path: serve a previously transcoded WebP straight from disk.
+        const cachedWebp = await getPageCacheBuffer(webpCacheKey);
+        if (cachedWebp) {
+          res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+          res.setHeader('Content-Type', 'image/webp');
+          return res.send(cachedWebp);
+        }
+
+        let sourceBuffer;
+        try {
+          sourceBuffer = await getEntryBuffer(p, pageName);
+        } catch (err) {
+          log('ERROR', 'PAGES', `Failed to read page ${pageName}: ${err.message}`);
+          return res.status(500).end();
+        }
+        if (!sourceBuffer) return res.status(404).end();
+
+        try {
+          let transcode = inFlightTranscodes.get(webpCacheKey);
+          if (!transcode) {
+            const sharp = require('sharp');
+            let pipeline = sharp(sourceBuffer);
+            if (targetWidth) {
+              pipeline = pipeline.resize({ width: targetWidth, withoutEnlargement: true });
+            }
+            transcode = pipeline
+              .webp({ quality: 80, effort: 1 })
+              .toBuffer()
+              .then(async (webpBuffer) => {
+                await setPageCacheBuffer(webpCacheKey, webpBuffer);
+                return webpBuffer;
+              });
+            inFlightTranscodes.set(webpCacheKey, transcode);
+            // Clear the entry once settled (both branches resolve → no unhandled rejection).
+            transcode.then(
+              () => inFlightTranscodes.delete(webpCacheKey),
+              () => inFlightTranscodes.delete(webpCacheKey)
+            );
+          }
+          const webpBuffer = await transcode;
+
+          if (res.writableEnded || req.destroyed) return;
+          res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+          res.setHeader('Content-Type', 'image/webp');
+          return res.send(webpBuffer);
+        } catch (err) {
+          // Corrupt/unsupported source: fall back to original bytes rather than 500.
+          log('WARN', 'PAGES', `WebP transcode failed for ${pageName}, serving original: ${err.message}`);
+          if (res.writableEnded || req.destroyed) return;
+          res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+          res.setHeader('Content-Type', getMimeFromExt(pageName));
+          return res.send(sourceBuffer);
+        }
+      }
+
+      // Original-format path (no width requested, or animated GIF).
       try {
         const buffer = await getEntryBuffer(p, pageName);
         if (!buffer) return res.status(404).end();

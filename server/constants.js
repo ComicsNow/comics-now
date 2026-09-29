@@ -14,6 +14,8 @@ module.exports = {
   PUBLIC_DIR: path.join(ROOT_DIR, 'public'),
   SCRIPTS_DIRECTORY: path.join(ROOT_DIR, 'scripts'),
   GUIDED_VIEW_DIR: path.join(DATA_DIR, 'metadata', 'guided_view'),
+  PAGE_CACHE_DIRECTORY: path.join(DATA_DIR, 'page-cache'),
+  DEFAULT_MAX_PAGE_CACHE_MB: 700,
   MAX_LOG_ENTRIES: 500,
   METADATA_MARKER_FILE: '.metadata.txt'
 };
