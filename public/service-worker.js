@@ -726,3 +726,105 @@ self.addEventListener('notificationclick', (event) => {
     );
   }
 });
+
+// ==============================================================================
+// BACKGROUND FETCH API — true OS-level background downloads (Android Chrome)
+// ==============================================================================
+// Registration ids are `comic-<id>`; the fetched response is persisted to the
+// offline DB and the page is notified. Foreground resumable download remains the
+// fallback where Background Fetch is unavailable (iOS, etc.).
+
+function bgFetchComicId(registration) {
+  return registration.id.startsWith('comic-') ? registration.id.slice('comic-'.length) : registration.id;
+}
+
+self.addEventListener('backgroundfetchsuccess', (event) => {
+  const bgFetch = event.registration;
+  event.waitUntil((async () => {
+    let db = null;
+    try {
+      const records = await bgFetch.matchAll();
+      const comicId = bgFetchComicId(bgFetch);
+      try { db = await openDownloadDB(); } catch (e) { db = null; }
+
+      for (const record of records) {
+        try {
+          const response = await record.responseReady;
+          if (!response.ok) continue;
+          const blob = await response.blob();
+
+          if (db) {
+            const queue = await getQueueItems(db);
+            const item = queue.find(i => i.id === comicId);
+            const comic = (item && item.comic) || { id: comicId };
+            await saveComicBlob(db, comic, blob);
+            if (item) {
+              await updateQueueItem(db, item.id, {
+                status: 'completed',
+                progress: 1,
+                completedAt: Date.now(),
+                error: null
+              });
+            }
+            // Pre-cache guided-view data for offline reading.
+            try {
+              const gvUrl = `${self.location.origin}${BASE_PATH}api/v1/comics/${encodeURIComponent(comicId)}/guided-view`;
+              const gvRes = await fetch(gvUrl, { credentials: 'include' });
+              if (gvRes.ok) {
+                const cache = await caches.open(DOWNLOADS_CACHE_NAME);
+                await cache.put(gvUrl, gvRes);
+              }
+            } catch (_) {}
+          }
+
+          await notifyClients({ type: 'download-complete', comicId });
+        } catch (recErr) {
+          console.error('[SW] Background fetch record error:', recErr);
+        }
+      }
+
+      if (typeof event.updateUI === 'function') {
+        try { await event.updateUI({ title: 'Download complete' }); } catch (_) {}
+      }
+      await showCompletionNotification(1);
+    } catch (err) {
+      console.error('[SW] backgroundfetchsuccess error:', err);
+    } finally {
+      if (db && db.close) db.close();
+    }
+  })());
+});
+
+self.addEventListener('backgroundfetchfail', (event) => {
+  const bgFetch = event.registration;
+  event.waitUntil((async () => {
+    const comicId = bgFetchComicId(bgFetch);
+    try {
+      const db = await openDownloadDB();
+      await updateQueueItem(db, comicId, {
+        status: 'error',
+        error: 'Background download failed',
+        failedAt: Date.now()
+      });
+      if (db.close) db.close();
+    } catch (_) {}
+    await notifyClients({ type: 'download-error', comicId, error: 'Background download failed' });
+  })());
+});
+
+self.addEventListener('backgroundfetchabort', (event) => {
+  const bgFetch = event.registration;
+  event.waitUntil((async () => {
+    const comicId = bgFetchComicId(bgFetch);
+    try {
+      const db = await openDownloadDB();
+      await removeQueueItem(db, comicId);
+      if (db.close) db.close();
+    } catch (_) {}
+    await notifyClients({ type: 'download-aborted', comicId });
+  })());
+});
+
+self.addEventListener('backgroundfetchclick', (event) => {
+  event.waitUntil(clients.openWindow(BASE_PATH || '/'));
+});
