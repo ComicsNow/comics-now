@@ -57,6 +57,7 @@ import './js/viewer/ui-orientation.js';
 import './js/viewer/ui-summary.js';
 import './js/viewer/ui.js';
 import './js/viewer/ui-init.js';
+import './js/viewer/page-previews.js';
 import './js/viewer/navigation.js';
 import './js/viewer/viewer-server.js';
 import './js/viewer/viewer-local.js';
