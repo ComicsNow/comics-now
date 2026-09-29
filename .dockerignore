@@ -30,5 +30,6 @@ pnpm-lock.yaml
 pnpm-workspace.yaml
 .pnpm-store
 thumbnails
+page-cache
 data
 

@@ -33,6 +33,9 @@ plans/
 *.bak
 *.bak-*
 
+# Server-side page transcode cache (regenerated on demand)
+page-cache/
+
 # Python / Tagger caches & configs
 __pycache__/
 *.py[cod]

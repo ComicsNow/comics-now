@@ -44,8 +44,10 @@ const {
   LOGOS_DIRECTORY,
   ICONS_DIRECTORY,
   THUMBNAILS_DIRECTORY,
+  PAGE_CACHE_DIRECTORY,
   SCRIPTS_DIRECTORY
 } = require('./server/constants');
+const { initPageCache } = require('./server/services/page-cache');
 
 const {
   loadConfigFromDisk,
@@ -394,7 +396,8 @@ app.use(baseUrl, staticRouter);
   [
     LOGOS_DIRECTORY,
     ICONS_DIRECTORY,
-    THUMBNAILS_DIRECTORY
+    THUMBNAILS_DIRECTORY,
+    PAGE_CACHE_DIRECTORY
   ].forEach((dir) => {
     try {
       if (dir && !fs.existsSync(dir)) {
@@ -405,6 +408,9 @@ app.use(baseUrl, staticRouter);
       log('WARN', 'SERVER', `Could not ensure directory ${dir}: ${e.message}`);
     }
   });
+
+  // Prime the on-disk WebP page cache (creates dir + prunes any over-cap leftovers).
+  await initPageCache();
 
   const server = app.listen(PORT, () => {
     log('INFO', 'SERVER', `Server is running on http://localhost:${PORT}`);
