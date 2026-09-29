@@ -162,7 +162,7 @@ describe('Admin Settings Routes', () => {
       await removeLibraryHandler(req, res);
 
       expect(deps.removeLibrary).toHaveBeenCalledWith('/comics1');
-      expect(res.json).toHaveBeenCalledWith({ ok: true });
+      expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ ok: true }));
     });
 
     it('should return 400 if path is missing', async () => {

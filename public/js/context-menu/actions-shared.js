@@ -202,25 +202,50 @@ function createContinuousToggleItem(comics, labelPrefix = '') {
 /**
  * Factory for Guided Detection items
  */
-function createGuidedDetectionItem(scope, target, label, comics) {
-  const comicsArray = Array.isArray(comics) ? comics : [comics];
-  const eligibleCount = comicsArray.filter(isEligibleComic).length;
-  if (eligibleCount === 0) return null;
+// A comic still needs (incremental) guided detection unless it's already done
+// or currently being processed. Missing status counts as "needs detection".
+function needsGuidedDetection(comic) {
+  return !!comic && comic.guidedViewStatus !== 'completed' && comic.guidedViewStatus !== 'processing';
+}
 
-  const isSingle = comicsArray.length === 1;
+function createGuidedDetectionItem(scope, target, label, comics) {
+  const comicsArray = (Array.isArray(comics) ? comics : [comics]).filter(isEligibleComic);
+  const totalCount = comicsArray.length;
+  if (totalCount === 0) return null;
+
+  const isSingle = totalCount === 1;
   const comic = isSingle ? comicsArray[0] : null;
   const isProcessed = isSingle && comic.guidedViewStatus === 'completed';
   const isProcessing = isSingle && comic.guidedViewStatus === 'processing';
 
-  const text = isProcessing ? 'Guided Detection Running…' : 
-               `${isProcessed ? 'Re-run' : 'Run'} Guided Detection${!isSingle ? ` (${eligibleCount})` : ''}`;
+  // Single comic: one item. A completed comic re-runs (force), otherwise it would
+  // be skipped by the incremental default.
+  if (isSingle) {
+    const text = isProcessing ? 'Guided Detection Running…' : `${isProcessed ? 'Re-run' : 'Run'} Guided Detection`;
+    return createMenuItem(`${ICONS.BOOK}<span>${escapeHtml(text)}</span>`, async () => {
+      await triggerGuidedRunForScope(scope, target, label, isProcessed);
+    }, {
+      disabled: isProcessing,
+      opacity: isProcessing ? '0.6' : null
+    });
+  }
 
-  return createMenuItem(`${ICONS.BOOK}<span>${escapeHtml(text)}</span>`, async () => {
-    await triggerGuidedRunForScope(scope, target, label);
-  }, {
-    disabled: isProcessing,
-    opacity: isProcessing ? '0.6' : null
-  });
+  // Multi-comic scope (series / publisher / folder / library): offer both
+  //   "Run"       — incremental; count = comics still needing detection
+  //   "Force Re-run" — every comic in scope (count = total), incl. completed
+  const pendingCount = comicsArray.filter(needsGuidedDetection).length;
+
+  const frag = document.createDocumentFragment();
+  frag.appendChild(createMenuItem(
+    `${ICONS.BOOK}<span>${escapeHtml(`Run Guided Detection (${pendingCount})`)}</span>`,
+    async () => { await triggerGuidedRunForScope(scope, target, label, false); },
+    { disabled: pendingCount === 0, opacity: pendingCount === 0 ? '0.6' : null }
+  ));
+  frag.appendChild(createMenuItem(
+    `${ICONS.BOOK}<span>${escapeHtml(`Force Re-run Guided Detection (${totalCount})`)}</span>`,
+    async () => { await triggerGuidedRunForScope(scope, target, label, true); }
+  ));
+  return frag;
 }
 
 /**
@@ -246,20 +271,23 @@ function createReadingListItem(comics) {
 }
 
 // Trigger the server-side guided panel detector for a given scope.
-async function triggerGuidedRunForScope(scope, target, label) {
+// force=false (default): incremental — only comics without guided detection.
+// force=true: re-run detection for every comic in scope, including completed.
+async function triggerGuidedRunForScope(scope, target, label, force = false) {
   try {
     const base = state.API_BASE_URL || '';
     const res = await fetch(`${base}/api/v1/guided/run-scope`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ scope, target })
+      body: JSON.stringify({ scope, target, force: !!force })
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
       alert(data.message || `Could not start guided detection for ${label}.`);
       return false;
     }
-    alert(`Guided detection started for ${label}.\nWatch progress under Settings → Guided View.`);
+    const mode = force ? 're-run (all comics)' : 'new comics only';
+    alert(`Guided detection started for ${label} — ${mode}.\nWatch progress under Settings → Guided View.`);
     return true;
   } catch (e) {
     alert(`Failed to start guided detection: ${e.message || e}`);

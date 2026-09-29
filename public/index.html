@@ -380,9 +380,10 @@
             <div class="border border-gray-700 rounded-lg p-4">
               <h5 class="text-md font-semibold mb-3">Manual Run</h5>
               <p class="text-sm text-gray-400 mb-3">Process all pending and failed comics across libraries, traversing in folder hierarchy order (Library → Publisher → Series → Issue).</p>
-              <div class="flex gap-2">
+              <div class="flex flex-wrap gap-2">
                 <button id="guided-run-btn" class="bg-red-600 hover:bg-red-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-bold py-2 px-4 rounded-full transition-colors">Run Now</button>
-                <button id="guided-cancel-btn" class="bg-red-600 hover:bg-red-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-bold py-2 px-4 rounded-full transition-colors" disabled>Cancel</button>
+                <button id="guided-cancel-current-btn" class="bg-amber-600 hover:bg-amber-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-bold py-2 px-4 rounded-full transition-colors" disabled>Cancel Current</button>
+                <button id="guided-cancel-btn" class="bg-red-600 hover:bg-red-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-bold py-2 px-4 rounded-full transition-colors" disabled>Cancel All</button>
               </div>
             </div>
 

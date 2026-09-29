@@ -12,7 +12,8 @@ const SETTINGS_KEYS = {
 
 const state = {
   isRunning: false,
-  isCancelled: false,
+  isCancelled: false,   // cancel the whole batch: stop worker + clear queue
+  cancelCurrent: false, // skip just the in-flight comic, then continue
   current: null,        // { id, name, index, total }
   queue: [],            // array of comic rows
   startedAt: null,
@@ -129,7 +130,7 @@ async function processComic(comic) {
   guidedLog('INFO', `   model: ${type}`);
   const startedAt = Date.now();
   const result = await panelDetector.processComic(comic.id, comic.path, type, {
-    isCancelled: () => state.isCancelled
+    isCancelled: () => state.isCancelled || state.cancelCurrent
   });
   const secs = Math.round((Date.now() - startedAt) / 1000);
   guidedLog('INFO', `   pages ${result.pagesProcessed}/${result.pageCount}` +
@@ -151,15 +152,16 @@ async function runWorker() {
     while (state.queue.length > 0 && !state.isCancelled) {
       const comic = state.queue[0]; // Peek at first item
       const total = state.queue.length;
-      
-      state.current = { 
-        id: comic.id, 
-        name: comic.name, 
-        path: comic.path, 
-        index: 1, 
-        total: total 
+      state.cancelCurrent = false;  // fresh per-item skip flag
+
+      state.current = {
+        id: comic.id,
+        name: comic.name,
+        path: comic.path,
+        index: 1,
+        total: total
       };
-      
+
       guidedLog('INFO', `Processing: ${comic.name} (${total} remaining in queue)`);
 
       try {
@@ -174,14 +176,25 @@ async function runWorker() {
         );
         guidedLog('INFO', `   ✓ Completed (${result.panels} panels)`);
       } catch (err) {
-        await dbRun(
-          `UPDATE comics SET guidedViewStatus = 'failed', guidedViewError = ? WHERE id = ?`,
-          [String(err.message || err).slice(0, 500), comic.id]
-        );
-        guidedLog('ERROR', `   ✗ Failed: ${err.message || err}`);
+        if (state.isCancelled || state.cancelCurrent) {
+          // Not a real failure — the user skipped this comic. Leave it undone
+          // (pending) so it can be re-run later.
+          await dbRun(
+            `UPDATE comics SET guidedViewStatus = 'pending', guidedViewError = NULL WHERE id = ?`,
+            [comic.id]
+          ).catch(() => {});
+          guidedLog('WARN', `   ⦸ Cancelled: ${comic.name}`);
+        } else {
+          await dbRun(
+            `UPDATE comics SET guidedViewStatus = 'failed', guidedViewError = ? WHERE id = ?`,
+            [String(err.message || err).slice(0, 500), comic.id]
+          );
+          guidedLog('ERROR', `   ✗ Failed: ${err.message || err}`);
+        }
       }
 
       state.queue.shift(); // Remove processed item
+      state.cancelCurrent = false; // consumed; keep going to the next item
     }
     
     if (state.isCancelled) {
@@ -220,17 +233,24 @@ async function startRun() {
   return true;
 }
 
-// Scoped run — process only comics matching {type, target}.
-// For scoped runs we also include 'completed' in the eligible statuses so that
-// "Run again" on a single comic / series / publisher / library works as expected.
-async function startRunForScope(type, target) {
+// Eligible guidedViewStatus values for a scoped run.
+//   incremental (default): only comics that still need detection.
+//   force: also re-run comics already 'completed'.
+function getScopeStatuses(force) {
+  return force ? ['pending', 'failed', 'completed'] : ['pending', 'failed'];
+}
+
+// Scoped run — process comics matching {type, target}.
+// Incremental by default (skips already-detected comics); pass { force: true }
+// to re-run everything in scope, including completed comics.
+async function startRunForScope(type, target, options = {}) {
   const validTypes = ['comic', 'series', 'publisher', 'library'];
   if (!validTypes.includes(type) || !target) {
     guidedLog('ERROR', `Invalid scope: type=${type} target=${target}`);
     return false;
   }
-  
-  const scope = { type, target, statuses: ['pending', 'failed', 'completed'] };
+
+  const scope = { type, target, statuses: getScopeStatuses(!!options.force) };
   const newItems = await buildQueue(scope);
   
   // Filter out items already in queue
@@ -248,12 +268,29 @@ async function startRunForScope(type, target) {
   return true;
 }
 
-function cancelRun() {
-  dbRun("UPDATE comics SET guidedViewStatus = 'pending' WHERE guidedViewStatus = 'processing'").catch(() => {});
-  if (!state.isRunning) return false;
-  state.isCancelled = true;
-  guidedLog('WARN', 'Cancellation requested; finishing current item then stopping');
+// Skip only the comic currently being processed; the worker then continues with
+// the rest of the queue.
+function cancelCurrent() {
+  if (!state.isRunning || !state.current) return false;
+  state.cancelCurrent = true;
+  guidedLog('WARN', `Skipping current job: ${state.current.name}`);
   return true;
+}
+
+// Cancel the entire batch: drop every queued job and stop the worker after the
+// in-flight comic unwinds.
+function cancelAll() {
+  const cleared = state.queue.length;
+  state.queue = [];
+  if (state.isRunning) state.isCancelled = true;
+  dbRun("UPDATE comics SET guidedViewStatus = 'pending' WHERE guidedViewStatus = 'processing'").catch(() => {});
+  guidedLog('WARN', `Cancel-all requested: cleared ${cleared} queued job(s); stopping current item.`);
+  return state.isRunning || cleared > 0;
+}
+
+// Backward-compatible alias — the original single "cancel" now cancels the batch.
+function cancelRun() {
+  return cancelAll();
 }
 
 // Called from library scan completion when settings.autoOnAdd is on.
@@ -322,7 +359,11 @@ module.exports = {
   initialize,
   startRun,
   startRunForScope,
+  getScopeStatuses,
+  buildQueue,
   cancelRun,
+  cancelCurrent,
+  cancelAll,
   getStatus,
   getSettings,
   onLibraryScanComplete,
