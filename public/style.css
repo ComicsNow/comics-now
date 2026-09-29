@@ -596,11 +596,11 @@ body.is-offline .comic-context-menu-item.hide-offline {
     left: 50%;
     transform: translateX(-50%);
     display: grid;
-    grid-template-columns: auto auto auto auto auto;
+    grid-template-columns: auto auto minmax(0, auto) auto auto auto;
     align-items: center;
     justify-items: center;
     column-gap: 0.75rem;
-    width: min(500px, calc(100% - 32px));
+    width: min(540px, calc(100% - 32px));
     padding: 0.25rem 1rem;
     border-radius: 9999px;
     background-color: rgba(0, 0, 0, 0.75);
@@ -808,10 +808,10 @@ body.is-offline .comic-context-menu-item.hide-offline {
 @media (max-width: 640px) {
     .fullscreen-info-bar {
         bottom: env(safe-area-inset-bottom);
-        width: min(420px, calc(100% - 16px));
-        padding: 0.25rem 1rem;
-        column-gap: 0.5rem;
-        grid-template-columns: auto minmax(0, auto) auto auto auto;
+        width: min(440px, calc(100% - 16px));
+        padding: 0.25rem 0.75rem;
+        column-gap: 0.35rem;
+        grid-template-columns: auto auto minmax(0, auto) auto auto auto;
     }
 
     .fullscreen-progress-indicator {
@@ -2910,3 +2910,214 @@ body.eink-color-mode #bubble-magnifier-img {
     color: var(--paper-dim) !important;
 }
 
+
+/* ==========================================================================
+   Comic Page Preview Grid Navigator & Modal Overlay
+   (overlay is created on open and removed on close — nothing lingers)
+   ========================================================================== */
+
+.comic-page-grid-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 95;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+    box-sizing: border-box;
+}
+
+.comic-page-grid-backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.85);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    cursor: pointer;
+}
+
+.comic-page-grid-modal {
+    position: relative;
+    z-index: 1;
+    width: 100%;
+    max-width: 900px;
+    max-height: 85vh;
+    display: flex;
+    flex-direction: column;
+    background-color: #111827;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 1rem;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.75);
+    overflow: hidden;
+    color: #f3f4f6;
+}
+
+.comic-page-grid-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.75rem 1.25rem;
+    background: rgba(31, 41, 55, 0.7);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.comic-page-grid-title-group {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.comic-page-grid-icon { font-size: 1.25rem; color: #22d3ee; }
+
+.comic-page-grid-title {
+    font-weight: 600;
+    font-size: 1rem;
+    color: #f9fafb;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 320px;
+}
+
+.comic-page-grid-count {
+    font-size: 0.8rem;
+    padding: 0.15rem 0.5rem;
+    border-radius: 9999px;
+    background: rgba(255, 255, 255, 0.1);
+    color: #9ca3af;
+    white-space: nowrap;
+}
+
+.comic-page-grid-close {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    border-radius: 9999px;
+    background: rgba(255, 255, 255, 0.1);
+    border: none;
+    color: #e5e7eb;
+    font-size: 1.5rem;
+    line-height: 1;
+    cursor: pointer;
+    transition: background 0.15s ease, transform 0.1s ease;
+}
+
+.comic-page-grid-close:hover { background: rgba(239, 68, 68, 0.8); color: white; }
+.comic-page-grid-close:active { transform: scale(0.92); }
+
+.comic-page-grid-scroll {
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 0.75rem;
+    flex: 1 1 auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+.comic-page-grid-scroll::-webkit-scrollbar { width: 6px; }
+.comic-page-grid-scroll::-webkit-scrollbar-track { background: rgba(0, 0, 0, 0.2); }
+.comic-page-grid-scroll::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.25); border-radius: 3px; }
+
+.comic-page-grid-items {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.6rem;
+}
+
+@media (min-width: 640px) { .comic-page-grid-items { grid-template-columns: repeat(4, 1fr); gap: 0.75rem; } }
+@media (min-width: 860px) { .comic-page-grid-items { grid-template-columns: repeat(5, 1fr); gap: 1rem; } }
+@media (min-width: 1100px) { .comic-page-grid-items { grid-template-columns: repeat(6, 1fr); gap: 1rem; } }
+
+.comic-page-preview-card {
+    display: flex;
+    flex-direction: column;
+    background: #1f2937;
+    border: 2px solid transparent;
+    border-radius: 0.5rem;
+    padding: 0.25rem;
+    cursor: pointer;
+    transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+    text-align: center;
+    color: inherit;
+}
+
+.comic-page-preview-card:hover {
+    transform: translateY(-2px);
+    border-color: rgba(255, 255, 255, 0.4);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+}
+
+.comic-page-preview-card:active { transform: scale(0.96); }
+
+.comic-page-preview-card.active-page-card {
+    border-color: #22d3ee;
+    background: rgba(8, 51, 68, 0.6);
+    box-shadow: 0 0 16px rgba(34, 211, 238, 0.45);
+}
+
+.comic-page-preview-thumb-wrap {
+    width: 100%;
+    aspect-ratio: 1 / 1.5;
+    background: #111827;
+    border-radius: 0.375rem;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.comic-page-preview-img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+.comic-page-preview-number { font-size: 0.75rem; font-weight: 600; margin-top: 0.25rem; color: #9ca3af; }
+
+.comic-page-preview-card.active-page-card .comic-page-preview-number { color: #22d3ee; font-weight: 700; }
+
+/* ==========================================================================
+   Downloads panel — In Progress / Downloaded / Failed tabs
+   ========================================================================== */
+.dl-tabs {
+    display: flex;
+    gap: 2px;
+    padding: 6px 8px 0;
+    background: rgba(17, 24, 39, 0.6);
+}
+.dl-tab {
+    flex: 1 1 auto;
+    padding: 6px 4px;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: #9ca3af;
+    background: transparent;
+    border: none;
+    border-bottom: 2px solid transparent;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: color 0.15s ease, border-color 0.15s ease;
+}
+.dl-tab:hover { color: #e5e7eb; }
+.dl-tab.active { color: #22d3ee; border-bottom-color: #22d3ee; }
+.dl-tab-empty {
+    padding: 18px 12px;
+    text-align: center;
+    font-size: 12px;
+    color: #6b7280;
+}
+.dl-action {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    color: #9ca3af;
+    cursor: pointer;
+    border-radius: 6px;
+    transition: color 0.15s ease, background 0.15s ease;
+}
+.dl-action:hover { color: #fff; background: rgba(255, 255, 255, 0.1); }
+.dl-action svg { width: 14px; height: 14px; fill: currentColor; stroke: none; }
