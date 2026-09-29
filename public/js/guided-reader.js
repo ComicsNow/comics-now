@@ -128,8 +128,10 @@ function applyStatusToUI(s) {
 
   const runBtn = el('guided-run-btn');
   const cancelBtn = el('guided-cancel-btn');
+  const cancelCurrentBtn = el('guided-cancel-current-btn');
   if (runBtn) runBtn.disabled = !!s.isRunning;
   if (cancelBtn) cancelBtn.disabled = !s.isRunning;
+  if (cancelCurrentBtn) cancelCurrentBtn.disabled = !s.isRunning;
 }
 
 function applySettingsToUI(settings) {
@@ -254,9 +256,18 @@ function bindOnce() {
     } catch (_) {}
   });
 
+  // Cancel all: drop the entire queue and stop.
   el('guided-cancel-btn')?.addEventListener('click', async () => {
     try {
       await fetch(api('/api/v1/guided/cancel'), { method: 'POST' });
+      fetchStatus();
+    } catch (_) {}
+  });
+
+  // Cancel current: skip only the in-flight comic, keep processing the rest.
+  el('guided-cancel-current-btn')?.addEventListener('click', async () => {
+    try {
+      await fetch(api('/api/v1/guided/cancel-current'), { method: 'POST' });
       fetchStatus();
     } catch (_) {}
   });

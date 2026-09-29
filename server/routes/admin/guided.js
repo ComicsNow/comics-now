@@ -57,27 +57,38 @@ module.exports = function attach(router, deps) {
 
   router.post('/api/v1/guided/run-scope', (req, res) => {
     try {
-      const { scope, target } = req.body || {};
+      const { scope, target, force } = req.body || {};
       const validScopes = ['comic', 'series', 'publisher', 'library'];
       if (!validScopes.includes(scope) || !target || typeof target !== 'string') {
         return res.status(400).json({ ok: false, message: 'scope must be comic|series|publisher|library and target must be a non-empty string' });
       }
-      const started = guidedReader.startRunForScope(scope, target);
+      const started = guidedReader.startRunForScope(scope, target, { force: !!force });
       if (!started) {
         return res.status(409).json({ ok: false, message: 'A guided run is already in progress' });
       }
-      res.json({ ok: true, started, scope, target });
+      res.json({ ok: true, started, scope, target, force: !!force });
     } catch (e) {
       res.status(400).json({ ok: false, message: formatErrorMessage(e, req, 'Failed to start scoped guided run') });
     }
   });
 
+  // Cancel the entire batch (drop the whole queue + stop).
   router.post('/api/v1/guided/cancel', (req, res) => {
     try {
-      const cancelled = guidedReader.cancelRun();
+      const cancelled = guidedReader.cancelAll();
       res.json({ ok: true, cancelled });
     } catch (e) {
       res.status(400).json({ ok: false, message: formatErrorMessage(e, req, 'Failed to cancel guided run') });
+    }
+  });
+
+  // Skip only the currently-processing comic; the rest of the queue continues.
+  router.post('/api/v1/guided/cancel-current', (req, res) => {
+    try {
+      const cancelled = guidedReader.cancelCurrent();
+      res.json({ ok: true, cancelled });
+    } catch (e) {
+      res.status(400).json({ ok: false, message: formatErrorMessage(e, req, 'Failed to cancel current job') });
     }
   });
 
