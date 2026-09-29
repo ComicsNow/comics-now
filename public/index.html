@@ -555,6 +555,11 @@
 
         <!-- Settings & Sources Tab -->
         <div id="ct-content-settings" class="hidden">
+          <div class="mb-4">
+            <label for="ct-scan-folder-input" class="block mb-1 text-sm font-semibold">Scan Folder</label>
+            <input type="text" id="ct-scan-folder-input" class="w-full bg-gray-700 text-white p-2 rounded-lg text-sm font-mono" placeholder="/path/to/incoming/comics">
+            <p class="text-xs text-gray-500 mt-1">The folder ComicTagger scans for new comics to tag. Absolute path on the server.</p>
+          </div>
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
             <div>
               <label for="ct-schedule-input" class="block mb-1 text-sm font-semibold">Automated Scan Schedule (minutes)</label>
@@ -677,7 +682,7 @@
 
         <!-- Management Tab -->
         <div id="ct-content-management" class="hidden">
-          <!-- Management sub-tabs -->
+          <!-- Management sub-tabs: Operations, Errors, Name, Folder -->
           <div class="flex overflow-x-auto border-b border-gray-700 mb-4 scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-gray-800 flex-shrink-0">
             <button id="mgmt-tab-operations" class="tab-button active py-2 px-4 text-xs sm:text-sm whitespace-nowrap">
               <span>Operations</span>
@@ -685,14 +690,20 @@
             <button id="mgmt-tab-errors" class="tab-button py-2 px-4 text-xs sm:text-sm whitespace-nowrap">
               <span>Errors</span>
             </button>
+            <button id="mgmt-tab-name" class="tab-button py-2 px-4 text-xs sm:text-sm whitespace-nowrap">
+              <span>Name</span>
+            </button>
+            <button id="mgmt-tab-folder" class="tab-button py-2 px-4 text-xs sm:text-sm whitespace-nowrap">
+              <span>Folder</span>
+            </button>
           </div>
 
           <!-- Operations panel -->
           <div id="mgmt-content-operations">
             <div class="space-y-6">
               <div class="border border-gray-700 rounded-lg p-4">
-                <h5 class="text-md font-semibold mb-2 text-white">Rename CBZ Files</h5>
-                <p class="text-sm text-gray-400 mb-3">Rename CBZ files in the comics directory based on ComicInfo.xml metadata.</p>
+                <h5 class="text-md font-semibold mb-2 text-white">Rename Inbox Comics</h5>
+                <p class="text-sm text-gray-400 mb-3">Rename freshly-tagged comics in the scan/inbox folder using the saved Naming rules. No confirmation needed. (To rename a whole library, use the Name tab.)</p>
                 <div class="flex gap-2 mb-2">
                   <button id="rename-cbz-btn" class="flex-1 sm:flex-initial bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-full transition-colors">Rename</button>
                   <button id="rename-clear-output" class="flex-1 sm:flex-initial bg-gray-600 hover:bg-gray-500 text-white font-bold py-2 px-4 rounded-full transition-colors">Clear Output</button>
@@ -701,8 +712,8 @@
                 <div id="rename-status" class="text-sm mt-2"></div>
               </div>
               <div class="border border-gray-700 rounded-lg p-4">
-                <h5 class="text-md font-semibold mb-2 text-white">Move Comics</h5>
-                <p class="text-sm text-gray-400 mb-3">Move CBZ files from comics/yes to organized publisher/series folders in the comics library.</p>
+                <h5 class="text-md font-semibold mb-2 text-white">Move Inbox Comics into Library</h5>
+                <p class="text-sm text-gray-400 mb-3">Move freshly-tagged comics from the scan/inbox folder into a library using the saved Folder hierarchy. No confirmation needed. (To reorganize a whole library, use the Folder tab.)</p>
                 <div class="flex gap-2 mb-2">
                   <button id="move-comics-btn" class="flex-1 sm:flex-initial bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-full transition-colors">Move Comic</button>
                   <button id="move-clear-output" class="flex-1 sm:flex-initial bg-gray-600 hover:bg-gray-500 text-white font-bold py-2 px-4 rounded-full transition-colors">Clear Output</button>
@@ -720,6 +731,107 @@
               <button id="errors-refresh-btn" class="text-xs text-red-400 hover:text-red-300 transition-colors">Refresh</button>
             </div>
             <div id="errors-list" class="space-y-2 max-h-96 overflow-y-auto pr-1"></div>
+          </div>
+
+          <!-- Name Panel (naming rules configuration) -->
+          <div id="mgmt-content-name" class="hidden">
+            <div class="space-y-4">
+              <div>
+                <h4 class="text-md font-bold text-white mb-1">Comic File Naming Rules</h4>
+                <p class="text-xs text-gray-400">Reorder tokens, toggle metadata inclusion in the filename, and set mandatory fields. Save your rules, then use "Batch: Rename an Entire Library" below to apply them.</p>
+              </div>
+              <div class="bg-gray-950 border border-gray-700 rounded-lg p-3">
+                <div class="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-1">Live Filename Preview</div>
+                <div id="naming-live-preview" class="font-mono text-sm text-green-400 break-all select-all">--</div>
+              </div>
+              <div class="border border-gray-700 rounded-lg p-3 bg-gray-900/60">
+                <div class="flex justify-between items-center mb-3">
+                  <span class="text-xs font-semibold text-gray-300 uppercase tracking-wider">Metadata Tokens Order &amp; Rules</span>
+                  <button id="save-naming-rules-btn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-1 px-3 rounded-full text-xs transition-colors">Save Naming Rules</button>
+                </div>
+                <div id="naming-tokens-list" class="space-y-2">
+                  <!-- Injected dynamically by comics-management.js -->
+                </div>
+              </div>
+
+              <!-- Whole-library batch rename -->
+              <div class="border border-amber-700/50 rounded-lg p-3 bg-amber-900/10">
+                <div class="text-xs font-semibold text-amber-300 uppercase tracking-wider mb-2">Batch: Rename an Entire Library</div>
+                <p class="text-xs text-gray-400 mb-2">Applies the saved naming rules to every comic in the chosen library. Requires typed confirmation.</p>
+                <div class="flex flex-col sm:flex-row gap-2">
+                  <select id="rename-library-select" class="flex-1 bg-gray-800 text-gray-200 border border-gray-700 rounded text-sm px-2 py-1.5 focus:outline-none">
+                    <!-- Populated from /api/v1/comics-directories -->
+                  </select>
+                  <button id="rename-library-btn" class="bg-red-600 hover:bg-red-700 text-white font-bold py-1.5 px-4 rounded-full text-sm transition-colors whitespace-nowrap">Rename Library</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Folder Panel (folder hierarchy configuration) -->
+          <div id="mgmt-content-folder" class="hidden">
+            <div class="space-y-4">
+              <div>
+                <h4 class="text-md font-bold text-white mb-1">Folder Hierarchy Rules</h4>
+                <p class="text-xs text-gray-400">Configure directory hierarchy levels (e.g. Publisher / Series or Publisher / Writer / Series). Save, then use "Batch: Reorganize an Entire Library" below to apply them.</p>
+              </div>
+              <div class="bg-gray-950 border border-gray-700 rounded-lg p-3">
+                <div class="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-1">Live Folder Path Preview</div>
+                <div id="folder-live-preview" class="font-mono text-sm text-blue-400 break-all select-all">--</div>
+              </div>
+              <div class="border border-gray-700 rounded-lg p-3 bg-gray-900/60">
+                <div class="flex justify-between items-center mb-3">
+                  <span class="text-xs font-semibold text-gray-300 uppercase tracking-wider">Hierarchy Levels</span>
+                  <div class="flex gap-2">
+                    <select id="add-folder-token-select" class="bg-gray-800 text-gray-200 border border-gray-700 rounded text-xs px-2 py-1 focus:outline-none">
+                      <option value="publisher">Publisher</option>
+                      <option value="writer">Writer</option>
+                      <option value="series">Series</option>
+                      <option value="volume">Volume</option>
+                      <option value="year">Year</option>
+                    </select>
+                    <button id="add-folder-level-btn" class="bg-gray-700 hover:bg-gray-600 text-white font-bold py-1 px-3 rounded-full text-xs transition-colors">+ Add Level</button>
+                    <button id="save-folder-rules-btn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-1 px-3 rounded-full text-xs transition-colors">Save Folder Rules</button>
+                  </div>
+                </div>
+                <div id="folder-levels-list" class="space-y-2">
+                  <!-- Injected dynamically by comics-management.js -->
+                </div>
+              </div>
+
+              <!-- Whole-library batch reorganize -->
+              <div class="border border-amber-700/50 rounded-lg p-3 bg-amber-900/10">
+                <div class="text-xs font-semibold text-amber-300 uppercase tracking-wider mb-2">Batch: Reorganize an Entire Library</div>
+                <p class="text-xs text-gray-400 mb-2">Moves every comic in the chosen library into the saved folder hierarchy. Requires typed confirmation.</p>
+                <div class="flex flex-col sm:flex-row gap-2">
+                  <select id="move-library-select" class="flex-1 bg-gray-800 text-gray-200 border border-gray-700 rounded text-sm px-2 py-1.5 focus:outline-none">
+                    <!-- Populated from /api/v1/comics-directories -->
+                  </select>
+                  <button id="move-library-btn" class="bg-red-600 hover:bg-red-700 text-white font-bold py-1.5 px-4 rounded-full text-sm transition-colors whitespace-nowrap">Reorganize Library</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Batch Operations Safety Confirmation Modal -->
+          <div id="mgmt-confirm-modal" class="hidden fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+            <div class="bg-gray-800 border-2 border-amber-500 rounded-xl max-w-md w-full p-6 shadow-2xl space-y-4">
+              <div class="flex items-center gap-3 text-amber-400">
+                <svg class="w-8 h-8 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+                <h4 id="mgmt-confirm-title" class="text-lg font-bold text-white">Safety Warning</h4>
+              </div>
+              <p id="mgmt-confirm-warning" class="text-sm text-gray-300">
+                This batch operation will modify files across your entire comic collection. This action cannot be easily undone.
+              </p>
+              <div class="bg-gray-900 p-3 rounded border border-gray-700 text-xs text-gray-400">
+                To confirm, please type exactly: <span class="font-mono font-bold text-amber-300 select-all">i want to do this</span>
+              </div>
+              <input type="text" id="mgmt-confirm-input" placeholder="Type: i want to do this" class="w-full bg-gray-950 border border-gray-700 rounded-lg px-3 py-2 text-white font-mono text-sm focus:border-amber-500 focus:outline-none">
+              <div class="flex justify-end gap-3 pt-2">
+                <button id="mgmt-confirm-cancel-btn" class="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg text-sm font-medium transition-colors">Cancel</button>
+                <button id="mgmt-confirm-proceed-btn" disabled class="px-5 py-2 bg-red-600 hover:bg-red-700 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-lg text-sm font-bold transition-colors">Confirm &amp; Proceed</button>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -884,6 +996,17 @@
           title="Next page"
         >
           →
+        </button>
+
+        <!-- Page Preview Grid button -->
+        <button
+          id="fullscreen-page-grid-btn"
+          type="button"
+          class="fullscreen-nav-button"
+          aria-label="View all pages in a grid"
+          title="Page preview grid"
+        >
+          <span aria-hidden="true">⊞</span>
         </button>
 
         <!-- Close button -->
@@ -1355,6 +1478,15 @@
                 aria-label="Enter a page number to jump to"
               />
             </div>
+            <button
+              id="page-grid-btn"
+              type="button"
+              class="pill-button bg-gray-700 hover:bg-gray-600 text-white transition-colors text-sm font-semibold px-2.5 py-1"
+              title="Page preview grid"
+              aria-label="View all pages in a grid"
+            >
+              ⊞
+            </button>
           </div>
           <button id="next-page-btn" type="button" class="pill-button bg-gray-700 hover:bg-gray-600 text-white transition-colors" aria-label="Next page">→</button>
         </div>
@@ -1394,6 +1526,15 @@
                 aria-label="Enter a page number to jump to"
               />
             </div>
+            <button
+              id="page-grid-btn-bottom"
+              type="button"
+              class="pill-button bg-gray-700 hover:bg-gray-600 text-white transition-colors text-sm font-semibold px-2.5 py-1"
+              title="Page preview grid"
+              aria-label="View all pages in a grid"
+            >
+              ⊞
+            </button>
           </div>
           <button id="next-page-btn-bottom" type="button" class="pill-button bg-gray-700 hover:bg-gray-600 text-white transition-colors" aria-label="Next page">→</button>
         </div>
