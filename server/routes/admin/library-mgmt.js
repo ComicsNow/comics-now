@@ -205,10 +205,12 @@ module.exports = function attach(router, deps) {
         return res.status(500).json({ ok: false, message: 'No comics directories configured' });
       }
 
+      const comicsLocation = getConfig().comicsLocation;
       const payload = directories.map(dir => ({
         path: dir,
         name: path.basename(dir),
-        fullPath: dir
+        fullPath: dir,
+        isInbox: dir === comicsLocation // the scan/inbox folder, not a real library
       }));
 
       res.json({ ok: true, directories: payload });
@@ -219,36 +221,54 @@ module.exports = function attach(router, deps) {
 
   router.post('/api/v1/move-comics', requireAdmin, async (req, res) => {
     try {
+      const body = req.body || {};
       const config = getConfig();
       const comicsLocation = config.comicsLocation;
-
-      if (!fs.existsSync(comicsLocation)) {
-        return res.status(404).json({ ok: false, message: 'Inbox directory not found' });
-      }
 
       const directories = getComicsDirectories();
       if (!directories || directories.length === 0) {
         return res.status(500).json({ ok: false, message: 'No comics directories configured' });
       }
 
+      // Two scopes:
+      //  - Inbox (Operations tab): move freshly-tagged comics from comicsLocation
+      //    into a target library. No confirmation.
+      //  - Whole library (Folder tab): re-organise an entire library in place
+      //    (source === dest === libraryPath). Requires the typed confirmation.
+      const libraryPath = typeof body.libraryPath === 'string' ? body.libraryPath.trim() : '';
+      let sourceDir;
       let destBaseDir;
-      if (req.body.targetDirectory) {
-        if (!directories.includes(req.body.targetDirectory)) {
-          return res.status(400).json({ ok: false, message: 'Invalid target directory' });
+      if (libraryPath) {
+        if (!directories.includes(libraryPath)) {
+          return res.status(400).json({ ok: false, message: 'Unknown library path' });
         }
-        destBaseDir = req.body.targetDirectory;
+        if (body.confirmation !== 'i want to do this') {
+          return res.status(400).json({
+            ok: false,
+            message: 'Confirmation phrase "i want to do this" required for a whole-library reorganize.'
+          });
+        }
+        sourceDir = libraryPath;
+        destBaseDir = libraryPath;
       } else {
-        destBaseDir = directories[0];
+        sourceDir = comicsLocation;
+        destBaseDir = (body.targetDirectory && directories.includes(body.targetDirectory))
+          ? body.targetDirectory
+          : directories[0];
       }
 
-      log('INFO', 'MOVE', `Starting comic move operation from ${comicsLocation} to ${destBaseDir}`);
+      if (!sourceDir || !fs.existsSync(sourceDir)) {
+        return res.status(404).json({ ok: false, message: 'Source directory not found' });
+      }
+
+      log('INFO', 'MOVE', `Starting comic move operation from ${sourceDir} to ${destBaseDir}`);
       moveLog(`Starting move operation to ${destBaseDir}`);
 
       const allowedFormats = deps.getAllowedFormats ? deps.getAllowedFormats() : 'cbz';
-      
+
       const comics = await dbAll(
         `SELECT id, path, name, metadata FROM comics WHERE tagStatus = 'successful' AND path LIKE ?`,
-        [`${comicsLocation}%`]
+        [`${sourceDir}%`]
       );
 
       const files = comics.filter(c => {
@@ -270,6 +290,10 @@ module.exports = function attach(router, deps) {
       let moved = 0;
       let errors = 0;
       const results = [];
+
+      const { THUMBNAILS_DIRECTORY, GUIDED_VIEW_DIR } = require('../../constants');
+      const { formatFolderPath, updateComicIdentity } = require('../../services/organization');
+      const folderRules = (deps.getFolderRules || require('../../config').getFolderRules)();
 
       for (const comicRecord of files) {
         const file = comicRecord.name;
@@ -297,9 +321,8 @@ module.exports = function attach(router, deps) {
             continue;
           }
 
-          const publisher = safeDirName(info.Publisher || 'Unknown Publisher');
-
-          const destDir = path.join(destBaseDir, publisher);
+          const relFolder = formatFolderPath(info, folderRules);
+          const destDir = path.join(destBaseDir, relFolder);
           if (!fs.existsSync(destDir)) {
             fs.mkdirSync(destDir, { recursive: true });
           }
@@ -312,45 +335,39 @@ module.exports = function attach(router, deps) {
             continue;
           }
 
-          try {
-            fs.renameSync(filePath, destPath);
-          } catch (renameErr) {
-            if (renameErr.code === 'EXDEV') {
-              fs.copyFileSync(filePath, destPath);
-              fs.unlinkSync(filePath);
-            } else {
-              throw renameErr;
-            }
-          }
-
-          // Move the adjacent ComicInfo.xml sidecar alongside the comic
-          const srcExt = path.extname(filePath);
-          const srcSidecar = path.join(path.dirname(filePath), path.basename(filePath, srcExt) + '.ComicInfo.xml');
-          if (fs.existsSync(srcSidecar)) {
-            const destSidecar = path.join(destDir, path.basename(destPath, path.extname(destPath)) + '.ComicInfo.xml');
-            try {
-              fs.renameSync(srcSidecar, destSidecar);
-            } catch (sErr) {
-              if (sErr.code === 'EXDEV') {
-                fs.copyFileSync(srcSidecar, destSidecar);
-                fs.unlinkSync(srcSidecar);
-              } else {
-                moveLog(`  ↳ ⚠ Failed to move sidecar for ${file}: ${sErr.message}`);
-              }
-            }
-          }
-
-          // Update database record immediately to preserve metadata and progress
           const oldId = comicRecord.id;
           const newId = createId(destPath);
           const newName = path.basename(destPath);
-          await dbRun(
-            'UPDATE comics SET id = ?, path = ?, name = ? WHERE id = ?',
-            [newId, destPath, newName, oldId]
-          );
+
+          await updateComicIdentity({
+            dbRun,
+            oldId,
+            newId,
+            oldPath: filePath,
+            newPath: destPath,
+            newName,
+            thumbnailsDir: THUMBNAILS_DIRECTORY,
+            guidedViewDir: GUIDED_VIEW_DIR
+          });
+
+          // Clean up old source directory if empty
+          let parent = path.dirname(filePath);
+          while (parent && parent !== comicsLocation && parent.startsWith(comicsLocation)) {
+            try {
+              const remaining = fs.readdirSync(parent);
+              if (remaining.length === 0) {
+                fs.rmdirSync(parent);
+                parent = path.dirname(parent);
+              } else {
+                break;
+              }
+            } catch (_) {
+              break;
+            }
+          }
 
           moved++;
-          moveLog(`✓ Moved: ${publisher}/${file}`);
+          moveLog(`✓ Moved: ${relFolder}/${file}`);
           results.push({ file, success: true, destination: destPath });
           log('INFO', 'MOVE', `Moved ${file} to ${destPath}`);
 

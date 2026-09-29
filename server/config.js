@@ -21,7 +21,9 @@ const DEFAULT_CONFIG = {
   taggerEnabledSources: ['src-comicvine', 'src-metron', 'src-gcd', 'src-lcg', 'src-goodreads', 'src-blackwells', 'src-waterstones', 'src-googlebooks', 'src-amazon'],
   metronUser: '',
   metronPassword: '',
-  googleBooksApiKey: ''
+  googleBooksApiKey: '',
+  namingRules: null,
+  folderRules: null
 };
 
 let config = { ...DEFAULT_CONFIG };
@@ -462,6 +464,26 @@ function setTaggerForceReprocess(val, skipSave = false) {
   if (!skipSave) saveConfigToDisk();
 }
 
+function getNamingRules() {
+  const { DEFAULT_NAMING_RULES } = require('./services/organization');
+  return config.namingRules || DEFAULT_NAMING_RULES;
+}
+
+function setNamingRules(rules, skipSave = false) {
+  config.namingRules = rules;
+  if (!skipSave) saveConfigToDisk();
+}
+
+function getFolderRules() {
+  const { DEFAULT_FOLDER_RULES } = require('./services/organization');
+  return config.folderRules || DEFAULT_FOLDER_RULES;
+}
+
+function setFolderRules(rules, skipSave = false) {
+  config.folderRules = rules;
+  if (!skipSave) saveConfigToDisk();
+}
+
 module.exports = {
   DEFAULT_CONFIG,
   loadConfigFromDisk,
@@ -513,6 +535,10 @@ module.exports = {
   getMetronPassword,
   setMetronPassword,
   getTaggerForceReprocess,
-  setTaggerForceReprocess
+  setTaggerForceReprocess,
+  getNamingRules,
+  setNamingRules,
+  getFolderRules,
+  setFolderRules
 };
 
