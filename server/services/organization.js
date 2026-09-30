@@ -313,22 +313,25 @@ async function updateComicIdentity({
       [newId, newPath, newName, newThumbFilename, newGvPath, oldId]
     );
 
-    // Update cascading/related tables
+    // Update cascading/related tables — only those present in this schema, so we
+    // don't log "no such table" errors for tables a deployment doesn't have.
+    let tables = new Set();
     try {
-      await dbRun('UPDATE progress SET comicId = ? WHERE comicId = ?', [newId, oldId]);
+      const { dbAll } = require('../db');
+      const rows = await dbAll("SELECT name FROM sqlite_master WHERE type = 'table'");
+      tables = new Set(rows.map(r => r.name));
     } catch (_) {}
-    try {
-      await dbRun('UPDATE device_progress SET comicId = ? WHERE comicId = ?', [newId, oldId]);
-    } catch (_) {}
-    try {
-      await dbRun('UPDATE reading_list_items SET comicId = ? WHERE comicId = ?', [newId, oldId]);
-    } catch (_) {}
-    try {
-      await dbRun('UPDATE user_bookmarks SET comicId = ? WHERE comicId = ?', [newId, oldId]);
-    } catch (_) {}
-    try {
-      await dbRun('UPDATE reading_mode_preferences SET targetId = ? WHERE targetId = ? AND preferenceType = ?', [newId, oldId, 'comic']);
-    } catch (_) {}
+    const updateIfTable = async (table, sql, params) => {
+      if (!tables.has(table)) return;
+      try { await dbRun(sql, params); } catch (_) {}
+    };
+
+    await updateIfTable('progress', 'UPDATE progress SET comicId = ? WHERE comicId = ?', [newId, oldId]);
+    await updateIfTable('device_progress', 'UPDATE device_progress SET comicId = ? WHERE comicId = ?', [newId, oldId]);
+    await updateIfTable('reading_list_items', 'UPDATE reading_list_items SET comicId = ? WHERE comicId = ?', [newId, oldId]);
+    await updateIfTable('user_comic_status', 'UPDATE user_comic_status SET comicId = ? WHERE comicId = ?', [newId, oldId]);
+    await updateIfTable('user_bookmarks', 'UPDATE user_bookmarks SET comicId = ? WHERE comicId = ?', [newId, oldId]);
+    await updateIfTable('reading_mode_preferences', 'UPDATE reading_mode_preferences SET targetId = ? WHERE targetId = ? AND preferenceType = ?', [newId, oldId, 'comic']);
   }
 }
 

@@ -23,6 +23,25 @@ module.exports = function attach(router, deps) {
   const path = require('path');
   const { THUMBNAILS_DIRECTORY, GUIDED_VIEW_DIR } = require('../../constants');
 
+  // Which reference tables actually exist in this deployment's schema (cached).
+  // Guards against "no such table" errors when a table isn't present.
+  let _existingTables = null;
+  async function existingTables() {
+    if (_existingTables) return _existingTables;
+    try {
+      const rows = await dbAll("SELECT name FROM sqlite_master WHERE type = 'table'");
+      _existingTables = new Set(rows.map(r => r.name));
+    } catch {
+      _existingTables = new Set();
+    }
+    return _existingTables;
+  }
+
+  async function runIfTable(tables, table, sql, params) {
+    if (!tables.has(table)) return;
+    try { await dbRun(sql, params); } catch (_) {}
+  }
+
   // Delete one comic's on-disk artifacts and every DB reference to it.
   async function purgeComicRow(c) {
     try {
@@ -37,14 +56,16 @@ module.exports = function attach(router, deps) {
     } catch (_) {}
 
     const id = c.id;
-    // Tables that may not exist in every deployment are ignored individually.
-    try { await dbRun('DELETE FROM progress WHERE comicId = ?', [id]); } catch (_) {}
-    try { await dbRun('DELETE FROM device_progress WHERE comicId = ?', [id]); } catch (_) {}
-    try { await dbRun('DELETE FROM reading_list_items WHERE comicId = ?', [id]); } catch (_) {}
-    try { await dbRun('DELETE FROM user_bookmarks WHERE comicId = ?', [id]); } catch (_) {}
-    try { await dbRun("DELETE FROM reading_mode_preferences WHERE targetId = ? AND preferenceType = 'comic'", [id]); } catch (_) {}
-    try { await dbRun("DELETE FROM user_library_access WHERE accessType = 'comic' AND accessValue = ?", [id]); } catch (_) {}
-    try { await dbRun('DELETE FROM comics WHERE id = ?', [id]); } catch (_) {}
+    const tables = await existingTables();
+    // Only touch tables that exist (schema varies across deployments).
+    await runIfTable(tables, 'progress', 'DELETE FROM progress WHERE comicId = ?', [id]);
+    await runIfTable(tables, 'device_progress', 'DELETE FROM device_progress WHERE comicId = ?', [id]);
+    await runIfTable(tables, 'reading_list_items', 'DELETE FROM reading_list_items WHERE comicId = ?', [id]);
+    await runIfTable(tables, 'user_comic_status', 'DELETE FROM user_comic_status WHERE comicId = ?', [id]);
+    await runIfTable(tables, 'user_bookmarks', 'DELETE FROM user_bookmarks WHERE comicId = ?', [id]);
+    await runIfTable(tables, 'reading_mode_preferences', "DELETE FROM reading_mode_preferences WHERE targetId = ? AND preferenceType = 'comic'", [id]);
+    await runIfTable(tables, 'user_library_access', "DELETE FROM user_library_access WHERE accessType = 'comic' AND accessValue = ?", [id]);
+    await runIfTable(tables, 'comics', 'DELETE FROM comics WHERE id = ?', [id]);
   }
 
   const normRoot = (p) => String(p || '').replace(/[/\\]+$/, '');
@@ -66,8 +87,9 @@ module.exports = function attach(router, deps) {
     );
     for (const c of comics) await purgeComicRow(c);
 
-    try { await dbRun("DELETE FROM user_library_access WHERE accessType = 'root_folder' AND accessValue = ?", [root]); } catch (_) {}
-    try { await dbRun("DELETE FROM user_library_access WHERE accessType = 'folder' AND (accessValue = ? OR accessValue LIKE ?)", [root, `${root}/%`]); } catch (_) {}
+    const tables = await existingTables();
+    await runIfTable(tables, 'user_library_access', "DELETE FROM user_library_access WHERE accessType = 'root_folder' AND accessValue = ?", [root]);
+    await runIfTable(tables, 'user_library_access', "DELETE FROM user_library_access WHERE accessType = 'folder' AND (accessValue = ? OR accessValue LIKE ?)", [root, `${root}/%`]);
 
     if (log && comics.length) log('INFO', 'LIBRARY', `Removed library ${root}: purged ${comics.length} comic(s) from DB`);
     return comics.length;

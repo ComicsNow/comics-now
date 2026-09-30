@@ -222,7 +222,6 @@ module.exports = function attach(router, deps) {
       try {
         rawPath = Buffer.from(encodedPath, 'base64').toString('utf-8');
         decodedPath = resolvePath(rawPath);
-        log('DEBUG', 'API', `Decoded folder path: ${decodedPath} (from raw: ${rawPath})`);
       } catch (e) {
         log('ERROR', 'API', `Invalid path encoding: ${encodedPath}`);
         return res.status(400).json({ ok: false, message: 'Invalid path encoding' });
