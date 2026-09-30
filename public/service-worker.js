@@ -816,9 +816,11 @@ self.addEventListener('backgroundfetchabort', (event) => {
   const bgFetch = event.registration;
   event.waitUntil((async () => {
     const comicId = bgFetchComicId(bgFetch);
+    // Abort == pause: mark the item paused (update-only, so a client-side cancel
+    // that already removed the row is a no-op). The page decides pause vs cancel.
     try {
       const db = await openDownloadDB();
-      await removeQueueItem(db, comicId);
+      await updateQueueItem(db, comicId, { status: 'paused' });
       if (db.close) db.close();
     } catch (_) {}
     await notifyClients({ type: 'download-aborted', comicId });

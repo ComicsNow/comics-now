@@ -6,7 +6,8 @@ const {
   partitionDownloads,
   selectExpired,
   computeBackoffMs,
-  nextRangeHeader
+  nextRangeHeader,
+  planBatch
 } = require('../public/js/offline/download-history.js');
 
 const HOUR = 60 * 60 * 1000;
@@ -93,5 +94,37 @@ describe('download-history: resumable Range header', () => {
   test('ignores invalid/negative offsets', () => {
     expect(nextRangeHeader(-5)).toBeNull();
     expect(nextRangeHeader(NaN)).toBeNull();
+  });
+});
+
+describe('download-history: planBatch (which items a batch action affects)', () => {
+  const items = [
+    { id: 'p', status: 'pending' },
+    { id: 'd', status: 'downloading' },
+    { id: 'z', status: 'paused' },
+    { id: 'c', status: 'completed' },
+    { id: 'e', status: 'error' }
+  ];
+
+  test('pause-all affects pending + downloading', () => {
+    expect(planBatch(items, 'pause-all').map(i => i.id).sort()).toEqual(['d', 'p']);
+  });
+
+  test('start-all affects paused only', () => {
+    expect(planBatch(items, 'start-all').map(i => i.id)).toEqual(['z']);
+  });
+
+  test('retry-failed affects errored only', () => {
+    expect(planBatch(items, 'retry-failed').map(i => i.id)).toEqual(['e']);
+  });
+
+  test('cancel-all affects pending + downloading + paused', () => {
+    expect(planBatch(items, 'cancel-all').map(i => i.id).sort()).toEqual(['d', 'p', 'z']);
+  });
+
+  test('unknown action affects nothing; handles empty', () => {
+    expect(planBatch(items, 'nope')).toEqual([]);
+    expect(planBatch([], 'pause-all')).toEqual([]);
+    expect(planBatch(undefined, 'pause-all')).toEqual([]);
   });
 });

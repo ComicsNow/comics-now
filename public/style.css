@@ -3121,3 +3121,51 @@ body.eink-color-mode #bubble-magnifier-img {
 }
 .dl-action:hover { color: #fff; background: rgba(255, 255, 255, 0.1); }
 .dl-action svg { width: 14px; height: 14px; fill: currentColor; stroke: none; }
+
+/* Downloads: Retry All (Failed tab) */
+.dl-retry-all-bar {
+    padding: 8px 10px;
+    display: flex;
+    justify-content: flex-end;
+}
+.dl-retry-all-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    background: #b45309;
+    color: #fff;
+    padding: 0;
+    border: none;
+    border-radius: 9999px;
+    cursor: pointer;
+    transition: background 0.15s ease;
+}
+.dl-retry-all-btn:hover { background: #d97706; }
+
+/* Downloads: batch controls toolbar (In Progress tab) — icon buttons */
+.dl-batch-bar {
+    display: flex;
+    gap: 8px;
+    padding: 8px 10px;
+    justify-content: flex-end;
+}
+.dl-batch-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    padding: 0;
+    border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 9999px;
+    color: #e5e7eb;
+    background: rgba(255,255,255,0.06);
+    cursor: pointer;
+    transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+.dl-batch-btn:hover { background: rgba(255,255,255,0.12); }
+.dl-batch-btn.start:hover { border-color: #22c55e; color: #86efac; }
+.dl-batch-btn.pause:hover { border-color: #f59e0b; color: #fcd34d; }
+.dl-batch-btn.cancel:hover { border-color: #ef4444; color: #fca5a5; }

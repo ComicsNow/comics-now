@@ -9,6 +9,15 @@ import * as DownloadHistory from './download-history.js';
 
 const MAX_DOWNLOAD_RETRIES = 3;
 
+// Inline icons for the batch controls (start/pause/cancel/retry). Icons only —
+// no text labels — to keep the floaty compact.
+const DL_ICONS = {
+  start: '<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>',
+  pause: '<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true"><path d="M6 5h4v14H6zM14 5h4v14h-4z"/></svg>',
+  cancel: '<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>',
+  retry: '<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true"><path d="M17.65 6.35A7.95 7.95 0 0 0 12 4a8 8 0 1 0 7.73 10h-2.08A6 6 0 1 1 12 6c1.66 0 3.14.69 4.22 1.78L13 11h7V4z"/></svg>'
+};
+
 export class BackgroundDownloadManager {
   constructor() {
     this.isProcessing = false;
@@ -18,6 +27,8 @@ export class BackgroundDownloadManager {
     // comicId -> { chunks: Uint8Array[], receivedBytes } kept in memory so a
     // paused/interrupted download can resume without refetching what we have.
     this.partialData = new Map();
+    // Sequential guard: id of the comic currently downloading (bgFetch or foreground).
+    this.activeDownloadId = null;
     this.useServiceWorker = BackgroundDownloadManager.isBackgroundSyncSupported();
     this.useBackgroundFetch = BackgroundDownloadManager.isBackgroundFetchSupported();
     this.syncRegistered = false;
@@ -68,22 +79,65 @@ export class BackgroundDownloadManager {
 
     queueItem.status = 'downloading';
     queueItem.backgroundFetchId = bgFetch.id;
+    queueItem.totalBytes = downloadTotal || queueItem.totalBytes || 0;
     const db = state.OfflineDB || window.OfflineDB || {};
     if (db.saveQueueItemToDB) await db.saveQueueItemToDB(queueItem);
     this.updateQueueUI();
-
-    if (typeof bgFetch.addEventListener === 'function') {
-      bgFetch.addEventListener('progress', () => {
-        const total = bgFetch.downloadTotal || downloadTotal;
-        if (total > 0) {
-          queueItem.progress = Math.min(1, bgFetch.downloaded / total);
-          queueItem.receivedBytes = bgFetch.downloaded;
-          queueItem.totalBytes = total;
-          this.updateQueueUI();
-        }
-      });
-    }
     return bgFetch;
+  }
+
+  /**
+   * Sequential engine: ensure only ONE download runs at a time. Starts the next
+   * pending item when nothing is active. Background Fetch advances via the SW
+   * completion message (handleServiceWorkerMessage → pump); the foreground path
+   * is already sequential inside processQueue().
+   */
+  async pump() {
+    if (this.useBackgroundFetch) {
+      if (this.activeDownloadId) return; // one at a time
+      const next = this.persistentQueue.find(i => i.status === 'pending');
+      if (!next) return;
+      this.activeDownloadId = next.id;
+      try {
+        await this.startBackgroundFetch(next);
+      } catch (e) {
+        // Background Fetch unavailable/failed — fall back to foreground for the rest.
+        this.useBackgroundFetch = false;
+        this.activeDownloadId = null;
+        if (!this.isProcessing) this.processQueue();
+      }
+    } else if (!this.isProcessing) {
+      this.processQueue();
+    }
+  }
+
+  /**
+   * After a page load/reload, if a Background Fetch is still running in the OS,
+   * mark that comic active so the sequential pump won't start a second one. We
+   * don't track in-app progress — the OS notification shows the real %.
+   */
+  async reconnectBackgroundFetches() {
+    if (!this.useBackgroundFetch || typeof navigator === 'undefined' || !navigator.serviceWorker) return;
+    try {
+      const reg = await navigator.serviceWorker.ready;
+      if (!reg.backgroundFetch || !reg.backgroundFetch.getIds) return;
+      const ids = await reg.backgroundFetch.getIds();
+      for (const id of ids) {
+        try {
+          const bg = await reg.backgroundFetch.get(id);
+          if (!bg || bg.result) continue; // settled
+          const comicId = id.startsWith('comic-') ? id.slice('comic-'.length) : id;
+          this.activeDownloadId = comicId;
+          const item = this.persistentQueue.find(i => i.id === comicId);
+          if (item && item.status !== 'downloading') {
+            item.status = 'downloading';
+            const db = state.OfflineDB || window.OfflineDB || {};
+            if (db.saveQueueItemToDB) db.saveQueueItemToDB(item);
+          }
+        } catch (_) {}
+      }
+      this.updateQueueUI();
+    } catch (_) {}
   }
 
   /**
@@ -115,10 +169,19 @@ export class BackgroundDownloadManager {
         if (db.saveQueueItemToDB) await db.saveQueueItemToDB(item);
       }
     } else if (data.type === 'download-aborted') {
-      this.persistentQueue = this.persistentQueue.filter(i => i.id !== data.comicId);
-      this.partialData.delete(data.comicId);
+      // Abort == pause. If the item still exists (wasn't cancelled/removed by the
+      // page), mark it paused so the user can restart it.
+      if (item) {
+        item.status = 'paused';
+        if (db.saveQueueItemToDB) await db.saveQueueItemToDB(item);
+      }
+    }
+    // This download finished/aborted — free the slot and start the next.
+    if (this.activeDownloadId === data.comicId) {
+      this.activeDownloadId = null;
     }
     this.updateQueueUI();
+    this.pump();
   }
 
   /**
@@ -238,24 +301,9 @@ export class BackgroundDownloadManager {
       await db.saveQueueItemToDB(queueItem);
     }
 
-    // Update UI
+    // Update UI, then let the sequential pump start it when the slot is free.
     this.updateQueueUI();
-
-    // Preferred: native Background Fetch (true OS-level background on Android).
-    if (this.useBackgroundFetch) {
-      try {
-        await this.startBackgroundFetch(queueItem);
-        return queueItem;
-      } catch (bgErr) {
-        console.warn('[DOWNLOAD MANAGER] Background Fetch failed, falling back to foreground:', bgErr);
-        this.useBackgroundFetch = false; // don't keep retrying a broken path this session
-      }
-    }
-
-    // Fallback: foreground resumable download (keeps running while the tab is open).
-    if (!this.isProcessing) {
-      this.processQueue();
-    }
+    this.pump();
 
     return queueItem;
   }
@@ -284,35 +332,37 @@ export class BackgroundDownloadManager {
   /**
    * Remove comic from queue and cancel if currently downloading
    */
-  async cancelDownload(comicId) {
-    // If currently downloading in the foreground, abort it
-    if (this.currentDownload && this.currentDownload.id === comicId) {
-      if (this.abortController) {
-        this.abortController.abort();
+  // Abort a native Background Fetch for a comic (best effort).
+  async _abortBackgroundFetch(comicId) {
+    if (!this.useBackgroundFetch || typeof navigator === 'undefined' || !navigator.serviceWorker) return;
+    try {
+      const reg = await navigator.serviceWorker.ready;
+      if (reg && reg.backgroundFetch && reg.backgroundFetch.get) {
+        const bg = await reg.backgroundFetch.get(`comic-${comicId}`);
+        if (bg && bg.abort) await bg.abort();
       }
+    } catch (_) {}
+  }
+
+  async cancelDownload(comicId) {
+    // Abort the foreground download if it's the current one
+    if (this.currentDownload && this.currentDownload.id === comicId) {
+      if (this.abortController) this.abortController.abort();
       this.currentDownload = null;
     }
-
-    // If there's a native Background Fetch in flight, abort that too (best effort).
-    if (this.useBackgroundFetch && navigator.serviceWorker) {
-      try {
-        const reg = await navigator.serviceWorker.ready;
-        if (reg && reg.backgroundFetch && reg.backgroundFetch.get) {
-          const bg = await reg.backgroundFetch.get(`comic-${comicId}`);
-          if (bg && bg.abort) await bg.abort();
-        }
-      } catch (_) {}
-    }
+    await this._abortBackgroundFetch(comicId);
 
     // Remove from persistent queue and drop any buffered partial bytes
     this.persistentQueue = this.persistentQueue.filter(item => item.id !== comicId);
     this.partialData.delete(comicId);
+    if (this.activeDownloadId === comicId) this.activeDownloadId = null;
     const db = state.OfflineDB || window.OfflineDB || {};
     if (db.removeQueueItemFromDB) {
       await db.removeQueueItemFromDB(comicId);
     }
 
     this.updateQueueUI();
+    this.pump(); // free slot → start next
   }
 
   /**
@@ -367,21 +417,7 @@ export class BackgroundDownloadManager {
     }
 
     this.updateQueueUI();
-
-    // Retry via Background Fetch when available, else the foreground path.
-    if (this.useBackgroundFetch) {
-      try {
-        await this.startBackgroundFetch(item);
-        return true;
-      } catch (bgErr) {
-        console.warn('[DOWNLOAD MANAGER] Background Fetch retry failed, using foreground:', bgErr);
-        this.useBackgroundFetch = false;
-      }
-    }
-    if (!this.isProcessing) {
-      this.processQueue();
-    }
-
+    this.pump();
     return true;
   }
 
@@ -390,27 +426,21 @@ export class BackgroundDownloadManager {
    */
   async pauseDownload(comicId) {
     const item = this.persistentQueue.find(i => i.id === comicId);
-    if (!item || item.status !== 'downloading') return false;
+    if (!item || (item.status !== 'downloading' && item.status !== 'pending')) return false;
 
-    // If using Service Worker background sync, can't pause
-    if (this.useServiceWorker && this.currentDownload?.id !== comicId) {
-      return false;
+    // Abort the in-flight transfer (foreground and/or Background Fetch).
+    if (this.currentDownload && this.currentDownload.id === comicId && this.abortController) {
+      this.abortController.abort();
     }
-
-    // For in-page downloads, abort the current download
-    if (this.currentDownload && this.currentDownload.id === comicId) {
-      if (this.abortController) {
-        this.abortController.abort();
-      }
-    }
+    await this._abortBackgroundFetch(comicId);
 
     item.status = 'paused';
+    if (this.activeDownloadId === comicId) this.activeDownloadId = null;
     const db = state.OfflineDB || window.OfflineDB || {};
-    if (db.saveQueueItemToDB) {
-      await db.saveQueueItemToDB(item);
-    }
+    if (db.saveQueueItemToDB) await db.saveQueueItemToDB(item);
 
     this.updateQueueUI();
+    this.pump(); // a slot may have freed up — start the next queued item
     return true;
   }
 
@@ -423,18 +453,85 @@ export class BackgroundDownloadManager {
 
     item.status = 'pending';
     const db = state.OfflineDB || window.OfflineDB || {};
-    if (db.saveQueueItemToDB) {
-      await db.saveQueueItemToDB(item);
-    }
+    if (db.saveQueueItemToDB) await db.saveQueueItemToDB(item);
 
     this.updateQueueUI();
-
-    // Restart processing
-    if (!this.isProcessing) {
-      this.processQueue();
-    }
-
+    this.pump();
     return true;
+  }
+
+  // ---- Batch controls -------------------------------------------------------
+
+  /** Pause every queued/active download. */
+  async pauseAll() {
+    const affected = DownloadHistory.planBatch(this.persistentQueue, 'pause-all');
+    if (this.abortController) { try { this.abortController.abort(); } catch (_) {} this.abortController = null; }
+    this.currentDownload = null;
+    const db = state.OfflineDB || window.OfflineDB || {};
+    for (const item of affected) {
+      await this._abortBackgroundFetch(item.id);
+      item.status = 'paused';
+      if (db.saveQueueItemToDB) await db.saveQueueItemToDB(item);
+    }
+    this.activeDownloadId = null;
+    this.updateQueueUI();
+    return affected.length;
+  }
+
+  /** Resume/start every paused (and queued) download; runs sequentially. */
+  async startAll() {
+    const affected = DownloadHistory.planBatch(this.persistentQueue, 'start-all');
+    const db = state.OfflineDB || window.OfflineDB || {};
+    for (const item of affected) {
+      item.status = 'pending';
+      if (db.saveQueueItemToDB) await db.saveQueueItemToDB(item);
+    }
+    this.updateQueueUI();
+    this.pump();
+    return affected.length;
+  }
+
+  /** Cancel every in-progress/queued/paused download (keeps 24h history). */
+  async cancelAll() {
+    const affected = DownloadHistory.planBatch(this.persistentQueue, 'cancel-all');
+    if (affected.length === 0) return 0;
+    const ok = typeof window === 'undefined' || window.confirm(
+      `Cancel all downloads (${affected.length})?`
+    );
+    if (!ok) return 0;
+
+    if (this.abortController) { try { this.abortController.abort(); } catch (_) {} this.abortController = null; }
+    this.currentDownload = null;
+    this.activeDownloadId = null;
+
+    const db = state.OfflineDB || window.OfflineDB || {};
+    const ids = new Set(affected.map(i => i.id));
+    for (const id of ids) {
+      await this._abortBackgroundFetch(id);
+      this.partialData.delete(id);
+      try { if (db.removeQueueItemFromDB) await db.removeQueueItemFromDB(id); } catch (_) {}
+    }
+    this.persistentQueue = this.persistentQueue.filter(i => !ids.has(i.id));
+    this.updateQueueUI();
+    return ids.size;
+  }
+
+  /** Retry every failed download (from the Failed tab). */
+  async retryAllFailed() {
+    const affected = DownloadHistory.planBatch(this.persistentQueue, 'retry-failed');
+    const db = state.OfflineDB || window.OfflineDB || {};
+    for (const item of affected) {
+      item.status = 'pending';
+      item.progress = 0;
+      item.error = null;
+      item.failedAt = null;
+      item.receivedBytes = 0;
+      this.partialData.delete(item.id);
+      if (db.saveQueueItemToDB) await db.saveQueueItemToDB(item);
+    }
+    this.updateQueueUI();
+    this.pump();
+    return affected.length;
   }
 
   /**
@@ -782,18 +879,6 @@ export class BackgroundDownloadManager {
     const actionGroup = document.createElement('div');
     actionGroup.className = 'header-actions';
 
-    // Stop all button
-    const stopAllBtn = document.createElement('button');
-    stopAllBtn.type = 'button';
-    stopAllBtn.className = 'ha';
-    stopAllBtn.title = 'Stop all downloads';
-    stopAllBtn.innerHTML = '<svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2" stroke="currentColor" stroke-width="2" fill="none"/></svg>';
-    stopAllBtn.onclick = (e) => {
-      e.stopPropagation();
-      this.stopAllDownloads();
-    };
-    actionGroup.appendChild(stopAllBtn);
-
     // Collapse button
     const collapseBtn = document.createElement('button');
     collapseBtn.type = 'button';
@@ -849,21 +934,56 @@ export class BackgroundDownloadManager {
     const queueContent = document.createElement('div');
     queueContent.className = 'download-queue-scroll';
 
-    // Dynamic Sync Notice
-    const syncIndicator = document.createElement('div');
-    const syncText = document.createElement('p');
-    syncIndicator.innerHTML = '<svg viewBox="0 0 24 24"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>';
+    // Sync notice (In Progress tab only) — progress details live in the OS notification.
+    if (this.activeTab === 'in-progress') {
+      const syncIndicator = document.createElement('div');
+      const syncText = document.createElement('p');
+      syncIndicator.innerHTML = '<svg viewBox="0 0 24 24"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>';
+      if (this.useBackgroundFetch) {
+        syncIndicator.className = 'sync-notice sync-active';
+        syncText.textContent = 'Downloads run one at a time — see progress in your notifications.';
+      } else {
+        syncIndicator.className = 'sync-notice sync-warning';
+        syncText.textContent = 'Keep this tab open — background downloads unavailable on this device.';
+      }
+      syncIndicator.appendChild(syncText);
+      queueContent.appendChild(syncIndicator);
 
-    if (this.useBackgroundFetch) {
-      syncIndicator.className = 'sync-notice sync-active';
-      syncText.textContent = 'Background downloads on — continue even if you close the app';
-    } else {
-      syncIndicator.className = 'sync-notice sync-warning';
-      syncText.textContent = 'Keep this tab open — background downloads unavailable on this device';
+      // Batch controls toolbar (In Progress tab) — icon buttons only.
+      if (activeItems.length > 0) {
+        const bar = document.createElement('div');
+        bar.className = 'dl-batch-bar';
+        const mk = (title, cls, icon, handler) => {
+          const b = document.createElement('button');
+          b.type = 'button';
+          b.className = `dl-batch-btn ${cls}`;
+          b.title = title;
+          b.setAttribute('aria-label', title);
+          b.innerHTML = icon;
+          b.onclick = (e) => { e.stopPropagation(); handler(); };
+          bar.appendChild(b);
+        };
+        mk('Start all', 'start', DL_ICONS.start, () => this.startAll());
+        mk('Pause all', 'pause', DL_ICONS.pause, () => this.pauseAll());
+        mk('Cancel all', 'cancel', DL_ICONS.cancel, () => this.cancelAll());
+        queueContent.appendChild(bar);
+      }
     }
 
-    syncIndicator.appendChild(syncText);
-    queueContent.appendChild(syncIndicator);
+    // Retry All (Failed tab only) — icon button.
+    if (this.activeTab === 'failed' && activeItems.length > 0) {
+      const retryBar = document.createElement('div');
+      retryBar.className = 'dl-retry-all-bar';
+      const retryBtn = document.createElement('button');
+      retryBtn.type = 'button';
+      retryBtn.className = 'dl-retry-all-btn';
+      retryBtn.title = `Retry all (${activeItems.length})`;
+      retryBtn.setAttribute('aria-label', `Retry all (${activeItems.length})`);
+      retryBtn.innerHTML = DL_ICONS.retry;
+      retryBtn.onclick = (e) => { e.stopPropagation(); this.retryAllFailed(); };
+      retryBar.appendChild(retryBtn);
+      queueContent.appendChild(retryBar);
+    }
 
     // Items list
     const list = document.createElement('div');
@@ -881,8 +1001,6 @@ export class BackgroundDownloadManager {
     }
 
     activeItems.forEach(item => {
-      const pct = Math.round((item.progress || 0) * 100);
-
       const wrapper = document.createElement('div');
       wrapper.className = 'item';
       wrapper.dataset.comicId = item.id;
@@ -893,7 +1011,7 @@ export class BackgroundDownloadManager {
 
       const dot = document.createElement('span');
       let statusDotClass = 'dot-pending';
-      let statusLabel = 'Waiting';
+      let statusLabel = 'Queued';
 
       if (item.status === 'downloading') {
         statusDotClass = 'dot-active';
@@ -950,38 +1068,13 @@ export class BackgroundDownloadManager {
       topRow.appendChild(cancelBtn);
       wrapper.appendChild(topRow);
 
-      // Progress bar
-      const track = document.createElement('div');
-      track.className = 'progress-track';
-      const fill = document.createElement('div');
-      fill.className = 'progress-fill';
-      fill.style.width = `${pct}%`;
-      track.appendChild(fill);
-      wrapper.appendChild(track);
-
-      // Status row: label + percent
+      // Status label only — the actual download % lives in the OS notification.
       const statusRow = document.createElement('div');
       statusRow.className = 'item-status';
-
       const labelSpan = document.createElement('span');
       labelSpan.className = `status-label${item.status === 'error' ? ' status-error' : ''}`;
       labelSpan.textContent = statusLabel;
       statusRow.appendChild(labelSpan);
-
-      const pctSpan = document.createElement('span');
-      let pctClass = 'status-pct';
-      if (item.status === 'completed') pctClass += ' pct-completed';
-      else if (item.status === 'error') pctClass += ' pct-error';
-      pctSpan.className = pctClass;
-      
-      if (item.status === 'completed') {
-        pctSpan.textContent = '100%';
-      } else if (item.status === 'error') {
-        pctSpan.textContent = 'Failed';
-      } else {
-        pctSpan.textContent = `${pct}%`;
-      }
-      statusRow.appendChild(pctSpan);
       wrapper.appendChild(statusRow);
 
       list.appendChild(wrapper);

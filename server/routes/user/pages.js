@@ -280,6 +280,15 @@ module.exports = function attach(router, deps) {
       const fileSize = stat.size;
       const range = req.headers.range;
 
+      // HEAD: return size only (used to seed Background Fetch's downloadTotal so
+      // the progress bar can compute a percentage) — never stream the body.
+      if (req.method === 'HEAD') {
+        res.setHeader('Accept-Ranges', 'bytes');
+        res.setHeader('Content-Type', 'application/zip');
+        res.setHeader('Content-Length', fileSize);
+        return res.end();
+      }
+
       if (range) {
         const [startStr, endStr] = range.replace(/bytes=/, '').split('-');
         let start = parseInt(startStr, 10);
