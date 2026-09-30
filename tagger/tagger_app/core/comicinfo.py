@@ -105,8 +105,8 @@ def generate_comic_info_xml(metadata, enabled_fields=None):
     })
     
     # Title & Series & Issue Number
-    title_val = clean_format_and_edition(_clean_str(metadata.get("title") or metadata.get("issue_title")))
-    series_val = clean_format_and_edition(_clean_str(metadata.get("series")))
+    title_val = clean_format_and_edition(_clean_str(metadata.get("title") or metadata.get("Title") or metadata.get("issue_title") or metadata.get("IssueTitle")))
+    series_val = clean_format_and_edition(_clean_str(metadata.get("series") or metadata.get("Series")))
     
     # Rule: If the title and series match (including issue numbers, #3, 3, volume suffixes, or format tags), do NOT add Title; keep Series
     if title_val and (is_title_same_as_series(title_val, series_val) or (not series_val and is_title_same_as_series(title_val, ""))):
@@ -117,28 +117,28 @@ def generate_comic_info_xml(metadata, enabled_fields=None):
     if title_val:
         ET.SubElement(root, "Title").text = title_val
         
-    num_val = _clean_str(metadata.get("number") or metadata.get("issue_number") or metadata.get("issue"))
+    num_val = _clean_str(metadata.get("number") or metadata.get("Number") or metadata.get("issue_number") or metadata.get("issue") or metadata.get("Issue"))
     if num_val:
         ET.SubElement(root, "Number").text = num_val
 
-    vol_val = _clean_str(metadata.get("volume"))
+    vol_val = _clean_str(metadata.get("volume") or metadata.get("Volume"))
     if vol_val:
         ET.SubElement(root, "Volume").text = vol_val
         
-    pub_val = normalize_publisher(_clean_str(metadata.get("publisher")))
+    pub_val = normalize_publisher(_clean_str(metadata.get("publisher") or metadata.get("Publisher")))
     if pub_val:
         ET.SubElement(root, "Publisher").text = pub_val
         
-    desc_val = clean_description(_clean_str(metadata.get("description") or metadata.get("summary")))
+    desc_val = clean_description(_clean_str(metadata.get("description") or metadata.get("Description") or metadata.get("summary") or metadata.get("Summary")))
     if desc_val:
         ET.SubElement(root, "Summary").text = desc_val
         
     # Handle Year / Month / Day
-    year = _clean_str(metadata.get("year"))
-    month = _clean_str(metadata.get("month"))
-    day = _clean_str(metadata.get("day"))
+    year = _clean_str(metadata.get("year") or metadata.get("Year"))
+    month = _clean_str(metadata.get("month") or metadata.get("Month"))
+    day = _clean_str(metadata.get("day") or metadata.get("Day"))
     
-    p_date = _clean_str(metadata.get("publish_date") or metadata.get("cover_date"))
+    p_date = _clean_str(metadata.get("publish_date") or metadata.get("PublishDate") or metadata.get("cover_date") or metadata.get("CoverDate"))
     if not year and p_date:
         if "-" in p_date:
             year_parts = p_date.split("-")
@@ -179,73 +179,73 @@ def generate_comic_info_xml(metadata, enabled_fields=None):
     
     # 1. Writer / Authors
     if enabled_fields is None or "Writer" in enabled_fields:
-        writer_val = _clean_str(metadata.get("writer") or metadata.get("authors"))
+        writer_val = _clean_str(metadata.get("writer") or metadata.get("Writer") or metadata.get("authors") or metadata.get("Authors"))
         if writer_val:
             ET.SubElement(root, "Writer").text = writer_val
             
     # 2. Penciller
     if enabled_fields is None or "Penciller" in enabled_fields:
-        penciller_val = _clean_str(metadata.get("penciller"))
+        penciller_val = _clean_str(metadata.get("penciller") or metadata.get("Penciller"))
         if penciller_val:
             ET.SubElement(root, "Penciller").text = penciller_val
             
     # 3. Inker
     if enabled_fields is None or "Inker" in enabled_fields:
-        inker_val = _clean_str(metadata.get("inker"))
+        inker_val = _clean_str(metadata.get("inker") or metadata.get("Inker"))
         if inker_val:
             ET.SubElement(root, "Inker").text = inker_val
             
     # 4. Colorist
     if enabled_fields is None or "Colorist" in enabled_fields:
-        colorist_val = _clean_str(metadata.get("colorist"))
+        colorist_val = _clean_str(metadata.get("colorist") or metadata.get("Colorist"))
         if colorist_val:
             ET.SubElement(root, "Colorist").text = colorist_val
             
     # 5. Letterer
     if enabled_fields is None or "Letterer" in enabled_fields:
-        letterer_val = _clean_str(metadata.get("letterer"))
+        letterer_val = _clean_str(metadata.get("letterer") or metadata.get("Letterer"))
         if letterer_val:
             ET.SubElement(root, "Letterer").text = letterer_val
             
     # 6. CoverArtist
     if enabled_fields is None or "CoverArtist" in enabled_fields:
-        cover_val = _clean_str(metadata.get("cover_artist") or metadata.get("coverArtist"))
+        cover_val = _clean_str(metadata.get("cover_artist") or metadata.get("CoverArtist") or metadata.get("coverArtist"))
         if cover_val:
             ET.SubElement(root, "CoverArtist").text = cover_val
             
     # 7. Editor
     if enabled_fields is None or "Editor" in enabled_fields:
-        editor_val = _clean_str(metadata.get("editor"))
+        editor_val = _clean_str(metadata.get("editor") or metadata.get("Editor"))
         if editor_val:
             ET.SubElement(root, "Editor").text = editor_val
             
     # 8. Genre
     if enabled_fields is None or "Genre" in enabled_fields:
-        genre_val = _clean_str(metadata.get("genres") or metadata.get("genre"))
+        genre_val = _clean_str(metadata.get("genres") or metadata.get("Genre") or metadata.get("genre"))
         if genre_val:
             ET.SubElement(root, "Genre").text = genre_val
             
     # 9. PageCount
     if enabled_fields is None or "PageCount" in enabled_fields:
-        pages_val = _clean_str(metadata.get("pages") or metadata.get("page_count") or metadata.get("pageCount"))
+        pages_val = _clean_str(metadata.get("pages") or metadata.get("page_count") or metadata.get("PageCount") or metadata.get("pageCount"))
         if pages_val:
             ET.SubElement(root, "PageCount").text = pages_val
             
     # 10. Characters
     if enabled_fields is None or "Characters" in enabled_fields:
-        char_val = _clean_str(metadata.get("characters"))
+        char_val = _clean_str(metadata.get("characters") or metadata.get("Characters"))
         if char_val:
             ET.SubElement(root, "Characters").text = char_val
             
     # 11. Teams
     if enabled_fields is None or "Teams" in enabled_fields:
-        teams_val = _clean_str(metadata.get("teams"))
+        teams_val = _clean_str(metadata.get("teams") or metadata.get("Teams"))
         if teams_val:
             ET.SubElement(root, "Teams").text = teams_val
             
     # 12. Locations
     if enabled_fields is None or "Locations" in enabled_fields:
-        loc_val = _clean_str(metadata.get("locations"))
+        loc_val = _clean_str(metadata.get("locations") or metadata.get("Locations"))
         if loc_val:
             ET.SubElement(root, "Locations").text = loc_val
 

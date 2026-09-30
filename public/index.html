@@ -664,6 +664,29 @@
                 </div>
               </div>
             </div>
+
+            <!-- Gemini AI Vision & Metadata Integration -->
+            <div class="pt-3 border-t border-gray-700" id="ct-gemini-key-wrapper">
+              <div class="flex items-center justify-between mb-1.5">
+                <label for="ct-gemini-key-input" class="block text-xs font-semibold uppercase tracking-wider text-gray-400">
+                  Gemini AI (Vision &amp; Metadata)
+                </label>
+                <div class="flex items-center gap-2">
+                  <label class="flex items-center gap-1.5 cursor-pointer text-xs text-blue-400 select-none">
+                    <input type="checkbox" id="ct-gemini-enabled-toggle" class="cursor-pointer accent-blue-600 rounded" checked>
+                    <span>Enable Gemini</span>
+                  </label>
+                </div>
+              </div>
+              <div class="flex gap-2">
+                <input type="password" id="ct-gemini-key-input" placeholder="AIzaSy... (Gemini 3.5 Flash-Lite)"
+                  class="w-full bg-gray-800 text-white p-2 rounded text-xs border border-gray-700 focus:outline-none focus:border-blue-500 font-mono">
+                <button type="button" id="ct-gemini-key-toggle" class="px-3 py-1 bg-gray-700 hover:bg-gray-600 text-gray-300 rounded text-xs cursor-pointer">Show</button>
+              </div>
+              <p class="text-[11px] text-gray-400 mt-1">
+                When enabled, ComicTagger uses Gemini 3.5 Flash-Lite for visual cover matching and canonical metadata synthesis. When disabled or quota (450/day) is reached, standard pHash image matching is used.
+              </p>
+            </div>
           </div>
 
           <div class="flex justify-between items-center">
@@ -837,6 +860,50 @@
             </div>
           </div>
         </div>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- Gemini Strict Compliance Modal -->
+  <div id="gemini-compliance-modal" class="hidden fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm" role="dialog" aria-modal="true">
+    <div class="bg-gray-900 border border-gray-700 rounded-xl shadow-2xl p-6 max-w-lg w-full text-gray-200">
+      <div class="border-b border-gray-800 pb-3 mb-4">
+        <h3 class="text-base font-bold text-white tracking-wide flex items-center gap-2">
+          <span>Comics Now! - AI Cataloging Config</span>
+        </h3>
+      </div>
+      <div class="space-y-4 text-sm">
+        <div>
+          <label for="gemini-modal-key-input" class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1.5">
+            Enter API Key:
+          </label>
+          <input type="password" id="gemini-modal-key-input" placeholder="AIzaSy... (Gemini 3.5 Flash-Lite)"
+            class="w-full bg-gray-950 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-blue-500 font-mono">
+        </div>
+
+        <div class="p-3 bg-gray-950/80 border border-gray-800 rounded-lg flex items-start gap-3">
+          <input type="checkbox" id="gemini-modal-agree-cb" class="mt-0.5 w-4 h-4 accent-blue-600 rounded cursor-pointer shrink-0">
+          <label for="gemini-modal-agree-cb" class="text-xs text-gray-300 leading-relaxed cursor-pointer select-none">
+            I verify I am 18+ and using this for personal development &amp; media cataloging workflows.
+          </label>
+        </div>
+
+        <div class="p-3 bg-amber-950/40 border border-amber-500/50 rounded-lg flex items-start gap-2.5 text-xs text-amber-200">
+          <span class="text-base leading-none select-none">⚠️</span>
+          <div class="leading-relaxed">
+            <strong class="font-semibold text-amber-300">WARNING:</strong> Free-tier Gemini keys submit prompt data to Google servers for potential human review.
+          </div>
+        </div>
+      </div>
+
+      <div class="mt-6 pt-3 border-t border-gray-800 flex justify-end items-center gap-3">
+        <button type="button" id="gemini-modal-disagree-btn" class="px-4 py-2 bg-gray-800 hover:bg-gray-700 active:bg-gray-600 text-gray-300 rounded-lg text-xs font-semibold uppercase tracking-wider transition-colors cursor-pointer">
+          Disagree
+        </button>
+        <button type="button" id="gemini-modal-save-btn" disabled class="px-5 py-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-lg text-xs font-semibold uppercase tracking-wider transition-colors shadow-md cursor-pointer">
+          Save Configuration
+        </button>
       </div>
     </div>
   </div>

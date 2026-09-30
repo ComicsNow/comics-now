@@ -167,9 +167,16 @@ function saveConfigToDisk() {
     if (!fs.existsSync(dir)) {
       fs.mkdirSync(dir, { recursive: true });
     }
+    let diskConfig = {};
+    try {
+      if (fs.existsSync(CONFIG_FILE)) {
+        diskConfig = JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf-8'));
+      }
+    } catch (_) {}
     // Ensure we don't save legacy comicsDirectories if it somehow got into the config object
     const { comicsDirectories, ...safeConfig } = config;
-    fs.writeFileSync(CONFIG_FILE, JSON.stringify(safeConfig, null, 2));
+    const merged = { ...diskConfig, ...safeConfig };
+    fs.writeFileSync(CONFIG_FILE, JSON.stringify(merged, null, 2));
     log('INFO', 'SERVER', `Saved config to ${CONFIG_FILE}`);
     return true;
   } catch (e) {

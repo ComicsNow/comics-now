@@ -457,12 +457,12 @@ def clean_description(desc: str) -> str:
 
 
 VOL_SPLIT_PATTERN = re.compile(
-    r'^(?P<series>.+?)[\s,:;\-–—]+\b(?P<vol_token>(?P<vol_prefix>Vol(?:ume|\.)?|Book|Bk\.?|v)\s*0*(?P<vol_num>\d+)(?:(?P<sub_sep>\s*[:\-–—]\s*|\s+)(?P<subtitle>.+))?)$',
+    r'^(?P<series>.+?)[\s,:;\-–—]+\b(?P<vol_token>(?P<vol_prefix>Vol(?:ume|\.)?|Book|Bk\.?|v)\s*0*(?P<vol_num>\d+)(?:(?P<sub_sep>\s*[:\-–—,;]\s*|\s+)(?P<subtitle>.+))?)$',
     re.IGNORECASE
 )
 
 STANDALONE_VOL_PATTERN = re.compile(
-    r'^(?P<vol_token>(?P<vol_prefix>Vol(?:ume|\.)?|Book|Bk\.?|v)\s*0*(?P<vol_num>\d+)(?:(?P<sub_sep>\s*[:\-–—]\s*|\s+)(?P<subtitle>.+))?)$',
+    r'^(?P<vol_token>(?P<vol_prefix>Vol(?:ume|\.)?|Book|Bk\.?|v)\s*0*(?P<vol_num>\d+)(?:(?P<sub_sep>\s*[:\-–—,;]\s*|\s+)(?P<subtitle>.+))?)$',
     re.IGNORECASE
 )
 
@@ -498,15 +498,15 @@ def resolve_creator_roles(meta):
                     names.append(p)
         return names
 
-    writers = _to_name_list(meta.get("writer"))
-    pencillers = _to_name_list(meta.get("penciller"))
-    inkers = _to_name_list(meta.get("inker"))
-    colorists = _to_name_list(meta.get("colorist"))
-    letterers = _to_name_list(meta.get("letterer"))
-    cover_artists = _to_name_list(meta.get("cover_artist") or meta.get("CoverArtist"))
-    authors = _to_name_list(meta.get("authors"))
+    writers = _to_name_list(meta.get("writer") or meta.get("Writer"))
+    pencillers = _to_name_list(meta.get("penciller") or meta.get("Penciller"))
+    inkers = _to_name_list(meta.get("inker") or meta.get("Inker"))
+    colorists = _to_name_list(meta.get("colorist") or meta.get("Colorist"))
+    letterers = _to_name_list(meta.get("letterer") or meta.get("Letterer"))
+    cover_artists = _to_name_list(meta.get("cover_artist") or meta.get("CoverArtist") or meta.get("coverArtist"))
+    authors = _to_name_list(meta.get("authors") or meta.get("Authors"))
 
-    desc = meta.get("description") or meta.get("summary") or ""
+    desc = meta.get("description") or meta.get("Description") or meta.get("summary") or meta.get("Summary") or ""
     if desc:
         w_pattern = r'\b(?:writer|written by|script(?: by)?)\s+([A-Z][a-zA-Z\.\'\-\s]+?)(?=\s*[\(\,\.\n]| and | & | artist | while |\bjoins\b|\btest\b|$)'
         a_pattern = r'\b(?:artist|art by|illustrated by|drawn by|penciller|penciler)\s+([A-Z][a-zA-Z\.\'\-\s]+?)(?=\s*[\(\,\.\n]| and | & | writer | while |\bjoins\b|\btest\b|\bexplore\b|$)'
@@ -599,6 +599,14 @@ def resolve_creator_roles(meta):
     meta["letterer"] = ", ".join(letterers) if letterers else ""
     meta["cover_artist"] = ", ".join(cover_artists) if cover_artists else ""
     meta["authors"] = authors or writers
+
+    # Also keep PascalCase synchronized if present or needed
+    if "Writer" in meta or writers: meta["Writer"] = meta["writer"]
+    if "Penciller" in meta or pencillers: meta["Penciller"] = meta["penciller"]
+    if "Inker" in meta or inkers: meta["Inker"] = meta["inker"]
+    if "Colorist" in meta or colorists: meta["Colorist"] = meta["colorist"]
+    if "Letterer" in meta or letterers: meta["Letterer"] = meta["letterer"]
+    if "CoverArtist" in meta or cover_artists: meta["CoverArtist"] = meta["cover_artist"]
     return meta
 
 

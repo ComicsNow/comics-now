@@ -124,6 +124,7 @@ function createApiRouter(deps) {
   require('./admin/rename')(adminRouter, extendedDeps);
   require('./admin/mcp-tools')(adminRouter, extendedDeps);
   require('./admin/user-stats')(adminRouter, extendedDeps);
+  require('./admin/gemini')(adminRouter, extendedDeps);
 
   // Impersonation control (judged by the real admin identity, not the swap).
   // Must be registered BEFORE adminRouter so its /api/v1/admin/impersonate/*

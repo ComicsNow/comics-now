@@ -550,6 +550,31 @@ async function fetchCtSettings() {
     const isForce = !!data.forceReprocess;
     if (forceScanCb) forceScanCb.checked = isForce;
     if (forceSettingCb) forceSettingCb.checked = isForce;
+
+    // Fetch Gemini settings
+    try {
+      const geminiRes = await fetch(`${global.API_BASE_URL}/api/v1/gemini/config?_t=${Date.now()}`);
+      if (geminiRes.ok) {
+        const geminiData = await geminiRes.json();
+        if (typeof window !== 'undefined') {
+          window._geminiState = window._geminiState || {};
+          window._geminiState.termsAccepted = !!geminiData.termsAccepted;
+          window._geminiState.hasApiKey = !!geminiData.hasApiKey;
+          window._geminiState.enabled = geminiData.enabled !== false;
+        }
+
+        const geminiToggle = document.getElementById('ct-gemini-enabled-toggle');
+        if (geminiToggle && geminiData.enabled !== undefined) {
+          geminiToggle.checked = !!geminiData.enabled;
+        }
+        const geminiKeyInput = document.getElementById('ct-gemini-key-input');
+        if (geminiKeyInput) {
+          if (geminiData.hasApiKey && !geminiKeyInput.value) {
+            geminiKeyInput.placeholder = '•••••••••••••••••••••••••••••••• (API Key set)';
+          }
+        }
+      }
+    } catch (_) {}
   } catch {}
 }
 
@@ -728,6 +753,18 @@ async function saveCtSettings() {
     }
   });
 
+  const geminiToggle = document.getElementById('ct-gemini-enabled-toggle');
+  const geminiKeyInput = document.getElementById('ct-gemini-key-input');
+  const geminiVal = geminiKeyInput ? geminiKeyInput.value.trim() : '';
+  const geminiEnabled = geminiToggle ? geminiToggle.checked : false;
+  const geminiState = (typeof window !== 'undefined' && window._geminiState) ? window._geminiState : {};
+
+  if (geminiEnabled && (geminiVal || geminiState.hasApiKey) && !geminiState.termsAccepted) {
+    initGeminiComplianceModal();
+    openGeminiComplianceModal(geminiVal);
+    return;
+  }
+
   const saveBtn = document.getElementById('ct-save-btn');
   if (saveBtn) {
     saveBtn.disabled = true;
@@ -753,6 +790,21 @@ async function saveCtSettings() {
       })
     });
     if (res.ok) {
+      if (geminiState.termsAccepted) {
+        const geminiPayload = {
+          geminiCoverMatchEnabled: geminiEnabled,
+          geminiTermsAccepted: true
+        };
+        if (geminiVal) {
+          geminiPayload.geminiApiKey = geminiVal;
+        }
+        fetch(`${global.API_BASE_URL}/api/v1/gemini/config`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(geminiPayload)
+        }).catch(function() {});
+      }
+
       if (saveBtn) {
         saveBtn.textContent = '✓ Saved';
         setTimeout(() => {
@@ -768,6 +820,134 @@ async function saveCtSettings() {
       saveBtn.textContent = '✗ Error';
       saveBtn.disabled = false;
     }
+  }
+}
+
+function openGeminiComplianceModal(prefillKey) {
+  const modal = document.getElementById('gemini-compliance-modal');
+  if (!modal) return;
+  const keyInput = document.getElementById('gemini-modal-key-input');
+  const agreeCb = document.getElementById('gemini-modal-agree-cb');
+  const saveBtn = document.getElementById('gemini-modal-save-btn');
+
+  if (agreeCb) agreeCb.checked = false;
+  if (keyInput) {
+    if (prefillKey) {
+      keyInput.value = prefillKey;
+    } else if (typeof window !== 'undefined' && window._geminiState?.hasApiKey) {
+      keyInput.placeholder = '•••••••••••••••••••••••••••••••• (API Key set)';
+    }
+  }
+  if (saveBtn) {
+    const hasKey = (keyInput && keyInput.value.trim().length > 0) || !!(typeof window !== 'undefined' && window._geminiState?.hasApiKey);
+    saveBtn.disabled = !agreeCb?.checked || !hasKey;
+  }
+  modal.classList.remove('hidden');
+}
+
+function initGeminiComplianceModal() {
+  const modal = document.getElementById('gemini-compliance-modal');
+  if (!modal || modal.dataset.geminiInitialized) return;
+  modal.dataset.geminiInitialized = 'true';
+
+  const keyInput = document.getElementById('gemini-modal-key-input');
+  const agreeCb = document.getElementById('gemini-modal-agree-cb');
+  const saveBtn = document.getElementById('gemini-modal-save-btn');
+  const disagreeBtn = document.getElementById('gemini-modal-disagree-btn');
+
+  function checkFormValidity() {
+    const hasAgreed = !!agreeCb?.checked;
+    const keyVal = keyInput ? keyInput.value.trim() : '';
+    const hasKey = keyVal.length > 0 || !!(typeof window !== 'undefined' && window._geminiState?.hasApiKey);
+    if (saveBtn) {
+      saveBtn.disabled = !hasAgreed || !hasKey;
+    }
+  }
+
+  agreeCb?.addEventListener('change', checkFormValidity);
+  keyInput?.addEventListener('input', checkFormValidity);
+
+  disagreeBtn?.addEventListener('click', function() {
+    modal.classList.add('hidden');
+    const ctKeyInput = document.getElementById('ct-gemini-key-input');
+    const ctEnabledToggle = document.getElementById('ct-gemini-enabled-toggle');
+    if (ctKeyInput) ctKeyInput.value = '';
+    if (ctEnabledToggle) ctEnabledToggle.checked = false;
+
+    fetch(`${global.API_BASE_URL}/api/v1/gemini/config`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ geminiCoverMatchEnabled: false, geminiTermsAccepted: false })
+    }).catch(function() {});
+  });
+
+  saveBtn?.addEventListener('click', async function() {
+    if (!agreeCb?.checked) return;
+    const keyVal = keyInput ? keyInput.value.trim() : '';
+    saveBtn.disabled = true;
+    saveBtn.textContent = 'Saving...';
+
+    try {
+      const payload = {
+        geminiCoverMatchEnabled: true,
+        geminiTermsAccepted: true
+      };
+      if (keyVal) payload.geminiApiKey = keyVal;
+
+      const res = await fetch(`${global.API_BASE_URL}/api/v1/gemini/config`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      if (res.ok) {
+        if (typeof window !== 'undefined') {
+          window._geminiState = window._geminiState || {};
+          window._geminiState.termsAccepted = true;
+          window._geminiState.hasApiKey = true;
+          window._geminiState.enabled = true;
+        }
+
+        const ctKeyInput = document.getElementById('ct-gemini-key-input');
+        const ctEnabledToggle = document.getElementById('ct-gemini-enabled-toggle');
+
+        if (ctKeyInput) {
+          ctKeyInput.value = '';
+          ctKeyInput.placeholder = '•••••••••••••••••••••••••••••••• (API Key set)';
+        }
+        if (ctEnabledToggle) {
+          ctEnabledToggle.checked = true;
+        }
+
+        modal.classList.add('hidden');
+
+        // Continue saving settings
+        saveCtSettings();
+      } else {
+        const errData = await res.json().catch(function() { return {}; });
+        alert('Failed to save configuration: ' + (errData.error || 'Server error'));
+      }
+    } catch (err) {
+      alert('Network error saving configuration');
+    } finally {
+      saveBtn.disabled = false;
+      saveBtn.textContent = 'Save Configuration';
+    }
+  });
+
+  // Key toggle show/hide
+  const toggleBtn = document.getElementById('ct-gemini-key-toggle');
+  const ctKeyInput = document.getElementById('ct-gemini-key-input');
+  if (toggleBtn && ctKeyInput) {
+    toggleBtn.addEventListener('click', function() {
+      if (ctKeyInput.type === 'password') {
+        ctKeyInput.type = 'text';
+        toggleBtn.textContent = 'Hide';
+      } else {
+        ctKeyInput.type = 'password';
+        toggleBtn.textContent = 'Show';
+      }
+    });
   }
 }
 
@@ -1035,6 +1215,7 @@ if (typeof window !== 'undefined') {
   document.getElementById('ct-clear-output')?.addEventListener('click', () => {
     if (ctOutputDiv) ctOutputDiv.innerHTML = '';
   });
+  initGeminiComplianceModal();
 }
 
 // Periodic check for pending matches on CT button
