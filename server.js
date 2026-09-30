@@ -385,6 +385,26 @@ app.use(baseUrl, createImpersonationMiddleware({ dbGet, dbRun, log }));
 app.use(baseUrl, impersonationReadOnlyGuard);
 
 app.use(baseUrl, apiRouter);
+
+// Optional local extensions (no-op if absent)
+try {
+  const { installGeminiTagger } = require('./server/services/gemini-tagger');
+  installGeminiTagger({
+    app,
+    config,
+    db: { dbGet, dbRun, dbAll, closeDb },
+    paths: require('./server/constants'),
+    services: {
+      metadata: require('./server/services/metadata'),
+      tagger: require('./server/services/tagger'),
+      library: require('./server/services/library')
+    },
+    log
+  });
+} catch (err) {
+  log('WARN', 'GEMINI', `Gemini tagger initialization note: ${err.message}`);
+}
+
 app.use(baseUrl, staticRouter);
 
 (async () => {

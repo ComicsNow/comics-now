@@ -446,8 +446,8 @@ function cleanFormatAndEdition(text) {
   return s;
 }
 
-const VOL_SPLIT_PATTERN = /^(?<series>.+?)[\s,:;\-–—]+\b(?<vol_token>(?<vol_prefix>Vol(?:ume|\.)?|Book|Bk\.?|v)\s*0*(?<vol_num>\d+)(?:(?<sub_sep>\s*[:\-–—]\s*|\s+)(?<subtitle>.+))?)$/i;
-const STANDALONE_VOL_PATTERN = /^(?<vol_token>(?<vol_prefix>Vol(?:ume|\.)?|Book|Bk\.?|v)\s*0*(?<vol_num>\d+)(?:(?<sub_sep>\s*[:\-–—]\s*|\s+)(?<subtitle>.+))?)$/i;
+const VOL_SPLIT_PATTERN = /^(?<series>.+?)[\s,:;\-–—]+\b(?<vol_token>(?<vol_prefix>Vol(?:ume|\.)?|Book|Bk\.?|v)\s*0*(?<vol_num>\d+)(?:(?<sub_sep>\s*[:\-–—,;]\s*|\s+)(?<subtitle>.+))?)$/i;
+const STANDALONE_VOL_PATTERN = /^(?<vol_token>(?<vol_prefix>Vol(?:ume|\.)?|Book|Bk\.?|v)\s*0*(?<vol_num>\d+)(?:(?<sub_sep>\s*[:\-–—,;]\s*|\s+)(?<subtitle>.+))?)$/i;
 
 function splitVolumeSeriesAndTitle(series, title) {
   let s = (series || '').trim();
