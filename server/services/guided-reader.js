@@ -99,6 +99,11 @@ async function buildQueue(scope = null) {
                  AND COALESCE(guidedViewStatus, 'pending') IN (${statusPlaceholders})`;
     const params = [likePattern, ...statuses];
 
+    if (scope && Array.isArray(scope.ids) && scope.ids.length) {
+      sql += ` AND id IN (${scope.ids.map(() => '?').join(',')})`;
+      params.push(...scope.ids);
+    }
+
     if (scope && scope.type === 'comic') {
       sql += ' AND id = ?';
       params.push(scope.target);
@@ -293,19 +298,29 @@ function cancelRun() {
   return cancelAll();
 }
 
-// Called from library scan completion when settings.autoOnAdd is on.
-async function onLibraryScanComplete() {
+// Called from library scan completion when settings.autoOnAdd is on. Only the
+// comics newly inserted by that scan (newComicIds) are considered — never the
+// existing pending backlog. Detection is incremental (pending/failed only).
+async function onLibraryScanComplete(newComicIds = []) {
+  const ids = Array.isArray(newComicIds) ? newComicIds.filter(Boolean) : [];
+  if (ids.length === 0) return;
   const settings = await getSettings();
   if (!settings.autoOnAdd) return;
-  const counts = await getStatusCounts();
-  const work = (counts.pending || 0) + (counts.failed || 0);
-  if (work === 0) return;
-  if (state.isRunning) {
-    guidedLog('INFO', `Auto-trigger: ${work} pending, but a run is already in progress`);
-    return;
+
+  const scope = { ids, statuses: getScopeStatuses(false) };
+  const newItems = await buildQueue(scope);
+  if (newItems.length === 0) return;
+
+  const existingIds = new Set(state.queue.map(c => c.id));
+  const filtered = newItems.filter(c => !existingIds.has(c.id));
+  state.queue.push(...filtered);
+
+  if (filtered.length > 0) {
+    guidedLog('INFO', `Auto-trigger: ${filtered.length} newly-added comic(s) queued for guided detection.`);
   }
-  guidedLog('INFO', `Auto-trigger: scan completed, ${work} pending — starting run`);
-  startRun();
+  if (!state.isRunning) {
+    runWorker().catch(err => log('ERROR', 'GUIDED', `runWorker(auto) rejected: ${err.message}`));
+  }
 }
 
 function intervalToMs(interval, unit) {

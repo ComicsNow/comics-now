@@ -56,6 +56,7 @@ async function scanLibrary(force = false) {
   const allowedFormats = config.allowed_formats || 'cbz';
   log('INFO', 'SCAN', `Starting scan… Libraries: ${libraries.length > 0 ? libraries.map(l => `${l.path} (${l.hierarchyMode})`).join(', ') : '(none set)'} | Allowed Formats: ${allowedFormats}`);
   const fileSystemComics = new Set();
+  const newComicIds = []; // ids of comics inserted (not updated) by this scan
   const dbComics = await dbAll('SELECT path, thumbnailPath FROM comics');
   const dbComicsMap = new Map(dbComics.map(c => [c.path, c.thumbnailPath]));
   const conversionRoot = config.comicsLocation ? path.resolve(config.comicsLocation) : null;
@@ -303,6 +304,11 @@ async function scanLibrary(force = false) {
           ]
         );
         totalInsertedOrUpdated++;
+        // Track brand-new comics so auto-on-add guided detection runs on just
+        // these, not the whole pending backlog.
+        if (!existing && guidedViewStatus === 'pending') {
+          newComicIds.push(id);
+        }
       } catch (e) {
         errors++;
         log('ERROR', 'SCAN', `Failed to process ${path.basename(filePath)}: ${e.message}`);
@@ -384,7 +390,7 @@ async function scanLibrary(force = false) {
   // Lazy require avoids a circular dependency at module-load time.
   try {
     const guidedReader = require('./guided-reader');
-    guidedReader.onLibraryScanComplete().catch(err =>
+    guidedReader.onLibraryScanComplete(newComicIds).catch(err =>
       log('ERROR', 'GUIDED', `onLibraryScanComplete failed: ${err.message}`)
     );
   } catch (err) {
