@@ -558,6 +558,40 @@ def resolve_creator_roles(meta):
         if filtered:
             writers = filtered
 
+    # Drop entries that are clearly not personal names — scraped marketing/solicit
+    # headings sometimes land in creator fields (e.g. "From ERIN CONNALLY comes
+    # THE CUTTING GARDEN"). Real creator names are short, title/one-case tokens
+    # with no connective verbs and don't contain the series title.
+    series_title = str(meta.get("series") or meta.get("Series") or "").strip()
+    _BLURB_WORDS = {
+        'comes', 'from', 'presents', 'present', 'returns', 'brings', 'featuring',
+        'introducing', 'available', 'now', 'out', 'series', 'issue', 'edition',
+        'preview', 'exclusive', 'collects', 'collecting', 'includes', 'story',
+        'stories', 'graphic', 'novel', 'volume', 'vol'
+    }
+
+    def _is_creator_name(name):
+        n = (name or '').strip()
+        if len(n) < 2:
+            return False
+        words = n.split()
+        if len(words) > 4:  # personal names are ~1–4 tokens; longer => a phrase
+            return False
+        lowered = {re.sub(r'[^a-z]', '', w.lower()) for w in words}
+        if lowered & _BLURB_WORDS:
+            return False
+        if series_title and series_title.lower() in n.lower() and n.lower() != series_title.lower():
+            return False
+        return True
+
+    writers = [w for w in writers if _is_creator_name(w)]
+    pencillers = [p for p in pencillers if _is_creator_name(p)]
+    inkers = [i for i in inkers if _is_creator_name(i)]
+    colorists = [c for c in colorists if _is_creator_name(c)]
+    letterers = [l for l in letterers if _is_creator_name(l)]
+    cover_artists = [ca for ca in cover_artists if _is_creator_name(ca)]
+    authors = [a for a in authors if _is_creator_name(a)]
+
     meta["writer"] = ", ".join(writers) if writers else ""
     meta["penciller"] = ", ".join(pencillers) if pencillers else ""
     meta["inker"] = ", ".join(inkers) if inkers else ""
