@@ -389,9 +389,11 @@
 
             <form id="guided-settings-form" class="border border-gray-700 rounded-lg p-4 space-y-4">
               <h5 class="text-md font-semibold">Automatic Processing</h5>
-              <label class="flex items-center gap-2 cursor-pointer">
-                <input type="checkbox" id="guided-auto-on-add" class="w-4 h-4">
-                <span>Run automatically when new comics are added (after every library scan)</span>
+              <label class="flex items-start gap-2 cursor-pointer">
+                <input type="checkbox" id="guided-auto-on-add" class="w-4 h-4 mt-1">
+                <span>Run automatically on newly-added comics
+                  <span class="block text-xs text-gray-400">After each library scan, guided detection runs only on the comics that were just added — not the existing pending backlog. Use “Run Guided Detection” to process the rest.</span>
+                </span>
               </label>
 
               <div class="pt-2 border-t border-gray-700">
