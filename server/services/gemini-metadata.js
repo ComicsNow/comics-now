@@ -198,7 +198,8 @@ async function synthesizeMetadataWithGemini({
   filename,
   existingMeta = {},
   publisherCodex = [],
-  apiKey
+  apiKey,
+  model = STRICT_MODEL
 }) {
   if (!apiKey) {
     throw new Error('No Gemini API key provided for metadata synthesis');
@@ -212,7 +213,8 @@ async function synthesizeMetadataWithGemini({
     publisherCodex
   });
 
-  const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(STRICT_MODEL)}:generateContent?key=${encodeURIComponent(apiKey)}`;
+  const activeModel = (model || '').trim() || STRICT_MODEL;
+  const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(activeModel)}:generateContent?key=${encodeURIComponent(apiKey)}`;
 
   const res = await fetch(endpoint, {
     method: 'POST',

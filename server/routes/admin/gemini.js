@@ -73,10 +73,87 @@ module.exports = function attach(router, deps) {
         enabled: cfg.geminiCoverMatchEnabled !== false,
         hasApiKey: !!apiKey,
         termsAccepted: termsAccepted,
-        model: 'gemini-3.5-flash-lite',
+        model: cfg.geminiModel || config.geminiModel || 'gemini-3.5-flash-lite',
         dailyCap: parseInt(cfg.geminiCoverDailyCap || '450', 10),
         dailyUsed: quotaCount
       });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  }
+
+  async function handleGetModels(req, res) {
+    try {
+      const cfg = readConfig();
+      const apiKey = (req.query.apiKey || cfg.geminiApiKey || config.geminiApiKey || (process.env.NODE_ENV === 'test' ? '' : process.env.GEMINI_API_KEY) || '').trim();
+
+      const fallbackModels = [
+        { id: 'gemini-3.5-flash-lite', displayName: 'Gemini 3.5 Flash-Lite (Recommended Default)' },
+        { id: 'gemini-2.5-flash-lite', displayName: 'Gemini 2.5 Flash-Lite' },
+        { id: 'gemini-2.0-flash-lite', displayName: 'Gemini 2.0 Flash-Lite' },
+        { id: 'gemini-2.0-flash-lite-preview-02-05', displayName: 'Gemini 2.0 Flash-Lite Preview' }
+      ];
+
+      if (!apiKey) {
+        return res.json({
+          models: fallbackModels,
+          source: 'default'
+        });
+      }
+
+      try {
+        const url = `https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(apiKey)}`;
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 8000);
+        const resp = await fetch(url, { signal: controller.signal });
+        clearTimeout(timeout);
+
+        if (resp.ok) {
+          const data = await resp.json();
+          const rawModels = Array.isArray(data.models) ? data.models : [];
+          // Filter ONLY models that have Flash-Lite in name or displayName
+          const flashLiteModels = rawModels.filter(m => {
+            const name = (m.name || '').toLowerCase();
+            const disp = (m.displayName || '').toLowerCase();
+            return name.includes('flash-lite') || name.includes('flashlite') ||
+                   disp.includes('flash-lite') || disp.includes('flashlite');
+          }).map(m => {
+            const cleanId = (m.name || '').replace(/^models\//, '');
+            return {
+              id: cleanId,
+              displayName: m.displayName || cleanId,
+              description: m.description || ''
+            };
+          });
+
+          // Ensure gemini-3.5-flash-lite is present
+          if (!flashLiteModels.some(m => m.id === 'gemini-3.5-flash-lite')) {
+            flashLiteModels.unshift({
+              id: 'gemini-3.5-flash-lite',
+              displayName: 'Gemini 3.5 Flash-Lite (Default)',
+              description: 'Fast multimodal vision & canonical metadata reasoning'
+            });
+          }
+
+          return res.json({
+            models: flashLiteModels.length > 0 ? flashLiteModels : fallbackModels,
+            source: 'gemini-api'
+          });
+        } else {
+          const errData = await resp.json().catch(() => ({}));
+          return res.json({
+            models: fallbackModels,
+            source: 'fallback',
+            warning: errData.error?.message || 'API request failed'
+          });
+        }
+      } catch (fetchErr) {
+        return res.json({
+          models: fallbackModels,
+          source: 'fallback',
+          warning: fetchErr.message
+        });
+      }
     } catch (err) {
       res.status(500).json({ error: err.message });
     }
@@ -145,7 +222,8 @@ module.exports = function attach(router, deps) {
       res.json({
         ok: true,
         message: 'Settings saved',
-        termsAccepted: !!cfg.geminiTermsAccepted
+        termsAccepted: !!cfg.geminiTermsAccepted,
+        model: cfg.geminiModel || 'gemini-3.5-flash-lite'
       });
     } catch (err) {
       res.status(500).json({ error: err.message });
@@ -155,10 +233,12 @@ module.exports = function attach(router, deps) {
   // Canonical endpoints
   router.get('/api/v1/gemini/config', handleGetConfig);
   router.post('/api/v1/gemini/config', handlePostConfig);
+  router.get('/api/v1/gemini/models', handleGetModels);
 
   // Backwards compatibility aliases
   router.get('/api/v1/_ext/gemini/config', handleGetConfig);
   router.post('/api/v1/_ext/gemini/config', handlePostConfig);
+  router.get('/api/v1/_ext/gemini/models', handleGetModels);
   router.get('/api/v1/_ext/cover-match/config', handleGetConfig);
   router.post('/api/v1/_ext/cover-match/config', handlePostConfig);
 };

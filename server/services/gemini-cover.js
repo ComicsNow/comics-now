@@ -263,8 +263,7 @@ async function matchCoverToCandidates({
   model = 'gemini-3.5-flash-lite',
   throttleMs = DEFAULT_THROTTLE_MS
 }) {
-  // Strictly enforce gemini-3.5-flash-lite
-  const activeModel = 'gemini-3.5-flash-lite';
+  const activeModel = (model || '').trim() || 'gemini-3.5-flash-lite';
   if (!apiKey) {
     return {
       bestIndex: -1,

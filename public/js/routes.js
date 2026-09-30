@@ -128,6 +128,12 @@ function registerRoutes() {
       if (typeof global.openCTModal === 'function') global.openCTModal();
       if (ctTabSettings) ctTabSettings.click();
     });
+ 
+    global.router.addRoute('/comictagger/gemini', () => {
+      if (typeof global.openCTModal === 'function') global.openCTModal();
+      const tab = document.getElementById('ct-tab-gemini');
+      if (tab) tab.click();
+    });
 
     global.router.addRoute('/comictagger/matches', () => {
       if (typeof global.openCTModal === 'function') global.openCTModal();
