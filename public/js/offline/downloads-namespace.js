@@ -17,23 +17,21 @@ export const OfflineDownloads = {
       return;
     }
     await downloadManager.loadQueue();
-    // If items exist in queue, resume processing
-    if (downloadManager.persistentQueue.length > 0) {
-      if (downloadManager.useServiceWorker) {
-        await downloadManager.registerBackgroundSync();
-        // Explicitly trigger SW to resume
-        if (navigator.serviceWorker && navigator.serviceWorker.controller) {
-          navigator.serviceWorker.controller.postMessage({ type: 'start-downloads' });
-        }
-      } else {
-        downloadManager.processQueue();
-      }
-    }
+    // If a Background Fetch is still running from a previous session, mark it
+    // active so the sequential pump won't start a second one.
+    await downloadManager.reconnectBackgroundFetches();
+    // Start the next pending item (one at a time). Interrupted downloads were
+    // left 'paused' by loadQueue and wait for the user's Start All.
+    downloadManager.pump();
   },
   cancelDownload: (comicId) => downloadManager ? downloadManager.cancelDownload(comicId) : null,
   restartDownload: (comicId) => downloadManager ? downloadManager.restartDownload(comicId) : null,
   pauseDownload: (comicId) => downloadManager ? downloadManager.pauseDownload(comicId) : null,
   resumeDownload: (comicId) => downloadManager ? downloadManager.resumeDownload(comicId) : null,
+  pauseAllDownloads: () => downloadManager ? downloadManager.pauseAll() : null,
+  startAllDownloads: () => downloadManager ? downloadManager.startAll() : null,
+  cancelAllDownloads: () => downloadManager ? downloadManager.cancelAll() : null,
+  retryAllFailedDownloads: () => downloadManager ? downloadManager.retryAllFailed() : null,
   clearCompletedDownloads: () => downloadManager ? downloadManager.clearCompleted() : null,
   deleteOfflineComic: (comicId) => {
     const db = state.OfflineDB || window.OfflineDB || {};

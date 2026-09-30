@@ -68,6 +68,25 @@ function computeBackoffMs(retryCount = 0) {
   return Math.min(1000 * Math.pow(2, n), MAX_BACKOFF_MS);
 }
 
+/**
+ * Which queue items a batch action applies to.
+ *   pause-all    -> pending + downloading
+ *   start-all    -> paused
+ *   retry-failed -> error
+ *   cancel-all   -> pending + downloading + paused (everything in-progress)
+ */
+function planBatch(items, action) {
+  const list = Array.isArray(items) ? items : [];
+  const affects = {
+    'pause-all': ['pending', 'downloading'],
+    'start-all': ['paused'],
+    'retry-failed': ['error'],
+    'cancel-all': ['pending', 'downloading', 'paused']
+  }[action];
+  if (!affects) return [];
+  return list.filter((it) => it && affects.includes(it.status));
+}
+
 /** Range header to resume a partial download, or null to start fresh. */
 function nextRangeHeader(receivedBytes) {
   if (typeof receivedBytes !== 'number' || !Number.isFinite(receivedBytes) || receivedBytes <= 0) {
@@ -85,5 +104,6 @@ module.exports = {
   partitionDownloads,
   selectExpired,
   computeBackoffMs,
-  nextRangeHeader
+  nextRangeHeader,
+  planBatch
 };
