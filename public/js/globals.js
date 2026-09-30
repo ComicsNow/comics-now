@@ -524,11 +524,13 @@ export const ctClearOutputBtn = document.getElementById('ct-clear-output');
 export const ctRunBtn = document.getElementById('ct-run-btn');
 export const ctCancelBtn = document.getElementById('ct-cancel-btn');
 export const ctTabSettings = document.getElementById('ct-tab-settings');
+export const ctTabGemini = document.getElementById('ct-tab-gemini');
 export const ctTabMatches = document.getElementById('ct-tab-matches');
 export const ctTabOutput = document.getElementById('ct-tab-output');
 export const ctTabLogs = document.getElementById('ct-tab-logs');
 export const ctTabManagement = document.getElementById('ct-tab-management');
 export const ctContentSettings = document.getElementById('ct-content-settings');
+export const ctContentGemini = document.getElementById('ct-content-gemini');
 export const ctContentMatches = document.getElementById('ct-content-matches');
 export const ctContentOutput = document.getElementById('ct-content-output');
 export const ctContentLogs = document.getElementById('ct-content-logs');
@@ -813,11 +815,13 @@ const globalsObj = {
   ctRunBtn,
   ctCancelBtn,
   ctTabSettings,
+  ctTabGemini,
   ctTabMatches,
   ctTabOutput,
   ctTabLogs,
   ctTabManagement,
   ctContentSettings,
+  ctContentGemini,
   ctContentMatches,
   ctContentOutput,
   ctContentLogs,

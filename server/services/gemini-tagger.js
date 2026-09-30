@@ -42,8 +42,8 @@ function installTaggerHook(ctx) {
       : (fileConfig.geminiCoverMatchEnabled !== undefined ? !!fileConfig.geminiCoverMatchEnabled : true);
 
     const termsAccepted = fileConfig.geminiTermsAccepted === true;
-    const apiKey = process.env.GEMINI_API_KEY || fileConfig.geminiApiKey || '';
-    const model = 'gemini-3.5-flash-lite';
+    const apiKey = process.env.GEMINI_API_KEY || fileConfig.geminiApiKey || ctx.config?.geminiApiKey || '';
+    const model = (fileConfig.geminiModel || ctx.config?.geminiModel || process.env.GEMINI_MODEL || 'gemini-3.5-flash-lite').trim();
     const dailyCap = parseInt(process.env.GEMINI_COVER_DAILY_CAP || fileConfig.geminiCoverDailyCap || '450', 10);
     const taggerServiceUrl = fileConfig.taggerServiceUrl || ctx.config?.taggerServiceUrl || 'http://127.0.0.1:5000';
 
@@ -215,7 +215,8 @@ function installTaggerHook(ctx) {
             filename: path.basename(filePath),
             existingMeta,
             publisherCodex,
-            apiKey: config.apiKey
+            apiKey: config.apiKey,
+            model: config.model
           });
 
           if (synthesized && typeof synthesized === 'object') {

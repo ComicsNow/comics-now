@@ -561,6 +561,7 @@ async function fetchCtSettings() {
           window._geminiState.termsAccepted = !!geminiData.termsAccepted;
           window._geminiState.hasApiKey = !!geminiData.hasApiKey;
           window._geminiState.enabled = geminiData.enabled !== false;
+          window._geminiState.model = geminiData.model || 'gemini-3.5-flash-lite';
         }
 
         const geminiToggle = document.getElementById('ct-gemini-enabled-toggle');
@@ -572,6 +573,18 @@ async function fetchCtSettings() {
           if (geminiData.hasApiKey && !geminiKeyInput.value) {
             geminiKeyInput.placeholder = '•••••••••••••••••••••••••••••••• (API Key set)';
           }
+        }
+        const dailyCapInput = document.getElementById('ct-gemini-daily-cap');
+        if (dailyCapInput && geminiData.dailyCap) {
+          dailyCapInput.value = geminiData.dailyCap;
+        }
+        const dailyUsedDiv = document.getElementById('ct-gemini-daily-used');
+        if (dailyUsedDiv && geminiData.dailyUsed !== undefined) {
+          dailyUsedDiv.textContent = `${geminiData.dailyUsed} requests used`;
+        }
+
+        if (typeof loadGeminiModels === 'function') {
+          loadGeminiModels('', geminiData.model || 'gemini-3.5-flash-lite');
         }
       }
     } catch (_) {}
@@ -823,6 +836,61 @@ async function saveCtSettings() {
   }
 }
 
+let geminiModelFetchTimer = null;
+
+async function loadGeminiModels(apiKey = '', targetModel = '') {
+  const modelSelect = document.getElementById('ct-gemini-model-select');
+  const statusSpan = document.getElementById('ct-gemini-models-status');
+  if (!modelSelect) return;
+
+  const currentVal = targetModel || modelSelect.value || (window._geminiState?.model) || 'gemini-3.5-flash-lite';
+  if (statusSpan && apiKey) {
+    statusSpan.textContent = 'Querying available Flash-Lite models...';
+  }
+
+  try {
+    const url = apiKey
+      ? `${global.API_BASE_URL}/api/v1/gemini/models?apiKey=${encodeURIComponent(apiKey)}`
+      : `${global.API_BASE_URL}/api/v1/gemini/models`;
+
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('Fetch failed');
+    const data = await res.json();
+    const models = Array.isArray(data.models) ? data.models : [];
+
+    if (models.length > 0) {
+      modelSelect.innerHTML = '';
+      models.forEach(m => {
+        const opt = document.createElement('option');
+        opt.value = m.id;
+        opt.textContent = m.displayName || m.id;
+        if (m.id === currentVal) opt.selected = true;
+        modelSelect.appendChild(opt);
+      });
+
+      if (!models.some(m => m.id === currentVal)) {
+        const opt = document.createElement('option');
+        opt.value = currentVal;
+        opt.textContent = currentVal;
+        opt.selected = true;
+        modelSelect.appendChild(opt);
+      }
+
+      if (statusSpan) {
+        if (data.source === 'gemini-api') {
+          statusSpan.textContent = `✓ ${models.length} Flash-Lite models available`;
+        } else {
+          statusSpan.textContent = 'Default: 3.5 Flash-Lite';
+        }
+      }
+    }
+  } catch (err) {
+    if (statusSpan) {
+      statusSpan.textContent = 'Default: 3.5 Flash-Lite';
+    }
+  }
+}
+
 function openGeminiComplianceModal(prefillKey) {
   const modal = document.getElementById('gemini-compliance-modal');
   if (!modal) return;
@@ -888,9 +956,16 @@ function initGeminiComplianceModal() {
     saveBtn.textContent = 'Saving...';
 
     try {
+      const modelSelect = document.getElementById('ct-gemini-model-select');
+      const selectedModel = modelSelect ? modelSelect.value : 'gemini-3.5-flash-lite';
+      const capInput = document.getElementById('ct-gemini-daily-cap');
+      const dailyCap = capInput ? parseInt(capInput.value, 10) : 450;
+
       const payload = {
         geminiCoverMatchEnabled: true,
-        geminiTermsAccepted: true
+        geminiTermsAccepted: true,
+        geminiModel: selectedModel,
+        geminiCoverDailyCap: dailyCap
       };
       if (keyVal) payload.geminiApiKey = keyVal;
 
@@ -906,6 +981,7 @@ function initGeminiComplianceModal() {
           window._geminiState.termsAccepted = true;
           window._geminiState.hasApiKey = true;
           window._geminiState.enabled = true;
+          window._geminiState.model = selectedModel;
         }
 
         const ctKeyInput = document.getElementById('ct-gemini-key-input');
@@ -946,6 +1022,81 @@ function initGeminiComplianceModal() {
       } else {
         ctKeyInput.type = 'password';
         toggleBtn.textContent = 'Show';
+      }
+    });
+  }
+
+  // Dynamic model querying on entering API key
+  if (ctKeyInput) {
+    ctKeyInput.addEventListener('input', function() {
+      const val = ctKeyInput.value.trim();
+      if (geminiModelFetchTimer) clearTimeout(geminiModelFetchTimer);
+      if (val.length >= 8) {
+        geminiModelFetchTimer = setTimeout(() => {
+          loadGeminiModels(val);
+        }, 600);
+      }
+    });
+  }
+
+  // Dedicated Save Gemini Settings Button
+  const geminiSaveBtn = document.getElementById('ct-gemini-save-btn');
+  if (geminiSaveBtn && !geminiSaveBtn.dataset.bound) {
+    geminiSaveBtn.dataset.bound = 'true';
+    geminiSaveBtn.addEventListener('click', async function() {
+      const isEnabled = document.getElementById('ct-gemini-enabled-toggle')?.checked ?? true;
+      const keyVal = ctKeyInput ? ctKeyInput.value.trim() : '';
+      const modelSelect = document.getElementById('ct-gemini-model-select');
+      const selectedModel = modelSelect ? modelSelect.value : 'gemini-3.5-flash-lite';
+      const capInput = document.getElementById('ct-gemini-daily-cap');
+      const dailyCap = capInput ? parseInt(capInput.value, 10) : 450;
+      const state = window._geminiState || {};
+
+      if (!state.termsAccepted && isEnabled && (keyVal || state.hasApiKey)) {
+        openGeminiComplianceModal(keyVal);
+        return;
+      }
+
+      geminiSaveBtn.disabled = true;
+      geminiSaveBtn.textContent = 'Saving...';
+
+      try {
+        const payload = {
+          geminiCoverMatchEnabled: isEnabled,
+          geminiTermsAccepted: true,
+          geminiModel: selectedModel,
+          geminiCoverDailyCap: dailyCap
+        };
+        if (keyVal) payload.geminiApiKey = keyVal;
+
+        const res = await fetch(`${global.API_BASE_URL}/api/v1/gemini/config`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+
+        if (res.ok) {
+          state.termsAccepted = true;
+          if (keyVal) state.hasApiKey = true;
+          state.enabled = isEnabled;
+          state.model = selectedModel;
+
+          geminiSaveBtn.textContent = '✓ Saved';
+          if (keyVal && ctKeyInput) {
+            ctKeyInput.value = '';
+            ctKeyInput.placeholder = '•••••••••••••••••••••••••••••••• (API Key set)';
+          }
+          setTimeout(() => {
+            geminiSaveBtn.textContent = 'Save Gemini Settings';
+            geminiSaveBtn.disabled = false;
+          }, 1500);
+        } else {
+          geminiSaveBtn.textContent = '✗ Error';
+          geminiSaveBtn.disabled = false;
+        }
+      } catch (_) {
+        geminiSaveBtn.textContent = '✗ Error';
+        geminiSaveBtn.disabled = false;
       }
     });
   }

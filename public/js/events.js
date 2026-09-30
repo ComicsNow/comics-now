@@ -14,11 +14,13 @@ import {
   ctOutputDiv,
   ctRunBtn,
   ctTabSettings,
+  ctTabGemini,
   ctTabMatches,
   ctTabOutput,
   ctTabLogs,
   ctTabManagement,
   ctContentSettings,
+  ctContentGemini,
   ctContentMatches,
   ctContentOutput,
   ctContentLogs,
@@ -268,14 +270,30 @@ function switchCtTab(activeTab, activeContent, routePath) {
   if (!state._isNavigatingFromRouter && state.router && routePath) {
     state.router.navigate(routePath, true);
   }
-  [ctTabOutput, ctTabMatches, ctTabSettings, ctTabLogs, ctTabManagement].forEach(t => t?.classList.remove('active'));
-  [ctContentOutput, ctContentMatches, ctContentSettings, ctContentLogs, ctContentManagement].forEach(c => c?.classList.add('hidden'));
+  [
+    typeof ctTabOutput !== 'undefined' ? ctTabOutput : null,
+    typeof ctTabMatches !== 'undefined' ? ctTabMatches : null,
+    typeof ctTabSettings !== 'undefined' ? ctTabSettings : null,
+    typeof ctTabGemini !== 'undefined' ? ctTabGemini : null,
+    typeof ctTabLogs !== 'undefined' ? ctTabLogs : null,
+    typeof ctTabManagement !== 'undefined' ? ctTabManagement : null
+  ].forEach(t => t?.classList.remove('active'));
+
+  [
+    typeof ctContentOutput !== 'undefined' ? ctContentOutput : null,
+    typeof ctContentMatches !== 'undefined' ? ctContentMatches : null,
+    typeof ctContentSettings !== 'undefined' ? ctContentSettings : null,
+    typeof ctContentGemini !== 'undefined' ? ctContentGemini : null,
+    typeof ctContentLogs !== 'undefined' ? ctContentLogs : null,
+    typeof ctContentManagement !== 'undefined' ? ctContentManagement : null
+  ].forEach(c => c?.classList.add('hidden'));
+
   activeTab?.classList.add('active');
   activeContent?.classList.remove('hidden');
 
   const stopRenameFn = state.stopRenameStream || window.stopRenameStream;
   const stopMoveFn = state.stopMoveStream || window.stopMoveStream;
-  if (activeTab !== ctTabManagement) {
+  if (activeTab !== (typeof ctTabManagement !== 'undefined' ? ctTabManagement : null)) {
     if (typeof stopRenameFn === 'function') stopRenameFn();
     if (typeof stopMoveFn === 'function') stopMoveFn();
   }
@@ -297,6 +315,12 @@ ctTabMatches?.addEventListener('click', () => {
 ctTabSettings?.addEventListener('click', () => {
   switchCtTab(ctTabSettings, ctContentSettings, '/comictagger');
 });
+
+if (typeof ctTabGemini !== 'undefined' && ctTabGemini) {
+  ctTabGemini.addEventListener('click', () => {
+    switchCtTab(ctTabGemini, ctContentGemini, '/comictagger/gemini');
+  });
+}
 
 ctTabLogs?.addEventListener('click', () => {
   switchCtTab(ctTabLogs, ctContentLogs, '/comictagger/logs');

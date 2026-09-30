@@ -459,6 +459,9 @@
         <button id="ct-tab-settings" class="tab-button py-3 px-2 sm:px-4 text-xs sm:text-base whitespace-nowrap">
           <span>Settings & Sources</span>
         </button>
+        <button id="ct-tab-gemini" class="tab-button py-3 px-2 sm:px-4 text-xs sm:text-base whitespace-nowrap flex items-center gap-1.5">
+          <span>Gemini AI</span>
+        </button>
         <button id="ct-tab-logs" class="tab-button py-3 px-2 sm:px-4 text-xs sm:text-base whitespace-nowrap">
           <span>Scan Logs</span>
         </button>
@@ -665,33 +668,85 @@
               </div>
             </div>
 
-            <!-- Gemini AI Vision & Metadata Integration -->
-            <div class="pt-3 border-t border-gray-700" id="ct-gemini-key-wrapper">
-              <div class="flex items-center justify-between mb-1.5">
-                <label for="ct-gemini-key-input" class="block text-xs font-semibold uppercase tracking-wider text-gray-400">
-                  Gemini AI (Vision &amp; Metadata)
-                </label>
-                <div class="flex items-center gap-2">
-                  <label class="flex items-center gap-1.5 cursor-pointer text-xs text-blue-400 select-none">
-                    <input type="checkbox" id="ct-gemini-enabled-toggle" class="cursor-pointer accent-blue-600 rounded" checked>
-                    <span>Enable Gemini</span>
-                  </label>
-                </div>
-              </div>
-              <div class="flex gap-2">
-                <input type="password" id="ct-gemini-key-input" placeholder="AIzaSy... (Gemini 3.5 Flash-Lite)"
-                  class="w-full bg-gray-800 text-white p-2 rounded text-xs border border-gray-700 focus:outline-none focus:border-blue-500 font-mono">
-                <button type="button" id="ct-gemini-key-toggle" class="px-3 py-1 bg-gray-700 hover:bg-gray-600 text-gray-300 rounded text-xs cursor-pointer">Show</button>
-              </div>
-              <p class="text-[11px] text-gray-400 mt-1">
-                When enabled, ComicTagger uses Gemini 3.5 Flash-Lite for visual cover matching and canonical metadata synthesis. When disabled or quota (450/day) is reached, standard pHash image matching is used.
-              </p>
             </div>
           </div>
 
           <div class="flex justify-between items-center">
             <button id="ct-save-btn" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-6 rounded-full transition-colors text-sm">Save Settings</button>
             <button id="ct-clear-history-btn" class="text-xs text-gray-400 hover:text-red-400 transition-colors">Clear Enhancement History</button>
+          </div>
+        </div>
+
+        <!-- Gemini AI Settings Tab -->
+        <div id="ct-content-gemini" class="hidden space-y-4">
+          <div class="bg-gray-800/80 border border-gray-700 rounded-xl p-5 shadow-lg space-y-4">
+            <div class="flex items-center justify-between pb-3 border-b border-gray-700">
+              <div>
+                <h4 class="text-sm font-bold text-white flex items-center gap-2">
+                  <span class="text-blue-400 text-base">✦</span> Gemini Multimodal Vision &amp; Metadata Synthesis
+                </h4>
+                <p class="text-xs text-gray-400 mt-0.5">
+                  Accelerate comic book recognition using Gemini Flash-Lite visual cover matching and structured metadata normalization.
+                </p>
+              </div>
+              <label class="flex items-center gap-2 cursor-pointer bg-gray-900 border border-gray-700 px-3 py-1.5 rounded-lg text-xs text-blue-400 font-medium select-none hover:bg-gray-850 transition-colors">
+                <input type="checkbox" id="ct-gemini-enabled-toggle" class="cursor-pointer accent-blue-600 rounded w-4 h-4" checked>
+                <span>Enable Gemini</span>
+              </label>
+            </div>
+
+            <!-- API Key Input -->
+            <div class="space-y-1.5">
+              <label for="ct-gemini-key-input" class="block text-xs font-semibold text-gray-300 uppercase tracking-wider">
+                Google Gemini API Key
+              </label>
+              <div class="flex gap-2">
+                <input type="password" id="ct-gemini-key-input" placeholder="AIzaSy... (Gemini API Key)"
+                  class="w-full bg-gray-900 text-white p-2.5 rounded-lg text-xs border border-gray-700 focus:outline-none focus:border-blue-500 font-mono">
+                <button type="button" id="ct-gemini-key-toggle" class="px-3.5 py-1.5 bg-gray-700 hover:bg-gray-600 text-gray-200 rounded-lg text-xs font-medium cursor-pointer transition-colors">Show</button>
+              </div>
+              <p class="text-[11px] text-gray-400">
+                Entering an API key automatically queries Google Gemini for all available <strong>Flash-Lite</strong> models.
+              </p>
+            </div>
+
+            <!-- Model Selection Dropdown -->
+            <div class="space-y-1.5">
+              <div class="flex items-center justify-between">
+                <label for="ct-gemini-model-select" class="block text-xs font-semibold text-gray-300 uppercase tracking-wider">
+                  Flash-Lite Model Selection
+                </label>
+                <span id="ct-gemini-models-status" class="text-[11px] text-gray-400">Default: 3.5 Flash-Lite</span>
+              </div>
+              <select id="ct-gemini-model-select" class="w-full bg-gray-900 text-white p-2.5 rounded-lg text-xs border border-gray-700 focus:outline-none focus:border-blue-500 font-mono cursor-pointer">
+                <option value="gemini-3.5-flash-lite">Gemini 3.5 Flash-Lite (Recommended Default)</option>
+              </select>
+              <p class="text-[11px] text-gray-400">
+                Only models containing <strong>Flash-Lite</strong> are listed to ensure fast response latency and free-tier compatibility.
+              </p>
+            </div>
+
+            <!-- Quota and Rate Limit Info -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-gray-700">
+              <div class="bg-gray-900/80 p-3 rounded-lg border border-gray-700">
+                <div class="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Daily Request Cap</div>
+                <div class="flex items-center gap-2 mt-1">
+                  <input type="number" id="ct-gemini-daily-cap" value="450" min="1" max="1500" class="w-24 bg-gray-800 border border-gray-700 rounded px-2 py-1 text-xs text-white">
+                  <span class="text-xs text-gray-400">requests / day (Free tier: 500)</span>
+                </div>
+              </div>
+              <div class="bg-gray-900/80 p-3 rounded-lg border border-gray-700">
+                <div class="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Today's Usage</div>
+                <div id="ct-gemini-daily-used" class="text-sm font-bold text-blue-400 mt-1">0 requests used</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="flex justify-between items-center pt-2">
+            <button id="ct-gemini-save-btn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-full transition-colors text-sm shadow-md cursor-pointer">
+              Save Gemini Settings
+            </button>
+            <span class="text-xs text-gray-400">Fallback to standard pHash image matching when disabled or quota is reached.</span>
           </div>
         </div>
 
