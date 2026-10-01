@@ -283,6 +283,14 @@ async function synthesizeMetadataWithGemini({
       }
     }
 
+    // For graphic novels, TPBs, and collected editions, volume number serves as issue number if Number is blank
+    if (!cleanNumber && cleanVolume) {
+      cleanNumber = cleanVolume;
+    }
+    if (!cleanNumber && (existingMeta?.Number || existingMeta?.number)) {
+      cleanNumber = String(existingMeta.Number || existingMeta.number).trim();
+    }
+
     if (cleanTitle && (isTitleSameAsSeries(cleanTitle, cleanSeries) || (!cleanSeries && isTitleSameAsSeries(cleanTitle, '')))) {
       cleanTitle = '';
     }

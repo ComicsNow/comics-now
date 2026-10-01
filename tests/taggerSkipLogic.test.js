@@ -581,4 +581,32 @@ describe('runComicTagger - Skip & Tagging Logic', () => {
     );
     expect(getPendingMatch()).toBeNull();
   });
+
+  test('considers collected edition with Volume but without Number as complete metadata', async () => {
+    jest.spyOn(fs, 'existsSync').mockReturnValue(true);
+    jest.spyOn(fs.promises, 'readdir').mockResolvedValue([
+      { name: 'Fantastic Four Epic Collection v26.cbz', isFile: () => true }
+    ]);
+    jest.spyOn(fs.promises, 'stat').mockResolvedValue({ mtimeMs: 20000 });
+
+    metaSpy.mockResolvedValue({
+      Series: 'Fantastic Four Epic Collection',
+      Publisher: 'Marvel',
+      Year: '2026',
+      Volume: '26'
+      // Notice Number is omitted/undefined
+    });
+
+    await runComicTagger();
+
+    // /api/tag-file should NOT be called because checkFileSuccess succeeds with Volume
+    expect(global.fetch).not.toHaveBeenCalledWith(
+      expect.stringContaining('/api/tag-file'),
+      expect.any(Object)
+    );
+    expect(dbRunSpy).toHaveBeenCalledWith(
+      expect.stringContaining('INSERT INTO comics'),
+      expect.arrayContaining(['successful'])
+    );
+  });
 });

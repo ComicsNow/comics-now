@@ -735,6 +735,9 @@ function buildComicInfoXml(metadataObj) {
       safeObj.Volume = volSplit.volume;
     }
   }
+  if (!safeObj.Number && safeObj.Volume) {
+    safeObj.Number = safeObj.Volume;
+  }
 
   // Rule: If Title is the same as Series (even with issue numbers, #3, 3, volume, or format tags), do NOT add Title and keep Series
   if (safeObj.Title && (isTitleSameAsSeries(safeObj.Title, safeObj.Series) || (!safeObj.Series && isTitleSameAsSeries(safeObj.Title, '')))) {

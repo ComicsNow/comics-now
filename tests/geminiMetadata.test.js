@@ -162,4 +162,50 @@ describe('Gemini Metadata Synthesizer', () => {
       global.fetch = originalFetch;
     }
   });
+
+  test('synthesizeMetadataWithGemini falls back Number to Volume when Number is blank for collected editions', async () => {
+    const originalFetch = global.fetch;
+    const mockOutput = {
+      Series: 'Fantastic Four Epic Collection',
+      Volume: '26',
+      Number: '',
+      Title: 'Heroes Reborn',
+      Publisher: 'Marvel',
+      Writer: 'Jim Lee',
+      Summary: 'Marvel First Family reimagined.',
+      Year: 2026
+    };
+
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({
+        candidates: [
+          {
+            content: {
+              parts: [{ text: JSON.stringify(mockOutput) }]
+            }
+          }
+        ]
+      })
+    });
+
+    try {
+      const res = await synthesizeMetadataWithGemini({
+        winningCandidate: {
+          title: 'Heroes Reborn',
+          metadata: { series: 'Fantastic Four Epic Collection', volume: '26' }
+        },
+        filename: 'Fantastic Four Epic Collection v26 (2026) - Heroes Reborn (digital) (Marika-Empire).cbz',
+        apiKey: 'test-key'
+      });
+
+      expect(res.Volume).toBe('26');
+      expect(res.volume).toBe('26');
+      expect(res.Number).toBe('26');
+      expect(res.number).toBe('26');
+      expect(res.issue_number).toBe('26');
+    } finally {
+      global.fetch = originalFetch;
+    }
+  });
 });
