@@ -538,7 +538,7 @@ async function fetchCtSettings() {
 
     // Source checkboxes
     const enabled = data.enabledSources || [];
-    ['comicvine', 'metron', 'gcd', 'lcg', 'goodreads', 'blackwells', 'waterstones', 'googlebooks', 'amazon'].forEach(s => {
+    ['comicvine', 'metron', 'gcd', 'lcg', 'goodreads', 'blackwells', 'waterstones', 'googlebooks', 'amazon', 'forbiddenplanet'].forEach(s => {
       const cb = document.getElementById(`src-cb-${s}`);
       if (cb) {
         cb.checked = enabled.length === 0 || enabled.includes(`src-${s}`) || enabled.includes(s);
@@ -759,7 +759,7 @@ async function saveCtSettings() {
   const forceReprocess = forceSettingCb ? forceSettingCb.checked : (forceScanCb ? forceScanCb.checked : false);
 
   const enabledSources = [];
-  ['comicvine', 'metron', 'gcd', 'lcg', 'goodreads', 'blackwells', 'waterstones', 'googlebooks', 'amazon'].forEach(s => {
+  ['comicvine', 'metron', 'gcd', 'lcg', 'goodreads', 'blackwells', 'waterstones', 'googlebooks', 'amazon', 'forbiddenplanet'].forEach(s => {
     const cb = document.getElementById(`src-cb-${s}`);
     if (cb && cb.checked) {
       enabledSources.push(`src-${s}`);

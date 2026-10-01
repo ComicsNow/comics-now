@@ -28,6 +28,7 @@ from tagger_app.sources.blackwells import search_blackwells_multi
 from tagger_app.sources.waterstones import search_waterstones_multi
 from tagger_app.sources.googlebooks import search_googlebooks_multi
 from tagger_app.sources.amazon import search_amazon_multi
+from tagger_app.sources.forbiddenplanet import search_forbiddenplanet_multi
 from tagger_app.sources.registry import SOURCES, SourceContext
 from tagger_app.config import DB_TRACKING_PATH, LOGS_DIR
 from tagger_app.persistence.tracking_db import (
@@ -586,7 +587,7 @@ def enhance_single_cbz_file(file_path, comicvine_api_key, google_books_api_key=N
     except Exception as read_err:
         print(f"[-] Failed to read existing ComicInfo.xml for {filename}: {read_err}")
         
-    active_sources = enabled_sources if enabled_sources else ["src-comicvine", "src-metron", "src-gcd", "src-lcg", "src-goodreads"]
+    active_sources = enabled_sources if enabled_sources else ["src-comicvine", "src-metron", "src-gcd", "src-lcg", "src-goodreads", "src-blackwells", "src-waterstones", "src-googlebooks", "src-amazon", "src-forbiddenplanet"]
     api_failed = False
         
     metadata = None
@@ -1936,6 +1937,7 @@ def api_search_external():
                 ("waterstones", lambda: search_waterstones_multi(query)),
                 ("googlebooks", lambda: search_googlebooks_multi(query, api_key=data.get("google_books_api_key") or scheduler_config.get("google_books_api_key"))),
                 ("amazon", lambda: search_amazon_multi(query)),
+                ("forbiddenplanet", lambda: search_forbiddenplanet_multi(query)),
             ]
 
             cv_key = data.get("comicvine_api_key") or scheduler_config.get("comicvine_api_key")
@@ -2029,6 +2031,13 @@ def api_search_external():
             for item in (res or []):
                 if isinstance(item, dict):
                     item["source"] = "amazon"
+                    results.append(item)
+
+        elif source in ("forbiddenplanet", "src-forbiddenplanet", "fp"):
+            res = search_forbiddenplanet_multi(query)
+            for item in (res or []):
+                if isinstance(item, dict):
+                    item["source"] = "forbiddenplanet"
                     results.append(item)
         else:
             return jsonify({"error": f"Unsupported search source: {source}"}), 400

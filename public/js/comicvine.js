@@ -104,7 +104,8 @@ const SOURCE_DISPLAY_CONFIG = {
   blackwells:  { name: "Blackwell's",  badgeBg: 'bg-teal-600' },
   waterstones: { name: 'Waterstones',  badgeBg: 'bg-emerald-600' },
   googlebooks: { name: 'Google Books', badgeBg: 'bg-blue-600' },
-  amazon:      { name: 'Amazon',       badgeBg: 'bg-yellow-600' }
+  amazon:      { name: 'Amazon',       badgeBg: 'bg-yellow-600' },
+  forbiddenplanet: { name: 'Forbidden Planet', badgeBg: 'bg-orange-600' }
 };
 
 function getSourceInfo(rawSource) {

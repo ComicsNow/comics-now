@@ -5,6 +5,8 @@ const attachGeminiRoutes = require('../server/routes/admin/gemini');
 describe('Compliance & Config Endpoints', () => {
   let router;
   let testConfig;
+  let mockDbRun;
+  let mockDbGet;
   const testConfigPath = '/tmp/test-compliance-config.json';
 
   beforeEach(() => {
@@ -15,12 +17,14 @@ describe('Compliance & Config Endpoints', () => {
     };
     fs.writeFileSync(testConfigPath, JSON.stringify(testConfig), 'utf8');
 
+    mockDbGet = jest.fn().mockResolvedValue(null);
+    mockDbRun = jest.fn().mockResolvedValue({});
     router = express.Router();
     attachGeminiRoutes(router, {
       config: testConfig,
       paths: { CONFIG_FILE: testConfigPath },
-      dbGet: jest.fn().mockResolvedValue(null),
-      dbRun: jest.fn().mockResolvedValue({}),
+      dbGet: mockDbGet,
+      dbRun: mockDbRun,
       log: jest.fn(),
       saveConfigToDisk: jest.fn()
     });
@@ -100,6 +104,37 @@ describe('Compliance & Config Endpoints', () => {
       ok: true,
       termsAccepted: true,
       model: 'gemini-2.5-flash-lite'
+    }));
+    expect(mockDbRun).toHaveBeenCalledWith(
+      expect.stringContaining('geminiApiKey'),
+      expect.any(Array)
+    );
+  });
+
+  test('GET /api/v1/gemini/config retrieves hasApiKey: true when stored in database', async () => {
+    mockDbGet.mockImplementation(async (query) => {
+      if (query.includes('geminiApiKey')) {
+        return { value: JSON.stringify('AIzaSyPersistedKey') };
+      }
+      if (query.includes('geminiTermsAccepted')) {
+        return { value: 'true' };
+      }
+      return null;
+    });
+
+    const handler = getRouteHandler('GET', '/api/v1/gemini/config');
+    const req = {};
+    const res = {
+      json: jest.fn(),
+      status: jest.fn().mockReturnThis(),
+      set: jest.fn()
+    };
+
+    await handler(req, res);
+
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
+      termsAccepted: true,
+      hasApiKey: true
     }));
   });
 

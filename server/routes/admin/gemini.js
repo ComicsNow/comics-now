@@ -20,7 +20,14 @@ module.exports = function attach(router, deps) {
     saveConfigToDisk
   } = deps;
 
-  const configPath = deps.paths?.CONFIG_FILE || path.join(__dirname, '../../../config.json');
+  const defaultConfigFile = (() => {
+    try {
+      return require('../../constants').CONFIG_FILE;
+    } catch (_) {
+      return path.join(__dirname, '../../../config.json');
+    }
+  })();
+  const configPath = deps.paths?.CONFIG_FILE || defaultConfigFile;
 
   function readConfig() {
     try {
@@ -33,10 +40,6 @@ module.exports = function attach(router, deps) {
 
   async function checkTermsAccepted() {
     const cfg = readConfig();
-    if (cfg.geminiTermsAccepted !== undefined) {
-      config.geminiTermsAccepted = cfg.geminiTermsAccepted === true;
-      return config.geminiTermsAccepted;
-    }
     if (config.geminiTermsAccepted === true) return true;
     if (typeof dbGet === 'function') {
       try {
@@ -46,6 +49,10 @@ module.exports = function attach(router, deps) {
           return true;
         }
       } catch (_) {}
+    }
+    if (cfg.geminiTermsAccepted !== undefined) {
+      config.geminiTermsAccepted = cfg.geminiTermsAccepted === true;
+      return config.geminiTermsAccepted;
     }
     return false;
   }
@@ -59,7 +66,39 @@ module.exports = function attach(router, deps) {
       }
       const cfg = readConfig();
       const termsAccepted = await checkTermsAccepted();
-      const apiKey = (process.env.NODE_ENV === 'test' ? '' : process.env.GEMINI_API_KEY) || cfg.geminiApiKey || config.geminiApiKey || '';
+
+      let dbApiKey = '';
+      let dbModel = '';
+      let dbEnabled = null;
+      let dbCap = null;
+      if (typeof dbGet === 'function') {
+        try {
+          const keyRow = await dbGet("SELECT value FROM settings WHERE key = 'geminiApiKey'");
+          if (keyRow?.value) {
+            try { dbApiKey = JSON.parse(keyRow.value); } catch { dbApiKey = keyRow.value; }
+          }
+          const modelRow = await dbGet("SELECT value FROM settings WHERE key = 'geminiModel'");
+          if (modelRow?.value) {
+            try { dbModel = JSON.parse(modelRow.value); } catch { dbModel = modelRow.value; }
+          }
+          const enabledRow = await dbGet("SELECT value FROM settings WHERE key = 'geminiCoverMatchEnabled'");
+          if (enabledRow?.value !== undefined) {
+            try { dbEnabled = JSON.parse(enabledRow.value); } catch { dbEnabled = enabledRow.value; }
+          }
+          const capRow = await dbGet("SELECT value FROM settings WHERE key = 'geminiCoverDailyCap'");
+          if (capRow?.value) {
+            try { dbCap = JSON.parse(capRow.value); } catch { dbCap = capRow.value; }
+          }
+        } catch (_) {}
+      }
+
+      let configGetterKey = '';
+      try {
+        const { getGeminiApiKey } = require('../../config');
+        configGetterKey = getGeminiApiKey();
+      } catch (_) {}
+
+      const apiKey = (process.env.NODE_ENV === 'test' ? '' : process.env.GEMINI_API_KEY) || dbApiKey || cfg.geminiApiKey || config.geminiApiKey || configGetterKey || '';
 
       let quotaCount = 0;
       if (typeof dbGet === 'function') {
@@ -69,12 +108,16 @@ module.exports = function attach(router, deps) {
         } catch (_) {}
       }
 
+      const isEnabled = dbEnabled !== null ? !!dbEnabled : (cfg.geminiCoverMatchEnabled !== false);
+      const activeModel = dbModel || cfg.geminiModel || config.geminiModel || 'gemini-3.5-flash-lite';
+      const dailyCapVal = dbCap ? parseInt(dbCap, 10) : parseInt(cfg.geminiCoverDailyCap || '450', 10);
+
       res.json({
-        enabled: cfg.geminiCoverMatchEnabled !== false,
+        enabled: isEnabled,
         hasApiKey: !!apiKey,
         termsAccepted: termsAccepted,
-        model: cfg.geminiModel || config.geminiModel || 'gemini-3.5-flash-lite',
-        dailyCap: parseInt(cfg.geminiCoverDailyCap || '450', 10),
+        model: activeModel,
+        dailyCap: dailyCapVal,
         dailyUsed: quotaCount
       });
     } catch (err) {
@@ -198,20 +241,52 @@ module.exports = function attach(router, deps) {
       }
 
       if (geminiApiKey !== undefined) {
-        cfg.geminiApiKey = String(geminiApiKey).trim();
-        config.geminiApiKey = cfg.geminiApiKey;
+        const key = String(geminiApiKey).trim();
+        cfg.geminiApiKey = key;
+        config.geminiApiKey = key;
+        try {
+          const { setGeminiApiKey } = require('../../config');
+          setGeminiApiKey(key, true);
+        } catch (_) {}
+        if (typeof dbRun === 'function') {
+          await dbRun("INSERT INTO settings (key, value) VALUES ('geminiApiKey', ?) ON CONFLICT(key) DO UPDATE SET value = ?", [JSON.stringify(key), JSON.stringify(key)]);
+        }
       }
       if (geminiModel !== undefined) {
-        cfg.geminiModel = String(geminiModel).trim();
-        config.geminiModel = cfg.geminiModel;
+        const model = String(geminiModel).trim();
+        cfg.geminiModel = model;
+        config.geminiModel = model;
+        try {
+          const { setGeminiModel } = require('../../config');
+          setGeminiModel(model, true);
+        } catch (_) {}
+        if (typeof dbRun === 'function') {
+          await dbRun("INSERT INTO settings (key, value) VALUES ('geminiModel', ?) ON CONFLICT(key) DO UPDATE SET value = ?", [JSON.stringify(model), JSON.stringify(model)]);
+        }
       }
       if (geminiCoverMatchEnabled !== undefined) {
-        cfg.geminiCoverMatchEnabled = !!geminiCoverMatchEnabled;
-        config.geminiCoverMatchEnabled = cfg.geminiCoverMatchEnabled;
+        const enabled = !!geminiCoverMatchEnabled;
+        cfg.geminiCoverMatchEnabled = enabled;
+        config.geminiCoverMatchEnabled = enabled;
+        try {
+          const { setGeminiCoverMatchEnabled } = require('../../config');
+          setGeminiCoverMatchEnabled(enabled, true);
+        } catch (_) {}
+        if (typeof dbRun === 'function') {
+          await dbRun("INSERT INTO settings (key, value) VALUES ('geminiCoverMatchEnabled', ?) ON CONFLICT(key) DO UPDATE SET value = ?", [JSON.stringify(enabled), JSON.stringify(enabled)]);
+        }
       }
       if (geminiCoverDailyCap !== undefined) {
-        cfg.geminiCoverDailyCap = parseInt(geminiCoverDailyCap, 10);
-        config.geminiCoverDailyCap = cfg.geminiCoverDailyCap;
+        const cap = parseInt(geminiCoverDailyCap, 10);
+        cfg.geminiCoverDailyCap = cap;
+        config.geminiCoverDailyCap = cap;
+        try {
+          const { setGeminiCoverDailyCap } = require('../../config');
+          setGeminiCoverDailyCap(cap, true);
+        } catch (_) {}
+        if (typeof dbRun === 'function') {
+          await dbRun("INSERT INTO settings (key, value) VALUES ('geminiCoverDailyCap', ?) ON CONFLICT(key) DO UPDATE SET value = ?", [JSON.stringify(cap), JSON.stringify(cap)]);
+        }
       }
 
       fs.writeFileSync(configPath, JSON.stringify(cfg, null, 2), 'utf8');
