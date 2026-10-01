@@ -181,7 +181,8 @@ module.exports = function attach(router, deps) {
       { id: 'src-blackwells', label: "Blackwell's" },
       { id: 'src-waterstones', label: 'Waterstones' },
       { id: 'src-googlebooks', label: 'Google Books', requiresApiKey: true },
-      { id: 'src-amazon', label: 'Amazon' }
+      { id: 'src-amazon', label: 'Amazon' },
+      { id: 'src-forbiddenplanet', label: 'Forbidden Planet' }
     ];
     const enabled = getTaggerEnabledSources ? getTaggerEnabledSources() : allSources.map(s => s.id);
     res.json({

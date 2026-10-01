@@ -23,6 +23,7 @@ class DomainRateLimiter:
             "goodreads.com": 2.0,
             "blackwells.co.uk": 2.0,
             "waterstones.com": 2.0,
+            "forbiddenplanet.com": 1.5,
             "googleapis.com": 0.2,
             "amazon.com": 2.5,
             "amazon.co.uk": 2.5,

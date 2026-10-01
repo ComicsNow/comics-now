@@ -264,6 +264,170 @@ def comicvine_search(query: str) -> str:
     )
 
 
+@mcp.tool()
+def external_metadata_search(query: str, source: str = "all") -> str:
+    """Search for comic metadata across external databases.
+
+    Args:
+        query: Comic title / series search string.
+        source: Metadata source to query ("all", "comicvine", "metron", or "gcd").
+    """
+    return _dump(
+        _request("GET", "/api/v1/search/external", params={"query": query, "source": source})
+    )
+
+
+@mcp.tool()
+def get_metadata_sources() -> str:
+    """Get all available external metadata sources and their configuration status."""
+    return _dump(_request("GET", "/api/v1/comictagger/sources"))
+
+
+@mcp.tool()
+def get_comictagger_pending_details() -> str:
+    """Get full details, candidates, cover URLs, and match confidence for the comic currently pending review."""
+    return _dump(_request("GET", "/api/v1/comictagger/pending-details"))
+
+
+@mcp.tool()
+def get_gemini_status() -> str:
+    """Get Gemini AI cover-matching status, model configuration, daily quota cap, and usage today."""
+    return _dump(_request("GET", "/api/v1/gemini/config"))
+
+
+@mcp.tool()
+def list_gemini_models(api_key: Optional[str] = None) -> str:
+    """List available Google Gemini models supported for visual cover matching."""
+    params = {}
+    if api_key:
+        params["apiKey"] = api_key
+    return _dump(_request("GET", "/api/v1/gemini/models", params=params if params else None))
+
+
+@mcp.tool()
+def get_organization_rules() -> str:
+    """Get active comic file naming tokens and folder hierarchy rules."""
+    naming = _request("GET", "/api/v1/comictagger/naming-rules")
+    folder = _request("GET", "/api/v1/comictagger/folder-rules")
+    naming_rules = (
+        naming.get("data", {}).get("rules")
+        if isinstance(naming, dict) and isinstance(naming.get("data"), dict)
+        else (naming.get("data") if isinstance(naming, dict) else naming)
+    )
+    folder_rules = (
+        folder.get("data", {}).get("rules")
+        if isinstance(folder, dict) and isinstance(folder.get("data"), dict)
+        else (folder.get("data") if isinstance(folder, dict) else folder)
+    )
+    return _dump({
+        "namingRules": naming_rules,
+        "folderRules": folder_rules,
+    })
+
+
+@mcp.tool()
+def preview_comic_organization(metadata: dict) -> str:
+    """Simulate file naming and folder path organization for a comic without writing any files.
+
+    Args:
+        metadata: Comic metadata dictionary, e.g. {"series": "Batman", "issue": "1", "year": "2016", "publisher": "DC Comics"}.
+    """
+    normalized = dict(metadata)
+    mapping = {
+        "series": "Series",
+        "publisher": "Publisher",
+        "year": "Year",
+        "issue": "Number",
+        "number": "Number",
+        "title": "Title",
+        "writer": "Writer",
+        "volume": "Volume",
+        "pages": "PageCount",
+        "page_count": "PageCount",
+        "cover_date": "CoverDate",
+    }
+    for src, target in mapping.items():
+        if src in metadata and target not in normalized:
+            normalized[target] = metadata[src]
+        elif target in metadata and src not in normalized:
+            normalized[src] = metadata[target]
+
+    filename_resp = _request("POST", "/api/v1/comictagger/naming-preview", body={"metadata": normalized})
+    folder_resp = _request("POST", "/api/v1/comictagger/folder-preview", body={"metadata": normalized})
+
+    filename = None
+    if isinstance(filename_resp, dict):
+        if "filename" in filename_resp:
+            filename = filename_resp["filename"]
+        elif isinstance(filename_resp.get("data"), dict):
+            filename = filename_resp["data"].get("filename")
+
+    folder_path = None
+    if isinstance(folder_resp, dict):
+        if "folderPath" in folder_resp:
+            folder_path = folder_resp["folderPath"]
+        elif isinstance(folder_resp.get("data"), dict):
+            folder_path = folder_resp["data"].get("folderPath")
+
+    return _dump({
+        "filename": filename,
+        "folderPath": folder_path,
+    })
+
+
+
+@mcp.tool()
+def get_guided_status() -> str:
+    """Get Guided View panel detector status, queue size, and active job."""
+    return _dump(_request("GET", "/api/v1/guided/status"))
+
+
+@mcp.tool()
+def get_guided_logs() -> str:
+    """Fetch recent Guided View detection logs."""
+    return _dump(_request("GET", "/api/v1/guided/logs"))
+
+
+@mcp.tool()
+def trigger_guided_detection(
+    scope: str,
+    target: str,
+    force: bool = False,
+) -> str:
+    """Start Guided View panel/bubble detection for a comic, series, publisher, or library.
+
+    Args:
+        scope: Target scope type ("comic", "series", "publisher", or "library").
+        target: Target identifier or name (e.g. comic ID, series name, publisher name, or library path).
+        force: If True, forces re-detection on comics even if already completed.
+    """
+    return _dump(
+        _request(
+            "POST",
+            "/api/v1/guided/run-scope",
+            body={"scope": scope, "target": target, "force": bool(force)},
+        )
+    )
+
+
+@mcp.tool()
+def list_libraries() -> str:
+    """List all configured comic libraries, root paths, and settings."""
+    return _dump(_request("GET", "/api/v1/admin/libraries"))
+
+
+@mcp.tool()
+def get_user_stats(user_id: str) -> str:
+    """Get reading statistics for a user (total read, pages read, series progress)."""
+    return _dump(_request("GET", f"/api/v1/users/{user_id}/stats"))
+
+
+@mcp.tool()
+def get_operation_errors() -> str:
+    """Get background operation errors (file move, rename, scan, or tagging errors)."""
+    return _dump(_request("GET", "/api/v1/operation-errors"))
+
+
 # --- Curated safe-write tools ------------------------------------------------
 
 

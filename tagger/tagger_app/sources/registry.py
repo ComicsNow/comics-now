@@ -9,6 +9,7 @@ from typing import Callable, Optional
 
 from tagger_app.sources import (
     comicvine, metron, gcd, lcg, goodreads, blackwells, waterstones, googlebooks, amazon,
+    forbiddenplanet,
 )
 
 
@@ -114,6 +115,14 @@ SOURCES = [
         frozenset({"src-amazon", "amazon", "amz"}),
         "Searching Amazon...",
         lambda f, ctx, prog: amazon.resolve_amazon(
+            f, cover_path=ctx.cover_path, on_progress=prog, existing_meta=ctx.existing_meta),
+        tier=2,
+    ),
+    Source(
+        "src-forbiddenplanet", "Forbidden Planet",
+        frozenset({"src-forbiddenplanet", "forbiddenplanet", "fp"}),
+        "Searching Forbidden Planet...",
+        lambda f, ctx, prog: forbiddenplanet.resolve_forbiddenplanet(
             f, cover_path=ctx.cover_path, on_progress=prog, existing_meta=ctx.existing_meta),
         tier=2,
     ),

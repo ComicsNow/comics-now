@@ -27,7 +27,7 @@ scheduler_config = {
     "upper_threshold": 0.90,
     "batch_concurrency": 4,
     "selected_fields": ["Writer", "Penciller", "Inker", "Colorist", "Letterer", "CoverArtist", "Editor", "Genre", "PageCount", "Characters", "Teams", "Locations"],
-    "enabled_sources": ["src-comicvine", "src-metron", "src-gcd", "src-lcg", "src-goodreads", "src-blackwells", "src-waterstones", "src-googlebooks", "src-amazon"],
+    "enabled_sources": ["src-comicvine", "src-metron", "src-gcd", "src-lcg", "src-goodreads", "src-blackwells", "src-waterstones", "src-googlebooks", "src-amazon", "src-forbiddenplanet"],
     "force_reprocess": False,
     "legacy_xml_fallback": True
 }
