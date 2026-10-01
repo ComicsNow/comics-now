@@ -607,7 +607,7 @@
           </div>
 
           <div class="border border-gray-700 rounded-lg p-4 mb-4 bg-gray-900/50">
-            <h4 class="font-semibold text-white mb-3 text-sm">Metadata Sources (9 Available)</h4>
+            <h4 class="font-semibold text-white mb-3 text-sm">Metadata Sources (10 Available)</h4>
             <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4 text-sm">
               <label class="flex items-center gap-2 cursor-pointer">
                 <input type="checkbox" id="src-cb-comicvine" class="rounded bg-gray-700 text-blue-600">
@@ -644,6 +644,10 @@
               <label class="flex items-center gap-2 cursor-pointer">
                 <input type="checkbox" id="src-cb-amazon" class="rounded bg-gray-700 text-blue-600">
                 <span>Amazon</span>
+              </label>
+              <label class="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" id="src-cb-forbiddenplanet" class="rounded bg-gray-700 text-blue-600">
+                <span>Forbidden Planet</span>
               </label>
             </div>
 
@@ -1682,13 +1686,13 @@
       </div>
 <!-- Metadata tab content -->
 <div id="metadata-content" class="hidden">
-  <!-- Mobile sub-tabs: ComicVine search vs metadata edit. Hidden on md+ where both sections show side-by-side. -->
+  <!-- Mobile sub-tabs: Comics Tagger search vs metadata edit. Hidden on md+ where both sections show side-by-side. -->
   <div id="metadata-subtabs" class="md:hidden flex gap-2 mb-3">
-    <button type="button" id="metadata-subtab-cv" class="pill-button bg-red-600 text-white flex-1">ComicVine</button>
+    <button type="button" id="metadata-subtab-cv" class="pill-button bg-red-600 text-white flex-1">Comics Tagger</button>
     <button type="button" id="metadata-subtab-form" class="pill-button bg-gray-700 hover:bg-gray-600 text-white flex-1">Metadata</button>
   </div>
   <div class="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
-    <!-- LEFT: ComicVine Search -->
+    <!-- LEFT: Comics Tagger Search -->
 <section id="metadata-sub-cv" class="flex flex-col space-y-3">
       <!-- Sticky search controls -->
       <div class="sticky top-0 z-10 bg-gray-900/80 backdrop-blur p-4 rounded-xl border border-gray-800">
@@ -1712,6 +1716,7 @@
                 <option value="waterstones">Waterstones</option>
                 <option value="googlebooks">Google Books</option>
                 <option value="amazon">Amazon</option>
+                <option value="forbiddenplanet">Forbidden Planet</option>
               </select>
             </div>
           </div>

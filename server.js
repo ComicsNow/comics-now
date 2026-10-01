@@ -59,6 +59,7 @@ const {
   getLibraryIdFromPath,
   addLibrary,
   removeLibrary,
+  saveConfigToDisk,
   getScanIntervalMinutes,
   setScanIntervalMinutes,
   getComicVineApiKey,
@@ -315,7 +316,9 @@ const apiRouter = createApiRouter({
   ms,
   requireAdmin,
   requireAuth,
-  isAuthEnabled
+  isAuthEnabled,
+  saveConfigToDisk,
+  paths: require('./server/constants')
 });
 
 const staticRouter = createStaticRouter({

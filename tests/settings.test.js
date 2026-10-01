@@ -265,4 +265,28 @@ describe('Admin Settings Routes', () => {
       expect(res.json).toHaveBeenCalledWith({ ok: false, message: 'API Key must be hexadecimal' });
     });
   });
+
+  describe('loadSettings', () => {
+    it('should load Gemini settings from DB into config', async () => {
+      const { loadSettings } = require('../server/settings');
+      const db = require('../server/db');
+      const config = require('../server/config');
+
+      jest.spyOn(db, 'dbAll').mockResolvedValueOnce([
+        { key: 'geminiApiKey', value: JSON.stringify('test-gemini-key') },
+        { key: 'geminiModel', value: JSON.stringify('gemini-2.5-flash-lite') },
+        { key: 'geminiCoverMatchEnabled', value: JSON.stringify(true) },
+        { key: 'geminiCoverDailyCap', value: JSON.stringify(300) },
+        { key: 'geminiTermsAccepted', value: JSON.stringify(true) }
+      ]);
+
+      await loadSettings();
+
+      expect(config.getGeminiApiKey()).toBe('test-gemini-key');
+      expect(config.getGeminiModel()).toBe('gemini-2.5-flash-lite');
+      expect(config.getGeminiCoverMatchEnabled()).toBe(true);
+      expect(config.getGeminiCoverDailyCap()).toBe(300);
+      expect(config.getGeminiTermsAccepted()).toBe(true);
+    });
+  });
 });

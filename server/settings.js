@@ -1,4 +1,4 @@
-const { dbAll, dbRun } = require('./db');
+const db = require('./db');
 const { log } = require('./logger');
 const {
   setScanIntervalMinutes,
@@ -12,7 +12,7 @@ const {
 
 async function loadSettings() {
   try {
-    const rows = await dbAll('SELECT key, value FROM settings');
+    const rows = await db.dbAll('SELECT key, value FROM settings');
     if (!rows) {
       return;
     }
@@ -110,6 +110,36 @@ async function loadSettings() {
         const { setFolderRules } = require('./config');
         setFolderRules(val, true);
       }
+      if (row.key === 'geminiApiKey') {
+        let val;
+        try { val = JSON.parse(row.value); } catch { val = row.value; }
+        const { setGeminiApiKey } = require('./config');
+        setGeminiApiKey(val, true);
+      }
+      if (row.key === 'geminiModel') {
+        let val;
+        try { val = JSON.parse(row.value); } catch { val = row.value; }
+        const { setGeminiModel } = require('./config');
+        setGeminiModel(val, true);
+      }
+      if (row.key === 'geminiCoverMatchEnabled') {
+        let val;
+        try { val = JSON.parse(row.value); } catch { val = row.value; }
+        const { setGeminiCoverMatchEnabled } = require('./config');
+        setGeminiCoverMatchEnabled(val !== false && val !== 'false', true);
+      }
+      if (row.key === 'geminiCoverDailyCap') {
+        let val;
+        try { val = JSON.parse(row.value); } catch { val = row.value; }
+        const { setGeminiCoverDailyCap } = require('./config');
+        setGeminiCoverDailyCap(val, true);
+      }
+      if (row.key === 'geminiTermsAccepted') {
+        let val;
+        try { val = JSON.parse(row.value); } catch { val = row.value; }
+        const { setGeminiTermsAccepted } = require('./config');
+        setGeminiTermsAccepted(val === true || val === 'true', true);
+      }
     }
     log('INFO', 'SERVER', 'Settings loaded from DB.');
   } catch (err) {
@@ -119,7 +149,7 @@ async function loadSettings() {
 
 async function saveSetting(key, value) {
   try {
-    await dbRun('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)', [key, JSON.stringify(value)]);
+    await db.dbRun('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)', [key, JSON.stringify(value)]);
   } catch (err) {
     log('ERROR', 'DB', `Save setting '${key}' failed: ${err.message}`);
     throw err;

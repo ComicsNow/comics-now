@@ -23,7 +23,12 @@ const DEFAULT_CONFIG = {
   metronPassword: '',
   googleBooksApiKey: '',
   namingRules: null,
-  folderRules: null
+  folderRules: null,
+  geminiApiKey: '',
+  geminiModel: 'gemini-3.5-flash-lite',
+  geminiCoverMatchEnabled: true,
+  geminiCoverDailyCap: 450,
+  geminiTermsAccepted: false
 };
 
 let config = { ...DEFAULT_CONFIG };
@@ -35,6 +40,12 @@ function applyEnvOverrides() {
   if (process.env.SCAN_INTERVAL_MINUTES) config.scanIntervalMinutes = parseInt(process.env.SCAN_INTERVAL_MINUTES, 10);
   if (process.env.COMICVINE_API_KEY) config.comicVineApiKey = process.env.COMICVINE_API_KEY;
   if (process.env.GOOGLE_BOOKS_API_KEY) config.googleBooksApiKey = process.env.GOOGLE_BOOKS_API_KEY;
+  if (process.env.GEMINI_API_KEY) config.geminiApiKey = process.env.GEMINI_API_KEY;
+  if (process.env.GEMINI_MODEL) config.geminiModel = process.env.GEMINI_MODEL;
+  if (process.env.GEMINI_COVER_DAILY_CAP) config.geminiCoverDailyCap = parseInt(process.env.GEMINI_COVER_DAILY_CAP, 10);
+  if (process.env.GEMINI_COVER_MATCH_ENABLED !== undefined) {
+    config.geminiCoverMatchEnabled = process.env.GEMINI_COVER_MATCH_ENABLED === 'true' || process.env.GEMINI_COVER_MATCH_ENABLED === '1';
+  }
   if (process.env.CT_SCHEDULE_MINUTES) config.ctScheduleMinutes = parseInt(process.env.CT_SCHEDULE_MINUTES, 10);
   if (process.env.ALLOWED_FORMATS) config.allowed_formats = process.env.ALLOWED_FORMATS;
   if (process.env.METADATA_STORAGE) config.metadata_storage = process.env.METADATA_STORAGE;
@@ -491,6 +502,51 @@ function setFolderRules(rules, skipSave = false) {
   if (!skipSave) saveConfigToDisk();
 }
 
+function getGeminiApiKey() {
+  return config.geminiApiKey || '';
+}
+
+function setGeminiApiKey(key, skipSave = false) {
+  config.geminiApiKey = key ? String(key).trim() : '';
+  if (!skipSave) saveConfigToDisk();
+}
+
+function getGeminiModel() {
+  return config.geminiModel || 'gemini-3.5-flash-lite';
+}
+
+function setGeminiModel(model, skipSave = false) {
+  config.geminiModel = model ? String(model).trim() : 'gemini-3.5-flash-lite';
+  if (!skipSave) saveConfigToDisk();
+}
+
+function getGeminiCoverMatchEnabled() {
+  return config.geminiCoverMatchEnabled !== false;
+}
+
+function setGeminiCoverMatchEnabled(val, skipSave = false) {
+  config.geminiCoverMatchEnabled = val !== false;
+  if (!skipSave) saveConfigToDisk();
+}
+
+function getGeminiCoverDailyCap() {
+  return config.geminiCoverDailyCap || 450;
+}
+
+function setGeminiCoverDailyCap(cap, skipSave = false) {
+  config.geminiCoverDailyCap = parseInt(cap, 10) || 450;
+  if (!skipSave) saveConfigToDisk();
+}
+
+function getGeminiTermsAccepted() {
+  return config.geminiTermsAccepted === true;
+}
+
+function setGeminiTermsAccepted(val, skipSave = false) {
+  config.geminiTermsAccepted = val === true;
+  if (!skipSave) saveConfigToDisk();
+}
+
 module.exports = {
   DEFAULT_CONFIG,
   loadConfigFromDisk,
@@ -546,6 +602,17 @@ module.exports = {
   getNamingRules,
   setNamingRules,
   getFolderRules,
-  setFolderRules
+  setFolderRules,
+  getGeminiApiKey,
+  setGeminiApiKey,
+  getGeminiModel,
+  setGeminiModel,
+  getGeminiCoverMatchEnabled,
+  setGeminiCoverMatchEnabled,
+  getGeminiCoverDailyCap,
+  setGeminiCoverDailyCap,
+  getGeminiTermsAccepted,
+  setGeminiTermsAccepted
 };
+
 
