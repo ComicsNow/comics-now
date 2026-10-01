@@ -45,11 +45,41 @@ function getMimeType(filePath) {
   return 'image/jpeg';
 }
 
+function isPrivateUrl(urlStr) {
+  try {
+    const parsed = new URL(urlStr);
+    const hostname = parsed.hostname.toLowerCase();
+    if (
+      hostname === 'localhost' ||
+      hostname === '127.0.0.1' ||
+      hostname === '0.0.0.0' ||
+      hostname === '::1' ||
+      hostname.endsWith('.localhost') ||
+      hostname.endsWith('.internal') ||
+      hostname.endsWith('.local')
+    ) {
+      return true;
+    }
+    const parts = hostname.split('.').map(Number);
+    if (parts.length === 4 && parts.every(p => !isNaN(p) && p >= 0 && p <= 255)) {
+      if (parts[0] === 10) return true;
+      if (parts[0] === 127) return true;
+      if (parts[0] === 169 && parts[1] === 254) return true;
+      if (parts[0] === 172 && parts[1] >= 16 && parts[1] <= 31) return true;
+      if (parts[0] === 192 && parts[1] === 168) return true;
+      if (parts[0] === 0) return true;
+    }
+    return false;
+  } catch {
+    return true;
+  }
+}
+
 /**
  * Fetches an external image URL and converts it to base64 inlineData.
  */
 async function fetchImageAsBase64(url, timeoutMs = 8000) {
-  if (!url || typeof url !== 'string' || !url.startsWith('http')) {
+  if (!url || typeof url !== 'string' || !url.startsWith('http') || isPrivateUrl(url)) {
     return null;
   }
   try {
