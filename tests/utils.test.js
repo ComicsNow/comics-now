@@ -61,3 +61,23 @@ describe('stripHtml', () => {
     expect(stripHtml('abc<<p>p>def')).toBe('abcdef');
   });
 });
+
+describe('safeDirName', () => {
+  const { safeDirName } = require('../server/utils');
+
+  it('sanitizes slashes and replaces them with underscores', () => {
+    expect(safeDirName('foo/bar\\baz')).toBe('foo_bar_baz');
+  });
+
+  it('replaces dangerous dot-only directory navigation strings with underscore', () => {
+    expect(safeDirName('.')).toBe('_');
+    expect(safeDirName('..')).toBe('_');
+    expect(safeDirName('...')).toBe('_');
+    expect(safeDirName('   ..   ')).toBe('_');
+  });
+
+  it('preserves valid directory names', () => {
+    expect(safeDirName('Marvel Comics')).toBe('Marvel Comics');
+    expect(safeDirName('Vol. 1')).toBe('Vol. 1');
+  });
+});

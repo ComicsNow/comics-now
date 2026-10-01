@@ -284,5 +284,15 @@ describe('Gemini Vision Cover Arbiter', () => {
       expect(result.bestIndex).toBe(0);
       expect(result.confidence).toBe(0.88);
     });
+
+    test('fetchImageAsBase64 rejects loopback and private network URLs (SSRF protection)', async () => {
+      expect(await fetchImageAsBase64('http://localhost:5000/secret')).toBeNull();
+      expect(await fetchImageAsBase64('http://127.0.0.1:3000/api')).toBeNull();
+      expect(await fetchImageAsBase64('http://0.0.0.0:8080/')).toBeNull();
+      expect(await fetchImageAsBase64('http://169.254.169.254/latest/meta-data')).toBeNull();
+      expect(await fetchImageAsBase64('http://192.168.1.1/admin')).toBeNull();
+      expect(await fetchImageAsBase64('http://10.0.0.1/')).toBeNull();
+      expect(await fetchImageAsBase64('http://172.16.0.1/')).toBeNull();
+    });
   });
 });

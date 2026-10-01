@@ -7,7 +7,11 @@ function createId(p) {
 }
 
 function safeDirName(str) {
-  return String(str).trim().replace(/[\\/]+/g, '_').replace(/\s+/g, ' ');
+  const sanitized = String(str).trim().replace(/[\\/]+/g, '_').replace(/\s+/g, ' ');
+  if (!sanitized || sanitized === '.' || sanitized === '..' || /^\.+$/.test(sanitized)) {
+    return '_';
+  }
+  return sanitized;
 }
 
 function isImage(filename) {
