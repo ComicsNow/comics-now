@@ -32,7 +32,8 @@ async function checkFileSuccess(filePath) {
     const hasSeries = ((info.Series && info.Series.trim().length > 0) || (info.Title && info.Title.trim().length > 0));
     const hasPublisher = info.Publisher && info.Publisher.trim().length > 0;
     const hasDate = (info.Year || info.CoverDate || info.StoreDate || info['Cover Date'] || info['Store Date'] || '').toString().trim().length > 0;
-    const hasNumber = info.Number !== undefined && info.Number !== null && info.Number.toString().trim().length > 0;
+    const hasNumber = (info.Number !== undefined && info.Number !== null && info.Number.toString().trim().length > 0) ||
+                      (info.Volume !== undefined && info.Volume !== null && info.Volume.toString().trim().length > 0);
 
     return (hasSeries && hasPublisher && hasDate && hasNumber);
   } catch (err) {
@@ -258,6 +259,9 @@ async function runComicTagger(options = {}) {
               vol = volSplit.volume;
             }
           }
+          if (!num && vol) {
+            num = vol;
+          }
           if (title && (isTitleSameAsSeries(title, ser) || (!ser && isTitleSameAsSeries(title, '')))) {
             title = '';
           }
@@ -392,6 +396,9 @@ async function runComicTagger(options = {}) {
               if (!vol) {
                 vol = volSplit.volume;
               }
+            }
+            if (!num && vol) {
+              num = vol;
             }
             if (title && (isTitleSameAsSeries(title, ser) || (!ser && isTitleSameAsSeries(title, '')))) {
               title = '';
@@ -636,7 +643,8 @@ async function applyUserSelection(selections) {
       const dbMeta = {
         Title: title,
         Series: info.Series || ser,
-        Number: info.Number || '',
+        Number: info.Number || info.Volume || '',
+        Volume: info.Volume || '',
         Publisher: pub,
         Writer: info.Writer || '',
         Penciller: info.Penciller || '',

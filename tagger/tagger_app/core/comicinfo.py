@@ -118,10 +118,11 @@ def generate_comic_info_xml(metadata, enabled_fields=None):
         ET.SubElement(root, "Title").text = title_val
         
     num_val = _clean_str(metadata.get("number") or metadata.get("Number") or metadata.get("issue_number") or metadata.get("issue") or metadata.get("Issue"))
+    vol_val = _clean_str(metadata.get("volume") or metadata.get("Volume"))
+    if not num_val and vol_val:
+        num_val = vol_val
     if num_val:
         ET.SubElement(root, "Number").text = num_val
-
-    vol_val = _clean_str(metadata.get("volume") or metadata.get("Volume"))
     if vol_val:
         ET.SubElement(root, "Volume").text = vol_val
         
