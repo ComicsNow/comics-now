@@ -1074,6 +1074,13 @@
                                     <div class="track"><div class="thumb"></div></div>
                                 </label>
                             </div>
+                            <div style="display: flex; align-items: center; justify-content: space-between; border-top: 1px solid rgba(255,255,255,0.03); padding-top: 0.5rem;">
+                                <span style="font-size: 0.85rem; color: var(--text-secondary);">Forbidden Planet</span>
+                                <label class="toggle sm" for="src-forbiddenplanet">
+                                    <input type="checkbox" id="src-forbiddenplanet" checked>
+                                    <div class="track"><div class="thumb"></div></div>
+                                </label>
+                            </div>
                         </div>
                         <p style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.4rem;">
                             Select which metadata databases are queried during scanning.
@@ -1735,6 +1742,7 @@
         const srcGoodreads = document.getElementById('src-goodreads');
         const srcBlackwells = document.getElementById('src-blackwells');
         const srcWaterstones = document.getElementById('src-waterstones');
+        const srcForbiddenPlanet = document.getElementById('src-forbiddenplanet');
         const forceReprocessCheckbox = document.getElementById('force-reprocess');
         
         const btnSearch = document.getElementById('btn-search');
@@ -2370,6 +2378,7 @@
             if (srcGoodreads && srcGoodreads.checked) enabledSources.push('src-goodreads');
             if (srcBlackwells && srcBlackwells.checked) enabledSources.push('src-blackwells');
             if (srcWaterstones && srcWaterstones.checked) enabledSources.push('src-waterstones');
+            if (srcForbiddenPlanet && srcForbiddenPlanet.checked) enabledSources.push('src-forbiddenplanet');
 
             if (enabledSources.length === 0) {
                 showError(rightError, 'Please enable at least one search source in Search API Settings.');
@@ -2586,6 +2595,7 @@
             if (srcGoodreads && srcGoodreads.checked) enabledSources.push('src-goodreads');
             if (srcBlackwells && srcBlackwells.checked) enabledSources.push('src-blackwells');
             if (srcWaterstones && srcWaterstones.checked) enabledSources.push('src-waterstones');
+            if (srcForbiddenPlanet && srcForbiddenPlanet.checked) enabledSources.push('src-forbiddenplanet');
 
             if (enabledSources.length === 0) {
                 showError(rightError, 'Please enable at least one search source in Search API Settings.');
@@ -3071,7 +3081,7 @@
                         if (cfg.batch_concurrency !== undefined && batchConcurrencySelect) {
                             batchConcurrencySelect.value = cfg.batch_concurrency.toString();
                         }
-                        const enabledSrcs = cfg.enabled_sources || ['src-comicvine', 'src-metron', 'src-gcd', 'src-lcg', 'src-goodreads', 'src-blackwells', 'src-waterstones'];
+                        const enabledSrcs = cfg.enabled_sources || ['src-comicvine', 'src-metron', 'src-gcd', 'src-lcg', 'src-goodreads', 'src-blackwells', 'src-waterstones', 'src-googlebooks', 'src-amazon', 'src-forbiddenplanet'];
                         const hasComicvine = enabledSrcs.includes('src-comicvine');
                         const hasMetron = enabledSrcs.includes('src-metron') || enabledSrcs.includes('src-metron-gcd');
                         const hasGcd = enabledSrcs.includes('src-gcd') || enabledSrcs.includes('src-metron-gcd');
@@ -3083,6 +3093,7 @@
                         if (srcGoodreads) srcGoodreads.checked = enabledSrcs.includes('src-goodreads');
                         if (srcBlackwells) srcBlackwells.checked = enabledSrcs.includes('src-blackwells');
                         if (srcWaterstones) srcWaterstones.checked = enabledSrcs.includes('src-waterstones');
+                        if (srcForbiddenPlanet) srcForbiddenPlanet.checked = enabledSrcs.includes('src-forbiddenplanet');
                         if (forceReprocessCheckbox) forceReprocessCheckbox.checked = cfg.force_reprocess || false;
                     }
                     
@@ -3212,6 +3223,7 @@
             if (srcGoodreads && srcGoodreads.checked) enabledSources.push('src-goodreads');
             if (srcBlackwells && srcBlackwells.checked) enabledSources.push('src-blackwells');
             if (srcWaterstones && srcWaterstones.checked) enabledSources.push('src-waterstones');
+            if (srcForbiddenPlanet && srcForbiddenPlanet.checked) enabledSources.push('src-forbiddenplanet');
 
             if (enabledSources.length === 0) {
                 showError(schedError, 'Please enable at least one search source.');
@@ -3841,6 +3853,7 @@
             if (srcGoodreads && srcGoodreads.checked) enabledSources.push('src-goodreads');
             if (srcBlackwells && srcBlackwells.checked) enabledSources.push('src-blackwells');
             if (srcWaterstones && srcWaterstones.checked) enabledSources.push('src-waterstones');
+            if (srcForbiddenPlanet && srcForbiddenPlanet.checked) enabledSources.push('src-forbiddenplanet');
 
             if (enabledSources.length === 0 && !isReconnect) {
                 alert("Please enable at least one search source in Search API Settings.");

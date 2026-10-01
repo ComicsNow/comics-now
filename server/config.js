@@ -18,7 +18,7 @@ const DEFAULT_CONFIG = {
   taggerServiceUrl: 'http://127.0.0.1:5000',
   taggerLowerThreshold: 0.80,
   taggerUpperThreshold: 0.90,
-  taggerEnabledSources: ['src-comicvine', 'src-metron', 'src-gcd', 'src-lcg', 'src-goodreads', 'src-blackwells', 'src-waterstones', 'src-googlebooks', 'src-amazon'],
+  taggerEnabledSources: ['src-comicvine', 'src-metron', 'src-gcd', 'src-lcg', 'src-goodreads', 'src-blackwells', 'src-waterstones', 'src-googlebooks', 'src-amazon', 'src-forbiddenplanet'],
   metronUser: '',
   metronPassword: '',
   googleBooksApiKey: '',
@@ -425,7 +425,7 @@ function setTaggerUpperThreshold(value, skipSave = false) {
 }
 
 function getTaggerEnabledSources() {
-  return Array.isArray(config.taggerEnabledSources) ? config.taggerEnabledSources : ['src-comicvine', 'src-metron', 'src-gcd', 'src-lcg', 'src-goodreads', 'src-blackwells', 'src-waterstones', 'src-googlebooks', 'src-amazon'];
+  return Array.isArray(config.taggerEnabledSources) ? config.taggerEnabledSources : ['src-comicvine', 'src-metron', 'src-gcd', 'src-lcg', 'src-goodreads', 'src-blackwells', 'src-waterstones', 'src-googlebooks', 'src-amazon', 'src-forbiddenplanet'];
 }
 
 function setTaggerEnabledSources(sources, skipSave = false) {

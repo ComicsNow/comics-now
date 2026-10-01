@@ -336,7 +336,7 @@ def process_single_cbz_file(file_path, comicvine_api_key, google_books_api_key=N
     except Exception:
         pass
     
-    active_sources = enabled_sources if enabled_sources else ["src-comicvine", "src-metron", "src-gcd", "src-lcg", "src-goodreads", "src-blackwells", "src-waterstones"]
+    active_sources = enabled_sources if enabled_sources else ["src-comicvine", "src-metron", "src-gcd", "src-lcg", "src-goodreads", "src-blackwells", "src-waterstones", "src-googlebooks", "src-amazon", "src-forbiddenplanet"]
     
     metadata = None
     source_url = None

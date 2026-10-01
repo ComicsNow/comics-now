@@ -7,6 +7,7 @@ import pytest
 
 from tagger_app.sources import (
     comicvine, metron, gcd, lcg, goodreads, blackwells, waterstones, googlebooks, amazon,
+    forbiddenplanet,
 )
 from tagger_app.sources.registry import SOURCES
 
@@ -34,6 +35,11 @@ def test_canonical_id_and_alias_enable():
     assert amz.is_enabled(["amazon"]) is True
     assert amz.is_enabled(["amz"]) is True
 
+    fp = next(s for s in SOURCES if s.id == "src-forbiddenplanet")
+    assert fp.is_enabled(["src-forbiddenplanet"]) is True
+    assert fp.is_enabled(["forbiddenplanet"]) is True
+    assert fp.is_enabled(["fp"]) is True
+
 
 def test_metron_gcd_combo_alias_enables_both():
     metron_src = next(s for s in SOURCES if s.id == "src-metron")
@@ -50,7 +56,7 @@ def test_registry_order_and_coverage():
     assert ids == [
         "src-comicvine", "src-metron", "src-gcd", "src-lcg",
         "src-goodreads", "src-blackwells", "src-waterstones",
-        "src-googlebooks", "src-amazon",
+        "src-googlebooks", "src-amazon", "src-forbiddenplanet",
     ]
 
 
@@ -75,6 +81,7 @@ def record_resolvers(monkeypatch):
     monkeypatch.setattr(waterstones, "resolve_waterstones", make("waterstones"))
     monkeypatch.setattr(googlebooks, "resolve_googlebooks", make("googlebooks"))
     monkeypatch.setattr(amazon, "resolve_amazon", make("amazon"))
+    monkeypatch.setattr(forbiddenplanet, "resolve_forbiddenplanet", make("forbiddenplanet"))
     return calls
 
 

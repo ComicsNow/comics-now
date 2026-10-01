@@ -70,6 +70,24 @@ claude mcp add comics-now -- /path/to/comics-now/mcp/run.sh
 - **Library & Search**: `search_comics`, `library_tree`, `list_users`, `get_user_access`, `list_reading_lists`, `get_reading_list`, `get_settings`, `get_logs`.
 - **Reading Lists**: `create_reading_list`, `create_reading_lists_bulk`, `update_reading_list`, `delete_reading_list`, `delete_reading_lists_bulk`, `sync_reading_lists_to_all_users`, `add_comics_to_reading_list`, `remove_comics_from_reading_list`, `reorder_reading_list_comics`.
 - **Reading Status**: `set_comic_status`, `set_series_status`, `set_reading_list_read_status`.
+- **External Metadata & ComicTagger**:
+  - `external_metadata_search(query, source="all")`: Multi-source live search across ComicVine, Metron, AniList, MangaUpdates, League of Comic Geeks, Marvel, and Google Books.
+  - `get_metadata_sources()`: Get list and configuration status of supported ComicTagger metadata plugins.
+  - `get_comictagger_pending_details()`: Inspect pending ComicTagger background identification job candidate matches and status.
+- **Gemini AI Visual Cover Matching**:
+  - `get_gemini_status()`: Get Gemini Vision API configuration and status (API key configured, default model, prompt version).
+  - `list_gemini_models(api_key=None)`: List available Google Gemini models supported for visual cover matching.
+- **Organization & Rules**:
+  - `get_organization_rules()`: Get active comic file naming tokens and folder hierarchy rules.
+  - `preview_comic_organization(metadata)`: Simulate file naming and folder path organization for a comic without writing any files.
+- **Guided View Detection**:
+  - `get_guided_status()`: Get Guided View panel detector status, queue size, and active job.
+  - `get_guided_logs()`: Retrieve recent logs from the Guided View panel detection worker.
+  - `trigger_guided_detection(scope, target, force=False)`: Trigger panel detection across a library, publisher, series, or single comic.
+- **Administration & Diagnostics**:
+  - `list_libraries()`: List all configured comic root library folders.
+  - `get_user_stats(user_id)`: Get detailed reading statistics, read/unread counts, and total pages read for a user.
+  - `get_operation_errors()`: Retrieve recent system operation errors, failures, and stack traces.
 - **AI Visual Tagging**:
   - `get_cover_image(comic_id, page=0)`: Extracts a high-res cover image for visual inspection.
   - `get_tags(comic_id)` / `get_tags_bulk(comic_ids)`: Reads ComicInfo + database tags.
@@ -77,3 +95,4 @@ claude mcp add comics-now -- /path/to/comics-now/mcp/run.sh
   - `tag_workflow()`: Returns step-by-step guidance for cover-driven tagging.
 - **Database Query**: `query_db(sql, limit)`: Runs read-only SELECT / PRAGMA queries.
 - **REST API Escape Hatch**: `call_api(method, path, query, body)`: Directly invokes REST endpoints (destructive paths require `COMICS_ALLOW_DESTRUCTIVE=1`).
+

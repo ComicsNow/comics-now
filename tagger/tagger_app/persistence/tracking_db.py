@@ -108,6 +108,8 @@ def parse_sources_from_cbz_xml(file_path):
                                     sources.add("src-waterstones")
                                 elif "amazon" in line.lower():
                                     sources.add("src-amazon")
+                                elif "forbiddenplanet" in line.lower() or "forbidden planet" in line.lower():
+                                    sources.add("src-forbiddenplanet")
                                 elif "googlebooks" in line.lower() or "google" in line.lower():
                                     sources.add("src-googlebooks")
                                 else:
@@ -134,6 +136,7 @@ def check_sources_match(has_sources, enabled_sources):
         "src-waterstones": ["waterstones", "src-waterstones"],
         "src-googlebooks": ["googlebooks", "google", "src-googlebooks"],
         "src-amazon": ["amazon", "src-amazon"],
+        "src-forbiddenplanet": ["forbiddenplanet", "forbidden planet", "forbidden-planet", "fp", "src-forbiddenplanet"],
     }
     
     for src in enabled_sources:
@@ -147,6 +150,7 @@ def check_sources_match(has_sources, enabled_sources):
             elif "gcd" in src_key or "comics.org" in src_key: src_key = "src-gcd"
             elif "lcg" in src_key or "leagueof" in src_key: src_key = "src-lcg"
             elif "amazon" in src_key: src_key = "src-amazon"
+            elif "forbidden" in src_key: src_key = "src-forbiddenplanet"
             elif "google" in src_key: src_key = "src-googlebooks"
             
         keywords = source_keywords.get(src_key, [src_key])

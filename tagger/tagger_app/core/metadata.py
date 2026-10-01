@@ -567,7 +567,7 @@ def resolve_creator_roles(meta):
         'comes', 'from', 'presents', 'present', 'returns', 'brings', 'featuring',
         'introducing', 'available', 'now', 'out', 'series', 'issue', 'edition',
         'preview', 'exclusive', 'collects', 'collecting', 'includes', 'story',
-        'stories', 'graphic', 'novel', 'volume', 'vol'
+        'stories', 'graphic', 'novel', 'volume', 'vol', 'page', 'pages', 'script'
     }
 
     def _is_creator_name(name):
