@@ -55,8 +55,8 @@ def test_registry_order_and_coverage():
     ids = [s.id for s in SOURCES]
     assert ids == [
         "src-comicvine", "src-metron", "src-gcd", "src-lcg",
-        "src-goodreads", "src-blackwells", "src-waterstones",
-        "src-googlebooks", "src-amazon", "src-forbiddenplanet",
+        "src-forbiddenplanet", "src-googlebooks", "src-goodreads",
+        "src-blackwells", "src-waterstones", "src-amazon",
     ]
 
 

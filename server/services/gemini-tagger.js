@@ -18,6 +18,7 @@ const path = require('path');
 const crypto = require('crypto');
 const { matchCoverToCandidates } = require('./gemini-cover');
 const { synthesizeMetadataWithGemini } = require('./gemini-metadata');
+const { incrementDailyUsage, startMidnightPacificScheduler } = require('./gemini-quota');
 
 let isHookInstalled = false;
 
@@ -63,35 +64,16 @@ function installTaggerHook(ctx) {
     return { enabled, apiKey, model, dailyCap, taggerServiceUrl, termsAccepted };
   }
 
-  async function checkAndIncrementQuota(dailyCap) {
-    if (!ctx.db || typeof ctx.db.dbGet !== 'function') {
-      return { allowed: true, count: 0 };
-    }
-
+  if (ctx.db) {
     try {
-      const today = new Date().toISOString().slice(0, 10);
-      const resetRow = await ctx.db.dbGet("SELECT value FROM settings WHERE key = '_ext_cover_reset'");
-      const lastReset = resetRow?.value;
-
-      if (lastReset !== today) {
-        await ctx.db.dbRun("INSERT INTO settings (key, value) VALUES ('_ext_cover_reset', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value", [today]);
-        await ctx.db.dbRun("INSERT INTO settings (key, value) VALUES ('_ext_cover_requests', '0') ON CONFLICT(key) DO UPDATE SET value = '0'");
-      }
-
-      const reqRow = await ctx.db.dbGet("SELECT value FROM settings WHERE key = '_ext_cover_requests'");
-      const count = parseInt(reqRow?.value || '0', 10);
-
-      if (count >= dailyCap) {
-        return { allowed: false, count };
-      }
-
-      const newCount = count + 1;
-      await ctx.db.dbRun("UPDATE settings SET value = ? WHERE key = '_ext_cover_requests'", [String(newCount)]);
-      return { allowed: true, count: newCount };
-    } catch (err) {
-      return { allowed: true, count: 0 };
-    }
+      startMidnightPacificScheduler({ db: ctx.db, log: logger });
+    } catch (_) {}
   }
+
+  async function checkAndIncrementQuota(dailyCap) {
+    return incrementDailyUsage(ctx.db, dailyCap);
+  }
+
 
   async function resolveLocalCover(filePath) {
     try {
