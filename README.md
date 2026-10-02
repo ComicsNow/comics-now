@@ -22,11 +22,13 @@
 
 Most digital comic servers were built a decade ago as basic file browsers. **Comics Now!** re-imagines your comic library as a modern, intelligent web application designed for desktops, tablets, and phones:
 
-* 🧠 **Smart Guided View**: Automatically detects panels and dialogue bubbles using deep learning neural networks (`western.onnx` and `manga.onnx`) for an immersive panel-by-panel reading experience.
+* 🧠 **Smart Guided View**: Automatically detects panels and dialogue bubbles using deep learning neural networks (`manga.onnx` and speech bubble detectors) for an immersive panel-by-panel reading experience. Features incremental scoping and auto-detection on library scan.
+* 🖼️ **Fullscreen Page Preview Grid & WebP Cache**: Navigate issues visually with a dynamic, lazy-loaded page preview grid. Full-resolution WebP on-the-fly transcoding backed by an LRU disk cache cuts bandwidth and memory while keeping 1:1 pixel coordinates for panel zoom.
 * 🔄 **True Cross-Device Sync**: Pick up right where you left off. Reading progress syncs in real-time between your phone, tablet, and PC.
-* 📱 **Installable Offline PWA**: Install Comics Now! to your iOS, iPadOS, Android, or desktop home screen. Queue comics in the background and read them completely offline without internet.
-* 🏷️ **Multi-Source Metadata Tagger**: Built-in enrichment engine querying ComicVine, Metron, GCD, Goodreads, Amazon, and Google Books with perceptual cover image hashing and automatic file renaming/sorting.
-* 🤖 **AI Model Context Protocol (MCP)**: Native Python MCP server allowing Claude, Cursor, and Gemini to curate reading lists, inspect cover art, and query your collection with natural language.
+* 📱 **Resumable Offline PWA & Background Fetch**: Install Comics Now! to your iOS, iPadOS, Android, or desktop home screen. Queue comics with HTTP `Range` resumable transfers, and enjoy native Android Background Fetch so downloads keep running with the browser closed.
+* 🤖 **Google Gemini AI Vision & Multi-Source Tagging**: Built-in enrichment engine querying ComicVine, Metron, GCD, Goodreads, Amazon, Google Books, and additional sources with perceptual cover hashing. Powered by Google Gemini AI Vision to visually identify issue numbers, series, publishers, and release years directly from cover art when standard scraping fails.
+* 📁 **Configurable File & Folder Organization**: Flexible 4-tab management panel with customizable token naming rules and folder hierarchy templates, with live preview and safe, type-to-confirm batch execution for entire libraries.
+* 🔌 **AI Model Context Protocol (MCP)**: Native Python MCP server exposing 13+ tools allowing Claude, Cursor, and Gemini to curate reading lists, inspect cover art, trigger guided view detection, reorganize directories, and query your collection with natural language.
 * 🛡️ **Cloudflare Zero Trust Ready**: Zero open ports needed. Full integration with Cloudflare Access JWT authentication, granular user permissions (down to publisher and series), and admin impersonation.
 * 📂 **Metadata Mode & Folder Mode**: Organize your library by metadata tags (Publisher → Series → Issue) or mirror your physical directory tree directly.
 * 💻 **Client-Side Local Reader**: Drag and drop local CBZ/CBR files directly into the browser to read instantly with WebAssembly—no file upload required.
@@ -147,7 +149,10 @@ npm run mcp
 
 **What your AI agent can do:**
 - 🔍 *"Create a chronological reading list for the Infinity Gauntlet event across all my comics."*
+- 🤖 *"Use Gemini AI Vision to inspect the cover of comic #412 and identify its canonical publisher, series, and year."*
 - 🎨 *"Inspect the cover of comic #412, verify the issue via web search, and tag the writer and artist."*
+- 📐 *"Trigger incremental guided view panel detection for the Batman (2016) series."*
+- 📁 *"Simulate file renaming and folder reorganization for my Marvel library using saved token rules."*
 - 📊 *"Query SQLite for all unread Spider-Man comics published between 1985 and 1992."*
 
 *(Read the [MCP Architecture & Setup Guide](mcp/README.md) for configuration details.)*
