@@ -27,7 +27,8 @@ RUN npm prune --omit=dev
 # Install Python dependencies for internal tagger in a virtual environment
 RUN python3 -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
-RUN pip install --no-cache-dir -r tagger/requirements.txt
+RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
+    pip install --no-cache-dir -r tagger/requirements.txt
 
 # Runtime stage
 FROM node:20-bookworm-slim
