@@ -563,12 +563,5 @@ module.exports = {
   setReadingPreference,
   getAllReadingPreferences,
   getReadingPrefMaps,
-  resolveReadingModes,
-  // Aliases for backward compatibility during transition
-  setMangaModePreference: setReadingPreference,
-  getMangaPrefMaps: getReadingPrefMaps,
-  resolveMangaMode: (c, s, p, path, maps, roots) => {
-    const res = resolveReadingModes(c, s, p, path, maps, roots);
-    return res.mangaMode;
-  }
+  resolveReadingModes
 };

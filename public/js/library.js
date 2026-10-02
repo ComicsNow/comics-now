@@ -260,16 +260,6 @@ function initializeLibraryUIControls() {
     readingListFilterBtn.addEventListener('click', readingListFilterBtn._smartListListener);
   }
 
-  if (global.smartListBackBtn && !global.smartListBackBtn._smartListBackListener) {
-    global.smartListBackBtn._smartListBackListener = (event) => {
-      event.preventDefault();
-      if (typeof global.showRootFolderList === 'function') {
-        global.showRootFolderList({ force: true });
-      }
-    };
-    global.smartListBackBtn.addEventListener('click', global.smartListBackBtn._smartListBackListener);
-  }
-
   const runLibrarySearch = () => {
     const query = global.librarySearchQuery?.value?.trim();
     if (!query) return;

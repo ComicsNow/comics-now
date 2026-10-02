@@ -70,44 +70,6 @@ const global = new Proxy(typeof window !== 'undefined' ? window : globalThis, {
       global.metadataTabBtn.addEventListener('click', global.metadataTabBtn._tabListener);
     }
 
-    if (global.viewerLibrariesBtn && !global.viewerLibrariesBtn._navListener) {
-      global.viewerLibrariesBtn._navListener = (event) => {
-        event.preventDefault();
-        global.navigateBackFromViewer(null);
-      };
-      global.viewerLibrariesBtn.addEventListener('click', global.viewerLibrariesBtn._navListener);
-    }
-
-    if (global.viewerPublisherBtn && !global.viewerPublisherBtn._navListener) {
-      global.viewerPublisherBtn._navListener = (event) => {
-        event.preventDefault();
-        if (global.currentRootFolder) {
-          global.navigateBackFromViewer({ view: 'publishers', rootFolder: global.currentRootFolder });
-        } else {
-          global.navigateBackFromViewer(null);
-        }
-      };
-      global.viewerPublisherBtn.addEventListener('click', global.viewerPublisherBtn._navListener);
-    }
-
-    if (global.viewerSeriesBtn && !global.viewerSeriesBtn._navListener) {
-      global.viewerSeriesBtn._navListener = (event) => {
-        event.preventDefault();
-        if (global.currentRootFolder && global.currentPublisher) {
-          global.navigateBackFromViewer({
-            view: 'series',
-            rootFolder: global.currentRootFolder,
-            publisher: global.currentPublisher,
-          });
-        } else if (global.currentRootFolder) {
-          global.navigateBackFromViewer({ view: 'publishers', rootFolder: global.currentRootFolder });
-        } else {
-          global.navigateBackFromViewer(null);
-        }
-      };
-      global.viewerSeriesBtn.addEventListener('click', global.viewerSeriesBtn._navListener);
-    }
-
     if (global.fitHeightBtn && !global.fitHeightBtn._toggleListener) {
       global.fitHeightBtn._toggleListener = () => {
         global.setFitToHeightMode(!global.isFitToHeight);

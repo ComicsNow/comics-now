@@ -26,9 +26,8 @@ test.describe('ComicsNow! E2E Test Suite', () => {
     await settingsPromise;
     await page.waitForTimeout(500); // Allow JS to populate the values
 
-    // Switch to Comics Defaults tab and select Sidecar
+    // Switch to Comics Defaults tab
     await page.click('#settings-tab-comics-defaults');
-    await page.selectOption('#metadata-storage-select', 'sidecar');
 
     // Submit the settings form directly to avoid tab-switch reset
     await page.locator('#settings-form').evaluate(form => form.requestSubmit());

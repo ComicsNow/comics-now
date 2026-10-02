@@ -141,17 +141,6 @@ body::after {
     text-shadow: 3px 3px 0 var(--red), 6px 6px 0 var(--cyan);
 }
 
-.logo-dot {
-    display: inline-block;
-    width: 14px;
-    height: 14px;
-    border-radius: 50%;
-    background: var(--yellow);
-    box-shadow: 0 0 0 4px var(--ink), 0 0 0 6px var(--red);
-    margin-left: 0.3rem;
-    vertical-align: middle;
-}
-
 .logo-container {
     display: inline-flex;
     align-items: baseline;
@@ -181,7 +170,6 @@ body::after {
 
 /* Offline Mode UI Adjustments */
 body.is-offline #logout-button,
-body.is-offline #support-link,
 body.is-offline #settings-button,
 body.is-offline #ct-button,
 body.is-offline #downloads-button {
@@ -622,15 +610,6 @@ body.is-offline .comic-context-menu-item.hide-offline {
     opacity: 0.9;
 }
 
-.fullscreen-page-indicator {
-    justify-self: center;
-    font-size: 0.8rem;
-    font-weight: 700;
-    letter-spacing: 0.05em;
-    font-variant-numeric: tabular-nums;
-    white-space: nowrap;
-}
-
 .fullscreen-close-small {
     justify-self: end;
     display: inline-flex;
@@ -907,15 +886,6 @@ body.is-offline .comic-context-menu-item.hide-offline {
 .alpha-filter-btn.active {
     background-color: #e63928;
     color: #ffffff;
-}
-.metadata-tag {
-    background-color: #373737;
-    padding: 2px 8px;
-    border-radius: 9999px;
-    font-size: 0.8rem;
-    margin-right: 4px;
-    margin-bottom: 4px;
-    display: inline-block;
 }
 /* Filter & smart-list pills — aligned with the gray-800 + ring + vermilion design language */
 #filter-buttons .pill-button,
@@ -1592,12 +1562,6 @@ body.is-offline .comic-context-menu-item.hide-offline {
     border-color: #c42d1f;
 }
 
-/* Specific colors for Continuous Mode Toggle */
-#continuous-mode-default-toggle:checked + .toggle-bg {
-    background: linear-gradient(to right, #2563eb, #3b82f6);
-    border-color: #2563eb;
-}
-
 /* ─── CUSTOM TOGGLES (from settings-modal.html redesign) ─── */
 .toggle {
     position: relative;
@@ -2009,10 +1973,6 @@ body.eink-color-mode #bubble-magnifier-img {
 }
 
 /* Support link hidden to preserve Riso layout purity */
-#support-link {
-    display: none !important;
-}
-
 /* Card overrides to match mockup zine panel style */
 .comic-card, .series-card, .folder-card {
     background: none !important;
@@ -2289,13 +2249,6 @@ body.eink-color-mode #bubble-magnifier-img {
     letter-spacing: -0.5px !important;
     text-shadow: 1.5px 1.5px 0 var(--red), 3px 3px 0 var(--cyan) !important;
     transform: skewX(-5deg) !important;
-}
-
-.logo-compact .logo-dot {
-    width: 6px !important;
-    height: 6px !important;
-    box-shadow: 0 0 0 2px var(--ink), 0 0 0 3px var(--red) !important;
-    margin-left: 0.15rem !important;
 }
 
 .logo-compact br {
@@ -2575,39 +2528,6 @@ body.eink-color-mode #bubble-magnifier-img {
     background: rgba(251, 77, 61, .3) !important;
 }
 
-/* progress track */
-.dl-queue-container .progress-track {
-    height: 8px !important;
-    background: rgba(0, 0, 0, .4) !important;
-    border-radius: 99px !important;
-    overflow: hidden !important;
-    margin-bottom: 10px !important;
-    border: 1.5px solid rgba(255, 255, 255, .06) !important;
-}
-
-.dl-queue-container .progress-fill {
-    height: 100% !important;
-    border-radius: 99px !important;
-    background: var(--cyan) !important;
-    position: relative !important;
-    box-shadow: 0 0 8px rgba(46, 198, 214, .5) !important;
-    transition: width 0.3s ease !important;
-}
-
-.dl-queue-container .progress-fill::after {
-    content: "" !important;
-    position: absolute !important;
-    inset: 0 !important;
-    border-radius: 99px !important;
-    background: linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, .3) 50%, transparent 100%) !important;
-    background-size: 200% 100% !important;
-    animation: dl-shimmer 1.6s linear infinite !important;
-}
-
-@keyframes dl-shimmer {
-    from { background-position: 200% 0; }
-    to { background-position: -200% 0; }
-}
 
 .dl-queue-container .item-status {
     display: flex !important;
@@ -2621,22 +2541,6 @@ body.eink-color-mode #bubble-magnifier-img {
 }
 
 .dl-queue-container .status-label.status-error {
-    color: var(--red) !important;
-}
-
-.dl-queue-container .status-pct {
-    font-family: 'Space Mono', monospace !important;
-    font-weight: 700 !important;
-    font-size: 14px !important;
-    color: var(--cyan) !important;
-    letter-spacing: .5px !important;
-}
-
-.dl-queue-container .status-pct.pct-completed {
-    color: var(--green) !important;
-}
-
-.dl-queue-container .status-pct.pct-error {
     color: var(--red) !important;
 }
 

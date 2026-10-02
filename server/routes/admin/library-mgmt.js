@@ -2,7 +2,7 @@ const fs = require('fs');
 const path = require('path');
 
 const { writeComicInfoToCbz, buildComicInfoXml } = require('../../services/metadata');
-const { safeDirName, trimObjectStrings } = require('../../utils');
+const { trimObjectStrings } = require('../../utils');
 
 /**
  * Admin Library Management Routes

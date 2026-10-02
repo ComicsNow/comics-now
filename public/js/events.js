@@ -130,12 +130,6 @@ document.getElementById('settings-tab-comics-defaults')?.addEventListener('click
   if (typeof loadDefaultsFn === 'function') {
     await loadDefaultsFn();
   }
-
-  // Initialize continuous mode settings
-  const initContinuousFn = state.initContinuousModeSettings || window.initContinuousModeSettings;
-  if (typeof initContinuousFn === 'function') {
-    initContinuousFn();
-  }
 });
 
 document.getElementById('settings-tab-devices')?.addEventListener('click', async () => {

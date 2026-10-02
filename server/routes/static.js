@@ -20,7 +20,7 @@ function createStaticRouter({ getConfig, getComicsDirectories, getPublicLibrarie
       const indexHtml = fs.readFileSync(path.join(STATIC_DIR, 'index.html'), 'utf-8');
       const baseHref = config.baseUrl.endsWith('/') ? config.baseUrl : (config.baseUrl + '/');
       const hideSupport = config.hideSupportForAdmin || process.env.HIDE_SUPPORT_FOR_ADMIN === 'true';
-      const supportCss = hideSupport ? '\n  <style>#kofi-settings-link, #support-link { display: none !important; }</style>' : '';
+      const supportCss = hideSupport ? '\n  <style>#kofi-settings-link { display: none !important; }</style>' : '';
       const injectedHtml = indexHtml
         .replace(
           '<script id="app-config"></script>',

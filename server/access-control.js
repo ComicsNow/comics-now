@@ -29,12 +29,6 @@ async function checkComicAccess(userId, userRole, comicPath, publisher, series, 
     return true;
   }
 
-  // DEFAULT-ALLOW: grant every authenticated user access to all libraries.
-  // Per-user access control below is temporarily bypassed while the access
-  // UI is being reworked. Remove this early return to re-enable per-user
-  // permissions (the original logic is left intact below).
-  // return true;
-
   // Get user's access permissions (all at once for efficiency)
   const accessList = preFetchedAccessList || await dbAllFunc(
     `SELECT accessType, accessValue, direct_access, child_access
