@@ -32,8 +32,8 @@ RUN pip install --no-cache-dir -r tagger/requirements.txt
 # Runtime stage
 FROM node:20-bookworm-slim
 
-# Install runtime dependencies
-RUN apt-get update && apt-get install -y \
+# Install runtime dependencies and security updates without bloated recommendations
+RUN apt-get update && apt-get upgrade -y && apt-get install -y --no-install-recommends \
     python3 \
     libvips42 \
     libgomp1 \
@@ -41,6 +41,7 @@ RUN apt-get update && apt-get install -y \
     zip \
     unzip \
     poppler-utils \
+    && npm install -g npm@latest \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
