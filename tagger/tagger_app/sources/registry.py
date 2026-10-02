@@ -78,6 +78,23 @@ SOURCES = [
         tier=1,
     ),
     Source(
+        "src-forbiddenplanet", "Forbidden Planet",
+        frozenset({"src-forbiddenplanet", "forbiddenplanet", "fp"}),
+        "Searching Forbidden Planet...",
+        lambda f, ctx, prog: forbiddenplanet.resolve_forbiddenplanet(
+            f, cover_path=ctx.cover_path, on_progress=prog, existing_meta=ctx.existing_meta),
+        tier=2,
+    ),
+    Source(
+        "src-googlebooks", "Google Books",
+        frozenset({"src-googlebooks", "googlebooks", "google_books", "google-books"}),
+        "Searching Google Books...",
+        lambda f, ctx, prog: googlebooks.resolve_googlebooks(
+            f, api_key=ctx.google_books_api_key, cover_path=ctx.cover_path,
+            on_progress=prog, existing_meta=ctx.existing_meta),
+        tier=2,
+    ),
+    Source(
         "src-goodreads", "Goodreads",
         frozenset({"src-goodreads", "goodreads"}),
         "Searching Goodreads...",
@@ -102,15 +119,6 @@ SOURCES = [
         tier=2,
     ),
     Source(
-        "src-googlebooks", "Google Books",
-        frozenset({"src-googlebooks", "googlebooks", "google_books", "google-books"}),
-        "Searching Google Books...",
-        lambda f, ctx, prog: googlebooks.resolve_googlebooks(
-            f, api_key=ctx.google_books_api_key, cover_path=ctx.cover_path,
-            on_progress=prog, existing_meta=ctx.existing_meta),
-        tier=2,
-    ),
-    Source(
         "src-amazon", "Amazon",
         frozenset({"src-amazon", "amazon", "amz"}),
         "Searching Amazon...",
@@ -118,12 +126,6 @@ SOURCES = [
             f, cover_path=ctx.cover_path, on_progress=prog, existing_meta=ctx.existing_meta),
         tier=2,
     ),
-    Source(
-        "src-forbiddenplanet", "Forbidden Planet",
-        frozenset({"src-forbiddenplanet", "forbiddenplanet", "fp"}),
-        "Searching Forbidden Planet...",
-        lambda f, ctx, prog: forbiddenplanet.resolve_forbiddenplanet(
-            f, cover_path=ctx.cover_path, on_progress=prog, existing_meta=ctx.existing_meta),
-        tier=2,
-    ),
 ]
+
+

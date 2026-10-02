@@ -100,13 +100,9 @@ module.exports = function attach(router, deps) {
 
       const apiKey = (process.env.NODE_ENV === 'test' ? '' : process.env.GEMINI_API_KEY) || dbApiKey || cfg.geminiApiKey || config.geminiApiKey || configGetterKey || '';
 
-      let quotaCount = 0;
-      if (typeof dbGet === 'function') {
-        try {
-          const reqRow = await dbGet("SELECT value FROM settings WHERE key = '_ext_cover_requests'");
-          quotaCount = parseInt(reqRow?.value || '0', 10);
-        } catch (_) {}
-      }
+      const { getOrResetDailyUsage } = require('../../services/gemini-quota');
+      const quotaCount = await getOrResetDailyUsage({ dbGet, dbRun });
+
 
       const isEnabled = dbEnabled !== null ? !!dbEnabled : (cfg.geminiCoverMatchEnabled !== false);
       const activeModel = dbModel || cfg.geminiModel || config.geminiModel || 'gemini-3.5-flash-lite';

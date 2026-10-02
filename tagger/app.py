@@ -337,7 +337,7 @@ def process_single_cbz_file(file_path, comicvine_api_key, google_books_api_key=N
     except Exception:
         pass
     
-    active_sources = enabled_sources if enabled_sources else ["src-comicvine", "src-metron", "src-gcd", "src-lcg", "src-goodreads", "src-blackwells", "src-waterstones", "src-googlebooks", "src-amazon", "src-forbiddenplanet"]
+    active_sources = enabled_sources if enabled_sources else ["src-comicvine", "src-metron", "src-gcd", "src-lcg", "src-forbiddenplanet", "src-googlebooks", "src-goodreads", "src-blackwells", "src-waterstones", "src-amazon"]
     
     metadata = None
     source_url = None
@@ -587,7 +587,7 @@ def enhance_single_cbz_file(file_path, comicvine_api_key, google_books_api_key=N
     except Exception as read_err:
         print(f"[-] Failed to read existing ComicInfo.xml for {filename}: {read_err}")
         
-    active_sources = enabled_sources if enabled_sources else ["src-comicvine", "src-metron", "src-gcd", "src-lcg", "src-goodreads", "src-blackwells", "src-waterstones", "src-googlebooks", "src-amazon", "src-forbiddenplanet"]
+    active_sources = enabled_sources if enabled_sources else ["src-comicvine", "src-metron", "src-gcd", "src-lcg", "src-forbiddenplanet", "src-googlebooks", "src-goodreads", "src-blackwells", "src-waterstones", "src-amazon"]
     api_failed = False
         
     metadata = None
@@ -1932,13 +1932,14 @@ def api_search_external():
             sources_to_run = [
                 ("gcd", lambda: search_gcd_multi(query)),
                 ("lcg", lambda: search_lcg_multi(query)),
+                ("forbiddenplanet", lambda: search_forbiddenplanet_multi(query)),
+                ("googlebooks", lambda: search_googlebooks_multi(query, api_key=data.get("google_books_api_key") or scheduler_config.get("google_books_api_key"))),
                 ("goodreads", lambda: search_goodreads_multi(query)),
                 ("blackwells", lambda: search_blackwells_multi(query)),
                 ("waterstones", lambda: search_waterstones_multi(query)),
-                ("googlebooks", lambda: search_googlebooks_multi(query, api_key=data.get("google_books_api_key") or scheduler_config.get("google_books_api_key"))),
                 ("amazon", lambda: search_amazon_multi(query)),
-                ("forbiddenplanet", lambda: search_forbiddenplanet_multi(query)),
             ]
+
 
             cv_key = data.get("comicvine_api_key") or scheduler_config.get("comicvine_api_key")
             if cv_key:

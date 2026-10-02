@@ -3081,7 +3081,7 @@
                         if (cfg.batch_concurrency !== undefined && batchConcurrencySelect) {
                             batchConcurrencySelect.value = cfg.batch_concurrency.toString();
                         }
-                        const enabledSrcs = cfg.enabled_sources || ['src-comicvine', 'src-metron', 'src-gcd', 'src-lcg', 'src-goodreads', 'src-blackwells', 'src-waterstones', 'src-googlebooks', 'src-amazon', 'src-forbiddenplanet'];
+                        const enabledSrcs = cfg.enabled_sources || ['src-comicvine', 'src-metron', 'src-gcd', 'src-lcg', 'src-forbiddenplanet', 'src-googlebooks', 'src-goodreads', 'src-blackwells', 'src-waterstones', 'src-amazon'];
                         const hasComicvine = enabledSrcs.includes('src-comicvine');
                         const hasMetron = enabledSrcs.includes('src-metron') || enabledSrcs.includes('src-metron-gcd');
                         const hasGcd = enabledSrcs.includes('src-gcd') || enabledSrcs.includes('src-metron-gcd');
