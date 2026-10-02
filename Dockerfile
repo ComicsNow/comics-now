@@ -41,7 +41,7 @@ RUN apt-get update && apt-get upgrade -y && apt-get install -y --no-install-reco
     zip \
     unzip \
     poppler-utils \
-    && npm install -g npm@latest \
+    && npm install -g npm@10 \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
