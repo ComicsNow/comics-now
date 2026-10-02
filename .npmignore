@@ -59,5 +59,4 @@ tagger/scheduler_config.json
 
 # Model checkpoints and redundant models not used by inference engine
 models/**/*.pt
-models/manga/manga_panel_detector_fp32.onnx
 models/western/

@@ -178,7 +178,7 @@ function renderSourceFilterTabs(results) {
 }
 
 function renderResultsList() {
-  const resultsUl = document.getElementById('search-results') || document.getElementById('cv-results') || (typeof searchResultsUl !== 'undefined' ? searchResultsUl : null);
+  const resultsUl = document.getElementById('search-results') || document.getElementById('cv-results');
   if (!resultsUl) return;
   resultsUl.innerHTML = '';
 
@@ -359,7 +359,7 @@ export async function performCvSearch() {
   const comic = state.currentComic || window.currentComic;
   const isLocal = comic && (comic.handle || comic.file || (comic.id && String(comic.id).startsWith('device-')));
   if (isLocal || (comic && comic.libraryMode === 'folder')) {
-    const statusDiv = document.getElementById('search-status') || document.getElementById('cv-status') || (typeof searchStatusDiv !== 'undefined' ? searchStatusDiv : null);
+    const statusDiv = document.getElementById('search-status') || document.getElementById('cv-status');
     if (statusDiv) {
       statusDiv.textContent = 'Metadata search is disabled for folder mode library comics.';
     }
@@ -376,11 +376,11 @@ export async function performCvSearch() {
 
   if (!query) return;
 
-  const statusDiv = document.getElementById('search-status') || document.getElementById('cv-status') || (typeof searchStatusDiv !== 'undefined' ? searchStatusDiv : null);
-  const resultsUl = document.getElementById('search-results') || document.getElementById('cv-results') || (typeof searchResultsUl !== 'undefined' ? searchResultsUl : null);
-  const pageInfoEl = document.getElementById('cv-page-info') || (typeof cvPageInfo !== 'undefined' ? cvPageInfo : null);
-  const prevBtn = document.getElementById('cv-prev') || (typeof cvPrevBtn !== 'undefined' ? cvPrevBtn : null);
-  const nextBtn = document.getElementById('cv-next') || (typeof cvNextBtn !== 'undefined' ? cvNextBtn : null);
+  const statusDiv = document.getElementById('search-status') || document.getElementById('cv-status');
+  const resultsUl = document.getElementById('search-results') || document.getElementById('cv-results');
+  const pageInfoEl = document.getElementById('cv-page-info');
+  const prevBtn = document.getElementById('cv-prev');
+  const nextBtn = document.getElementById('cv-next');
 
   if (statusDiv) statusDiv.textContent = 'Searching across sources...';
   if (resultsUl) resultsUl.innerHTML = '';

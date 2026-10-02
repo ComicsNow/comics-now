@@ -77,7 +77,6 @@ import './js/viewer/guided/lifecycle.js';
 import './js/viewer/guided/buttons.js';
 import './js/viewer/guided/index.js';
 import './js/settings/shared.js';
-import './js/settings/continuous-mode.js';
 import './js/settings/devices.js';
 import './js/settings/users.js';
 import './js/settings/user-access.js';
@@ -179,21 +178,6 @@ global.libraryReady = false;
 global.libraryLoadedAt = null;
 let isListEditMode = false;
 
-function updateLibraryStatusBadge() {
-  const badge = document.getElementById('library-status-badge');
-  if (!badge) return;
-
-  if (global.libraryReady) {
-    const comicCount = Object.keys(global.library || {}).length;
-    badge.textContent = comicCount > 0 ? 'Ready' : 'Empty';
-    badge.className = comicCount > 0
-      ? 'text-xs px-2 py-1 rounded-full bg-green-600'
-      : 'text-xs px-2 py-1 rounded-full bg-gray-600';
-  } else {
-    badge.textContent = 'Loading...';
-    badge.className = 'text-xs px-2 py-1 rounded-full bg-yellow-600';
-  }
-}
 
 // --- INITIAL LOAD ---
 
@@ -475,8 +459,6 @@ async function loadLibraryOfflineFirst() {
     global.libraryReady = true;
     global.libraryLoadedAt = Date.now();
 
-    // Update library status badge
-    updateLibraryStatusBadge();
 
   } catch (error) {
     global.libraryReady = false;
@@ -594,7 +576,6 @@ function openReadingListModal() {
   const modal = document.getElementById('reading-list-modal');
   if (modal) {
     modal.classList.remove('hidden');
-    updateLibraryStatusBadge(); // Update status badge
     refreshReadingListModal();
   }
 }
@@ -1650,7 +1631,6 @@ export {
   loadCachedAppConfig,
   resolveAppConfig,
   showOfflineLibraryUnavailableMessage,
-  updateLibraryStatusBadge,
   initEnvironment,
   registerServiceWorker,
   initAppStorage,
@@ -1674,7 +1654,6 @@ state.cacheAppConfig = cacheAppConfig;
 state.loadCachedAppConfig = loadCachedAppConfig;
 state.resolveAppConfig = resolveAppConfig;
 state.showOfflineLibraryUnavailableMessage = showOfflineLibraryUnavailableMessage;
-state.updateLibraryStatusBadge = updateLibraryStatusBadge;
 state.initEnvironment = initEnvironment;
 state.registerServiceWorker = registerServiceWorker;
 state.initAppStorage = initAppStorage;
@@ -1698,7 +1677,6 @@ if (typeof window !== 'undefined') {
   window.loadCachedAppConfig = loadCachedAppConfig;
   window.resolveAppConfig = resolveAppConfig;
   window.showOfflineLibraryUnavailableMessage = showOfflineLibraryUnavailableMessage;
-  window.updateLibraryStatusBadge = updateLibraryStatusBadge;
   window.initEnvironment = initEnvironment;
   window.registerServiceWorker = registerServiceWorker;
   window.initAppStorage = initAppStorage;

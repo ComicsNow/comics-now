@@ -122,18 +122,6 @@ function setLibraries(newLibraries, skipSave = false) {
   }
 }
 
-// Legacy support: setComicsDirectories now maps to setLibraries
-function setComicsDirectories(dirs, skipSave = false) {
-  const newLibraries = dirs.map(dir => {
-    const existing = (config.libraries || []).find(lib => normalizeDirectory(lib.path) === normalizeDirectory(dir));
-    return {
-      path: dir,
-      hierarchyMode: existing?.hierarchyMode || 'metadata'
-    };
-  });
-  setLibraries(newLibraries, skipSave);
-  return getComicsDirectories();
-}
 
 function addLibrary(dir, mode = 'metadata') {
   const normalized = normalizeDirectory(dir);
@@ -395,10 +383,6 @@ function setComicsLocation(location, skipSave = false) {
   return false;
 }
 
-function getTaggerMode() {
-  return 'new';
-}
-
 function setTaggerMode(value, skipSave = false) {
   config.taggerMode = 'new';
   return 'new';
@@ -551,7 +535,6 @@ module.exports = {
   DEFAULT_CONFIG,
   loadConfigFromDisk,
   getConfig,
-  setComicsDirectories,
   getComicsDirectories,
   getLibraries,
   getPublicLibraries,
@@ -583,7 +566,6 @@ module.exports = {
   getAdminEmail,
   getCloudflareConfig,
   getTrustedIPs,
-  getTaggerMode,
   setTaggerMode,
   getTaggerServiceUrl,
   setTaggerServiceUrl,

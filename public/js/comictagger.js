@@ -1102,79 +1102,6 @@ function initGeminiComplianceModal() {
   }
 }
 
-async function performManualSearch() {
-  const queryInput = document.getElementById('ct-search-query-input');
-  const sourceSelect = document.getElementById('ct-search-source-select');
-  const resultsContainer = document.getElementById('ct-search-results-container');
-  const submitBtn = document.getElementById('ct-search-submit-btn');
-
-  const query = queryInput ? queryInput.value.trim() : '';
-  const source = sourceSelect ? sourceSelect.value : 'comicvine';
-
-  if (!query) return;
-
-  if (submitBtn) {
-    submitBtn.disabled = true;
-    submitBtn.textContent = 'Searching...';
-  }
-  if (resultsContainer) {
-    resultsContainer.innerHTML = '<div class="text-center py-8 text-sm text-gray-400"><svg class="animate-spin h-6 w-6 text-blue-400 mx-auto mb-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>Searching across providers...</div>';
-  }
-
-  try {
-    const res = await fetch(`${global.API_BASE_URL}/api/v1/comictagger/search`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ query, source })
-    });
-    const data = await res.json();
-    const results = data.results || [];
-
-    if (!resultsContainer) return;
-
-    if (results.length === 0) {
-      resultsContainer.innerHTML = `<div class="text-center py-8 text-sm text-gray-500">No results found on ${escapeHtml(source)} for "${escapeHtml(query)}".</div>`;
-      return;
-    }
-
-    let html = '';
-    results.forEach((item, idx) => {
-      const cover = item.cover_image_url || null;
-      html += `
-        <div class="bg-gray-800 p-4 rounded-lg border border-gray-700 flex gap-4 items-start">
-          <div class="w-20 flex-shrink-0">
-            ${cover
-              ? `<img src="${escapeHtml(cover)}" class="w-full rounded border border-gray-700" alt="Cover">`
-              : `<div class="w-full h-28 rounded bg-gray-900 flex items-center justify-center text-[10px] text-gray-600 text-center">No Cover</div>`
-            }
-          </div>
-          <div class="flex-1 min-w-0">
-            <div class="flex items-center gap-2 mb-1">
-              <h5 class="font-bold text-white text-base truncate">${escapeHtml(item.title || 'Untitled')}</h5>
-              <span class="text-xs px-2 py-0.5 rounded bg-blue-900/50 text-blue-300 border border-blue-700 font-semibold">${escapeHtml(source)}</span>
-            </div>
-            <div class="text-xs text-gray-300 space-y-0.5 mb-2">
-              <div><span class="text-gray-500">Publisher:</span> ${escapeHtml(item.publisher || 'Unknown')} • <span class="text-gray-500">Issue:</span> #${escapeHtml(item.issue || item.number || '?')} ${item.year ? `• Year: ${escapeHtml(item.year)}` : ''}</div>
-              ${item.writer ? `<div><span class="text-gray-500">Writer:</span> ${escapeHtml(item.writer)}</div>` : ''}
-              ${item.description ? `<div class="text-gray-400 line-clamp-2 italic">${escapeHtml(item.description)}</div>` : ''}
-            </div>
-          </div>
-        </div>
-      `;
-    });
-    resultsContainer.innerHTML = html;
-  } catch (err) {
-    if (resultsContainer) {
-      resultsContainer.innerHTML = `<div class="text-center py-8 text-sm text-red-400">Search failed: ${escapeHtml(err.message)}</div>`;
-    }
-  } finally {
-    if (submitBtn) {
-      submitBtn.disabled = false;
-      submitBtn.innerHTML = '<svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2"><use href="#icon-search"></use></svg> Search';
-    }
-  }
-}
-
 async function loadScanLogs() {
   const container = document.getElementById('ct-logs-container');
   if (!container) return;
@@ -1416,7 +1343,6 @@ export {
   getCtMatchHtml,
   renderComicPreview,
   saveCtSettings,
-  performManualSearch,
   loadScanLogs,
   clearTrackingHistory,
   showCtConfirm,
@@ -1439,7 +1365,6 @@ state.fetchPendingMatchDetails = fetchPendingMatchDetails;
 state.getCtMatchHtml = getCtMatchHtml;
 state.renderComicPreview = renderComicPreview;
 state.saveCtSettings = saveCtSettings;
-state.performManualSearch = performManualSearch;
 state.loadScanLogs = loadScanLogs;
 state.clearTrackingHistory = clearTrackingHistory;
 state.showCtConfirm = showCtConfirm;
@@ -1461,7 +1386,6 @@ if (typeof window !== 'undefined') {
   window.getCtMatchHtml = getCtMatchHtml;
   window.renderComicPreview = renderComicPreview;
   window.saveCtSettings = saveCtSettings;
-  window.performManualSearch = performManualSearch;
   window.loadScanLogs = loadScanLogs;
   window.clearTrackingHistory = clearTrackingHistory;
   window.showCtConfirm = showCtConfirm;

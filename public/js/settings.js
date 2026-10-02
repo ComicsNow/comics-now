@@ -5,7 +5,6 @@ import {
   settingsTabDevices,
   settingsForm,
   scanIntervalInput,
-  apiKeyInput,
   settingsStatusDiv,
   scanButton,
   fullScanButton,
@@ -96,33 +95,6 @@ async function fetchSettings() {
       allowedFormatsSelect.value = data.allowedFormats;
     }
 
-    // Handle metadata storage
-    const metadataStorageSelect = document.getElementById('metadata-storage-select');
-    if (metadataStorageSelect && data.metadataStorage) {
-      metadataStorageSelect.value = data.metadataStorage;
-    }
-
-    // Gate the XML Sidecar option on Tag Comics Now being configured
-    await applyStorageOptionConstraints();
-
-    // Handle API key display
-    if (apiKeyInput) {
-      if (data.comicVineApiKey !== undefined) {
-        // Admin user - show actual key
-        apiKeyInput.value = data.comicVineApiKey || '';
-        apiKeyInput.placeholder = 'Enter your ComicVine API key';
-      } else if (data.hasApiKey) {
-        // Non-admin user with key configured - show masked
-        apiKeyInput.value = '';
-        apiKeyInput.placeholder = '••••••••••••••••';
-        apiKeyInput.disabled = true;
-      } else {
-        // No key configured
-        apiKeyInput.value = '';
-        apiKeyInput.placeholder = 'Not configured';
-        apiKeyInput.disabled = true;
-      }
-    }
   } catch (error) {
     if (settingsStatusDiv) {
       settingsStatusDiv.textContent = 'Failed to load settings.';
@@ -130,18 +102,6 @@ async function fetchSettings() {
   }
 }
 
-// XML Sidecar storage is only valid when the tagger is Tag Comics Now (mode 'new')
-// AND a service URL is configured. Otherwise grey out the option and, if it was
-// selected, fall back to Archive.
-async function applyStorageOptionConstraints() {
-  const select = document.getElementById('metadata-storage-select');
-  if (!select) return;
-  const sidecarOption = select.querySelector('option[value="sidecar"]');
-  if (!sidecarOption) return;
-
-  sidecarOption.disabled = false;
-  sidecarOption.title = 'Stores metadata in a companion .ComicInfo.xml file alongside each comic (works for CBZ & CBR).';
-}
 
 async function refreshLibraryFolders() {
   const list = document.getElementById('library-folders-list');

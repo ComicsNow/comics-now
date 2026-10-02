@@ -424,7 +424,6 @@ export const seriesListDiv = document.getElementById('series-list');
 export const smartListView = document.getElementById('smart-list-view');
 export const smartListContainer = document.getElementById('smart-list-container');
 export const smartListTitle = document.getElementById('smart-list-title');
-export const smartListBackBtn = document.getElementById('smart-list-back-btn');
 export const filterButtonsDiv = document.getElementById('filter-buttons');
 export const smartListButtonsDiv = document.getElementById('smart-list-buttons');
 export const latestAddedButton = document.getElementById('latest-added-btn');
@@ -433,9 +432,6 @@ export const downloadedButton = document.getElementById('downloaded-btn');
 export const downloadedCountSpan = document.getElementById('downloaded-count');
 export const comicListDiv = document.getElementById('comic-list');
 export const comicViewerDiv = document.getElementById('comic-viewer');
-export const viewerLibrariesBtn = document.getElementById('viewer-libraries-btn');
-export const viewerPublisherBtn = document.getElementById('viewer-publisher-btn');
-export const viewerSeriesBtn = document.getElementById('viewer-series-btn');
 export const publisherAlphaFilter = document.getElementById('publisher-alpha-filter');
 export const seriesAlphaFilter = document.getElementById('series-alpha-filter');
 export const seriesSortContainer = document.getElementById('series-sort-container');
@@ -495,7 +491,6 @@ export const fullscreenNavRight = document.getElementById('fullscreen-nav-right'
 export const settingsModal = document.getElementById('settings-modal');
 export const settingsForm = document.getElementById('settings-form');
 export const scanIntervalInput = document.getElementById('scan-interval-input');
-export const apiKeyInput = document.getElementById('api-key-input');
 export const settingsStatusDiv = document.getElementById('settings-status');
 export const scanButton = document.getElementById('scan-button');
 export const fullScanButton = document.getElementById('full-scan-button');
@@ -717,7 +712,6 @@ const globalsObj = {
   smartListView,
   smartListContainer,
   smartListTitle,
-  smartListBackBtn,
   filterButtonsDiv,
   smartListButtonsDiv,
   latestAddedButton,
@@ -726,9 +720,6 @@ const globalsObj = {
   downloadedCountSpan,
   comicListDiv,
   comicViewerDiv,
-  viewerLibrariesBtn,
-  viewerPublisherBtn,
-  viewerSeriesBtn,
   publisherAlphaFilter,
   seriesAlphaFilter,
   comicAlphaFilter,
@@ -786,7 +777,6 @@ const globalsObj = {
   settingsModal,
   settingsForm,
   scanIntervalInput,
-  apiKeyInput,
   settingsStatusDiv,
   scanButton,
   fullScanButton,

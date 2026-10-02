@@ -44,7 +44,7 @@ export function isPagePreviewGridOpen() {
  * ui-page-jump.js behaviour).
  */
 export async function goToPage(targetIndex) {
-  const global = (typeof state !== 'undefined' ? state : window) || {};
+  const global = state;
   const pages = global.getViewerPages?.() || [];
   if (!pages.length) return false;
 
@@ -136,7 +136,7 @@ function ensureEscHandler() {
 }
 
 export async function openPagePreviewGrid(triggerElement = null) {
-  const global = (typeof state !== 'undefined' ? state : window) || {};
+  const global = state;
   if (isPagePreviewGridOpen()) return;
   ensureEscHandler();
 
