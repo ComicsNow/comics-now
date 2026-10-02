@@ -1,0 +1,63 @@
+name: Sync Multi-Arch Image to Docker Hub
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to sync (e.g. v1.2, latest)'
+        required: true
+        default: 'v1.2'
+  release:
+    types: [published]
+
+jobs:
+  sync-to-dockerhub:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
+
+    steps:
+      - name: Install Skopeo
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y skopeo
+
+      - name: Determine Tags
+        id: tags
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            TAG="${{ github.event.inputs.tag }}"
+          else
+            TAG="${{ github.event.release.tag_name }}"
+          fi
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+
+      - name: Copy Tagged Multi-Arch Image to Docker Hub
+        env:
+          GHCR_USER: ${{ github.actor }}
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DH_USER: comicsnowdev
+          DH_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+          TAG: ${{ steps.tags.outputs.tag }}
+        run: |
+          echo "Syncing tag: ${TAG} to Docker Hub..."
+          skopeo copy --all \
+            --src-creds "${GHCR_USER}:${GHCR_TOKEN}" \
+            --dest-creds "${DH_USER}:${DH_TOKEN}" \
+            docker://ghcr.io/${{ github.repository }}:${TAG} \
+            docker://docker.io/${DH_USER}/comics-now:${TAG}
+
+      - name: Copy latest Multi-Arch Image to Docker Hub
+        env:
+          GHCR_USER: ${{ github.actor }}
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DH_USER: comicsnowdev
+          DH_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+        run: |
+          echo "Syncing tag: latest to Docker Hub..."
+          skopeo copy --all \
+            --src-creds "${GHCR_USER}:${GHCR_TOKEN}" \
+            --dest-creds "${DH_USER}:${DH_TOKEN}" \
+            docker://ghcr.io/${{ github.repository }}:latest \
+            docker://docker.io/${DH_USER}/comics-now:latest
