@@ -118,6 +118,38 @@ let ctCancelled = false;
 let ctAbortController = null;
 let userChoiceResolver = null;
 let pendingMatchState = null;
+let waitingLogSeq = 0;
+
+const SCAN_MODES = ['default', 'unmatched', 'existing-xml', 'force'];
+
+// Explicit mode wins, then an explicit force flag, then the persisted
+// "force re-scan by default" setting (used by scheduled runs).
+function resolveScanMode(options = {}) {
+  const opts = options || {};
+  if (opts.mode && SCAN_MODES.includes(opts.mode)) return opts.mode;
+  if (opts.force !== undefined) return opts.force ? 'force' : 'default';
+  return (getTaggerForceReprocess && getTaggerForceReprocess()) ? 'existing-xml' : 'default';
+}
+
+// DB-exact count of inbox comics previously recorded as no-match.
+async function getScanScopeCounts() {
+  try {
+    const dir = getConfig().comicsLocation;
+    if (!dir) return { unmatched: 0 };
+    const prefix = dir.endsWith(path.sep) ? dir : dir + path.sep;
+    const escapeLike = (s) => String(s).replace(/\^/g, '^^').replace(/%/g, '^%').replace(/_/g, '^_');
+    const row = await db.dbGet(
+      `SELECT COUNT(*) AS unmatched FROM comics
+       WHERE tagStatus = 'failed'
+         AND path LIKE ? ESCAPE '^'
+         AND instr(substr(path, ?), ?) = 0`,
+      [`${escapeLike(prefix)}%`, prefix.length + 1, path.sep]
+    );
+    return { unmatched: (row && row.unmatched) || 0 };
+  } catch (e) {
+    return { unmatched: 0 };
+  }
+}
 
 async function runComicTagger(options = {}) {
   if (ctRunning) {
@@ -127,11 +159,19 @@ async function runComicTagger(options = {}) {
   ctRunning = true;
   ctCancelled = false;
   ctAbortController = new AbortController();
-  const force = options && options.force !== undefined ? !!options.force : (getTaggerForceReprocess ? getTaggerForceReprocess() : false);
+  const mode = resolveScanMode(options);
+  const bypassCoreGates = (mode === 'force' || mode === 'existing-xml');
+  const bypassNoMatchGate = (mode !== 'default');
+  const forceReprocess = (mode !== 'default');
   const scanStartTime = Date.now();
   try {
     ctLog('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-    ctLog(`Starting Tag Comics Now library scan...${force ? ' (⚡ Force Re-Scan: Existing ComicInfo.xml will be re-scanned)' : ''}`);
+    const headerSuffix = mode === 'unmatched'
+      ? ' (🔁 Rescan Unmatched — comics previously marked no-match)'
+      : (mode === 'existing-xml'
+        ? ' (⚡ Force Re-Scan — comics with existing ComicInfo.xml)'
+        : (mode === 'force' ? ' (⚡ Force Re-Scan: Existing ComicInfo.xml will be re-scanned)' : ''));
+    ctLog(`Starting Tag Comics Now library scan...${headerSuffix}`);
     ctLog('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     
     const serviceUrl = getTaggerServiceUrl() || 'http://127.0.0.1:5000';
@@ -228,8 +268,16 @@ async function runComicTagger(options = {}) {
 
       const isModified = !existing || !existing.updatedAt || Math.abs(stats.mtimeMs - existing.updatedAt) > 1000;
 
-      // 1. If already scanned and tagged successfully, and file is not modified -> SKIP (unless force is requested)
-      if (!force && existing && !isModified && existing.tagStatus === 'successful') {
+      // Scoped mode: only re-search comics previously recorded as no-match
+      if (mode === 'unmatched' && !(existing && existing.tagStatus === 'failed')) {
+        skippedCount++;
+        itemDurations.push(Date.now() - itemStart);
+        ctLog(`➜ SKIPPED: Not previously marked no-match (${entry.name})`);
+        continue;
+      }
+
+      // 1. If already scanned and tagged successfully, and file is not modified -> SKIP (unless forced)
+      if (!bypassCoreGates && existing && !isModified && existing.tagStatus === 'successful') {
         skippedCount++;
         itemDurations.push(Date.now() - itemStart);
         ctLog(`➜ SKIPPED: Already scanned and tagged (${entry.name})`);
@@ -238,7 +286,7 @@ async function runComicTagger(options = {}) {
 
       // 2. If the file on disk already contains complete metadata (Series, Publisher, Date, Number) -> ONLY skip if NOT forced
       const isAlreadyComplete = await checkFileSuccess(filePath);
-      if (!force && isAlreadyComplete) {
+      if (!bypassCoreGates && isAlreadyComplete) {
         try {
           const { getComicInfoFromArchive, normalizePublisher, cleanDescription, splitVolumeSeriesAndTitle, isTitleSameAsSeries } = require('./metadata');
           const info = await getComicInfoFromArchive(filePath);
@@ -300,8 +348,16 @@ async function runComicTagger(options = {}) {
         } catch (err) {}
       }
 
-      // 3. If previously scanned with no match and file has not been modified -> SKIP (unless force is requested)
-      if (!force && existing && !isModified && existing.tagStatus === 'failed') {
+      // Scoped mode: only re-scan comics that already carry a complete ComicInfo.xml
+      if (mode === 'existing-xml' && !(isAlreadyComplete || (existing && existing.tagStatus === 'successful'))) {
+        skippedCount++;
+        itemDurations.push(Date.now() - itemStart);
+        ctLog(`➜ SKIPPED: No existing ComicInfo.xml (${entry.name})`);
+        continue;
+      }
+
+      // 3. If previously scanned with no match and file has not been modified -> SKIP (unless forced)
+      if (!bypassNoMatchGate && existing && !isModified && existing.tagStatus === 'failed') {
         skippedCount++;
         itemDurations.push(Date.now() - itemStart);
         ctLog(`➜ SKIPPED: Previously scanned with no match (file unmodified) (${entry.name})`);
@@ -337,7 +393,7 @@ async function runComicTagger(options = {}) {
             lower_threshold: lowerThreshold,
             upper_threshold: upperThreshold,
             enabled_sources: enabledSources,
-            force_reprocess: force,
+            force_reprocess: forceReprocess,
             publisher_codex: publisherCodex
           },
           ctAbortController ? ctAbortController.signal : undefined,
@@ -473,7 +529,8 @@ async function runComicTagger(options = {}) {
           waitingForResponse: true,
           isFinal: true,
           previewBuffer: null,
-          previewMime: null
+          previewMime: null,
+          waitingLogId: `ct-wait-${++waitingLogSeq}`
         };
 
         const choicePromise = new Promise((resolveChoice) => {
@@ -498,7 +555,7 @@ async function runComicTagger(options = {}) {
           } catch (err) {}
         })();
 
-        ctLog(`>>> WAITING FOR USER SELECTION (Found ${formattedMatches.length} candidates)`);
+        ctLog(`>>> WAITING FOR USER SELECTION (Found ${formattedMatches.length} candidates)`, { id: pendingMatchState.waitingLogId });
         
         await new Promise((resolveLoop) => {
           choicePromise.then(async (action) => {
@@ -566,7 +623,7 @@ async function runComicTagger(options = {}) {
     ctRunning = false;
     userChoiceResolver = null;
     if (ctCancelled && pendingMatchState) {
-      ctLog('ⓘ Scan cancelled. Retaining pending low-confidence match for review.');
+      ctLog('⏸ Scan cancelled — pending match retained', { id: pendingMatchState.waitingLogId });
     } else {
       pendingMatchState = null;
     }
@@ -584,6 +641,7 @@ async function applyUserSelection(selections) {
   }
 
   const resolver = userChoiceResolver;
+  const waitingLogId = pendingMatchState.waitingLogId;
   const choiceStr = selections[0] || '1';
   const match = pendingMatchState.matches.find(m => m.choice === choiceStr);
   if (!match) {
@@ -591,7 +649,7 @@ async function applyUserSelection(selections) {
     throw new Error(`Selection #${choiceStr} not found`);
   }
 
-  ctLog(`✓ User selected candidate #${choiceStr}: ${match.title}`);
+  ctLog(`✓ User selected candidate #${choiceStr}: ${match.title}`, { id: waitingLogId });
   
   const serviceUrl = getTaggerServiceUrl() || 'http://127.0.0.1:5000';
   const filePath = pendingMatchState.filePath;
@@ -698,11 +756,12 @@ function skipCurrentMatch() {
   }
 
   const resolver = userChoiceResolver;
+  const waitingLogId = pendingMatchState.waitingLogId;
   const filePath = pendingMatchState.filePath;
   const fileName = pendingMatchState.fileName;
 
-  ctLog(`ⓘ Skipping match for: ${fileName}`);
-  
+  ctLog(`⊘ Skipped — recorded as unmatched: ${fileName}`, { id: waitingLogId });
+
   pendingMatchState = null;
   userChoiceResolver = null;
 
@@ -819,6 +878,8 @@ function isTaggerRunning() {
 
 module.exports = {
   runComicTagger,
+  resolveScanMode,
+  getScanScopeCounts,
   cancelComicTagger,
   isTaggerRunning,
   scheduleCtRun,
