@@ -35,12 +35,6 @@ async function scanLibrary(force = false) {
   }
   isScanning = true;
 
-  try {
-    // ... no temp cleanup needed
-  } catch (err) {
-    log('ERROR', 'SCAN', `Temp cleanup failed: ${err.message}`);
-  }
-
   const startScan = t0();
   let totalSeen = 0, totalInsertedOrUpdated = 0, totalConverted = 0, thumbOk = 0, thumbFail = 0, errors = 0;
   scanProgress = { totalFiles: 0, scannedFiles: 0, status: 'Starting' };

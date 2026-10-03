@@ -196,11 +196,6 @@ async function extractUserFromJWT(req, res, next) {
     }
   }
 
-  // Debug logging
-  if (!jwtToken && req.path.includes('/api/')) {
-
-  }
-
   // Development bypass (only if NODE_ENV is development)
   if (!jwtToken && process.env.NODE_ENV === 'development') {
     req.user = {

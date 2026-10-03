@@ -182,11 +182,6 @@ function createChipInputRow(name, initialCSV = '') {
   return wrap;
 }
 
-// Back-compat stub (we no longer render read-only rows)
-function createDisplayField() {
-  return document.createElement('div');
-}
-
 function isTitleSameAsSeries(title, series) {
   if (!title) return false;
   let tRaw = String(title).trim();
@@ -393,7 +388,6 @@ export {
   loadMetadata,
   createFormRow,
   createChipInputRow,
-  createDisplayField,
   renderMetadataDisplay,
   isTitleSameAsSeries
 };
@@ -401,7 +395,6 @@ export {
 state.loadMetadata = loadMetadata;
 state.createFormRow = createFormRow;
 state.createChipInputRow = createChipInputRow;
-state.createDisplayField = createDisplayField;
 state.renderMetadataDisplay = renderMetadataDisplay;
 state.isTitleSameAsSeries = isTitleSameAsSeries;
 
@@ -409,7 +402,6 @@ if (typeof window !== 'undefined') {
   window.loadMetadata = loadMetadata;
   window.createFormRow = createFormRow;
   window.createChipInputRow = createChipInputRow;
-  window.createDisplayField = createDisplayField;
   window.renderMetadataDisplay = renderMetadataDisplay;
   window.isTitleSameAsSeries = isTitleSameAsSeries;
 }

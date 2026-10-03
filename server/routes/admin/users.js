@@ -87,60 +87,16 @@ module.exports = function attach(router, deps) {
       if (metadataAccess.length > 0) {
         const rootFolders = getComicsDirectories();
 
-        // Build hierarchy map from comics database.
+        // Build hierarchy maps from the comics database.
         // IMPORTANT: only include comics that live under a configured library
         // root. This must mirror the /api/v1/library-tree endpoint, which skips
         // comics whose root folder is 'Unknown' (i.e. on disk but outside any
-        // configured library). If we counted those extra series here, the
-        // "are all children selected?" check below would compare the admin's
-        // selection (built from the tree) against an inflated total and wrongly
-        // strip child_access — the bug that made publishers such as
-        // "DC Comics" and "IDW Publishing" impossible to grant.
+        // configured library), so the publisher/root hierarchy derived below
+        // matches the tree the admin selected from.
         const allComics = await dbAll('SELECT path, publisher, series FROM comics');
         const comics = allComics.filter(c =>
           c.path && rootFolders.some(folder => c.path.startsWith(folder))
         );
-
-        // Map: root_folder -> Set of publishers
-        // Map: publisher -> Set of series
-        const rootToPublishers = new Map();
-        const publisherToSeries = new Map();
-
-        for (const comic of comics) {
-          // Determine root folder
-          let rootFolder = 'Unknown';
-          for (const folder of rootFolders) {
-            if (comic.path.startsWith(folder)) {
-              rootFolder = folder;
-              break;
-            }
-          }
-
-          // Map root -> publishers
-          if (!rootToPublishers.has(rootFolder)) {
-            rootToPublishers.set(rootFolder, new Set());
-          }
-          if (comic.publisher) {
-            rootToPublishers.get(rootFolder).add(comic.publisher);
-          }
-
-          // Map publisher -> series
-          if (comic.publisher) {
-            if (!publisherToSeries.has(comic.publisher)) {
-              publisherToSeries.set(comic.publisher, new Set());
-            }
-            if (comic.series) {
-              publisherToSeries.get(comic.publisher).add(comic.series);
-            }
-          }
-        }
-
-        // Build set of what children are present in access list
-        const accessSet = new Map();
-        for (const item of metadataAccess) {
-          const key = `${item.accessType}:${item.accessValue}`;
-          accessSet.set(key, item);
-        }
 
         // Process each access item
         for (const item of metadataAccess) {
