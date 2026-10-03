@@ -33,6 +33,30 @@ jobs:
           fi
           echo "tag=$TAG" >> $GITHUB_OUTPUT
 
+      # The release event fires while the multi-arch build in
+      # docker-publish.yml is still running (and the tag push already
+      # triggered docker-publish directly). Wait for the manifest to land in
+      # GHCR instead of racing the build — a tag being present also implies
+      # "latest" was pushed, since buildx pushes all tags in one go.
+      - name: Wait for image to appear in GHCR
+        env:
+          GHCR_USER: ${{ github.actor }}
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.tags.outputs.tag }}
+        run: |
+          echo "Waiting for ghcr.io/comicsnow/comics-now:${TAG} ..."
+          for i in $(seq 1 60); do
+            if skopeo inspect --creds "${GHCR_USER}:${GHCR_TOKEN}" \
+                "docker://ghcr.io/comicsnow/comics-now:${TAG}" >/dev/null 2>&1; then
+              echo "Image found (attempt ${i})."
+              exit 0
+            fi
+            echo "Attempt ${i}/60: image not in GHCR yet, retrying in 30s..."
+            sleep 30
+          done
+          echo "::error::ghcr.io/comicsnow/comics-now:${TAG} did not appear within 30 minutes."
+          exit 1
+
       - name: Copy Tagged Multi-Arch Image to Docker Hub
         env:
           GHCR_USER: ${{ github.actor }}
