@@ -1,6 +1,6 @@
 // --- PROGRESS TRACKING SYSTEM ---
-// Navigation, rendering, and fullscreen handling live in viewer.js. This module
-// now focuses on persistence helpers and wiring progress-related UI events.
+// Navigation, rendering, and fullscreen handling live in the viewer/ modules.
+// This module provides persistence helpers and wires progress-related UI events.
 
 import {
   state,

@@ -356,7 +356,7 @@ async function matchCoverToCandidates({
   // 4. Rate-limit throttle spacing (~4s between calls)
   await waitThrottle(throttleMs);
 
-  // 5. POST to Gemini generateContent (strictly gemini-2.5-flash-lite)
+  // 5. POST to Gemini generateContent (activeModel; default gemini-3.5-flash-lite)
   const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(activeModel)}:generateContent?key=${encodeURIComponent(apiKey)}`;
 
   try {

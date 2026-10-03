@@ -342,7 +342,7 @@ async function initializeApp() {
   }
 }
 
-// New function to load library offline-first
+// Loads the library offline-first: cache first, then refresh from server
 async function loadLibraryOfflineFirst() {
   try {
     let cachedLibrary = null;
@@ -469,7 +469,7 @@ async function loadLibraryOfflineFirst() {
   }
 }
 
-// Modified function to fetch from server and cache
+// Fetches the library from the server and caches it
 async function fetchLibraryFromServer() {
   try {
     // Try lazy loading first, fallback to full loading

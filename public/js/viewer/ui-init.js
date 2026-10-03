@@ -163,9 +163,9 @@ const global = new Proxy(typeof window !== 'undefined' ? window : globalThis, {
       global.fullscreenCloseBtnBottom.addEventListener('click', global.fullscreenCloseBtnBottom._closeListener);
     }
 
-    // Side-nav hotspots (#fullscreen-nav-left / -right) are exclusively long-press
-    // triggers — no single-click navigation. Long-press is handled by
-    // bindFullscreenLongPress on the viewer; the overlay divs let pointer events
+    // Side-nav hotspots (#fullscreen-nav-left / -right): long-press on touch and
+    // single-click on desktop (deferred 280ms) both navigate — handled by
+    // bindFullscreenLongPress in fullscreen.js; the overlay divs let pointer events
     // through to the viewer (and CSS gates them off entirely when zoomed).
 
     const fullscreenImage = global.fullscreenImage;

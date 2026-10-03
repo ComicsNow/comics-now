@@ -396,7 +396,7 @@ module.exports = function attach(router, deps) {
         return res.status(400).json({ error: 'matches must be an array' });
       }
 
-      // If matches already contain coverUrl from tagger-replacement, return directly!
+      // Ensure each match exposes a coverUrl, falling back to metadata.cover_image_url
       const enriched = matches.map(m => ({
         ...m,
         coverUrl: m.coverUrl || m.metadata?.cover_image_url || null
