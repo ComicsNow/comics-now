@@ -70,7 +70,7 @@ async function loadPage(pageName, container) {
     loadedPages.add(pageName);
 
     const getPageUrl = state.getPageUrl || window.getPageUrl;
-    // Use global getPageUrl function (defined in viewer.js)
+    // Use global getPageUrl function (defined in viewer/viewer-local.js / viewer-server.js)
     if (typeof getPageUrl !== 'function') {
       throw new Error('getPageUrl function not available');
     }

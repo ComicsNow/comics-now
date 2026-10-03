@@ -354,9 +354,6 @@ async function initializeDatabase() {
 }
 
 
-// Helper function to check if user has access to a specific comic
-// Uses hierarchical access control: root_folder -> publisher -> series
-// Series is the lowest level - having series access grants access to all comics in that series
 const { checkComicAccess: checkAccessLogic } = require('./access-control');
 
 // Helper function to check if user has access to a specific comic

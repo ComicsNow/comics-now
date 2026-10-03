@@ -1562,7 +1562,7 @@ body.is-offline .comic-context-menu-item.hide-offline {
     border-color: #c42d1f;
 }
 
-/* ─── CUSTOM TOGGLES (from settings-modal.html redesign) ─── */
+/* ─── CUSTOM TOGGLES ─── */
 .toggle {
     position: relative;
     display: inline-block;

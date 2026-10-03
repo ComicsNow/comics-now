@@ -338,9 +338,7 @@ if (typeof origClose === 'function') {
     return origClose.apply(this, arguments);
   };
 } else {
-  // If not immediately available, we can intercept calls via defineProperty or wait until it is set.
-  // Using global getter/setter properties via state or Object.defineProperty is super robust!
-  // Let's define it on state so it gets mirrored or intercepted by the proxy when it is called.
+  // Not registered yet — define it on state so a later assignment is intercepted.
   let currentClose = global.closeSettingsModal;
   Object.defineProperty(state, 'closeSettingsModal', {
     get() {
