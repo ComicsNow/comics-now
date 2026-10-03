@@ -131,6 +131,8 @@ const {
 const {
   scheduleCtRun,
   runComicTagger,
+  resolveScanMode,
+  getScanScopeCounts,
   cancelComicTagger,
   isTaggerRunning,
   applyUserSelection,
@@ -290,6 +292,8 @@ const apiRouter = createApiRouter({
   dbRun,
   dbAll,
   runComicTagger,
+  resolveScanMode,
+  getScanScopeCounts,
   cancelComicTagger,
   isTaggerRunning,
   scheduleCtRun,

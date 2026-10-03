@@ -1,5 +1,7 @@
 const fs = require('fs');
 
+const VALID_SCAN_MODES = ['default', 'unmatched', 'existing-xml', 'force'];
+
 module.exports = function attach(router, deps) {
   const {
     log,
@@ -13,6 +15,8 @@ module.exports = function attach(router, deps) {
     saveSetting,
     scheduleCtRun,
     runComicTagger,
+    resolveScanMode,
+    getScanScopeCounts,
     cancelComicTagger,
     isTaggerRunning,
     applyUserSelection,
@@ -190,12 +194,27 @@ module.exports = function attach(router, deps) {
   // Run Scan
   router.post('/api/v1/comictagger/run', async (req, res) => {
     try {
-      const { force } = req.body || {};
-      const shouldForce = force !== undefined ? !!force : (getTaggerForceReprocess ? getTaggerForceReprocess() : false);
-      runComicTagger({ force: shouldForce });
-      res.json({ ok: true, force: shouldForce });
+      const { force, mode } = req.body || {};
+      if (mode !== undefined && !VALID_SCAN_MODES.includes(mode)) {
+        return res.status(400).json({ ok: false, message: 'Invalid scan mode' });
+      }
+      const resolved = resolveScanMode
+        ? resolveScanMode({ force, mode })
+        : (mode || (force ? 'force' : 'default'));
+      runComicTagger({ force, mode });
+      res.json({ ok: true, mode: resolved });
     } catch (e) {
       res.status(400).json({ ok: false, message: formatErrorMessage(e, req, 'ComicTagger run failed') });
+    }
+  });
+
+  // Scoped scan counts (DB-exact)
+  router.get('/api/v1/comictagger/scope-counts', async (req, res) => {
+    try {
+      const counts = getScanScopeCounts ? await getScanScopeCounts() : { unmatched: 0 };
+      res.json({ ok: true, unmatched: counts.unmatched });
+    } catch (e) {
+      res.status(500).json({ ok: false, unmatched: 0, message: formatErrorMessage(e, req, 'Failed to get scan scope counts') });
     }
   });
 
@@ -312,7 +331,7 @@ module.exports = function attach(router, deps) {
         return res.json({ waitingForResponse: false });
       }
 
-      const { previewBuffer, ...safePending } = pending;
+      const { previewBuffer, waitingLogId, ...safePending } = pending;
       const response = {
         ...safePending,
         firstPageUrl: null,

@@ -75,9 +75,80 @@ async function checkPendingMatch() {
 
 const seenLogEntries = new Set();
 let ctSyncInterval = null;
+let isConfirmingCt = false;
+
+// --- Live output log-line bookkeeping ---
+// Id-stamped entries (e.g. the WAITING FOR USER SELECTION banner) are updated
+// in place instead of being appended again, so a resolved review never leaves
+// a stale line behind. Non-id entries keep timestamp+message dedupe.
+const ctLogLineElements = new Map();
+
+function isRateDefenseMessage(message) {
+  return /Rate defense|cooldown/i.test(String(message || ''));
+}
+
+function ctLogEntryKey(entry) {
+  if (entry && entry.id) return `id:${entry.id}:${entry.timestamp || ''}`;
+  return `${entry.timestamp}_${entry.message}`;
+}
+
+function upsertCtLogLine(entry) {
+  if (!ctOutputDiv) return false;
+  if (entry.id) {
+    const existing = ctLogLineElements.get(entry.id);
+    const line = formatCtLogMessage(entry.timestamp, entry.message);
+    line.dataset.logId = entry.id;
+    if (existing && existing.parentNode === ctOutputDiv) {
+      ctOutputDiv.replaceChild(line, existing);
+      ctLogLineElements.set(entry.id, line);
+      seenLogEntries.add(ctLogEntryKey(entry));
+      return true;
+    }
+    if (seenLogEntries.has(ctLogEntryKey(entry))) return false;
+    seenLogEntries.add(ctLogEntryKey(entry));
+    ctLogLineElements.set(entry.id, line);
+    ctOutputDiv.appendChild(line);
+    return true;
+  }
+  const key = ctLogEntryKey(entry);
+  if (seenLogEntries.has(key)) return false;
+  seenLogEntries.add(key);
+  ctOutputDiv.appendChild(formatCtLogMessage(entry.timestamp, entry.message));
+  return true;
+}
+
+function upsertRateDefenseLine(entry) {
+  const lastChild = ctOutputDiv ? ctOutputDiv.lastElementChild : null;
+  if (lastChild && lastChild.dataset && lastChild.dataset.logType === 'rate-defense') {
+    ctOutputDiv.replaceChild(formatCtLogMessage(entry.timestamp, entry.message), lastChild);
+    return true;
+  }
+  return false;
+}
+
+function appendLocalCtLogLine(message) {
+  if (!ctOutputDiv) return;
+  const line = formatCtLogMessage(new Date().toISOString(), message);
+  line.dataset.local = 'true';
+  ctOutputDiv.appendChild(line);
+  ctOutputDiv.scrollTop = ctOutputDiv.scrollHeight;
+}
+
+// Render an incoming log entry: live rate-defense updates merge into the last
+// rate-defense line, id-stamped entries upsert, everything else dedupes.
+function applyCtLogEntry(entry) {
+  if (!entry || typeof entry.message !== 'string') return false;
+  if (!entry.id && (entry.isUpdate || isRateDefenseMessage(entry.message)) && upsertRateDefenseLine(entry)) {
+    return true;
+  }
+  return upsertCtLogLine(entry);
+}
 
 function updateCtProgressFromLog(message) {
   if (!message || typeof message !== 'string') return;
+
+  // A finished run may have changed the unmatched scope: refresh the count
+  if (/Results:/i.test(message)) fetchCtScopeCounts();
 
   const progressCard = document.getElementById('ct-progress-card');
   const fileElem = document.getElementById('ct-progress-file');
@@ -116,7 +187,7 @@ function updateCtProgressFromLog(message) {
     const msg = progMatch[2].trim();
     if (activityText) activityText.textContent = `[${src}] ${msg}`;
 
-    if (/Rate defense|cooldown|waiting/i.test(msg)) {
+    if (isRateDefenseMessage(msg)) {
       if (badge) {
         badge.textContent = 'Rate Limit Wait';
         badge.className = 'px-2 py-0.5 rounded text-[10px] font-medium bg-amber-900/60 text-amber-300 border border-amber-700/50 flex-shrink-0';
@@ -211,7 +282,7 @@ function formatCtLogMessage(timestamp, message) {
     srcBadge.textContent = src;
 
     const msgSpan = document.createElement('span');
-    if (/Rate defense|cooldown|waiting/i.test(subMsg)) {
+    if (isRateDefenseMessage(subMsg)) {
       line.dataset.logType = 'rate-defense';
       msgSpan.className = 'text-amber-400 break-words min-w-[180px] flex-1 flex items-center gap-1.5 leading-snug';
       msgSpan.innerHTML = `<span class="flex-shrink-0">⏳</span> <span>${escapeHtml(subMsg)}</span>`;
@@ -289,18 +360,9 @@ async function loadCtSavedLogs() {
     if (Array.isArray(logs) && logs.length > 0 && ctOutputDiv) {
       ctOutputDiv.innerHTML = '';
       seenLogEntries.clear();
+      ctLogLineElements.clear();
       logs.forEach(entry => {
-        const isRateDefense = /Rate defense|cooldown|waiting/i.test(entry.message);
-        const lastChild = ctOutputDiv.lastElementChild;
-        if (isRateDefense && lastChild && lastChild.dataset && lastChild.dataset.logType === 'rate-defense') {
-          const logLine = formatCtLogMessage(entry.timestamp, entry.message);
-          ctOutputDiv.replaceChild(logLine, lastChild);
-        } else {
-          const entryKey = `${entry.timestamp}_${entry.message}`;
-          seenLogEntries.add(entryKey);
-          const logLine = formatCtLogMessage(entry.timestamp, entry.message);
-          ctOutputDiv.appendChild(logLine);
-        }
+        applyCtLogEntry(entry);
         updateCtProgressFromLog(entry.message);
       });
       ctOutputDiv.scrollTop = ctOutputDiv.scrollHeight;
@@ -318,22 +380,9 @@ async function ctSyncLogsAndState() {
     if (Array.isArray(logs) && ctOutputDiv) {
       let appended = false;
       logs.forEach(entry => {
-        const isRateDefense = /Rate defense|cooldown|waiting/i.test(entry.message);
-        const lastChild = ctOutputDiv.lastElementChild;
-        if (isRateDefense && lastChild && lastChild.dataset && lastChild.dataset.logType === 'rate-defense') {
-          const logLine = formatCtLogMessage(entry.timestamp, entry.message);
-          ctOutputDiv.replaceChild(logLine, lastChild);
+        if (applyCtLogEntry(entry)) {
           updateCtProgressFromLog(entry.message);
           appended = true;
-        } else {
-          const entryKey = `${entry.timestamp}_${entry.message}`;
-          if (!seenLogEntries.has(entryKey)) {
-            seenLogEntries.add(entryKey);
-            const logLine = formatCtLogMessage(entry.timestamp, entry.message);
-            ctOutputDiv.appendChild(logLine);
-            updateCtProgressFromLog(entry.message);
-            appended = true;
-          }
         }
       });
       if (appended) {
@@ -393,8 +442,10 @@ function openCTModal() {
   clearCtMatches();
   if (ctOutputDiv) ctOutputDiv.innerHTML = '';
   seenLogEntries.clear();
+  ctLogLineElements.clear();
 
   loadCtSavedLogs();
+  fetchCtScopeCounts();
 
   checkPendingMatch().then(() => {
     const indicator = document.getElementById('ct-pending-indicator');
@@ -424,23 +475,14 @@ function openCTModal() {
       if (e.data === ':ok' || e.data === ': keepalive') return;
       const data = JSON.parse(e.data);
       const msg = data.message;
-      const entryKey = `${data.timestamp}_${msg}`;
-      const isRateDefense = /Rate defense|cooldown|waiting/i.test(msg);
-      const lastChild = ctOutputDiv ? ctOutputDiv.lastElementChild : null;
 
-      if ((data.isUpdate || isRateDefense) && lastChild && lastChild.dataset && lastChild.dataset.logType === 'rate-defense') {
-        const updatedLine = formatCtLogMessage(data.timestamp, msg);
-        ctOutputDiv.replaceChild(updatedLine, lastChild);
-      } else if (ctOutputDiv && !seenLogEntries.has(entryKey)) {
-        seenLogEntries.add(entryKey);
-        const logLine = formatCtLogMessage(data.timestamp, msg);
-        ctOutputDiv.appendChild(logLine);
+      if (applyCtLogEntry(data) && ctOutputDiv) {
         ctOutputDiv.scrollTop = ctOutputDiv.scrollHeight;
       }
 
       updateCtProgressFromLog(msg);
 
-      if (/Review required/i.test(msg) || /WAITING FOR USER SELECTION/i.test(msg)) {
+      if (/Review required/i.test(msg) || /WAITING FOR USER SELECTION/i.test(msg) || /pending match retained/i.test(msg)) {
         checkPendingMatch();
         if (ctTabMatches && ctTabMatches.classList.contains('active')) {
           debouncedFetchPendingMatchDetails();
@@ -451,19 +493,52 @@ function openCTModal() {
 }
 
 function setScanRunningUI(isRunning) {
-  const runBtn = document.getElementById('ct-run-btn');
+  const runButtons = ['ct-run-btn', 'ct-rescan-unmatched-btn', 'ct-rescan-xml-btn']
+    .map(id => document.getElementById(id));
   const cancelBtn = document.getElementById('ct-cancel-btn');
   const statusText = document.getElementById('ct-scan-status-text');
 
   if (isRunning) {
-    if (runBtn) runBtn.classList.add('hidden');
+    runButtons.forEach(btn => btn && btn.classList.add('hidden'));
     if (cancelBtn) cancelBtn.classList.remove('hidden');
     if (statusText) statusText.textContent = 'Scanning comic library in progress...';
   } else {
-    if (runBtn) runBtn.classList.remove('hidden');
+    runButtons.forEach(btn => btn && btn.classList.remove('hidden'));
     if (cancelBtn) cancelBtn.classList.add('hidden');
     if (statusText) statusText.textContent = 'Ready to scan comic library';
   }
+}
+
+async function runCtScan(mode = 'default') {
+  setScanRunningUI(true);
+  try {
+    const res = await fetch(`${global.API_BASE_URL}/api/v1/comictagger/run`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ mode })
+    });
+    if (!res.ok) throw new Error(`request failed (${res.status})`);
+    return true;
+  } catch (err) {
+    setScanRunningUI(false);
+    appendLocalCtLogLine(`✗ Failed to start scan: ${err.message}`);
+    return false;
+  }
+}
+
+// DB-exact count of comics previously recorded as no-match; drives the
+// "Rescan Unmatched (N)" button label and its disabled-at-zero state.
+async function fetchCtScopeCounts() {
+  try {
+    const res = await fetch(`${global.API_BASE_URL}/api/v1/comictagger/scope-counts`);
+    if (!res.ok) return;
+    const data = await res.json();
+    const count = Math.max(0, parseInt(data && data.unmatched, 10) || 0);
+    const countSpan = document.getElementById('ct-unmatched-count');
+    const unmatchedBtn = document.getElementById('ct-rescan-unmatched-btn');
+    if (countSpan) countSpan.textContent = count > 0 ? `(${count})` : '';
+    if (unmatchedBtn) unmatchedBtn.disabled = count === 0;
+  } catch (err) {}
 }
 
 function clearCtMatches() {
@@ -545,11 +620,8 @@ async function fetchCtSettings() {
       }
     });
 
-    const forceScanCb = document.getElementById('ct-force-scan-cb');
     const forceSettingCb = document.getElementById('ct-force-setting-cb');
-    const isForce = !!data.forceReprocess;
-    if (forceScanCb) forceScanCb.checked = isForce;
-    if (forceSettingCb) forceSettingCb.checked = isForce;
+    if (forceSettingCb) forceSettingCb.checked = !!data.forceReprocess;
 
     // Fetch Gemini settings
     try {
@@ -755,8 +827,7 @@ async function saveCtSettings() {
   const metronPassword = metronPassInput ? metronPassInput.value.trim() : '';
 
   const forceSettingCb = document.getElementById('ct-force-setting-cb');
-  const forceScanCb = document.getElementById('ct-force-scan-cb');
-  const forceReprocess = forceSettingCb ? forceSettingCb.checked : (forceScanCb ? forceScanCb.checked : false);
+  const forceReprocess = forceSettingCb ? forceSettingCb.checked : false;
 
   const enabledSources = [];
   ['comicvine', 'metron', 'gcd', 'lcg', 'goodreads', 'blackwells', 'waterstones', 'googlebooks', 'amazon', 'forbiddenplanet'].forEach(s => {
@@ -1182,26 +1253,49 @@ function showCtConfirm(action) {
 }
 
 async function handleCtConfirmYes() {
+  // Single-flight: the button can be double-clicked and Enter fires too;
+  // a second in-flight confirmation would hit the server after the first
+  // already resolved the review.
+  if (isConfirmingCt) return;
   const action = ctConfirmBar?.dataset.action;
+  isConfirmingCt = true;
 
-  if (action === 'apply') {
-    const selected = document.querySelector('.ct-match-select:checked');
-    const choice = selected ? selected.dataset.choice : '1';
+  try {
+    let res;
+    if (action === 'apply') {
+      const selected = document.querySelector('.ct-match-select:checked');
+      const choice = selected ? selected.dataset.choice : '1';
 
-    await fetch(`${global.API_BASE_URL}/api/v1/comictagger/apply`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ selections: [choice] })
-    });
-  } else {
-    await fetch(`${global.API_BASE_URL}/api/v1/comictagger/skip`, {
-      method: 'POST'
-    });
+      res = await fetch(`${global.API_BASE_URL}/api/v1/comictagger/apply`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ selections: [choice] })
+      });
+    } else {
+      res = await fetch(`${global.API_BASE_URL}/api/v1/comictagger/skip`, {
+        method: 'POST'
+      });
+    }
+
+    if (!res || !res.ok) {
+      let detail = res ? `request failed (${res.status})` : 'network error';
+      try {
+        const data = await res.json();
+        if (data && data.message) detail = data.message;
+      } catch (_) {}
+      appendLocalCtLogLine(`✗ Error: ${detail}`);
+      return;
+    }
+
+    ctConfirmBar?.classList.add('hidden');
+    clearCtMatches();
+    fetchCtScopeCounts();
+    setTimeout(() => checkPendingMatch(), 500);
+  } catch (err) {
+    appendLocalCtLogLine(`✗ Error: ${err.message}`);
+  } finally {
+    isConfirmingCt = false;
   }
-
-  ctConfirmBar?.classList.add('hidden');
-  clearCtMatches();
-  setTimeout(() => checkPendingMatch(), 500);
 }
 
 function handleCtConfirmNo() {
@@ -1262,36 +1356,17 @@ if (typeof window !== 'undefined') {
   document.getElementById('ct-refresh-logs-btn')?.addEventListener('click', loadScanLogs);
   document.getElementById('ct-clear-history-btn')?.addEventListener('click', clearTrackingHistory);
   document.getElementById('ct-save-btn')?.addEventListener('click', saveCtSettings);
-  document.getElementById('ct-grab-btn')?.addEventListener('click', () => fetchPendingMatchDetails(true));
   document.getElementById('ct-apply-btn')?.addEventListener('click', () => showCtConfirm('apply'));
   document.getElementById('ct-skip-btn')?.addEventListener('click', () => showCtConfirm('skip'));
   document.getElementById('ct-confirm-yes')?.addEventListener('click', handleCtConfirmYes);
   document.getElementById('ct-confirm-no')?.addEventListener('click', handleCtConfirmNo);
-  const forceScanCb = document.getElementById('ct-force-scan-cb');
-  const forceSettingCb = document.getElementById('ct-force-setting-cb');
-  forceScanCb?.addEventListener('change', () => {
-    if (forceSettingCb) forceSettingCb.checked = forceScanCb.checked;
-  });
-  forceSettingCb?.addEventListener('change', () => {
-    if (forceScanCb) forceScanCb.checked = forceSettingCb.checked;
-  });
-
-  document.getElementById('ct-run-btn')?.addEventListener('click', async () => {
-    setScanRunningUI(true);
-    const isForced = document.getElementById('ct-force-scan-cb')?.checked || document.getElementById('ct-force-setting-cb')?.checked || false;
-    try {
-      await fetch(`${global.API_BASE_URL}/api/v1/comictagger/run`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ force: isForced })
-      });
-    } catch (err) {
-      setScanRunningUI(false);
-    }
-  });
+  document.getElementById('ct-run-btn')?.addEventListener('click', () => runCtScan('default'));
+  document.getElementById('ct-rescan-unmatched-btn')?.addEventListener('click', () => runCtScan('unmatched'));
+  document.getElementById('ct-rescan-xml-btn')?.addEventListener('click', () => runCtScan('existing-xml'));
   document.getElementById('ct-cancel-btn')?.addEventListener('click', cancelCtScan);
   document.getElementById('ct-clear-output')?.addEventListener('click', () => {
     if (ctOutputDiv) ctOutputDiv.innerHTML = '';
+    ctLogLineElements.clear();
   });
   initGeminiComplianceModal();
 }

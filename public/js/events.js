@@ -5,12 +5,6 @@ import {
   encodePath,
   ctButton,
   ctModal,
-  ctSaveBtn,
-  ctApplyBtn,
-  ctSkipBtn,
-  ctConfirmYes,
-  ctConfirmNo,
-  ctClearOutputBtn,
   ctOutputDiv,
   ctRunBtn,
   ctTabSettings,
@@ -216,29 +210,6 @@ ctButton?.addEventListener('click', () => {
 document.getElementById('ct-close-btn')?.addEventListener('click', () => {
   const closeCTFn = state.closeCTModal || window.closeCTModal;
   if (typeof closeCTFn === 'function') closeCTFn();
-});
-ctSaveBtn?.addEventListener('click', () => {
-  const saveCtFn = state.saveCtSettings || window.saveCtSettings;
-  if (typeof saveCtFn === 'function') saveCtFn();
-});
-ctApplyBtn?.addEventListener('click', () => {
-  const showCtConfirmFn = state.showCtConfirm || window.showCtConfirm;
-  if (typeof showCtConfirmFn === 'function') showCtConfirmFn('apply');
-});
-ctSkipBtn?.addEventListener('click', () => {
-  const showCtConfirmFn = state.showCtConfirm || window.showCtConfirm;
-  if (typeof showCtConfirmFn === 'function') showCtConfirmFn('skip');
-});
-ctConfirmYes?.addEventListener('click', () => {
-  const handleCtConfirmYesFn = state.handleCtConfirmYes || window.handleCtConfirmYes;
-  if (typeof handleCtConfirmYesFn === 'function') handleCtConfirmYesFn();
-});
-ctConfirmNo?.addEventListener('click', () => {
-  const handleCtConfirmNoFn = state.handleCtConfirmNo || window.handleCtConfirmNo;
-  if (typeof handleCtConfirmNoFn === 'function') handleCtConfirmNoFn();
-});
-ctClearOutputBtn?.addEventListener('click', () => { 
-  if (ctOutputDiv) ctOutputDiv.innerHTML = ''; 
 });
 
 document.getElementById('ct-grab-btn')?.addEventListener('click', function() {

@@ -23,26 +23,7 @@ function pushWithLimit(collection, entry) {
   }
 }
 
-function ctLog(message) {
-  const isRateDefense = /Rate defense|cooldown|waiting/i.test(message);
-  const lastEntry = ctLogs.length > 0 ? ctLogs[ctLogs.length - 1] : null;
-
-  if (isRateDefense && lastEntry && /Rate defense|cooldown|waiting/i.test(lastEntry.message)) {
-    lastEntry.message = message;
-    lastEntry.timestamp = new Date().toISOString();
-    for (const res of Array.from(ctClients)) {
-      try {
-        res.write(`data: ${JSON.stringify({ ...lastEntry, isUpdate: true })}\n\n`);
-        if (typeof res.flush === 'function') res.flush();
-      } catch (e) {
-        ctClients.delete(res);
-      }
-    }
-    return;
-  }
-
-  const entry = { timestamp: new Date().toISOString(), message };
-  pushWithLimit(ctLogs, entry);
+function broadcastCt(entry) {
   for (const res of Array.from(ctClients)) {
     try {
       res.write(`data: ${JSON.stringify(entry)}\n\n`);
@@ -51,6 +32,40 @@ function ctLog(message) {
       ctClients.delete(res);
     }
   }
+}
+
+// Log a ComicTagger line. Passing `opts.id` upserts an entry with that id:
+// the buffer entry and any client already showing it are updated in place so
+// transient states (e.g. "WAITING FOR USER SELECTION") resolve without
+// leaving a stale line behind.
+function ctLog(message, opts = {}) {
+  const id = opts && opts.id;
+  const entry = { timestamp: new Date().toISOString(), message };
+  if (id) entry.id = id;
+
+  if (id) {
+    const existingIdx = ctLogs.findIndex(e => e.id === id);
+    if (existingIdx >= 0) {
+      ctLogs[existingIdx] = entry;
+    } else {
+      pushWithLimit(ctLogs, entry);
+    }
+    broadcastCt(entry);
+    return;
+  }
+
+  const isRateDefense = /Rate defense|cooldown/i.test(message);
+  const lastEntry = ctLogs.length > 0 ? ctLogs[ctLogs.length - 1] : null;
+
+  if (isRateDefense && lastEntry && !lastEntry.id && /Rate defense|cooldown/i.test(lastEntry.message)) {
+    lastEntry.message = message;
+    lastEntry.timestamp = new Date().toISOString();
+    broadcastCt({ ...lastEntry, isUpdate: true });
+    return;
+  }
+
+  pushWithLimit(ctLogs, entry);
+  broadcastCt(entry);
 }
 
 function log(level, category, message) {
