@@ -1,8 +1,10 @@
 name: Publish to npm
 
+# NOTE: do not add `release: published` here. Creating a release with a new
+# tag (or on top of a pushed tag) also fires the tag push event, so the
+# workflow used to run twice in parallel — the loser hit a 409 "already
+# published" mid-race. Tag push alone covers every release.
 on:
-  release:
-    types: [published]
   push:
     tags:
       - 'v*'
@@ -30,9 +32,9 @@ jobs:
       - name: Run test suite
         run: npm test
 
-      # A release published on top of a pushed tag fires this workflow twice.
-      # Skip the duplicate run instead of failing with a 409 "cannot publish
-      # over previously published version".
+      # Re-dispatches (or a re-push of an existing tag) must not fail with a
+      # 409 "cannot publish over previously published version" — skip the
+      # publish step when the version is already on npm.
       - name: Check if version is already on npm
         id: npm-version
         run: |
