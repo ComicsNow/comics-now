@@ -522,7 +522,7 @@ const global = new Proxy(typeof window !== 'undefined' ? window : globalThis, {
     }
     // Skip taps on UI controls and the close button.
     if (event.target && typeof event.target.closest === 'function'
-        && event.target.closest('button, input, a, select, #fullscreen-controls')) {
+        && event.target.closest('button, input, a, select, #fullscreen-controls, #comic-page-grid-overlay')) {
       fsLastTapAt = 0;
       return;
     }
@@ -822,6 +822,12 @@ const global = new Proxy(typeof window !== 'undefined' ? window : globalThis, {
     const image = global.fullscreenImage;
     if (!viewer || !image) return;
 
+    // The page-preview grid is a modal inside the viewer: its own scroll and
+    // click handling must win. Skip pan/pinch/zoom bookkeeping for its events
+    // (this also keeps viewer.setPointerCapture off grid gestures).
+    if (event.target && typeof event.target.closest === 'function'
+        && event.target.closest('#comic-page-grid-overlay')) return;
+
     fsStartX = event.clientX;
     fsStartY = event.clientY;
     hasDragged = false;
@@ -890,6 +896,11 @@ const global = new Proxy(typeof window !== 'undefined' ? window : globalThis, {
     const viewer = global.fullscreenViewer;
     const image = global.fullscreenImage;
     if (!viewer || !image) return;
+
+    // Ignore moves whose target is the page-preview grid (its own scrolling
+    // must not promote a pending viewer pan or pinch).
+    if (event.target && typeof event.target.closest === 'function'
+        && event.target.closest('#comic-page-grid-overlay')) return;
 
     if (!hasDragged) {
       const dx = event.clientX - fsStartX;
@@ -970,6 +981,21 @@ const global = new Proxy(typeof window !== 'undefined' ? window : globalThis, {
 
   function handleFullscreenPointerUp(event) {
     const image = global.fullscreenImage;
+
+    // Events targeting the page-preview grid: run cleanup for this pointer (a
+    // pending pan armed on the image must not stay stale) but never start a
+    // fresh pan from a finger that is over the grid.
+    if (event.target && typeof event.target.closest === 'function'
+        && event.target.closest('#comic-page-grid-overlay')) {
+      fullscreenTouchPointers.delete(event.pointerId);
+      if (event.pointerId === fullscreenPanPointerId) endFullscreenPan(event.pointerId);
+      if (event.pointerId === landscapePanPointerId) endLandscapePan();
+      if (pendingPanPointerId !== null && event.pointerId === pendingPanPointerId) {
+        pendingPanPointerId = null;
+        pendingPanType = '';
+      }
+      return;
+    }
 
     if (event.pointerType === 'touch') {
       fullscreenTouchPointers.delete(event.pointerId);

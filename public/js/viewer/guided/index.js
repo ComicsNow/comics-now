@@ -150,6 +150,14 @@ function init() {
         touch-action: none !important;
       }
       .guided-zoom-no-touchmenu img { pointer-events: auto; }
+      /* The page-preview grid is mounted inside #fullscreen-viewer. While it is
+         open it must keep native touch panning: relax the stage and the whole
+         subtree (touch-action intersects with ancestors, so exempting only the
+         overlay's own nodes would not work). */
+      .guided-zoom-no-touchmenu:has(#comic-page-grid-overlay),
+      .guided-zoom-no-touchmenu:has(#comic-page-grid-overlay) * {
+        touch-action: auto !important;
+      }
     `;
     document.head.appendChild(style);
   }
