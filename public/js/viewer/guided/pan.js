@@ -51,6 +51,10 @@ function update() {
 }
 
 export function handlePointerDown(e) {
+  // The page-preview grid is a modal on top of the viewer: its gestures must
+  // never be captured by the magnifier pan.
+  if (e.target && typeof e.target.closest === 'function' && e.target.closest('#comic-page-grid-overlay')) return;
+
   const overlay = getOverlay();
   if (!overlay || overlay.style.display === 'none' || overlay.style.opacity === '0') return;
   
@@ -143,6 +147,7 @@ export function handlePointerUp(e) {
 }
 
 export function handleStageClick(e) {
+  if (e.target && typeof e.target.closest === 'function' && e.target.closest('#comic-page-grid-overlay')) return;
   if (justPanned) {
     e.preventDefault();
     e.stopPropagation();
@@ -162,6 +167,7 @@ function init() {
     
     // Prevent context menu on the stage when a guided mode is active
     stage.addEventListener('contextmenu', (e) => {
+      if (e.target && typeof e.target.closest === 'function' && e.target.closest('#comic-page-grid-overlay')) return;
       const overlay = getOverlay();
       if (overlay && overlay.style.display !== 'none' && overlay.style.opacity !== '0') {
         e.preventDefault();

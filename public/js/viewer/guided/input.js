@@ -17,6 +17,10 @@ function getStage() { return document.getElementById('fullscreen-viewer'); }
  * Delegates clicks to the active mode if applicable.
  */
 export function handleImageClick(e) {
+  // The page-preview grid is a modal on top of the viewer — never let a guided
+  // mode swallow its clicks.
+  if (e.target && typeof e.target.closest === 'function' && e.target.closest('#comic-page-grid-overlay')) return;
+
   const registry = state.GuidedView.ModeRegistry;
   const activeMode = registry.getActiveMode();
   const manualOverrideBox = registry.getManualOverrideBox();
@@ -77,6 +81,8 @@ export function handleImageClick(e) {
  * Handles double click or double tap to zoom in/out manually.
  */
 export function handleDoubleClickZoom(event) {
+  // Never zoom the page behind the open page-preview grid.
+  if (event && event.target && typeof event.target.closest === 'function' && event.target.closest('#comic-page-grid-overlay')) return;
   const isFullImageMode = state.isFullImageMode || window.isFullImageMode;
   if (isFullImageMode) return;
   const registry = state.GuidedView.ModeRegistry;
@@ -128,6 +134,8 @@ export function handleDoubleClickZoom(event) {
  */
 export function handlePointerUpForDblTap(event) {
   if (event.pointerType === 'mouse' && event.button !== 0) return;
+  // Grid taps are the grid's business — keep them out of dbl-tap zoom.
+  if (event.target && typeof event.target.closest === 'function' && event.target.closest('#comic-page-grid-overlay')) { lastTapAt = 0; return; }
   const registry = state.GuidedView.ModeRegistry;
   const activeModeName = registry.getActiveModeName();
   if (activeModeName !== 'western-speech-zoom' && activeModeName !== 'manga-panel-zoom' && activeModeName !== 'bubble' && activeModeName !== 'manga-speech-zoom') { lastTapAt = 0; return; }
@@ -145,6 +153,7 @@ function init() {
   if (stage) {
     stage.addEventListener('click', handleImageClick, true);
     stage.addEventListener('contextmenu', (e) => {
+      if (e.target && typeof e.target.closest === 'function' && e.target.closest('#comic-page-grid-overlay')) return;
       if (typeof state.GuidedView.isAnyGuidedActive === 'function' && state.GuidedView.isAnyGuidedActive()) e.preventDefault();
       else if (typeof window.GuidedView.isAnyGuidedActive === 'function' && window.GuidedView.isAnyGuidedActive()) e.preventDefault();
     });
