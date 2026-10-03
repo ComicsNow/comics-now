@@ -30,7 +30,22 @@ jobs:
       - name: Run test suite
         run: npm test
 
+      # A release published on top of a pushed tag fires this workflow twice.
+      # Skip the duplicate run instead of failing with a 409 "cannot publish
+      # over previously published version".
+      - name: Check if version is already on npm
+        id: npm-version
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          if npm view "comics-now@${VERSION}" version >/dev/null 2>&1; then
+            echo "published=true" >> "$GITHUB_OUTPUT"
+            echo "comics-now@${VERSION} is already published — skipping publish."
+          else
+            echo "published=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Publish package to npm
+        if: steps.npm-version.outputs.published != 'true'
         run: npm publish --provenance --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
