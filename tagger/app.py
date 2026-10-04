@@ -1992,7 +1992,7 @@ def api_search_external():
         elif source == "metron":
             user = data.get("metron_user") or scheduler_config.get("metron_user")
             pwd = data.get("metron_pass") or scheduler_config.get("metron_pass")
-            res = search_metron_multi(query, user, pwd)
+            res = search_metron_multi(query, user, pwd, year=data.get("year"))
             for item in (res or []):
                 if isinstance(item, dict):
                     item["source"] = "metron"

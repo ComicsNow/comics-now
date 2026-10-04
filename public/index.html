@@ -1004,7 +1004,19 @@
 
         <!-- Your Reading Lists Section -->
         <div>
-          <h4 class="text-lg font-semibold mb-3">Your Reading Lists</h4>
+          <div class="flex flex-col sm:flex-row gap-2 mb-3">
+            <h4 class="text-lg font-semibold sm:flex-none self-center">Your Reading Lists</h4>
+            <div class="flex gap-2 flex-1">
+              <input id="reading-list-search"
+                     type="search"
+                     placeholder="Search lists…"
+                     class="flex-1 min-w-0 bg-gray-700 text-white text-sm px-3 py-1.5 rounded-lg focus:outline-none placeholder-gray-400" />
+              <select id="reading-list-publisher-filter"
+                      class="w-36 sm:w-44 shrink-0 bg-gray-700 text-white text-sm pl-2.5 pr-8 py-1.5 rounded-lg focus:outline-none cursor-pointer truncate">
+                <option value="">All publishers</option>
+              </select>
+            </div>
+          </div>
           <div id="reading-lists-container" class="space-y-2">
             <p class="text-sm text-gray-400 text-center py-4">No reading lists yet. Create one to get started!</p>
           </div>
@@ -1254,6 +1266,16 @@
           <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><use href="#icon-18"></use></svg>
         </button>
       </div>
+
+      <!-- Floating Double-Page Spread Badge / Cinema Pan Button -->
+      <button
+        id="fullscreen-spread-badge"
+        class="hidden px-4 py-2 rounded-full bg-amber-500/90 hover:bg-amber-400 text-black font-bold text-xs uppercase tracking-wider shadow-lg transition-all flex items-center gap-2 cursor-pointer z-50 backdrop-blur-sm"
+        aria-label="Cinema Pan for Double-Page Spread"
+      >
+        <span class="animate-pulse">🎬</span>
+        <span id="fullscreen-spread-badge-text">Cinema Pan Spread</span>
+      </button>
 
       <div id="fullscreen-end-of-comic-navigation" class="hidden absolute bottom-24 left-1/2 transform -translate-x-1/2 z-20 bg-gray-900/95 p-4 rounded-lg border border-gray-700 shadow-2xl">
         <div id="fullscreen-end-nav-buttons" class="flex gap-3 flex-wrap justify-center">

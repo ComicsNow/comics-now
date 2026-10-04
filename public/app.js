@@ -630,14 +630,51 @@ async function refreshReadingListModal() {
   if (typeof global.ReadingLists !== 'undefined' && typeof global.ReadingLists.fetchReadingLists === 'function') {
     const lists = await global.ReadingLists.fetchReadingLists();
 
-    if (lists.length === 0) {
-      listsContainer.innerHTML = isOffline
-        ? '<p class="text-sm text-gray-400 text-center py-4">No cached reading lists available offline.</p>'
-        : '<p class="text-sm text-gray-400 text-center py-4">No reading lists yet. Create one to get started!</p>';
-    } else {
-      listsContainer.innerHTML = '';
+    // Populate publisher dropdown
+    const pubSelect = document.getElementById('reading-list-publisher-filter');
+    if (pubSelect) {
+      const allPubs = new Set();
+      lists.forEach(l => (l.publishers || []).forEach(p => { if (p) allPubs.add(p); }));
+      const currentPub = pubSelect.value;
+      pubSelect.innerHTML = '<option value="">All publishers</option>';
+      Array.from(allPubs).sort().forEach(p => {
+        const opt = document.createElement('option');
+        opt.value = p; opt.textContent = p;
+        if (p === currentPub) opt.selected = true;
+        pubSelect.appendChild(opt);
+      });
+    }
 
-      lists.forEach((list) => {
+    // Wire search/filter inputs once
+    const searchEl = document.getElementById('reading-list-search');
+    if (searchEl && !searchEl.dataset.rlFilterBound) {
+      searchEl.dataset.rlFilterBound = '1';
+      const rerender = () => renderFilteredLists(lists, listsContainer, isListEditMode);
+      searchEl.addEventListener('input', rerender);
+      if (pubSelect) pubSelect.addEventListener('change', rerender);
+    }
+
+    function renderFilteredLists(allLists, container, editMode) {
+      const term = (document.getElementById('reading-list-search')?.value || '').trim().toLowerCase();
+      const pub  = (document.getElementById('reading-list-publisher-filter')?.value || '').trim();
+      const filtered = allLists.filter(l => {
+        if (!l) return false;
+        if (term && !(l.name || '').toLowerCase().includes(term)) return false;
+        if (pub && !(l.publishers || []).includes(pub)) return false;
+        return true;
+      });
+
+      if (filtered.length === 0) {
+        container.innerHTML = term || pub
+          ? '<p class="text-sm text-gray-400 text-center py-4">No lists match your filter.</p>'
+          : (isOffline
+              ? '<p class="text-sm text-gray-400 text-center py-4">No cached reading lists available offline.</p>'
+              : '<p class="text-sm text-gray-400 text-center py-4">No reading lists yet. Create one to get started!</p>');
+        return;
+      }
+
+      container.innerHTML = '';
+      filtered.forEach((list) => {
         const listDiv = document.createElement('div');
         listDiv.className = 'bg-gray-800/50 p-5 rounded-xl border border-gray-700/50 hover:border-purple-500/50 transition-all group cursor-pointer relative flex flex-col gap-3';
         listDiv.dataset.listId = list.id;
@@ -861,9 +898,11 @@ async function refreshReadingListModal() {
           });
         }
 
-        listsContainer.appendChild(listDiv);
+        container.appendChild(listDiv);
       });
     }
+
+    renderFilteredLists(lists, listsContainer, isListEditMode);
   }
 }
 

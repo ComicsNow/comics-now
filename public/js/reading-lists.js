@@ -437,9 +437,7 @@ async function openAddToListModal(comicIds) {
  */
 function closeAddToListModal() {
   const modal = document.getElementById('add-to-list-modal');
-  if (modal) {
-    modal.classList.add('hidden');
-  }
+  if (modal) modal.classList.add('hidden');
   pendingComicIds = [];
   selectedListIds.clear();
 }
@@ -451,7 +449,6 @@ async function refreshAddToListModal() {
   const container = document.getElementById('add-to-list-container');
   if (!container) return;
 
-  // Fetch reading lists
   const lists = await fetchReadingLists();
 
   if (lists.length === 0) {
@@ -459,7 +456,6 @@ async function refreshAddToListModal() {
     return;
   }
 
-  // Build checkboxes for each list
   container.innerHTML = '';
   lists.forEach(list => {
     const checkbox = document.createElement('label');
@@ -473,17 +469,11 @@ async function refreshAddToListModal() {
         <span class="text-sm text-gray-400 ml-2">(${list.totalComics} items)</span>
       </span>
     `;
-
-    // Add event listener to track selection
     const input = checkbox.querySelector('input');
     input.addEventListener('change', (e) => {
-      if (e.target.checked) {
-        selectedListIds.add(list.id);
-      } else {
-        selectedListIds.delete(list.id);
-      }
+      if (e.target.checked) selectedListIds.add(list.id);
+      else selectedListIds.delete(list.id);
     });
-
     container.appendChild(checkbox);
   });
 }

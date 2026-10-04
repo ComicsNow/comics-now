@@ -194,6 +194,51 @@ def search_comicvine_volumes(query, api_key, limit=5):
     return candidates
 
 
+def _cv_id_num(raw):
+    """Strip a ComicVine prefix (4000-/4045-) and return just the numeric id as a string."""
+    m = re.search(r'(?:\d{4}-)?(\d+)', str(raw))
+    return m.group(1) if m else str(raw)
+
+
+def _issue_date_key(issue):
+    """Sort key for arc issues — cover_date first, then store_date."""
+    return issue.get("cover_date") or issue.get("store_date") or ""
+
+
+def fetch_comicvine_arc_position(arc_id, issue_id, api_key):
+    """Resolve the reading-order position of an issue within a ComicVine story arc.
+
+    Queries the story_arc resource, sorts its issues by cover_date (true reading
+    order), and returns {"name", "position" (1-based), "total"} — or None if the
+    issue isn't part of the arc or the lookup fails.
+    """
+    if not api_key:
+        return None
+    arc_num = _cv_id_num(arc_id)
+    headers = {"User-Agent": "ComicsNow/1.0 (https://github.com/comics-now)"}
+    url = (f"https://comicvine.gamespot.com/api/story_arc/4045-{arc_num}/"
+           f"?api_key={api_key}&format=json&field_list=id,name,issues")
+    try:
+        domain_limiter.wait_for_domain("comicvine.gamespot.com")
+        resp = requests.get(url, headers=headers, timeout=15)
+        if resp.status_code != 200:
+            return None
+        res = resp.json().get("results") or {}
+        issues = res.get("issues") or []
+        if not issues:
+            return None
+
+        issues_sorted = sorted(issues, key=_issue_date_key)
+        target = _cv_id_num(issue_id)
+        for idx, iss in enumerate(issues_sorted):
+            if _cv_id_num(iss.get("id")) == target:
+                return {"name": res.get("name") or "", "position": idx + 1, "total": len(issues_sorted)}
+        return None
+    except Exception as e:
+        print(f"[-] ComicVine arc position lookup failed: {e}")
+        return None
+
+
 def _extract_volume_number(filename):
     """Recover a volume/issue number from a filename: 'Vol 3', 'v3', 'volume 3', '#3'."""
     m = re.search(r'\bv(?:ol(?:ume)?)?\.?\s*(\d+)\b', filename, flags=re.IGNORECASE)
@@ -228,7 +273,7 @@ def fetch_comicvine_metadata(comicvine_url, api_key):
 
     if entity_type == "4000":
         # Issue endpoint - retrieve comprehensive fields
-        api_url = f"{base_api_url}/issue/{entity_id}/?api_key={api_key}&format=json&field_list=name,description,issue_number,cover_date,store_date,volume,person_credits,character_credits,team_credits,location_credits,page_count,image"
+        api_url = f"{base_api_url}/issue/{entity_id}/?api_key={api_key}&format=json&field_list=name,description,issue_number,cover_date,store_date,volume,person_credits,character_credits,team_credits,location_credits,page_count,image,story_arc_credits,site_detail_url"
         print(f"[*] Querying ComicVine Issue API: {base_api_url}/issue/{entity_id}/?api_key=***&format=json")
 
         domain_limiter.wait_for_domain("comicvine.gamespot.com")
@@ -299,6 +344,9 @@ def fetch_comicvine_metadata(comicvine_url, api_key):
         char_list = [c.get("name") for c in results.get("character_credits", []) if c.get("name")]
         team_list = [t.get("name") for t in results.get("team_credits", []) if t.get("name")]
         loc_list = [l.get("name") for l in results.get("location_credits", []) if l.get("name")]
+        web_url = results.get("site_detail_url") or comicvine_url
+        # Story arcs come from METRON ONLY — ComicVine does not contribute StoryArc
+        # or StoryArcNumber (sparse/inconsistently named on CV).
 
         # Check publisher cache by volume ID
         vol_id = volume_info.get("id")
@@ -349,6 +397,7 @@ def fetch_comicvine_metadata(comicvine_url, api_key):
             "characters": ", ".join(char_list),
             "teams": ", ".join(team_list),
             "locations": ", ".join(loc_list),
+            "web": web_url,
             "pages": str(results.get("page_count")) if results.get("page_count") else None
         }
 

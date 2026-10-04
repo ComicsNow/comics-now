@@ -244,19 +244,19 @@ function renderMetadataDisplay(metadata, clearForm = true) {
   // Check if user is admin
   const isAdmin = global.syncManager && global.syncManager.userRole === 'admin';
 
-  // For admins: show all default fields
-  // For non-admins: only show fields that have values
-  const defaults = {
-    Title: '', Series: '', Number: '', Summary: '',
-    Writer: '', Penciller: '', Inker: '', Colorist: '', Letterer: '', Editor: '',
-    Publisher: '', Imprint: '', AgeRating: '',
-    Characters: '', Teams: '', Locations: '',
-    Genre: '', Web: '', ISBN: '',
-    // Optional extras you might like:
-    'Cover Date': '', 'Store Date': '', 'PageCount': '', 'Format': ''
-  };
+  // Known fields in display order — used to populate the "missing fields" pills for admins
+  const KNOWN_FIELDS = [
+    'Title', 'Series', 'Number', 'Summary',
+    'Writer', 'Penciller', 'Inker', 'Colorist', 'Letterer', 'Editor',
+    'Publisher', 'Imprint', 'AgeRating',
+    'Characters', 'Teams', 'Locations',
+    'StoryArc', 'StoryArcNumber',
+    'Genre', 'Web', 'ISBN',
+    'Cover Date', 'Store Date', 'PageCount', 'Format'
+  ];
 
-  const merged = isAdmin ? { ...defaults, ...(metadata || {}) } : (metadata || {});
+  // Show only fields that have values (for both admin and non-admin)
+  const merged = { ...(metadata || {}) };
 
   // Rule: If Title is the same as Series (even with issue numbers, #3, 3, volume suffixes), leave it blank!
   if (merged.Title && (isTitleSameAsSeries(merged.Title, merged.Series) || (!merged.Series && isTitleSameAsSeries(merged.Title, '')))) {
@@ -264,7 +264,7 @@ function renderMetadataDisplay(metadata, clearForm = true) {
   }
 
   // Which keys should be chip inputs
-  const chipFields = new Set(['Characters', 'Teams', 'Locations', 'Genre']);
+  const chipFields = new Set(['Characters', 'Teams', 'Locations', 'StoryArc', 'Genre']);
 
   // Render each key
   for (const [key, val] of Object.entries(merged)) {
@@ -310,65 +310,85 @@ function renderMetadataDisplay(metadata, clearForm = true) {
     }
   }
 
-  // --- Add "Add custom field" controls (only for admins, only once) ---
-  if (isAdmin && !global.metadataForm.querySelector('#add-custom-field')) {
-    const controls = document.createElement('div');
-    controls.className = 'flex flex-wrap items-center gap-2 mt-2';
-
-    // Quick picker for common fields you may add often
-    const commonSelect = document.createElement('select');
-    commonSelect.className = 'bg-gray-700 text-white p-2 rounded-lg';
-    commonSelect.innerHTML = `
-      <option value="">Add common field…</option>
-      <option>Inker</option>
-      <option>Colorist</option>
-      <option>Letterer</option>
-      <option>Editor</option>
-      <option>Imprint</option>
-      <option>AgeRating</option>
-      <option>Genre</option>
-      <option>Web</option>
-      <option>ISBN</option>
-      <option>PageCount</option>
-      <option>Format</option>
-    `;
-    
-    // We will find the submitButton to insert controls before it if necessary
+  // --- Missing fields section (admins only) ---
+  // Shows clickable pills for each known field that has no value. Clicking a pill
+  // adds that field as an editable row above the save button and removes the pill.
+  if (isAdmin && !global.metadataForm.querySelector('#missing-fields-section')) {
     const submitButton = global.metadataForm.querySelector('button[type="submit"]');
 
-    commonSelect.addEventListener('change', () => {
-      const key = commonSelect.value;
-      if (!key) return;
-      if (global.metadataForm.querySelector(`[name="${CSS.escape(key)}"]`)) {
-        alert('That field already exists.');
+    function addFieldToForm(key) {
+      if (global.metadataForm.querySelector(`[name="${CSS.escape(key)}"]`)) return;
+      if (chipFields.has(key)) {
+        global.metadataForm.insertBefore(createChipInputRow(key, ''), submitButton);
       } else {
-        if (['Genre'].includes(key)) {
-          global.metadataForm.insertBefore(createChipInputRow(key, ''), submitButton);
-        } else {
-          global.metadataForm.insertBefore(createFormRow(key, ''), submitButton);
+        const type = key === 'Summary' ? 'textarea' : 'text';
+        global.metadataForm.insertBefore(createFormRow(key, ''), submitButton);
+      }
+      // Focus the new input
+      const el = global.metadataForm.querySelector(`[name="${CSS.escape(key)}"]`);
+      if (el) setTimeout(() => el.focus(), 50);
+    }
+
+    function buildMissingSection() {
+      let section = global.metadataForm.querySelector('#missing-fields-section');
+      if (section) section.remove();
+
+      const missingKeys = KNOWN_FIELDS.filter(k =>
+        !global.metadataForm.querySelector(`[name="${CSS.escape(k)}"]`) &&
+        !String(merged[k] || '').trim()
+      );
+
+      if (!missingKeys.length) return;
+
+      section = document.createElement('div');
+      section.id = 'missing-fields-section';
+      section.className = 'mt-4 border-t border-gray-700 pt-3';
+
+      const header = document.createElement('div');
+      header.className = 'text-xs text-gray-500 uppercase tracking-wide mb-2 select-none';
+      header.textContent = `Empty fields (${missingKeys.length})`;
+      section.appendChild(header);
+
+      const pillRow = document.createElement('div');
+      pillRow.className = 'flex flex-wrap gap-2';
+
+      for (const key of missingKeys) {
+        const pill = document.createElement('button');
+        pill.type = 'button';
+        pill.className = 'text-xs px-3 py-1 rounded-full border border-dashed border-gray-600 text-gray-500 hover:border-purple-400 hover:text-purple-300 transition-colors';
+        pill.textContent = `+ ${key}`;
+        pill.title = `Add ${key} field`;
+        pill.addEventListener('click', () => {
+          addFieldToForm(key);
+          pill.remove();
+          const remaining = pillRow.querySelectorAll('button').length;
+          if (!remaining) section.remove();
+          else header.textContent = `Empty fields (${remaining})`;
+        });
+        pillRow.appendChild(pill);
+      }
+
+      section.appendChild(pillRow);
+
+      const customBtn = document.createElement('button');
+      customBtn.id = 'add-custom-field';
+      customBtn.type = 'button';
+      customBtn.className = 'mt-2 text-xs text-gray-600 hover:text-gray-400 underline';
+      customBtn.textContent = 'Add custom field…';
+      customBtn.addEventListener('click', () => {
+        const key = prompt('Enter field name (e.g., Translator, CoverArtist):');
+        if (!key?.trim()) return;
+        if (global.metadataForm.querySelector(`[name="${CSS.escape(key.trim())}"]`)) {
+          return alert('That field already exists.');
         }
-      }
-      commonSelect.value = '';
-    });
+        addFieldToForm(key.trim());
+      });
+      section.appendChild(customBtn);
 
-    const addBtn = document.createElement('button');
-    addBtn.id = 'add-custom-field';
-    addBtn.type = 'button';
-    addBtn.className = 'bg-gray-700 hover:bg-gray-600 text-white px-3 py-2 rounded-lg';
-    addBtn.textContent = 'Add custom field';
-    addBtn.addEventListener('click', () => {
-      const key = prompt('Enter new field name (e.g., Translator, CoverArtist, Arc, Imprint):');
-      if (!key) return;
-      if (global.metadataForm.querySelector(`[name="${CSS.escape(key)}"]`)) {
-        return alert('That field already exists.');
-      }
-      // Default to text input; user can still store comma-separated values if desired
-      global.metadataForm.insertBefore(createFormRow(key, ''), submitButton);
-    });
+      global.metadataForm.appendChild(section);
+    }
 
-    controls.appendChild(commonSelect);
-    controls.appendChild(addBtn);
-    global.metadataForm.appendChild(controls);
+    buildMissingSection();
   }
 
   // --- Submit button (only for admins, only once) ---

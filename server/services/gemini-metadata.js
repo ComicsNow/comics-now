@@ -76,6 +76,13 @@ Letterer: ${winnerMeta.letterer || ''}
 Cover Artist: ${winnerMeta.cover_artist || ''}
 Editor: ${winnerMeta.editor || ''}
 Source URL: ${winner.matching_url || winner.source_url || winner.source || ''}
+Characters: ${winnerMeta.characters || winnerMeta.Characters || ''}
+Teams: ${winnerMeta.teams || winnerMeta.Teams || ''}
+Locations: ${winnerMeta.locations || winnerMeta.Locations || ''}
+Story Arc: ${winnerMeta.story_arc || winnerMeta.StoryArc || ''}
+Story Arc Number: ${winnerMeta.story_arc_number || winnerMeta.StoryArcNumber || ''}
+Page Count: ${winnerMeta.pages || winnerMeta.page_count || winnerMeta.PageCount || ''}
+Age Rating: ${winnerMeta.age_rating || winnerMeta.AgeRating || ''}
 
 --- OTHER CANDIDATE MATCHES (For Cross-Referencing & Enrichment) ---
 ${JSON.stringify((allCandidates || []).slice(0, 4).map(c => ({
@@ -86,6 +93,12 @@ ${JSON.stringify((allCandidates || []).slice(0, 4).map(c => ({
   publisher: c.metadata?.publisher,
   date: c.metadata?.cover_date || c.metadata?.publish_date || c.metadata?.year,
   creators: c.metadata?.creators || c.metadata?.credits || c.metadata?.writer,
+  characters: c.metadata?.characters,
+  teams: c.metadata?.teams,
+  locations: c.metadata?.locations,
+  storyArc: c.metadata?.story_arc || c.metadata?.StoryArc,
+  storyArcNumber: c.metadata?.story_arc_number || c.metadata?.StoryArcNumber,
+  ageRating: c.metadata?.age_rating || c.metadata?.AgeRating,
   summarySnippet: (c.metadata?.description || c.metadata?.summary || '').slice(0, 200)
 })), null, 2)}
 
@@ -137,6 +150,21 @@ ${JSON.stringify((allCandidates || []).slice(0, 4).map(c => ({
    - Day: Integer day (1-31) if known, or null.
    - CoverDate: Standard YYYY-MM string if available from sources.
 
+6. CONTENT FIELDS (Characters, Teams, Locations, StoryArc, StoryArcNumber, PageCount, AgeRating):
+   - AMALGAMATE across ALL sources: if the winning candidate lacks one of these
+     fields but any OTHER candidate above provides it, use that value. Different
+     sources are strong at different fields (e.g. Metron/ComicVine carry story
+     arcs & characters; GCD rarely does).
+   - For StoryArc/StoryArcNumber specifically: these come from METRON ONLY. Use
+     StoryArc/StoryArcNumber ONLY from a candidate whose source is "metron" (or
+     "src-metron"). IGNORE any arc data from ComicVine, GCD, or any other source —
+     if Metron provides no arc, leave StoryArc and StoryArcNumber EMPTY.
+   - For all OTHER content fields (Characters, Teams, Locations, Genre, AgeRating,
+     PageCount): amalgamate from whichever source has them.
+   - ONLY populate from data explicitly present in the candidates above. NEVER
+     invent, infer, or hallucinate values.
+   - Preserve comma-separated lists exactly as provided by the source.
+
 Return a JSON object adhering exactly to the requested schema.
 `;
 
@@ -172,7 +200,14 @@ Return a JSON object adhering exactly to the requested schema.
           Day: { type: 'INTEGER', description: 'Publication day (1-31)' },
           CoverDate: { type: 'STRING', description: 'Cover date string YYYY-MM' },
           Genre: { type: 'STRING', description: 'Comma-separated genres' },
-          Web: { type: 'STRING', description: 'Primary source reference URL' }
+          Web: { type: 'STRING', description: 'Primary source reference URL' },
+          Characters: { type: 'STRING', description: 'Comma-separated character names — from source only, never invent' },
+          Teams: { type: 'STRING', description: 'Comma-separated team names — from source only, never invent' },
+          Locations: { type: 'STRING', description: 'Comma-separated location names — from source only, never invent' },
+          StoryArc: { type: 'STRING', description: 'Story arc name(s) — from source only, never invent' },
+          StoryArcNumber: { type: 'STRING', description: 'Position within the story arc — from source only, never invent' },
+          PageCount: { type: 'STRING', description: 'Page count — from source only, never invent' },
+          AgeRating: { type: 'STRING', description: 'Content age rating — from source only, never invent' }
         },
         required: ['Series', 'Publisher']
       }
@@ -352,6 +387,13 @@ async function synthesizeMetadataWithGemini({
     CoverDate: coverDateStr,
     Genre: parsed.Genre || '',
     Web: parsed.Web || parsed.source_url || '',
+    Characters: parsed.Characters || '',
+    Teams: parsed.Teams || '',
+    Locations: parsed.Locations || '',
+    StoryArc: parsed.StoryArc || '',
+    StoryArcNumber: parsed.StoryArcNumber || '',
+    PageCount: parsed.PageCount || '',
+    AgeRating: parsed.AgeRating || '',
     Notes: parsed.Notes || existingMeta?.Notes || existingMeta?.notes || '',
 
     // Lowercase / standard keys
@@ -380,6 +422,13 @@ async function synthesizeMetadataWithGemini({
     editor: parsed.Editor || '',
     genre: parsed.Genre || '',
     genres: parsed.Genre ? parsed.Genre.split(',').map(s => s.trim()).filter(Boolean) : [],
+    characters: parsed.Characters || '',
+    teams: parsed.Teams || '',
+    locations: parsed.Locations || '',
+    story_arc: parsed.StoryArc || '',
+    story_arc_number: parsed.StoryArcNumber || '',
+    page_count: parsed.PageCount || '',
+    age_rating: parsed.AgeRating || '',
     cover_image_url: parsed.cover_image_url || null,
     source_url: parsed.source_url || parsed.Web || '',
     notes: parsed.Notes || existingMeta?.Notes || existingMeta?.notes || ''
