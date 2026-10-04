@@ -25,6 +25,47 @@ function getScanLibrary() {
   }
 }
 
+/**
+ * Build the full DB metadata blob for a tagged comic from the parsed ComicInfo.
+ * Used by every tag path (auto scan + manual selection) so the DB record carries
+ * the SAME field set that gets written to the archive — including Characters,
+ * Teams, Locations, StoryArc/StoryArcNumber, AgeRating, Web, Genre, PageCount.
+ * Empty fields are dropped so `metadata LIKE '%"StoryArc"%'` style queries stay accurate.
+ */
+function buildTaggedDbMeta({ title, series, number, volume, publisher, info }) {
+  const { cleanDescription } = require('./metadata');
+  const m = {
+    Title: title,
+    Series: series,
+    Number: number,
+    Volume: volume,
+    Publisher: publisher,
+    Imprint: info.Imprint || '',
+    Writer: info.Writer || '',
+    Penciller: info.Penciller || '',
+    Inker: info.Inker || '',
+    Colorist: info.Colorist || '',
+    Letterer: info.Letterer || '',
+    CoverArtist: info.CoverArtist || '',
+    Editor: info.Editor || '',
+    Summary: cleanDescription(info.Summary || ''),
+    Genre: info.Genre || '',
+    Characters: info.Characters || '',
+    Teams: info.Teams || '',
+    Locations: info.Locations || '',
+    StoryArc: info.StoryArc || '',
+    StoryArcNumber: info.StoryArcNumber || '',
+    AgeRating: info.AgeRating || '',
+    Web: info.Web || '',
+    PageCount: info.PageCount || '',
+    'Cover Date': info.CoverDate || info['Cover Date'] || info.Year || ''
+  };
+  for (const k of Object.keys(m)) {
+    if (m[k] === '' || m[k] == null) delete m[k];
+  }
+  return m;
+}
+
 async function checkFileSuccess(filePath) {
   try {
     const { getComicInfoFromArchive } = require('./metadata');
@@ -313,21 +354,7 @@ async function runComicTagger(options = {}) {
           if (title && (isTitleSameAsSeries(title, ser) || (!ser && isTitleSameAsSeries(title, '')))) {
             title = '';
           }
-          const dbMeta = {
-            Title: title,
-            Series: ser,
-            Number: num,
-            Volume: vol,
-            Publisher: pub,
-            Writer: info.Writer || '',
-            Penciller: info.Penciller || '',
-            Inker: info.Inker || '',
-            Colorist: info.Colorist || '',
-            Letterer: info.Letterer || '',
-            CoverArtist: info.CoverArtist || '',
-            Summary: cleanDescription(info.Summary || ''),
-            'Cover Date': info.CoverDate || info.Year || ''
-          };
+          const dbMeta = buildTaggedDbMeta({ title, series: ser, number: num, volume: vol, publisher: pub, info });
 
           await db.dbRun(
             `INSERT INTO comics (id, path, name, publisher, series, libraryMode, tagStatus, updatedAt, metadata)
@@ -459,21 +486,7 @@ async function runComicTagger(options = {}) {
             if (title && (isTitleSameAsSeries(title, ser) || (!ser && isTitleSameAsSeries(title, '')))) {
               title = '';
             }
-            const dbMeta = {
-              Title: title,
-              Series: ser,
-              Number: num,
-              Volume: vol,
-              Publisher: pub,
-              Writer: info.Writer || '',
-              Penciller: info.Penciller || '',
-              Inker: info.Inker || '',
-              Colorist: info.Colorist || '',
-              Letterer: info.Letterer || '',
-              CoverArtist: info.CoverArtist || '',
-              Summary: cleanDescription(info.Summary || ''),
-              'Cover Date': info.CoverDate || info.Year || ''
-            };
+            const dbMeta = buildTaggedDbMeta({ title, series: ser, number: num, volume: vol, publisher: pub, info });
             dbMetaStr = JSON.stringify(dbMeta);
           } catch (e) {}
 
@@ -698,21 +711,14 @@ async function applyUserSelection(selections) {
       if (title && (isTitleSameAsSeries(title, ser) || (!ser && isTitleSameAsSeries(title, '')))) {
         title = '';
       }
-      const dbMeta = {
-        Title: title,
-        Series: info.Series || ser,
-        Number: info.Number || info.Volume || '',
-        Volume: info.Volume || '',
-        Publisher: pub,
-        Writer: info.Writer || '',
-        Penciller: info.Penciller || '',
-        Inker: info.Inker || '',
-        Colorist: info.Colorist || '',
-        Letterer: info.Letterer || '',
-        CoverArtist: info.CoverArtist || '',
-        Summary: cleanDescription(info.Summary || ''),
-        'Cover Date': info.CoverDate || info.Year || ''
-      };
+      const dbMeta = buildTaggedDbMeta({
+        title,
+        series: info.Series || ser,
+        number: info.Number || info.Volume || '',
+        volume: info.Volume || '',
+        publisher: pub,
+        info
+      });
       dbMetaStr = JSON.stringify(dbMeta);
     } catch (e) {}
 

@@ -307,6 +307,30 @@ body.is-offline .comic-context-menu-item.hide-offline {
     will-change: transform;
     backface-visibility: hidden;
 }
+
+/* Cinema Pan Stage & Image:
+   Override flex centering so the image is absolute-positioned at top-left,
+   allowing translate3d(startX -> targetX) to span the exact full width of the spread. */
+#fullscreen-viewer.cinema-stage,
+.fullscreen-viewer.cinema-stage {
+    display: block !important;
+    overflow: hidden !important;
+}
+
+#fullscreen-image.cinema-img,
+.fullscreen-image.cinema-img {
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: auto !important;
+    height: 100% !important;
+    max-width: none !important;
+    max-height: 100% !important;
+    margin: 0 !important;
+    object-fit: contain !important;
+    transform-origin: 0 0 !important;
+}
+
 #manga-guided-toggle-btn.active {
     color: #00a3af;
     background-color: rgba(0, 163, 175, 0.12);
@@ -752,8 +776,9 @@ body.is-offline .comic-context-menu-item.hide-offline {
 /* Portrait toggle controls - shown on tap */
 .fullscreen-controls {
     flex-wrap: nowrap;
-    justify-content: center;
+    justify-content: flex-start;
     overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
     position: fixed;
     /* Strip sits in the black border at the bottom, above the page/nav info bar. */
     left: 0;
@@ -763,24 +788,50 @@ body.is-offline .comic-context-menu-item.hide-offline {
     display: flex;
     align-items: center;
     gap: 0.5rem;
-    background-color: rgba(0, 0, 0, 0.85);
+    background-color: rgba(0, 0, 0, 0.88);
     padding: 0.5rem max(1rem, env(safe-area-inset-left)) 0.5rem max(1rem, env(safe-area-inset-right));
-    border-top: 1px solid rgba(255, 255, 255, 0.08);
-    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
     border-radius: 0;
-    box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.45);
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
-    /* Hide scrollbar visually while keeping horizontal scroll for many buttons. */
-    scrollbar-width: thin;
+    box-shadow: 0 -4px 14px rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    scrollbar-width: none;
+    -ms-overflow-style: none;
 }
 
-.fullscreen-controls::-webkit-scrollbar { height: 4px; }
-.fullscreen-controls::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 2px; }
+.fullscreen-controls::-webkit-scrollbar { display: none; }
+
+.fullscreen-controls > * {
+    flex-shrink: 0;
+}
+
+@media (min-width: 641px) {
+    .fullscreen-controls {
+        justify-content: center;
+    }
+}
+
+/* Floating Cinema Spread Badge - dynamically elevated above toolbar when visible */
+#fullscreen-spread-badge {
+    position: fixed;
+    left: 50%;
+    transform: translateX(-50%);
+    bottom: calc(56px + env(safe-area-inset-bottom));
+    z-index: 90;
+    white-space: nowrap;
+    transition: bottom 0.25s cubic-bezier(0.4, 0, 0.2, 1), transform 0.2s ease, opacity 0.2s ease;
+}
+
+.fullscreen-viewer:has(> .fullscreen-controls:not(.hidden)) #fullscreen-spread-badge,
+.fullscreen-viewer.has-controls-open #fullscreen-spread-badge {
+    bottom: calc(108px + env(safe-area-inset-bottom));
+}
 
 /* When the mode strip is visible, push the image fit-area up so the strip
    never sits over the comic page. */
-.fullscreen-viewer.fullscreen-fit-mode:has(> .fullscreen-controls:not(.hidden)) .fullscreen-image {
+.fullscreen-viewer.fullscreen-fit-mode:has(> .fullscreen-controls:not(.hidden)) .fullscreen-image,
+.fullscreen-viewer.fullscreen-fit-mode.has-controls-open .fullscreen-image {
     max-height: calc(100vh - 110px - env(safe-area-inset-bottom)) !important;
 }
 
@@ -2652,6 +2703,8 @@ body.eink-color-mode #bubble-magnifier-img {
 #settings-modal input[type="number"],
 #settings-modal select,
 #reading-list-modal input[type="text"],
+#reading-list-modal input[type="search"],
+#reading-list-modal select,
 #add-to-list-modal input[type="text"],
 #ct-modal input[type="text"],
 #ct-modal select,
@@ -2668,12 +2721,68 @@ body.eink-color-mode #bubble-magnifier-img {
 #settings-modal input[type="number"]:focus,
 #settings-modal select:focus,
 #reading-list-modal input[type="text"]:focus,
+#reading-list-modal input[type="search"]:focus,
+#reading-list-modal select:focus,
 #add-to-list-modal input[type="text"]:focus,
 #ct-modal input[type="text"]:focus,
 #ct-modal select:focus,
 #ct-modal textarea:focus {
     border-color: var(--yellow) !important;
     outline: none !important;
+    box-shadow: 0 0 0 2px rgba(255, 206, 58, 0.25) !important;
+}
+
+/* Modal select custom chevron dropdown look and feel */
+#settings-modal select,
+#reading-list-modal select,
+#ct-modal select,
+#reading-list-publisher-filter {
+    appearance: none !important;
+    -webkit-appearance: none !important;
+    -moz-appearance: none !important;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%23b3a88e' stroke-width='2.5'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E") !important;
+    background-repeat: no-repeat !important;
+    background-position: right 10px center !important;
+    background-size: 14px 14px !important;
+    padding-right: 32px !important;
+    cursor: pointer !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease !important;
+}
+
+#settings-modal select:hover,
+#reading-list-modal select:hover,
+#ct-modal select:hover,
+#reading-list-publisher-filter:hover {
+    border-color: var(--paper-dim) !important;
+}
+
+#settings-modal select:focus,
+#reading-list-modal select:focus,
+#ct-modal select:focus,
+#reading-list-publisher-filter:focus {
+    border-color: var(--yellow) !important;
+    outline: none !important;
+    box-shadow: 0 0 0 2px rgba(255, 206, 58, 0.25) !important;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%23ffce3a' stroke-width='2.5'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E") !important;
+}
+
+#reading-list-publisher-filter option,
+#settings-modal select option,
+#ct-modal select option {
+    background-color: #1e1a14 !important;
+    color: #f3e9d2 !important;
+    padding: 8px 12px !important;
+}
+
+#reading-list-search {
+    transition: border-color 0.15s ease, box-shadow 0.15s ease !important;
+}
+
+#reading-list-search::placeholder {
+    color: var(--paper-dim) !important;
+    opacity: 0.6 !important;
 }
 
 /* Modal close button clean styles */

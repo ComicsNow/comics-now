@@ -20,7 +20,7 @@ const global = new Proxy(typeof window !== 'undefined' ? window : globalThis, {
   }
 });
 
-  const FULLSCREEN_CONTROLS_AUTOHIDE_DELAY = 2000;
+  const FULLSCREEN_CONTROLS_AUTOHIDE_DELAY = 3000;
   const FULLSCREEN_MIN_ZOOM_SCALE = 1;
   const FULLSCREEN_MAX_ZOOM_SCALE = 4;
   const FS_DOUBLE_TAP_MS = 300;
@@ -151,6 +151,9 @@ const global = new Proxy(typeof window !== 'undefined' ? window : globalThis, {
     if (!controls) return;
 
     controls.classList.remove('hidden');
+    if (global.fullscreenViewer) {
+      global.fullscreenViewer.classList.add('has-controls-open');
+    }
     if (closeBtn) closeBtn.classList.remove('hidden');
     if (title) {
       syncFullscreenTitle();
@@ -162,6 +165,9 @@ const global = new Proxy(typeof window !== 'undefined' ? window : globalThis, {
       fullscreenControlsTimeoutId = setTimeout(() => {
         if (global.fullscreenControls) {
           global.fullscreenControls.classList.add('hidden');
+        }
+        if (global.fullscreenViewer) {
+          global.fullscreenViewer.classList.remove('has-controls-open');
         }
         if (global.fullscreenCloseBtn) {
           global.fullscreenCloseBtn.classList.add('hidden');
@@ -183,6 +189,9 @@ const global = new Proxy(typeof window !== 'undefined' ? window : globalThis, {
     if (!controls) return;
 
     controls.classList.add('hidden');
+    if (global.fullscreenViewer) {
+      global.fullscreenViewer.classList.remove('has-controls-open');
+    }
     if (closeBtn) closeBtn.classList.add('hidden');
     if (title) title.classList.add('hidden');
     clearTimeout(fullscreenControlsTimeoutId);
@@ -265,6 +274,7 @@ const global = new Proxy(typeof window !== 'undefined' ? window : globalThis, {
     }
     
     hideFullscreenControls();
+    stopCinemaPan();
 
     // 2. CLEANUP IN BACKGROUND
     try {
@@ -329,6 +339,10 @@ const global = new Proxy(typeof window !== 'undefined' ? window : globalThis, {
   global.cancelPendingSideNav = cancelPendingSideNav;
 
   function handleFullscreenImageClick(event) {
+    if (isCinemaPanning) {
+      stopCinemaPan();
+      return;
+    }
     if (hasDragged) return;
     if (global.isFullImageMode) {
       global.showFullscreenControls?.(false);
@@ -1058,6 +1072,10 @@ const global = new Proxy(typeof window !== 'undefined' ? window : globalThis, {
   }
 
   function updateFullscreenPageStatus(currentPage, totalPages) {
+    if (isCinemaPanning) {
+      stopCinemaPan();
+    }
+
     const progressIndicator = global.fullscreenProgressIndicator;
     const pageCounter = global.fullscreenPageCounter;
 
@@ -1075,6 +1093,161 @@ const global = new Proxy(typeof window !== 'undefined' ? window : globalThis, {
     const progressPercent = Math.round((currentPage / totalPages) * 100);
     progressIndicator.textContent = `${progressPercent}% read`;
     pageCounter.textContent = pageText;
+    checkSpreadCinemaStatus();
+  }
+
+  let isCinemaPanning = false;
+  let cinemaPanRAF = null;
+  let cinemaPanEndTimeout = null;
+
+  function stopCinemaPan() {
+    const cancelRaf = (typeof window !== 'undefined' && window.cancelAnimationFrame) || (typeof globalThis !== 'undefined' && globalThis.cancelAnimationFrame);
+    if (cinemaPanRAF && typeof cancelRaf === 'function') {
+      cancelRaf(cinemaPanRAF);
+      cinemaPanRAF = null;
+    }
+    if (cinemaPanEndTimeout) {
+      clearTimeout(cinemaPanEndTimeout);
+      cinemaPanEndTimeout = null;
+    }
+    isCinemaPanning = false;
+
+    const viewer = global.fullscreenViewer;
+    if (viewer) {
+      viewer.classList.remove('cinema-stage');
+    }
+
+    const img = global.fullscreenImage;
+    if (img) {
+      img.classList.remove('cinema-img');
+      img.style.transform = '';
+      img.style.width = '';
+      img.style.height = '';
+      img.style.maxWidth = '';
+      img.style.maxHeight = '';
+      img.style.willChange = '';
+      img.style.margin = '';
+    }
+    if (typeof applyFullscreenFitMode === 'function') {
+      applyFullscreenFitMode();
+    }
+
+    const badgeText = document.getElementById('fullscreen-spread-badge-text');
+    if (badgeText) badgeText.textContent = 'Cinema Pan Spread';
+    checkSpreadCinemaStatus();
+  }
+
+  function checkSpreadCinemaStatus() {
+    const img = global.fullscreenImage;
+    const badge = document.getElementById('fullscreen-spread-badge');
+    if (!img) return;
+
+    const check = () => {
+      const naturalW = img.naturalWidth || 0;
+      const naturalH = img.naturalHeight || 0;
+      const isSpread = naturalW > 0 && naturalH > 0 && (naturalW / naturalH >= 1.2);
+
+      if (badge) {
+        if (isSpread) {
+          badge.classList.remove('hidden');
+        } else {
+          badge.classList.add('hidden');
+        }
+      }
+    };
+
+    if (img.complete && img.naturalWidth) {
+      check();
+    } else {
+      img.onload = check;
+    }
+  }
+
+  function toggleCinemaPan() {
+    const image = global.fullscreenImage;
+    if (!image) return;
+
+    if (isCinemaPanning) {
+      stopCinemaPan();
+      return;
+    }
+
+    const naturalW = image.naturalWidth || 0;
+    const naturalH = image.naturalHeight || 0;
+    if (!naturalW || !naturalH || (naturalW / naturalH < 1.2)) return;
+
+    const viewer = global.fullscreenViewer;
+    const vh = (viewer ? viewer.clientHeight : window.innerHeight) || window.innerHeight;
+    const vw = (viewer ? viewer.clientWidth : window.innerWidth) || window.innerWidth;
+    const scaledWidth = (naturalW / naturalH) * vh;
+    const overflowX = Math.max(0, scaledWidth - vw);
+
+    if (overflowX < 15) {
+      const badgeText = document.getElementById('fullscreen-spread-badge-text');
+      if (badgeText) {
+        badgeText.textContent = 'Page Fits Screen';
+        setTimeout(() => {
+          badgeText.textContent = 'Cinema Pan Spread';
+        }, 1500);
+      }
+      return;
+    }
+
+    const isManga = !!(
+      (global.currentComic && (global.currentComic.mangaMode === true || global.currentComic.mangaMode == 1 || global.currentComic.mangaMode === '1')) ||
+      document.getElementById('fullscreen-manga-mode-btn')?.classList.contains('active') ||
+      document.getElementById('manga-mode-btn')?.classList.contains('active')
+    );
+
+    const startX = isManga ? -overflowX : 0;
+    const targetX = isManga ? 0 : -overflowX;
+    const duration = Math.max(3800, Math.min(5500, 3200 + overflowX * 1.5)); // ms
+
+    if (viewer) {
+      viewer.classList.add('cinema-stage');
+    }
+    image.classList.add('cinema-img');
+    image.style.willChange = 'transform';
+    image.style.transform = `translate3d(${startX}px, 0, 0)`;
+
+    // Hide badge during cinema pan for an unobstructed view (no pause button)
+    const badge = document.getElementById('fullscreen-spread-badge');
+    if (badge) {
+      badge.classList.add('hidden');
+    }
+
+    isCinemaPanning = true;
+    const startTime = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+    const reqRaf = (typeof window !== 'undefined' && window.requestAnimationFrame) || (typeof globalThis !== 'undefined' && globalThis.requestAnimationFrame);
+
+    function easeInOutQuad(t) {
+      return t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t;
+    }
+
+    function step(now) {
+      if (!isCinemaPanning) return;
+      const elapsed = now - startTime;
+      const progress = Math.min(1, elapsed / duration);
+      const eased = easeInOutQuad(progress);
+      const currentX = startX + (targetX - startX) * eased;
+
+      image.style.transform = `translate3d(${currentX}px, 0, 0)`;
+
+      if (progress < 1) {
+        if (typeof reqRaf === 'function') {
+          cinemaPanRAF = reqRaf(step);
+        }
+      } else {
+        image.style.transform = `translate3d(${targetX}px, 0, 0)`;
+        cinemaPanEndTimeout = setTimeout(() => {
+          stopCinemaPan();
+        }, 450);
+      }
+    }
+
+    if (typeof reqRaf === 'function') {
+      cinemaPanRAF = reqRaf(step);
+    }
   }
 
   function showFullscreenPageJumpInput() {
@@ -1233,6 +1406,9 @@ const global = new Proxy(typeof window !== 'undefined' ? window : globalThis, {
     showFullscreenPageJumpInput,
     hideFullscreenPageJumpInput,
     commitFullscreenPageJump,
+    toggleCinemaPan,
+    stopCinemaPan,
+    checkSpreadCinemaStatus,
   };
 
   global.ViewerFullscreen = ViewerFullscreen;
@@ -1287,6 +1463,38 @@ const global = new Proxy(typeof window !== 'undefined' ? window : globalThis, {
       global.fullscreenPageJumpInput.addEventListener('blur', () => {
         hideFullscreenPageJumpInput();
       });
+    }
+
+    // Cinema Pan Spread Badge click handler
+    const spreadBadge = document.getElementById('fullscreen-spread-badge');
+    if (spreadBadge && !spreadBadge._cinemaListener) {
+      spreadBadge._cinemaListener = (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        toggleCinemaPan();
+      };
+      spreadBadge.addEventListener('click', spreadBadge._cinemaListener);
+    }
+
+    // Pause autohide while user hovers or touches toolbar controls
+    const controls = global.fullscreenControls;
+    if (controls && !controls._autohidePauseListener) {
+      controls._autohidePauseListener = true;
+      const pauseAutohide = () => {
+        if (fullscreenControlsTimeoutId) {
+          clearTimeout(fullscreenControlsTimeoutId);
+          fullscreenControlsTimeoutId = null;
+        }
+      };
+      const resumeAutohide = () => {
+        if (controls && !controls.classList.contains('hidden')) {
+          showFullscreenControls(true);
+        }
+      };
+      controls.addEventListener('pointerenter', pauseAutohide);
+      controls.addEventListener('pointerleave', resumeAutohide);
+      controls.addEventListener('touchstart', pauseAutohide, { passive: true });
+      controls.addEventListener('touchend', resumeAutohide, { passive: true });
     }
   }
 
@@ -1388,4 +1596,7 @@ if (typeof window !== 'undefined') {
   window.applyLandscapeTransform = applyLandscapeTransform;
   window.resetLandscapePan = resetLandscapePan;
   window.initFullscreenNavigation = initFullscreenNavigation;
+  window.toggleCinemaPan = toggleCinemaPan;
+  window.stopCinemaPan = stopCinemaPan;
+  window.checkSpreadCinemaStatus = checkSpreadCinemaStatus;
 }

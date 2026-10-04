@@ -62,7 +62,11 @@ def read_comic_info_xml(cbz_path):
                     "Volume": "volume",
                     "Characters": "characters",
                     "Teams": "teams",
-                    "Locations": "locations"
+                    "Locations": "locations",
+                    "StoryArc": "story_arc",
+                    "StoryArcNumber": "story_arc_number",
+                    "Web": "web",
+                    "AgeRating": "age_rating"
                 }
                 
                 for xml_tag, meta_key in tag_mappings.items():
@@ -249,6 +253,30 @@ def generate_comic_info_xml(metadata, enabled_fields=None):
         loc_val = _clean_str(metadata.get("locations") or metadata.get("Locations"))
         if loc_val:
             ET.SubElement(root, "Locations").text = loc_val
+
+    # 13. StoryArc
+    if enabled_fields is None or "StoryArc" in enabled_fields:
+        arc_val = _clean_str(metadata.get("story_arc") or metadata.get("StoryArc"))
+        if arc_val:
+            ET.SubElement(root, "StoryArc").text = arc_val
+
+    # 14. StoryArcNumber
+    if enabled_fields is None or "StoryArcNumber" in enabled_fields:
+        arc_num_val = _clean_str(metadata.get("story_arc_number") or metadata.get("StoryArcNumber"))
+        if arc_num_val:
+            ET.SubElement(root, "StoryArcNumber").text = arc_num_val
+
+    # 15. Web
+    if enabled_fields is None or "Web" in enabled_fields:
+        web_val = _clean_str(metadata.get("web") or metadata.get("Web"))
+        if web_val and web_val.startswith("http"):
+            ET.SubElement(root, "Web").text = web_val
+
+    # 16. AgeRating
+    if enabled_fields is None or "AgeRating" in enabled_fields:
+        age_val = _clean_str(metadata.get("age_rating") or metadata.get("AgeRating"))
+        if age_val:
+            ET.SubElement(root, "AgeRating").text = age_val
 
     # Metadata tracker tag
     src_url = _clean_str(metadata.get("source_url") or metadata.get("source") or "Unknown")

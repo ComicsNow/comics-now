@@ -104,20 +104,26 @@ const global = new Proxy(typeof window !== 'undefined' ? window : globalThis, {
     let readingListName = global.viewerReturnContext?.readingListName || null;
 
     try {
-      // If no readingListId in context, search user's reading lists as a fallback
+      // If no readingListId in context, search user's reading lists in parallel
       if (!readingListId && global.ReadingLists?.getReadingLists) {
         try {
           const res = await global.ReadingLists.getReadingLists();
           const lists = res?.lists || res || [];
-          for (const l of lists) {
-            const d = await global.ReadingLists.getReadingListDetails(l.id);
-            if (d?.items && Array.isArray(d.items)) {
-              if (d.items.some(item => String(item.comicId) === String(currentComic.id))) {
-                readingListId = l.id;
-                readingListName = l.name;
-                break;
+          const results = await Promise.all(
+            lists.map(async l => {
+              const d = await global.ReadingLists.getReadingListDetails(l.id);
+              if (d?.items && Array.isArray(d.items)) {
+                if (d.items.some(item => String(item.comicId) === String(currentComic.id))) {
+                  return { id: l.id, name: l.name };
+                }
               }
-            }
+              return null;
+            })
+          );
+          const found = results.find(Boolean);
+          if (found) {
+            readingListId = found.id;
+            readingListName = found.name;
           }
         } catch (e) {
           // ignore fallback lookup errors
@@ -240,8 +246,10 @@ const global = new Proxy(typeof window !== 'undefined' ? window : globalThis, {
       return;
     }
 
-    const nextInList = await getNextComicInReadingList();
-    const nextInSeries = await getNextComicInSeries();
+    const [nextInList, nextInSeries] = await Promise.all([
+      getNextComicInReadingList(),
+      getNextComicInSeries()
+    ]);
 
     if (!nextInList && !nextInSeries) {
       nav?.classList.add('hidden');

@@ -18,12 +18,17 @@ def search_gcd_multi(query):
 
     out = []
     try:
-        url = f"https://www.comics.org/api/series/name/{requests.utils.quote(query)}/"
+        # GCD's /series/name/ lookup wants the series name only — strip any '#N'
+        # issue suffix, otherwise it searches for a series literally named "X #N".
+        import re
+        series_query = re.sub(r'\s*#\s*[\d.]+\s*$', '', query).strip() or query
+        url = f"https://www.comics.org/api/series/name/{requests.utils.quote(series_query)}/"
         domain_limiter.wait_for_domain("comics.org")
         r = requests.get(url, headers={"Accept": "application/json", "User-Agent": "comic-tagger-bench/1.0"}, timeout=10)
         if r.status_code == 200:
             results = r.json().get("results", [])
             for s in results[:3]:
+                series_genre = s.get('genre') or ''
                 for iss_url in s.get("active_issues", [])[:3]:
                     cached_iss = tagger_cache.get_entity("gcd_issue", iss_url)
                     if cached_iss is not None:
@@ -39,6 +44,7 @@ def search_gcd_multi(query):
                             parts = cov.split('://', 1)
                             cov = parts[0] + '://' + parts[1].replace('//', '/')
                         writers, pencillers, inkers, colorists, letterers, editors = [], [], [], [], [], []
+                        total_pages = 0
                         stories = d.get('story_set') or d.get('stories') or []
                         import re
                         for story in stories:
@@ -62,6 +68,12 @@ def search_gcd_multi(query):
                             for e in re.split(r'[;,]', story.get('editing') or ''):
                                 e = e.strip()
                                 if e and e not in editors and e.lower() not in ['?', 'unknown']: editors.append(e)
+                            try:
+                                sp = story.get('page_count')
+                                if sp:
+                                    total_pages += int(sp)
+                            except (ValueError, TypeError):
+                                pass
 
                         item_meta = {
                             "title": f"{d.get('series_name','')} #{d.get('number','')}",
@@ -77,7 +89,9 @@ def search_gcd_multi(query):
                             "letterer": ", ".join(letterers) if letterers else None,
                             "editor": ", ".join(editors) if editors else None,
                             "source_url": iss_url.replace("/api", ""),
-                            "cover_image_url": cov
+                            "cover_image_url": cov,
+                            "genres": [g.strip() for g in series_genre.split(',') if g.strip()] or ["Comics"],
+                            "pages": str(total_pages) if total_pages > 0 else None
                         }
                         tagger_cache.set_entity("gcd_issue", iss_url, item_meta)
                         out.append(item_meta)
