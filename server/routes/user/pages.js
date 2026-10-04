@@ -62,8 +62,14 @@ module.exports = function attach(router, deps) {
       if (!fs.existsSync(row.guidedViewPath)) {
         return res.status(404).json({ ok: false, message: 'Guided view file missing' });
       }
+      // Revalidate so editor saves are visible immediately (no cached hour).
+      const stat = fs.statSync(row.guidedViewPath);
+      const etag = `W/"${stat.size}-${Math.round(stat.mtimeMs)}"`;
+      res.setHeader('Cache-Control', 'no-cache');
+      res.setHeader('ETag', etag);
+      res.setHeader('Last-Modified', stat.mtime.toUTCString());
+      if (req.headers['if-none-match'] === etag) return res.status(304).end();
       res.setHeader('Content-Type', 'application/json');
-      res.setHeader('Cache-Control', 'public, max-age=3600');
       fs.createReadStream(row.guidedViewPath).pipe(res);
     } catch (e) {
       res.status(500).json({ ok: false, message: formatErrorMessage(e, req, 'Failed to load guided view') });
