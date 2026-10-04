@@ -6,6 +6,7 @@ const { getConfig, getScanIntervalMs, getLibraries } = require('../config');
 const { getComicInfoFromArchive, normalizePublisher, cleanDescription, splitVolumeSeriesAndTitle, isTitleSameAsSeries } = require('./metadata');
 const { createId, t0, ms, pMap, trimObjectStrings } = require('../utils');
 const {
+  ROOT_DIR,
   THUMBNAILS_DIRECTORY,
   METADATA_MARKER_FILE,
   GUIDED_VIEW_DIR
@@ -51,8 +52,8 @@ async function scanLibrary(force = false) {
   log('INFO', 'SCAN', `Starting scan… Libraries: ${libraries.length > 0 ? libraries.map(l => `${l.path} (${l.hierarchyMode})`).join(', ') : '(none set)'} | Allowed Formats: ${allowedFormats}`);
   const fileSystemComics = new Set();
   const newComicIds = []; // ids of comics inserted (not updated) by this scan
-  const dbComics = await dbAll('SELECT path, thumbnailPath FROM comics');
-  const dbComicsMap = new Map(dbComics.map(c => [c.path, c.thumbnailPath]));
+  const dbComics = await dbAll('SELECT id, path, thumbnailPath, guidedViewPath FROM comics');
+  const dbComicsMap = new Map(dbComics.map(c => [c.path, { id: c.id, thumbnailPath: c.thumbnailPath, guidedViewPath: c.guidedViewPath }]));
   const conversionRoot = config.comicsLocation ? path.resolve(config.comicsLocation) : null;
   const unreachableTopDirs = [];
   let subDirScanErrors = 0;
@@ -343,14 +344,26 @@ async function scanLibrary(force = false) {
           log('WARN', 'SCAN', `Safeguard: preserving comic that exists on disk but was missed in scan: ${path.basename(p)}`);
           continue;
         }
-        const thumb = dbComicsMap.get(p);
+        const record = dbComicsMap.get(p);
         log('INFO', 'SCAN', `Removing missing comic: ${path.basename(p)}`);
         await dbRun('DELETE FROM comics WHERE path = ?', [p]);
-        if (thumb) {
-          const full = path.join(THUMBNAILS_DIRECTORY, thumb);
+        if (record?.thumbnailPath) {
+          const full = path.join(THUMBNAILS_DIRECTORY, record.thumbnailPath);
           if (fs.existsSync(full)) {
             await fs.promises.unlink(full).catch(() => {});
-            log('INFO', 'SCAN', `Deleted orphan thumbnail: ${thumb}`);
+            log('INFO', 'SCAN', `Deleted orphan thumbnail: ${record.thumbnailPath}`);
+          }
+        }
+        // Clean up guided view sidecar if it exists
+        const gvCandidates = [
+          record?.guidedViewPath,
+          record?.id ? path.join(GUIDED_VIEW_DIR, `${record.id}.json`) : null
+        ].filter(Boolean);
+        for (const gv of gvCandidates) {
+          const fullGv = path.isAbsolute(gv) ? gv : path.resolve(ROOT_DIR, gv);
+          if (fs.existsSync(fullGv)) {
+            await fs.promises.unlink(fullGv).catch(() => {});
+            log('INFO', 'SCAN', `Deleted orphan guided view sidecar: ${path.basename(fullGv)}`);
           }
         }
       }
