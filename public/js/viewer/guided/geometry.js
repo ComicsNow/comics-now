@@ -17,19 +17,40 @@ export function intersectionOverArea(a, b) {
   return area > 0 ? inter / area : 0;
 }
 
-// Classify the manga raw boxes into panels with their child bubbles.
+// Classify manga raw boxes into panels with their child bubbles.
 // Returns [{ box, bubbles: [box, ...] }, ...].
-export function classifyMangaPage() {
-  const boxes = state.GuidedView.currentPageRawBoxes();
+//
+// Two regimes:
+// - Legacy sidecars (explicitBubbles empty): heuristic split of the mixed raw
+//   set — a box that lies >= 0.7 inside any other is a child, then attached to
+//   the panel it overlaps most (> 0.6).
+// - Editor-written sidecars (explicitBubbles non-empty): the raw list is pure
+//   panels and the explicit bubble list is authoritative — every raw box stays
+//   a panel and each bubble attaches to its best-overlapping panel (> 0.6).
+export function classifyMangaBoxes(rawBoxes, explicitBubbles) {
+  const boxes = Array.isArray(rawBoxes) ? rawBoxes : [];
+  const explicit = Array.isArray(explicitBubbles) ? explicitBubbles : [];
+
+  if (explicit.length > 0) {
+    const panels = boxes.map((box) => ({ box, bubbles: [] }));
+    for (const bubble of explicit) {
+      let bestParent = -1, bestRatio = 0.6;
+      for (let p = 0; p < panels.length; p++) {
+        const r = intersectionOverArea(bubble, panels[p].box);
+        if (r > bestRatio) { bestRatio = r; bestParent = p; }
+      }
+      if (bestParent >= 0) panels[bestParent].bubbles.push(bubble);
+    }
+    return panels;
+  }
+
   if (boxes.length === 0) return [];
   const isChild = boxes.map((b, i) =>
     boxes.some((other, j) => i !== j && intersectionOverArea(b, other) >= 0.7)
   );
   const panels = [];
-  const panelOriginalIdx = [];
   for (let i = 0; i < boxes.length; i++) {
     if (!isChild[i]) {
-      panelOriginalIdx.push(i);
       panels.push({ box: boxes[i], bubbles: [] });
     }
   }
@@ -45,10 +66,21 @@ export function classifyMangaPage() {
   return panels;
 }
 
+export function classifyMangaPage() {
+  // Only bubbles referenced by the page's sequence count as editor-written
+  // (see mangaExplicitBubbles); anything else keeps the legacy heuristic.
+  const explicit = state.GuidedView.mangaExplicitBubbles
+    ? state.GuidedView.mangaExplicitBubbles()
+    : [];
+  return classifyMangaBoxes(state.GuidedView.currentPageRawBoxes(), explicit);
+}
+
 state.GuidedView.intersectionOverArea = intersectionOverArea;
+state.GuidedView.classifyMangaBoxes = classifyMangaBoxes;
 state.GuidedView.classifyMangaPage = classifyMangaPage;
 
 if (typeof window !== 'undefined') {
   window.GuidedView.intersectionOverArea = intersectionOverArea;
+  window.GuidedView.classifyMangaBoxes = classifyMangaBoxes;
   window.GuidedView.classifyMangaPage = classifyMangaPage;
 }

@@ -87,8 +87,33 @@ export function isMangaComic() {
   return !!(c && (c.mangaMode === true || c.mangaMode == 1));
 }
 
+// Bubbles the editor wrote for the current manga page, if any. Editor
+// regeneration always writes sequence = panels + bubbles, so an editor-written
+// page's bubbles are all referenced by its sequence. Legacy sidecars can carry
+// a bubbles list from a separate detection pass that the sequence never
+// references — those pages must keep the heuristic classification.
+export function mangaExplicitBubbles() {
+  const bubbles = currentPageBubbles();
+  if (bubbles.length === 0) return [];
+  const comic = state.currentComic || window.currentComic;
+  const data = cache.get(comic.id);
+  const getPages = state.getViewerPages || window.getViewerPages;
+  const pages = getPages?.() || [];
+  const pageIndex = (state.currentPageIndex !== undefined && state.currentPageIndex !== null) ? state.currentPageIndex : window.currentPageIndex;
+  const fname = pages[pageIndex];
+  const pageData = fname && data && data.pages ? data.pages[fname] : null;
+  const sequence = Array.isArray(pageData && pageData.sequence) ? pageData.sequence : [];
+  const key = (b) => `${b[0]},${b[1]},${b[2]},${b[3]}`;
+  const inSequence = new Set(sequence.map(key));
+  return bubbles.every((b) => inSequence.has(key(b))) ? bubbles : [];
+}
+
 // Flat list of speech-bubble boxes for the current manga page.
+// Editor-written pages carry an explicit, ordered bubbles list — step exactly
+// that. Legacy pages keep the heuristic classify flatten.
 export function mangaPageBubbles() {
+  const explicit = mangaExplicitBubbles();
+  if (explicit.length > 0) return explicit;
   const out = [];
   const panels = state.GuidedView.classifyMangaPage();
   for (const p of panels) for (const b of p.bubbles) out.push(b);
@@ -103,6 +128,7 @@ Object.assign(state.GuidedView, {
   currentPageBubbles,
   currentPageRawBoxes,
   isMangaComic,
+  mangaExplicitBubbles,
   mangaPageBubbles,
   api
 });
@@ -115,6 +141,7 @@ if (typeof window !== 'undefined') {
     currentPageBubbles,
     currentPageRawBoxes,
     isMangaComic,
+    mangaExplicitBubbles,
     mangaPageBubbles,
     api
   });
