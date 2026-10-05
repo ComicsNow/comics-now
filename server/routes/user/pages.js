@@ -86,22 +86,24 @@ module.exports = function attach(router, deps) {
         return res.status(403).json({ pages: [], error: 'Access denied' });
       }
 
-      // Security: Validate user has access to this specific comic
+      // Security: Validate user has access to this specific comic.
+      // Issue #9: run the check even when there is NO row (file on disk but not
+      // yet indexed). checkComicAccess still grants admins, inbox/comicsLocation
+      // paths and path-based root-folder grants, but denies otherwise — so an
+      // unscanned file in a restricted library fails closed instead of open.
       const comic = await dbGet('SELECT id, publisher, series FROM comics WHERE path = ?', [p]);
-      if (comic) {
-        const hasAccess = await checkComicAccess(
-          req.user.userId,
-          req.user.role,
-          p,
-          comic.publisher,
-          comic.series,
-          getComicsDirectories(),
-          comic.id
-        );
-        if (!hasAccess) {
-          log('WARN', 'SECURITY', `User ${req.user.userId} denied access to comic pages: ${p}`);
-          return res.status(403).json({ pages: [], error: 'Access denied' });
-        }
+      const hasAccess = await checkComicAccess(
+        req.user.userId,
+        req.user.role,
+        p,
+        comic?.publisher ?? null,
+        comic?.series ?? null,
+        getComicsDirectories(),
+        comic?.id ?? null
+      );
+      if (!hasAccess) {
+        log('WARN', 'SECURITY', `User ${req.user.userId} denied access to comic pages: ${p}`);
+        return res.status(403).json({ pages: [], error: 'Access denied' });
       }
 
       if (!p || !fs.existsSync(p)) return res.json({ pages: [] });
@@ -125,22 +127,23 @@ module.exports = function attach(router, deps) {
         return res.status(403).end();
       }
 
-      // Security: Validate user has access to this specific comic
+      // Security: Validate user has access to this specific comic.
+      // Issue #9: run the check even when there is NO row so unscanned files in
+      // a restricted library fail closed. checkComicAccess still grants admins,
+      // inbox paths and path-based root-folder grants.
       const comic = await dbGet('SELECT id, publisher, series FROM comics WHERE path = ?', [p]);
-      if (comic) {
-        const hasAccess = await checkComicAccess(
-          req.user.userId,
-          req.user.role,
-          p,
-          comic.publisher,
-          comic.series,
-          getComicsDirectories(),
-          comic.id
-        );
-        if (!hasAccess) {
-          log('WARN', 'SECURITY', `User ${req.user.userId} denied access to comic image: ${p}`);
-          return res.status(403).end();
-        }
+      const hasAccess = await checkComicAccess(
+        req.user.userId,
+        req.user.role,
+        p,
+        comic?.publisher ?? null,
+        comic?.series ?? null,
+        getComicsDirectories(),
+        comic?.id ?? null
+      );
+      if (!hasAccess) {
+        log('WARN', 'SECURITY', `User ${req.user.userId} denied access to comic image: ${p}`);
+        return res.status(403).end();
       }
 
       const pageName = getQueryParamString(req.query.page);
@@ -254,22 +257,23 @@ module.exports = function attach(router, deps) {
         return res.status(403).json({ message: 'Access denied' });
       }
 
-      // Security: Validate user has access to this specific comic
+      // Security: Validate user has access to this specific comic.
+      // Issue #9: run the check even when there is NO row so unscanned files in
+      // a restricted library fail closed. checkComicAccess still grants admins,
+      // inbox paths and path-based root-folder grants.
       const comic = await dbGet('SELECT id, publisher, series FROM comics WHERE path = ?', [p]);
-      if (comic) {
-        const hasAccess = await checkComicAccess(
-          req.user.userId,
-          req.user.role,
-          p,
-          comic.publisher,
-          comic.series,
-          getComicsDirectories(),
-          comic.id
-        );
-        if (!hasAccess) {
-          log('WARN', 'SECURITY', `User ${req.user.userId} denied download of comic: ${p}`);
-          return res.status(403).json({ message: 'Access denied' });
-        }
+      const hasAccess = await checkComicAccess(
+        req.user.userId,
+        req.user.role,
+        p,
+        comic?.publisher ?? null,
+        comic?.series ?? null,
+        getComicsDirectories(),
+        comic?.id ?? null
+      );
+      if (!hasAccess) {
+        log('WARN', 'SECURITY', `User ${req.user.userId} denied download of comic: ${p}`);
+        return res.status(403).json({ message: 'Access denied' });
       }
 
       if (!p || !fs.existsSync(p)) return res.status(404).json({ message: 'Not found' });
