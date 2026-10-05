@@ -178,7 +178,7 @@ describe('WAITING FOR USER SELECTION log line lifecycle', () => {
     let detailsHandler;
     const router = {
       get: jest.fn((path, ...args) => {
-        if (path === '/api/v1/comictagger/pending-details') detailsHandler = args[args.length - 1];
+        if (path === '/api/v1/tag-comics-now/pending-details') detailsHandler = args[args.length - 1];
       }),
       post: jest.fn()
     };

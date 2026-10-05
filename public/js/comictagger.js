@@ -40,7 +40,7 @@ const global = new Proxy(typeof window !== 'undefined' ? window : globalThis, {
 // --- COMICTAGGER / TAG COMICS NOW ---
 async function checkPendingMatch() {
   try {
-    const res = await fetch(`${global.API_BASE_URL}/api/v1/comictagger/pending`);
+    const res = await fetch(`${global.API_BASE_URL}/api/v1/tag-comics-now/pending`);
     if (res.status === 403) return;
 
     const pending = await res.json();
@@ -355,7 +355,7 @@ function formatCtLogMessage(timestamp, message) {
 
 async function loadCtSavedLogs() {
   try {
-    const res = await fetch(`${global.API_BASE_URL}/api/v1/comictagger/logs`);
+    const res = await fetch(`${global.API_BASE_URL}/api/v1/tag-comics-now/logs`);
     const logs = await res.json();
     if (Array.isArray(logs) && logs.length > 0 && ctOutputDiv) {
       ctOutputDiv.innerHTML = '';
@@ -374,7 +374,7 @@ async function ctSyncLogsAndState() {
   if (!ctModal || ctModal.classList.contains('hidden')) return;
 
   try {
-    const res = await fetch(`${global.API_BASE_URL}/api/v1/comictagger/logs`);
+    const res = await fetch(`${global.API_BASE_URL}/api/v1/tag-comics-now/logs`);
     if (!res.ok) return;
     const logs = await res.json();
     if (Array.isArray(logs) && ctOutputDiv) {
@@ -391,7 +391,7 @@ async function ctSyncLogsAndState() {
     }
 
     // Also update pending/running state
-    const pendingRes = await fetch(`${global.API_BASE_URL}/api/v1/comictagger/pending`);
+    const pendingRes = await fetch(`${global.API_BASE_URL}/api/v1/tag-comics-now/pending`);
     if (pendingRes.ok) {
       const pending = await pendingRes.json();
       if (pending && pending.isRunning !== undefined) {
@@ -410,7 +410,7 @@ let isCtModalInitializing = false;
 function openCTModal() {
   const sm = global.syncManager;
   if (sm && sm.authEnabled && sm.userRole !== 'admin') {
-    if (global.router && getRelativePath().startsWith('/comictagger')) {
+    if (global.router && getRelativePath().startsWith('/tag-comics-now')) {
       const path = global.getPathForCurrentView ? global.getPathForCurrentView() : '/';
       global.router.navigate(path, true);
     }
@@ -423,8 +423,8 @@ function openCTModal() {
   isCtModalInitializing = true;
 
   if (!global._isNavigatingFromRouter && global.router) {
-    if (!getRelativePath().startsWith('/comictagger')) {
-      global.router.navigate('/comictagger/output', true);
+    if (!getRelativePath().startsWith('/tag-comics-now')) {
+      global.router.navigate('/tag-comics-now/output', true);
     }
   }
   ctModal?.classList.remove('hidden');
@@ -460,7 +460,7 @@ function openCTModal() {
   // Start periodic background sync for logs & progress every 1.5s
   ctSyncInterval = setInterval(ctSyncLogsAndState, 1500);
 
-  global.ctEventSource = new EventSource(`${global.API_BASE_URL}/api/v1/comictagger/stream`);
+  global.ctEventSource = new EventSource(`${global.API_BASE_URL}/api/v1/tag-comics-now/stream`);
   
   global.ctEventSource.onopen = () => {
     console.log('[CT] SSE stream connected');
@@ -512,7 +512,7 @@ function setScanRunningUI(isRunning) {
 async function runCtScan(mode = 'default') {
   setScanRunningUI(true);
   try {
-    const res = await fetch(`${global.API_BASE_URL}/api/v1/comictagger/run`, {
+    const res = await fetch(`${global.API_BASE_URL}/api/v1/tag-comics-now/run`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ mode })
@@ -530,7 +530,7 @@ async function runCtScan(mode = 'default') {
 // "Rescan Unmatched (N)" button label and its disabled-at-zero state.
 async function fetchCtScopeCounts() {
   try {
-    const res = await fetch(`${global.API_BASE_URL}/api/v1/comictagger/scope-counts`);
+    const res = await fetch(`${global.API_BASE_URL}/api/v1/tag-comics-now/scope-counts`);
     if (!res.ok) return;
     const data = await res.json();
     const count = Math.max(0, parseInt(data && data.unmatched, 10) || 0);
@@ -571,7 +571,7 @@ function closeCTModal() {
     ctSyncInterval = null;
   }
 
-  if (global.router && getRelativePath().startsWith('/comictagger')) {
+  if (global.router && getRelativePath().startsWith('/tag-comics-now')) {
     const path = global.getPathForCurrentView ? global.getPathForCurrentView() : '/';
     global.router.navigate(path, true);
   }
@@ -582,7 +582,7 @@ function closeCTModal() {
 
 async function fetchCtSettings() {
   try {
-    const res = await fetch(`${global.API_BASE_URL}/api/v1/comictagger/schedule`);
+    const res = await fetch(`${global.API_BASE_URL}/api/v1/tag-comics-now/schedule`);
     const data = await res.json();
     
     if (ctScheduleInput) ctScheduleInput.value = data.minutes || 0;
@@ -610,6 +610,20 @@ async function fetchCtSettings() {
 
     const metronPassInput = document.getElementById('ct-metron-pass-input');
     if (metronPassInput && data.hasMetronPass) metronPassInput.placeholder = '•••••••• (saved)';
+
+    const portInput = document.getElementById('ct-tagger-port-input');
+    if (portInput) {
+      let port = 5000;
+      try {
+        port = parseInt(new URL(data.taggerServiceUrl).port, 10) || 5000;
+      } catch (_) {}
+      portInput.value = port;
+    }
+
+    const engineStatus = document.getElementById('ct-engine-status');
+    if (engineStatus) {
+      engineStatus.textContent = data.serviceOnline ? '● Engine Ready' : '● Engine Offline';
+    }
 
     // Source checkboxes
     const enabled = data.enabledSources || [];
@@ -679,7 +693,7 @@ async function fetchPendingMatchDetails(isManual = false) {
   isFetchingCtDetails = true;
 
   try {
-    const detailsRes = await fetch(`${global.API_BASE_URL}/api/v1/comictagger/pending-details?_t=${Date.now()}`);
+    const detailsRes = await fetch(`${global.API_BASE_URL}/api/v1/tag-comics-now/pending-details?_t=${Date.now()}`);
     if (!detailsRes.ok) throw new Error(`Status ${detailsRes.status}`);
     const details = await detailsRes.json();
 
@@ -695,7 +709,7 @@ async function fetchPendingMatchDetails(isManual = false) {
 
     if (details.fileName !== lastRenderedFileName) {
       clearCtMatches();
-      const previewUrl = `${global.API_BASE_URL}/api/v1/comictagger/preview?_t=${Date.now()}`;
+      const previewUrl = `${global.API_BASE_URL}/api/v1/tag-comics-now/preview?_t=${Date.now()}`;
       renderComicPreview(previewUrl, details.fileName);
       lastRenderedFileName = details.fileName;
     }
@@ -826,6 +840,9 @@ async function saveCtSettings() {
   const metronPassInput = document.getElementById('ct-metron-pass-input');
   const metronPassword = metronPassInput ? metronPassInput.value.trim() : '';
 
+  const portInput = document.getElementById('ct-tagger-port-input');
+  const taggerServicePort = portInput ? parseInt(portInput.value, 10) : NaN;
+
   const forceSettingCb = document.getElementById('ct-force-setting-cb');
   const forceReprocess = forceSettingCb ? forceSettingCb.checked : false;
 
@@ -856,7 +873,7 @@ async function saveCtSettings() {
   }
 
   try {
-    const res = await fetch(`${global.API_BASE_URL}/api/v1/comictagger/schedule`, {
+    const res = await fetch(`${global.API_BASE_URL}/api/v1/tag-comics-now/schedule`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -870,7 +887,10 @@ async function saveCtSettings() {
         metronUser,
         metronPassword,
         enabledSources,
-        forceReprocess
+        forceReprocess,
+        ...(Number.isInteger(taggerServicePort) && taggerServicePort >= 1 && taggerServicePort <= 65535
+          ? { taggerServicePort }
+          : {})
       })
     });
     if (res.ok) {
@@ -1180,7 +1200,7 @@ async function loadScanLogs() {
   container.innerHTML = '<div class="text-center py-8 text-sm text-gray-400">Loading scan logs...</div>';
 
   try {
-    const res = await fetch(`${global.API_BASE_URL}/api/v1/comictagger/scan-logs`);
+    const res = await fetch(`${global.API_BASE_URL}/api/v1/tag-comics-now/scan-logs`);
     const data = await res.json();
     let logs = [];
     if (Array.isArray(data)) {
@@ -1234,7 +1254,7 @@ async function clearTrackingHistory() {
   if (btn) btn.textContent = 'Clearing...';
 
   try {
-    await fetch(`${global.API_BASE_URL}/api/v1/comictagger/clear-history`, { method: 'POST' });
+    await fetch(`${global.API_BASE_URL}/api/v1/tag-comics-now/clear-history`, { method: 'POST' });
     if (btn) btn.textContent = '✓ Cleared';
     setTimeout(() => { if (btn) btn.textContent = 'Clear Enhancement History'; }, 2000);
   } catch (err) {
@@ -1266,13 +1286,13 @@ async function handleCtConfirmYes() {
       const selected = document.querySelector('.ct-match-select:checked');
       const choice = selected ? selected.dataset.choice : '1';
 
-      res = await fetch(`${global.API_BASE_URL}/api/v1/comictagger/apply`, {
+      res = await fetch(`${global.API_BASE_URL}/api/v1/tag-comics-now/apply`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ selections: [choice] })
       });
     } else {
-      res = await fetch(`${global.API_BASE_URL}/api/v1/comictagger/skip`, {
+      res = await fetch(`${global.API_BASE_URL}/api/v1/tag-comics-now/skip`, {
         method: 'POST'
       });
     }
@@ -1335,7 +1355,7 @@ async function cancelCtScan() {
     cancelBtn.textContent = 'Cancelling...';
   }
   try {
-    await fetch(`${global.API_BASE_URL}/api/v1/comictagger/cancel`, { method: 'POST' });
+    await fetch(`${global.API_BASE_URL}/api/v1/tag-comics-now/cancel`, { method: 'POST' });
     await checkPendingMatch();
     if (ctTabMatches && ctTabMatches.classList.contains('active')) {
       debouncedFetchPendingMatchDetails();
@@ -1374,7 +1394,7 @@ if (typeof window !== 'undefined') {
 // Periodic check for pending matches on CT button
 async function updateCtButtonIndicator() {
   try {
-    const res = await fetch(`${global.API_BASE_URL}/api/v1/comictagger/pending`);
+    const res = await fetch(`${global.API_BASE_URL}/api/v1/tag-comics-now/pending`);
     if (res.status === 403) return;
 
     const pending = await res.json();
@@ -1394,7 +1414,7 @@ async function updateCtButtonIndicator() {
         ctButton.classList.remove('ct-pending');
         ctButton.style.animation = '';
         ctButton.style.boxShadow = '';
-        ctButton.title = 'Comics Tagger';
+        ctButton.title = 'Tag Comics Now!';
       }
     }
   } catch (error) {}

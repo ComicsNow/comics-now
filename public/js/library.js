@@ -38,7 +38,7 @@ function goToInitialView() {
     }
   }
 
-  // Close settings, ComicTagger, and reading list modals
+  // Close settings, Tag Comics Now!, and reading list modals
   if (typeof window.closeSettingsModal === 'function') {
     try {
       window.closeSettingsModal();

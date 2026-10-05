@@ -4,7 +4,7 @@
 
 const attachComicTaggerRoutes = require('../server/routes/admin/comictagger');
 
-describe('ComicTagger scan mode routes', () => {
+describe('Tag Comics Now! scan mode routes', () => {
   let router;
   let deps;
   let runHandler;
@@ -17,10 +17,10 @@ describe('ComicTagger scan mode routes', () => {
 
     router = {
       get: jest.fn((path, ...args) => {
-        if (path === '/api/v1/comictagger/scope-counts') scopeCountsHandler = args[args.length - 1];
+        if (path === '/api/v1/tag-comics-now/scope-counts') scopeCountsHandler = args[args.length - 1];
       }),
       post: jest.fn((path, ...args) => {
-        if (path === '/api/v1/comictagger/run') runHandler = args[args.length - 1];
+        if (path === '/api/v1/tag-comics-now/run') runHandler = args[args.length - 1];
       })
     };
 
@@ -39,7 +39,7 @@ describe('ComicTagger scan mode routes', () => {
     attachComicTaggerRoutes(router, deps);
   });
 
-  describe('POST /api/v1/comictagger/run', () => {
+  describe('POST /api/v1/tag-comics-now/run', () => {
     function makeRes() {
       const res = {
         json: jest.fn(),
@@ -108,7 +108,7 @@ describe('ComicTagger scan mode routes', () => {
     });
   });
 
-  describe('GET /api/v1/comictagger/scope-counts', () => {
+  describe('GET /api/v1/tag-comics-now/scope-counts', () => {
     test('returns the unmatched count from the injected counter', async () => {
       const req = {};
       const res = { json: jest.fn() };
@@ -122,7 +122,7 @@ describe('ComicTagger scan mode routes', () => {
     test('falls back to zero when the counter is not wired', async () => {
       router = {
         get: jest.fn((path, ...args) => {
-          if (path === '/api/v1/comictagger/scope-counts') scopeCountsHandler = args[args.length - 1];
+          if (path === '/api/v1/tag-comics-now/scope-counts') scopeCountsHandler = args[args.length - 1];
         }),
         post: jest.fn()
       };

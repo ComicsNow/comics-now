@@ -7,7 +7,7 @@
   "taggerTextEngine": "google-books",
 
   /* 
-     comicsLocation: The "workspace" directory where ComicTagger looks for 
+     comicsLocation: The "workspace" directory where Tag Comics Now! looks for 
      new, untagged CBZ files to process.
   */
   "comicsLocation": "/path/to/comics/processing-inbox",

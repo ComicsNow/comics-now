@@ -69,27 +69,27 @@ class TestMcpTools(unittest.TestCase):
         }
         res_str = server.get_metadata_sources()
         res = json.loads(res_str)
-        mock_req.assert_called_once_with("GET", "/api/v1/comictagger/sources")
+        mock_req.assert_called_once_with("GET", "/api/v1/tag-comics-now/sources")
         self.assertIn("comicvine", res["data"]["sources"])
 
     @patch.object(server, "_request")
-    def test_get_comictagger_pending_details(self, mock_req):
+    def test_get_tag_comics_now_pending_details(self, mock_req):
         mock_req.return_value = {
             "status": 200,
             "ok": True,
             "data": {"comicId": "123", "candidates": []},
         }
-        res_str = server.get_comictagger_pending_details()
+        res_str = server.get_tag_comics_now_pending_details()
         res = json.loads(res_str)
-        mock_req.assert_called_once_with("GET", "/api/v1/comictagger/pending-details")
+        mock_req.assert_called_once_with("GET", "/api/v1/tag-comics-now/pending-details")
         self.assertEqual(res["data"]["comicId"], "123")
 
     @patch.object(server, "_request")
     def test_get_organization_rules(self, mock_req):
         def side_effect(method, path, **kwargs):
-            if path == "/api/v1/comictagger/naming-rules":
+            if path == "/api/v1/tag-comics-now/naming-rules":
                 return {"status": 200, "ok": True, "data": {"rules": {"tokens": ["{series}"]}}}
-            if path == "/api/v1/comictagger/folder-rules":
+            if path == "/api/v1/tag-comics-now/folder-rules":
                 return {"status": 200, "ok": True, "data": {"rules": {"hierarchy": ["{publisher}"]}}}
             return {"status": 404, "ok": False}
 
@@ -102,9 +102,9 @@ class TestMcpTools(unittest.TestCase):
     @patch.object(server, "_request")
     def test_preview_comic_organization(self, mock_req):
         def side_effect(method, path, **kwargs):
-            if path == "/api/v1/comictagger/naming-preview":
+            if path == "/api/v1/tag-comics-now/naming-preview":
                 return {"status": 200, "ok": True, "data": {"filename": "Batman #001 (2016).cbz"}}
-            if path == "/api/v1/comictagger/folder-preview":
+            if path == "/api/v1/tag-comics-now/folder-preview":
                 return {"status": 200, "ok": True, "data": {"folderPath": "DC Comics/Batman"}}
             return {"status": 404, "ok": False}
 
@@ -119,9 +119,9 @@ class TestMcpTools(unittest.TestCase):
         def side_effect(method, path, body=None, **kwargs):
             self.assertIn("Series", body["metadata"])
             self.assertIn("Number", body["metadata"])
-            if path == "/api/v1/comictagger/naming-preview":
+            if path == "/api/v1/tag-comics-now/naming-preview":
                 return {"ok": True, "filename": "Superman #001 (2018).cbz"}
-            if path == "/api/v1/comictagger/folder-preview":
+            if path == "/api/v1/tag-comics-now/folder-preview":
                 return {"ok": True, "folderPath": "DC Comics/Superman"}
             return {"ok": False}
 

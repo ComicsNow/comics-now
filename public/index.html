@@ -438,12 +438,12 @@
       </div>
     </div>
 
-  <!-- ComicTagger Modal -->
+  <!-- Tag Comics Now! Modal -->
   <div id="ct-modal" class="hidden fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-40 p-4">
     <div class="bg-gray-800 rounded-lg w-full h-full sm:h-auto sm:max-h-[90vh] max-w-4xl shadow-lg flex flex-col overflow-hidden">
       <div class="flex justify-between items-center p-4 sm:p-6 border-b border-gray-700">
         <div class="flex items-center gap-3">
-          <h3 class="text-2xl font-bold">Comics Tagger</h3>
+          <h3 class="text-2xl font-bold">Tag Comics Now!</h3>
           <span id="ct-engine-status" class="text-xs px-2.5 py-1 rounded-full bg-green-900/60 text-green-300 border border-green-700 font-medium">● Engine Ready</span>
         </div>
         <button id="ct-close-btn" class="modal-close-btn text-2xl font-bold hover:text-gray-300 transition-colors">&times;</button>
@@ -566,7 +566,7 @@
           <div class="mb-4">
             <label for="ct-scan-folder-input" class="block mb-1 text-sm font-semibold">Scan Folder</label>
             <input type="text" id="ct-scan-folder-input" class="w-full bg-gray-700 text-white p-2 rounded-lg text-sm font-mono" placeholder="/path/to/incoming/comics">
-            <p class="text-xs text-gray-500 mt-1">The folder ComicTagger scans for new comics to tag. Absolute path on the server.</p>
+            <p class="text-xs text-gray-500 mt-1">The folder Tag Comics Now! scans for new comics to tag. Absolute path on the server.</p>
           </div>
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
             <div>
@@ -598,6 +598,11 @@
               <label for="ct-lower-threshold-input" class="block mb-1 text-sm font-semibold">Review Confirmation Threshold (%)</label>
               <input type="number" id="ct-lower-threshold-input" class="w-full bg-gray-700 text-white p-2 rounded-lg text-sm" min="30" max="95" value="80">
               <p class="text-xs text-gray-500 mt-1">Matches between review & auto-tag threshold are queued in Matches tab.</p>
+            </div>
+            <div>
+              <label for="ct-tagger-port-input" class="block mb-1 text-sm font-semibold">Service Port</label>
+              <input type="number" id="ct-tagger-port-input" class="w-full bg-gray-700 text-white p-2 rounded-lg text-sm" min="1" max="65535" value="5000">
+              <p class="text-xs text-gray-500 mt-1">Port used by the local Tag Comics Now! service (default 5000). Change it if another app is using that port.</p>
             </div>
             <div class="md:col-span-2 pt-2 border-t border-gray-700/60">
               <label class="flex items-center gap-2 cursor-pointer text-sm">
@@ -1321,7 +1326,7 @@
         </button>
       </div>
 
-      <!-- Right Group: Reading List, Downloads, ComicTagger, and Settings -->
+      <!-- Right Group: Reading List, Downloads, Tag Comics Now!, and Settings -->
       <div class="flex gap-2">
         <button id="reading-list-button" aria-label="Reading Lists" class="brutalist-btn btn-cream w-10 h-10 transition-colors" onclick="openReadingListModal()">
           <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2"><use href="#icon-menu"></use></svg>
@@ -1329,7 +1334,7 @@
         <button id="downloads-button" aria-label="Downloads" class="brutalist-btn btn-cyan w-10 h-10 transition-colors" onclick="openDownloadsPanel()">
           <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2"><use href="#icon-download-alt"></use></svg>
         </button>
-        <button id="ct-button" aria-label="ComicTagger" class="brutalist-btn btn-yellow w-10 h-10 transition-colors">
+        <button id="ct-button" aria-label="Tag Comics Now!" class="brutalist-btn btn-yellow w-10 h-10 transition-colors">
           <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2"><use href="#icon-24"></use></svg>
         </button>
         <button id="settings-button" onclick="openSettingsModal()" aria-label="Settings" class="brutalist-btn btn-ink w-10 h-10 transition-colors">
@@ -1708,13 +1713,13 @@
       </div>
 <!-- Metadata tab content -->
 <div id="metadata-content" class="hidden">
-  <!-- Mobile sub-tabs: Comics Tagger search vs metadata edit. Hidden on md+ where both sections show side-by-side. -->
+  <!-- Mobile sub-tabs: Tag Comics Now! search vs metadata edit. Hidden on md+ where both sections show side-by-side. -->
   <div id="metadata-subtabs" class="md:hidden flex gap-2 mb-3">
-    <button type="button" id="metadata-subtab-cv" class="pill-button bg-red-600 text-white flex-1">Comics Tagger</button>
+    <button type="button" id="metadata-subtab-cv" class="pill-button bg-red-600 text-white flex-1">Tag Comics Now!</button>
     <button type="button" id="metadata-subtab-form" class="pill-button bg-gray-700 hover:bg-gray-600 text-white flex-1">Metadata</button>
   </div>
   <div class="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
-    <!-- LEFT: Comics Tagger Search -->
+    <!-- LEFT: Tag Comics Now! Search -->
 <section id="metadata-sub-cv" class="flex flex-col space-y-3">
       <!-- Sticky search controls -->
       <div class="sticky top-0 z-10 bg-gray-900/80 backdrop-blur p-4 rounded-xl border border-gray-800">
@@ -1866,7 +1871,7 @@
       <symbol id="icon-26" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16" /></symbol>
     </svg>
   </div>
-<script type="module" src="/app.js?v=8.8"></script>
+<script type="module" src="/app.js?v=8.9"></script>
   <script>
     // Show user badge if auth is enabled (invoked by sync.js)
     window.showUserBadge = function() {

@@ -39,15 +39,25 @@ async function startTaggerWorker() {
   const taggerScript = path.join(taggerRoot, 'app.py');
   const dataDir = process.env.DATA_DIR || path.join(__dirname, '..', '..', 'data');
 
-  log('INFO', 'TAGGER', `Starting internal Python tagger worker (${pythonBin} ${taggerScript})...`);
+  // The Flask worker reads APP_HOST/APP_PORT (see tagger/app.py); PORT is not
+  // consulted, so it must not be mistaken for the listen port here.
+  let appHost = '127.0.0.1';
+  let appPort = '5000';
+  try {
+    const parsed = new URL(serviceUrl);
+    if (parsed.hostname) appHost = parsed.hostname;
+    if (parsed.port) appPort = parsed.port;
+  } catch {}
+
+  log('INFO', 'TAGGER', `Starting internal Python tagger worker (${pythonBin} ${taggerScript}) on ${appHost}:${appPort}...`);
 
   try {
     taggerChild = spawn(pythonBin, [taggerScript], {
       cwd: taggerRoot,
       env: {
         ...process.env,
-        APP_HOST: '127.0.0.1',
-        PORT: '5000',
+        APP_HOST: appHost,
+        APP_PORT: appPort,
         FLASK_DEBUG: '0',
         DATA_DIR: dataDir,
         TRACKING_DB_PATH: path.join(dataDir, 'enhanced_tracking.db'),

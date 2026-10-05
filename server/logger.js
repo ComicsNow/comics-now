@@ -34,7 +34,7 @@ function broadcastCt(entry) {
   }
 }
 
-// Log a ComicTagger line. Passing `opts.id` upserts an entry with that id:
+// Log a Tag Comics Now! line. Passing `opts.id` upserts an entry with that id:
 // the buffer entry and any client already showing it are updated in place so
 // transient states (e.g. "WAITING FOR USER SELECTION") resolve without
 // leaving a stale line behind.

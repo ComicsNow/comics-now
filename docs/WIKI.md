@@ -2,6 +2,8 @@
 
 Welcome to the definitive user, administrator, and developer guide for **Comics Now!** — a modern, self-hosted comic book library server, reader, and organizer.
 
+For the complete REST endpoint reference — every route under `/api/v1` with parameters, request bodies, and admin-only notes — see the companion **[API Documentation](API.md)** (`docs/API.md`).
+
 ---
 
 # Table of Contents
@@ -31,7 +33,7 @@ Welcome to the definitive user, administrator, and developer guide for **Comics 
    - [The 3 Metadata Storage Options](#the-3-metadata-storage-options)
 7. [The Tagging Engine & File Organization](#7-the-tagging-engine--file-organization)
    - [Multi-Source Metadata APIs](#multi-source-metadata-apis)
-   - [The Tagger UI & Matching Workflow](#the-tagger-ui--matching-workflow)
+   - [The Tag Comics Now! UI & Matching Workflow](#the-tag-comics-now-ui--matching-workflow)
    - [Automatic Renaming & Moving](#automatic-renaming--moving)
 8. [Smart Guided View & Reading Modes](#8-smart-guided-view--reading-modes)
    - [How Guided View Works (Deep Learning / ONNX)](#how-guided-view-works-deep-learning--onnx)
@@ -66,6 +68,8 @@ Welcome to the definitive user, administrator, and developer guide for **Comics 
     - [Client Configuration](#client-configuration)
     - [AI Capabilities (Tagging, Reading Lists, SQL)](#ai-capabilities)
 14. [System Logs & Maintenance](#14-system-logs--maintenance)
+
+**Companion Document:** [REST API Reference (docs/API.md)](API.md)
 
 ---
 
@@ -295,15 +299,18 @@ The tagger queries the following providers:
 - **Goodreads & Amazon**: Ideal for trade paperbacks, graphic novels, and ISBN lookups.
 - **Google Books, Blackwells, Waterstones, LCG**: Supplemental publisher and store indicia.
 
-### The Tagger UI & Matching Workflow
-1. Navigate to the **Tagger** tab.
+### Service Port
+The tagger listens on port `5000` by default — configurable via the `APP_PORT` environment variable (`APP_HOST` defaults to `0.0.0.0`). When embedded, Comics Now! spawns the tagger and proxies to it; change the port under **Tag Comics Now! → Settings & Sources → Service Port** and the app will spawn and proxy to the new port. For a standalone or sidecar tagger, set `APP_PORT` and point Comics Now! at the same port, or set `TAGGER_SERVICE_URL` (or `taggerServiceUrl` in `config.json`).
+
+### The Tag Comics Now! UI & Matching Workflow
+1. Open the **Tag Comics Now!** panel from the top bar.
 2. Select a comic or folder to inspect.
 3. The engine extracts the cover image, computes an image perceptual hash (`imagehash`), and matches it against online covers.
 4. **Side-by-Side Review**: Displays the candidate match, match confidence percentage, publication year, and cover art.
 5. Click **Apply Tags** to confirm.
 
 ### Automatic Renaming & Moving
-In **Settings → Tagger Settings**, configure automated file organization rules:
+In the **Tag Comics Now!** panel → **Management** tab → **Name** / **Folder** sub-tabs, configure automated file organization rules:
 - **Naming Pattern**: `{Series} #{Number} ({Year})`
 - **Folder Pattern**: `{Publisher}/{Series} (v{Volume})/`
 - When enabled, applying tags automatically moves and renames the file on disk into a clean, uniform directory tree.
@@ -338,6 +345,8 @@ Switch between reading modes instantly in the reader overlay:
 - **Fit to Width**: Scales page width to 100% viewport width.
 - **Orientation Lock**: Portrait, Landscape, or Auto Dual-Page Spread.
 - **Full Page Overview**: Double-tap in Guided View to view the full page before stepping to the next page's panels.
+- **E-Ink Anti-Ghosting Mode**: Toggle in the fullscreen toolbar cycles **Off → Monochrome → Color**, saved per device (Kindle, Kobo, Onyx Boox, and PocketBook are auto-detected on first visit). **Monochrome** applies a grayscale + contrast filter for black-and-white e-readers; **Color** boosts saturation for color e-paper displays. Both modes disable animations and flash the screen black on each page turn to prevent ghosting.
+- **Cinema Pan (Spreads)**: In Fullscreen, wide double-page spreads pan across automatically when they overflow the screen, starting once per displayed page (a re-render never restarts a pan you've stopped; navigating away and back re-arms it). A **Cinema Pan Spread** badge indicates the spread — tap it to toggle panning manually; spreads that already fit the screen don't pan.
 
 ---
 
@@ -498,6 +507,8 @@ The MCP server communicates locally with Comics Now! as an admin, giving your AI
    # Or via npm
    npm run mcp
    ```
+
+**Network mode**: The default `stdio` transport has no listening port. For network transports (e.g. remote use), set `MCP_TRANSPORT=sse` (or `streamable-http`), plus `MCP_HOST` (default `127.0.0.1`) and `MCP_PORT` (default `8000`) in `mcp/.env` — `run.sh` loads that file automatically.
 
 ### Client Configuration
 

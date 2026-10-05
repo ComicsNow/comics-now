@@ -266,6 +266,11 @@ const global = new Proxy(typeof window !== 'undefined' ? window : globalThis, {
   }
 
   async function closeFullscreen() {
+    // A reopened fullscreen is a fresh display: the next status update always
+    // counts as a page change and the displayed image is auto-pan eligible again.
+    lastFullscreenStatusPage = null;
+    lastCinemaPanSrc = null;
+
     // 1. HIDE IMMEDIATELY - Don't wait for anything
     const viewer = global.fullscreenViewer;
     if (viewer) {
@@ -1072,7 +1077,13 @@ const global = new Proxy(typeof window !== 'undefined' ? window : globalThis, {
   }
 
   function updateFullscreenPageStatus(currentPage, totalPages) {
-    if (isCinemaPanning) {
+    // Page turns trigger a burst of status updates (viewer render + counter
+    // proxy). Only an actual page change stops the cinema pan; the auto-pan
+    // decision itself is per displayed image (see maybeAutoPanCinema), so a
+    // same-page re-render neither resets a running pan nor revives a stopped one.
+    const pageChanged = lastFullscreenStatusPage !== currentPage;
+    lastFullscreenStatusPage = currentPage;
+    if (isCinemaPanning && pageChanged) {
       stopCinemaPan();
     }
 
@@ -1093,12 +1104,14 @@ const global = new Proxy(typeof window !== 'undefined' ? window : globalThis, {
     const progressPercent = Math.round((currentPage / totalPages) * 100);
     progressIndicator.textContent = `${progressPercent}% read`;
     pageCounter.textContent = pageText;
-    checkSpreadCinemaStatus();
+    checkSpreadCinemaStatus({ autoPan: true });
   }
 
   let isCinemaPanning = false;
   let cinemaPanRAF = null;
   let cinemaPanEndTimeout = null;
+  let lastFullscreenStatusPage = null;
+  let lastCinemaPanSrc = null;
 
   function stopCinemaPan() {
     const cancelRaf = (typeof window !== 'undefined' && window.cancelAnimationFrame) || (typeof globalThis !== 'undefined' && globalThis.cancelAnimationFrame);
@@ -1137,7 +1150,7 @@ const global = new Proxy(typeof window !== 'undefined' ? window : globalThis, {
     checkSpreadCinemaStatus();
   }
 
-  function checkSpreadCinemaStatus() {
+  function checkSpreadCinemaStatus(options = {}) {
     const img = global.fullscreenImage;
     const badge = document.getElementById('fullscreen-spread-badge');
     if (!img) return;
@@ -1148,11 +1161,17 @@ const global = new Proxy(typeof window !== 'undefined' ? window : globalThis, {
       const isSpread = naturalW > 0 && naturalH > 0 && (naturalW / naturalH >= 1.2);
 
       if (badge) {
-        if (isSpread) {
+        // The badge stays hidden for the duration of a cinema pan (startCinemaPan
+        // hides it; a status check mid-pan must not bring it back).
+        if (isSpread && !isCinemaPanning) {
           badge.classList.remove('hidden');
-        } else {
+        } else if (!isSpread) {
           badge.classList.add('hidden');
         }
+      }
+
+      if (options.autoPan) {
+        maybeAutoPanCinema(isSpread);
       }
     };
 
@@ -1163,18 +1182,37 @@ const global = new Proxy(typeof window !== 'undefined' ? window : globalThis, {
     }
   }
 
-  function toggleCinemaPan() {
-    const image = global.fullscreenImage;
-    if (!image) return;
+  // Called when fullscreen displays a page: a spread pans on its own, once per
+  // displayed image. The displayed src is recorded for every page (spread or
+  // not), so a re-render of the same image never restarts a pan the user
+  // stopped, while navigating away and back re-arms the pan. The badge toggle
+  // remains available as a manual off switch (stopCinemaPan's trailing check
+  // passes no autoPan flag, so stopping sticks).
+  function maybeAutoPanCinema(isSpread) {
+    const viewer = global.fullscreenViewer;
+    if (viewer && viewer.classList.contains('hidden')) return;
+    if (isCinemaPanning) return;
 
-    if (isCinemaPanning) {
-      stopCinemaPan();
-      return;
+    const img = global.fullscreenImage;
+    const src = img ? (img.currentSrc || img.src || '') : '';
+    if (!src || src === lastCinemaPanSrc) return;
+    lastCinemaPanSrc = src;
+
+    if (isSpread) {
+      startCinemaPan();
     }
+  }
+
+  // Starts the cinema pan when the displayed page qualifies. Returns true when
+  // the pan started, false otherwise (no image, already panning, portrait page,
+  // or spread that fits the screen).
+  function startCinemaPan() {
+    const image = global.fullscreenImage;
+    if (!image || isCinemaPanning) return false;
 
     const naturalW = image.naturalWidth || 0;
     const naturalH = image.naturalHeight || 0;
-    if (!naturalW || !naturalH || (naturalW / naturalH < 1.2)) return;
+    if (!naturalW || !naturalH || (naturalW / naturalH < 1.2)) return false;
 
     const viewer = global.fullscreenViewer;
     const vh = (viewer ? viewer.clientHeight : window.innerHeight) || window.innerHeight;
@@ -1182,16 +1220,7 @@ const global = new Proxy(typeof window !== 'undefined' ? window : globalThis, {
     const scaledWidth = (naturalW / naturalH) * vh;
     const overflowX = Math.max(0, scaledWidth - vw);
 
-    if (overflowX < 15) {
-      const badgeText = document.getElementById('fullscreen-spread-badge-text');
-      if (badgeText) {
-        badgeText.textContent = 'Page Fits Screen';
-        setTimeout(() => {
-          badgeText.textContent = 'Cinema Pan Spread';
-        }, 1500);
-      }
-      return;
-    }
+    if (overflowX < 15) return false;
 
     const isManga = !!(
       (global.currentComic && (global.currentComic.mangaMode === true || global.currentComic.mangaMode == 1 || global.currentComic.mangaMode === '1')) ||
@@ -1247,6 +1276,33 @@ const global = new Proxy(typeof window !== 'undefined' ? window : globalThis, {
 
     if (typeof reqRaf === 'function') {
       cinemaPanRAF = reqRaf(step);
+    }
+    return true;
+  }
+
+  function toggleCinemaPan() {
+    if (isCinemaPanning) {
+      stopCinemaPan();
+      return;
+    }
+
+    if (startCinemaPan()) return;
+
+    const image = global.fullscreenImage;
+    if (!image) return;
+
+    const naturalW = image.naturalWidth || 0;
+    const naturalH = image.naturalHeight || 0;
+    const isSpread = naturalW > 0 && naturalH > 0 && (naturalW / naturalH >= 1.2);
+    if (!isSpread) return;
+
+    // Spread, but it already fits the screen.
+    const badgeText = document.getElementById('fullscreen-spread-badge-text');
+    if (badgeText) {
+      badgeText.textContent = 'Page Fits Screen';
+      setTimeout(() => {
+        badgeText.textContent = 'Cinema Pan Spread';
+      }, 1500);
     }
   }
 

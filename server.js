@@ -143,7 +143,7 @@ const {
   getScanLogDetail,
   clearEnhancedTracking
 } = require('./server/services/tagger');
-const { startTaggerWorker, stopTaggerWorker } = require('./server/services/tagger-process');
+const { startTaggerWorker, stopTaggerWorker, isWorkerOnline } = require('./server/services/tagger-process');
 const guidedReader = require('./server/services/guided-reader');
 const { saveMetadataToComic, getComicInfoFromArchive } = require('./server/services/metadata');
 
@@ -266,6 +266,9 @@ const apiRouter = createApiRouter({
   setTaggerMode,
   getTaggerServiceUrl,
   setTaggerServiceUrl,
+  startTaggerWorker,
+  stopTaggerWorker,
+  isWorkerOnline,
   getTaggerLowerThreshold,
   setTaggerLowerThreshold,
   getTaggerUpperThreshold,

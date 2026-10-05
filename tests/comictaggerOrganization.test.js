@@ -10,7 +10,7 @@ const {
   updateComicIdentity
 } = require('../server/services/organization');
 
-describe('ComicTagger Naming & Folder Organization Services', () => {
+describe('Tag Comics Now! Naming & Folder Organization Services', () => {
   describe('formatComicFilename', () => {
     const sampleMetadata = {
       Series: 'Animal Castle',
@@ -341,7 +341,7 @@ describe('ComicTagger Naming & Folder Organization Services', () => {
     });
   });
 
-  describe('ComicTagger Naming & Folder Rules Endpoints', () => {
+  describe('Tag Comics Now! Naming & Folder Rules Endpoints', () => {
     const attachComicTaggerRoutes = require('../server/routes/admin/comictagger');
     let router;
     let deps;
@@ -364,8 +364,8 @@ describe('ComicTagger Naming & Folder Organization Services', () => {
       attachComicTaggerRoutes(router, deps);
     });
 
-    test('GET /api/v1/comictagger/naming-rules returns current naming rules', async () => {
-      const handler = handlers['GET /api/v1/comictagger/naming-rules'];
+    test('GET /api/v1/tag-comics-now/naming-rules returns current naming rules', async () => {
+      const handler = handlers['GET /api/v1/tag-comics-now/naming-rules'];
       expect(handler).toBeDefined();
 
       const res = { json: jest.fn() };
@@ -377,8 +377,8 @@ describe('ComicTagger Naming & Folder Organization Services', () => {
       });
     });
 
-    test('POST /api/v1/comictagger/naming-rules saves new rules', async () => {
-      const handler = handlers['POST /api/v1/comictagger/naming-rules'];
+    test('POST /api/v1/tag-comics-now/naming-rules saves new rules', async () => {
+      const handler = handlers['POST /api/v1/tag-comics-now/naming-rules'];
       expect(handler).toBeDefined();
 
       const newRules = { tokens: [{ id: 'series', enabled: true, mandatory: true }] };
@@ -390,8 +390,8 @@ describe('ComicTagger Naming & Folder Organization Services', () => {
       expect(res.json).toHaveBeenCalledWith({ ok: true });
     });
 
-    test('POST /api/v1/comictagger/naming-preview generates a live preview filename', async () => {
-      const handler = handlers['POST /api/v1/comictagger/naming-preview'];
+    test('POST /api/v1/tag-comics-now/naming-preview generates a live preview filename', async () => {
+      const handler = handlers['POST /api/v1/tag-comics-now/naming-preview'];
       expect(handler).toBeDefined();
 
       const req = {

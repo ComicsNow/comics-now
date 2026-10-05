@@ -313,7 +313,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   async function loadNamingRules() {
     try {
-      const res = await fetch(`${apiBaseUrl}/api/v1/comictagger/naming-rules`);
+      const res = await fetch(`${apiBaseUrl}/api/v1/tag-comics-now/naming-rules`);
       const data = await res.json();
       if (data.ok && data.rules && Array.isArray(data.rules.tokens)) {
         namingRules = data.rules;
@@ -401,7 +401,7 @@ document.addEventListener('DOMContentLoaded', () => {
   async function updateNamingPreview() {
     if (!namingLivePreview) return;
     try {
-      const res = await fetch(`${apiBaseUrl}/api/v1/comictagger/naming-preview`, {
+      const res = await fetch(`${apiBaseUrl}/api/v1/tag-comics-now/naming-preview`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ metadata: SAMPLE_METADATA, rules: namingRules })
@@ -424,7 +424,7 @@ document.addEventListener('DOMContentLoaded', () => {
       saveNamingRulesBtn.disabled = true;
       saveNamingRulesBtn.textContent = 'Saving...';
       try {
-        const res = await fetch(`${apiBaseUrl}/api/v1/comictagger/naming-rules`, {
+        const res = await fetch(`${apiBaseUrl}/api/v1/tag-comics-now/naming-rules`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ rules: namingRules })
@@ -463,7 +463,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   async function loadFolderRules() {
     try {
-      const res = await fetch(`${apiBaseUrl}/api/v1/comictagger/folder-rules`);
+      const res = await fetch(`${apiBaseUrl}/api/v1/tag-comics-now/folder-rules`);
       const data = await res.json();
       if (data.ok && data.rules && Array.isArray(data.rules.hierarchy)) {
         folderRules = data.rules;
@@ -548,7 +548,7 @@ document.addEventListener('DOMContentLoaded', () => {
   async function updateFolderPreview() {
     if (!folderLivePreview) return;
     try {
-      const res = await fetch(`${apiBaseUrl}/api/v1/comictagger/folder-preview`, {
+      const res = await fetch(`${apiBaseUrl}/api/v1/tag-comics-now/folder-preview`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ metadata: SAMPLE_METADATA, rules: folderRules })
@@ -569,7 +569,7 @@ document.addEventListener('DOMContentLoaded', () => {
       saveFolderRulesBtn.disabled = true;
       saveFolderRulesBtn.textContent = 'Saving...';
       try {
-        const res = await fetch(`${apiBaseUrl}/api/v1/comictagger/folder-rules`, {
+        const res = await fetch(`${apiBaseUrl}/api/v1/tag-comics-now/folder-rules`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ rules: folderRules })

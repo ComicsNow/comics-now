@@ -27,8 +27,13 @@ module.exports = function attach(router, deps) {
     getComicVineApiKey,
     setComicVineApiKey,
     getGoogleBooksApiKey,
+    setGoogleBooksApiKey,
     formatErrorMessage,
     getTaggerServiceUrl,
+    setTaggerServiceUrl,
+    stopTaggerWorker,
+    startTaggerWorker,
+    isWorkerOnline,
     getMetadataStorage,
     setMetadataStorage,
     getTaggerLowerThreshold,
@@ -50,7 +55,7 @@ module.exports = function attach(router, deps) {
   } = deps;
 
   // SSE Log Stream
-  router.get('/api/v1/comictagger/stream', (req, res) => {
+  router.get('/api/v1/tag-comics-now/stream', (req, res) => {
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Connection', 'keep-alive');
@@ -74,12 +79,21 @@ module.exports = function attach(router, deps) {
   });
 
   // Settings / Schedule endpoint
-  router.get('/api/v1/comictagger/schedule', (req, res) => {
-    res.json({ 
+  router.get('/api/v1/tag-comics-now/schedule', async (req, res) => {
+    const taggerServiceUrl = getTaggerServiceUrl ? getTaggerServiceUrl() : 'http://127.0.0.1:5000';
+    let serviceOnline = false;
+    try {
+      serviceOnline = isWorkerOnline ? await isWorkerOnline(taggerServiceUrl) : false;
+    } catch (_) {
+      serviceOnline = false;
+    }
+
+    res.json({
       minutes: getCtScheduleMinutes ? getCtScheduleMinutes() : 60,
       comicsLocation: getComicsLocation ? getComicsLocation() : '',
       taggerMode: 'new',
-      taggerServiceUrl: getTaggerServiceUrl ? getTaggerServiceUrl() : 'http://127.0.0.1:5000',
+      taggerServiceUrl,
+      serviceOnline,
       metadataStorage: getMetadataStorage ? getMetadataStorage() : 'archive',
       lowerThreshold: getTaggerLowerThreshold ? getTaggerLowerThreshold() : 0.80,
       upperThreshold: getTaggerUpperThreshold ? getTaggerUpperThreshold() : 0.90,
@@ -92,7 +106,7 @@ module.exports = function attach(router, deps) {
     });
   });
 
-  router.post('/api/v1/comictagger/schedule', async (req, res) => {
+  router.post('/api/v1/tag-comics-now/schedule', async (req, res) => {
     try {
       const {
         minutes = 60,
@@ -105,8 +119,20 @@ module.exports = function attach(router, deps) {
         metronUser,
         metronPassword,
         comicVineApiKey,
-        googleBooksApiKey
+        googleBooksApiKey,
+        taggerServicePort
       } = req.body || {};
+
+      let servicePort;
+      if (taggerServicePort != null) {
+        const parsedPort = typeof taggerServicePort === 'string' && taggerServicePort.trim() !== ''
+          ? Number(taggerServicePort)
+          : taggerServicePort;
+        if (!Number.isInteger(parsedPort) || parsedPort < 1 || parsedPort > 65535) {
+          return res.status(400).json({ error: 'taggerServicePort must be an integer between 1 and 65535' });
+        }
+        servicePort = parsedPort;
+      }
 
       const mins = Math.max(0, parseInt(minutes, 10) || 0);
       if (setCtScheduleMinutes) setCtScheduleMinutes(mins);
@@ -161,15 +187,50 @@ module.exports = function attach(router, deps) {
         await saveSetting('googleBooksApiKey', googleBooksApiKey);
       }
 
+      const currentUrl = getTaggerServiceUrl ? getTaggerServiceUrl() : 'http://127.0.0.1:5000';
+      let taggerServiceUrl = currentUrl;
+      let changed = false;
+      let workerRestarted = false;
+      let warning;
+
+      if (servicePort !== undefined) {
+        let currentPort = 5000;
+        try {
+          const parsedCurrent = new URL(currentUrl);
+          currentPort = parseInt(parsedCurrent.port, 10) || (parsedCurrent.protocol === 'https:' ? 443 : 80);
+        } catch (_) {}
+
+        if (servicePort !== currentPort) {
+          const newUrl = `http://127.0.0.1:${servicePort}`;
+          if (setTaggerServiceUrl) setTaggerServiceUrl(newUrl, true);
+          await saveSetting('taggerServiceUrl', newUrl);
+          taggerServiceUrl = newUrl;
+          changed = true;
+          try {
+            if (stopTaggerWorker) stopTaggerWorker();
+            if (startTaggerWorker) await startTaggerWorker();
+            workerRestarted = true;
+          } catch (e) {
+            warning = formatErrorMessage(e, req, 'Port saved but the tagger worker failed to restart');
+            if (log) log('WARN', 'CT', `Tagger worker restart failed after port change: ${e.message}`);
+          }
+        }
+      }
+
       if (scheduleCtRun) scheduleCtRun();
-      res.json({ ok: true });
+      const payload = { ok: true, changed, taggerServiceUrl };
+      if (changed) {
+        payload.workerRestarted = workerRestarted;
+        if (warning) payload.warning = warning;
+      }
+      res.json(payload);
     } catch (e) {
       res.status(400).json({ message: formatErrorMessage(e, req, 'Failed to save settings') });
     }
   });
 
   // Available metadata sources list
-  router.get('/api/v1/comictagger/sources', (req, res) => {
+  router.get('/api/v1/tag-comics-now/sources', (req, res) => {
     const allSources = [
       { id: 'src-comicvine', label: 'ComicVine', requiresApiKey: true },
       { id: 'src-metron', label: 'Metron', requiresAuth: true },
@@ -192,7 +253,7 @@ module.exports = function attach(router, deps) {
   });
 
   // Run Scan
-  router.post('/api/v1/comictagger/run', async (req, res) => {
+  router.post('/api/v1/tag-comics-now/run', async (req, res) => {
     try {
       const { force, mode } = req.body || {};
       if (mode !== undefined && !VALID_SCAN_MODES.includes(mode)) {
@@ -204,12 +265,12 @@ module.exports = function attach(router, deps) {
       runComicTagger({ force, mode });
       res.json({ ok: true, mode: resolved });
     } catch (e) {
-      res.status(400).json({ ok: false, message: formatErrorMessage(e, req, 'ComicTagger run failed') });
+      res.status(400).json({ ok: false, message: formatErrorMessage(e, req, 'Tag Comics Now! run failed') });
     }
   });
 
   // Scoped scan counts (DB-exact)
-  router.get('/api/v1/comictagger/scope-counts', async (req, res) => {
+  router.get('/api/v1/tag-comics-now/scope-counts', async (req, res) => {
     try {
       const counts = getScanScopeCounts ? await getScanScopeCounts() : { unmatched: 0 };
       res.json({ ok: true, unmatched: counts.unmatched });
@@ -219,7 +280,7 @@ module.exports = function attach(router, deps) {
   });
 
   // Cancel Scan
-  router.post('/api/v1/comictagger/cancel', async (req, res) => {
+  router.post('/api/v1/tag-comics-now/cancel', async (req, res) => {
     try {
       if (cancelComicTagger) {
         const cancelled = cancelComicTagger();
@@ -232,7 +293,7 @@ module.exports = function attach(router, deps) {
   });
 
   // Apply Selection
-  router.post('/api/v1/comictagger/apply', async (req, res) => {
+  router.post('/api/v1/tag-comics-now/apply', async (req, res) => {
     try {
       const { selections = [] } = req.body || {};
       await applyUserSelection(selections);
@@ -243,7 +304,7 @@ module.exports = function attach(router, deps) {
   });
 
   // Skip Match
-  router.post('/api/v1/comictagger/skip', async (req, res) => {
+  router.post('/api/v1/tag-comics-now/skip', async (req, res) => {
     try {
       skipCurrentMatch();
       res.json({ ok: true });
@@ -253,7 +314,7 @@ module.exports = function attach(router, deps) {
   });
 
   // Manual Search across enabled sources
-  router.post('/api/v1/comictagger/search', async (req, res) => {
+  router.post('/api/v1/tag-comics-now/search', async (req, res) => {
     try {
       const { source = 'comicvine', query = '' } = req.body || {};
       if (!query.trim()) {
@@ -270,7 +331,7 @@ module.exports = function attach(router, deps) {
   });
 
   // Scan Logs List
-  router.get('/api/v1/comictagger/scan-logs', async (req, res) => {
+  router.get('/api/v1/tag-comics-now/scan-logs', async (req, res) => {
     try {
       if (getScanLogsList) {
         const rawLogs = await getScanLogsList();
@@ -284,7 +345,7 @@ module.exports = function attach(router, deps) {
   });
 
   // Scan Log Detail
-  router.get('/api/v1/comictagger/scan-logs/:id', async (req, res) => {
+  router.get('/api/v1/tag-comics-now/scan-logs/:id', async (req, res) => {
     try {
       if (getScanLogDetail) {
         const detail = await getScanLogDetail(req.params.id);
@@ -297,7 +358,7 @@ module.exports = function attach(router, deps) {
   });
 
   // Clear Tracking History
-  router.post('/api/v1/comictagger/clear-history', async (req, res) => {
+  router.post('/api/v1/tag-comics-now/clear-history', async (req, res) => {
     try {
       if (clearEnhancedTracking) {
         const result = await clearEnhancedTracking();
@@ -309,11 +370,11 @@ module.exports = function attach(router, deps) {
     }
   });
 
-  router.get('/api/v1/comictagger/logs', (req, res) => {
+  router.get('/api/v1/tag-comics-now/logs', (req, res) => {
     res.json(getCtLogs());
   });
 
-  router.get('/api/v1/comictagger/pending', (req, res) => {
+  router.get('/api/v1/tag-comics-now/pending', (req, res) => {
     const pending = getPendingMatch();
     const running = isTaggerRunning ? isTaggerRunning() : false;
     res.json({
@@ -324,7 +385,7 @@ module.exports = function attach(router, deps) {
   });
 
   // Get detailed pending match info
-  router.get('/api/v1/comictagger/pending-details', async (req, res) => {
+  router.get('/api/v1/tag-comics-now/pending-details', async (req, res) => {
     try {
       const pending = getPendingMatch();
       if (!pending || !pending.waitingForResponse) {
@@ -348,7 +409,7 @@ module.exports = function attach(router, deps) {
   });
 
   // Dedicated endpoint for the first page preview
-  router.get('/api/v1/comictagger/preview', async (req, res) => {
+  router.get('/api/v1/tag-comics-now/preview', async (req, res) => {
     try {
       const pending = getPendingMatch();
       if (!pending) {
@@ -389,7 +450,7 @@ module.exports = function attach(router, deps) {
   });
 
   // Match cover enrichment fallback
-  router.post('/api/v1/comictagger/match-covers', async (req, res) => {
+  router.post('/api/v1/tag-comics-now/match-covers', async (req, res) => {
     try {
       const { matches } = req.body;
       if (!Array.isArray(matches)) {
@@ -408,13 +469,13 @@ module.exports = function attach(router, deps) {
   });
 
   // Naming & Folder Organization Rules
-  router.get('/api/v1/comictagger/naming-rules', (req, res) => {
+  router.get('/api/v1/tag-comics-now/naming-rules', (req, res) => {
     const fn = deps.getNamingRules || require('../../config').getNamingRules;
     const { DEFAULT_NAMING_RULES } = require('../../services/organization');
     res.json({ ok: true, rules: fn ? fn() : DEFAULT_NAMING_RULES });
   });
 
-  router.post('/api/v1/comictagger/naming-rules', async (req, res) => {
+  router.post('/api/v1/tag-comics-now/naming-rules', async (req, res) => {
     try {
       const { rules } = req.body || {};
       if (!rules || !Array.isArray(rules.tokens)) {
@@ -430,13 +491,13 @@ module.exports = function attach(router, deps) {
     }
   });
 
-  router.get('/api/v1/comictagger/folder-rules', (req, res) => {
+  router.get('/api/v1/tag-comics-now/folder-rules', (req, res) => {
     const fn = deps.getFolderRules || require('../../config').getFolderRules;
     const { DEFAULT_FOLDER_RULES } = require('../../services/organization');
     res.json({ ok: true, rules: fn ? fn() : DEFAULT_FOLDER_RULES });
   });
 
-  router.post('/api/v1/comictagger/folder-rules', async (req, res) => {
+  router.post('/api/v1/tag-comics-now/folder-rules', async (req, res) => {
     try {
       const { rules } = req.body || {};
       if (!rules || !Array.isArray(rules.hierarchy)) {
@@ -452,7 +513,7 @@ module.exports = function attach(router, deps) {
     }
   });
 
-  router.post('/api/v1/comictagger/naming-preview', (req, res) => {
+  router.post('/api/v1/tag-comics-now/naming-preview', (req, res) => {
     try {
       const { metadata = {}, rules } = req.body || {};
       const { formatComicFilename, DEFAULT_NAMING_RULES } = require('../../services/organization');
@@ -463,7 +524,7 @@ module.exports = function attach(router, deps) {
     }
   });
 
-  router.post('/api/v1/comictagger/folder-preview', (req, res) => {
+  router.post('/api/v1/tag-comics-now/folder-preview', (req, res) => {
     try {
       const { metadata = {}, rules } = req.body || {};
       const { formatFolderPath, DEFAULT_FOLDER_RULES } = require('../../services/organization');

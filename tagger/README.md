@@ -185,13 +185,15 @@ Configuration is managed via `scheduler_config.json` (or environment overrides):
 
 | Variable | Default | Purpose |
 |---|---|---|
-| `APP_HOST` | `127.0.0.1` | Bind address for Flask server |
-| `PORT` | `5000` | Port for Flask server |
+| `APP_HOST` | `0.0.0.0` | Bind address for the Flask server (LAN-reachable by default; set `127.0.0.1` to restrict to loopback). |
+| `APP_PORT` | `5000` | Port for the Flask server. |
 | `FLASK_DEBUG` | `0` | Debug mode toggle |
 | `DATA_DIR` | `tagger/` | Root storage for database and logs |
 | `TRACKING_DB_PATH` | `<DATA_DIR>/enhanced_tracking.db` | Path to tracking SQLite database |
 | `SCAN_LOGS_DIR` | `<DATA_DIR>/scan_logs` | Directory for JSON scan logs |
 | `SCHEDULER_CONFIG_PATH` | `<DATA_DIR>/scheduler_config.json` | Path to scheduler configuration file |
+
+**Note:** When the tagger runs embedded (spawned by Comics Now!), Comics Now! proxies to it via its configured service URL. If you change `APP_PORT`, change the matching **Service Port** in Comics Now! (*Tag Comics Now! → Settings & Sources*) so both sides agree.
 
 ---
 
@@ -250,7 +252,7 @@ Open [http://localhost:5000](http://localhost:5000) in your web browser to acces
 
 When used as part of Comics Now:
 - The Node.js server automatically manages and spawns `app.py` via `server/services/tagger-process.js`.
-- All tagger requests from Comics Now UI routes (`/comics-sutherlandgrove/api/comictagger/*`) proxy directly to the internal Python daemon on port 5000.
+- All tagger requests from Comics Now UI routes (`/comics-sutherlandgrove/api/tag-comics-now/*`) proxy directly to the internal Python daemon on port 5000.
 - When Comics Now is managed via systemd (`comics-now.service`), restarting the main service automatically handles the tagger worker process.
 
 ---

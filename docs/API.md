@@ -17,7 +17,7 @@ Comics Now! uses role-based authentication. Most endpoints require a valid user 
 Returns the complete library accessible to the current user, grouped by publisher and series.
 
 ### `GET /search`
-**Query Params:** `query` (search term), `field` (all, title, series, publisher, character)
+**Query Params:** `query` (search term)
 Returns a flat list of comics matching the query, filtered by user access.
 
 ### `GET /folders/:path`
@@ -29,7 +29,7 @@ Returns the contents of a directory (folders and comics) for Folder Mode browsin
 ## Reader & Content
 
 ### `GET /comics/:id/guided-view`
-Returns the JSON sidecar containing ML-detected panel and speech bubble coordinates for the specified comic.
+Returns the JSON sidecar containing panel and speech bubble coordinates for the specified comic (machine-detected or editor-authored). Supports `ETag` revalidation (returns `304 Not Modified` when unchanged), so coordinate updates are picked up immediately.
 
 ### `GET /comics/pages`
 **Query Params:** `path` (Base64 encoded)
@@ -147,6 +147,22 @@ Marks all comics within the specific reading list as read.
 ### `POST /reading-lists/export` / `POST /reading-lists/import`
 Handles JSON-based export/import of reading list definitions.
 
+### Bulk Operations
+- **POST `/reading-lists/bulk`**: Creates multiple reading lists at once.
+  - **Body:** `{ lists: [{ name, description?, comicIds? }], syncToAll? }` (`syncToAll` requires admin)
+- **POST `/reading-lists/delete-bulk`**: Deletes multiple reading lists by ID or name.
+  - **Body:** `{ listIds?, names?, globally? }` (`globally` requires admin)
+- **POST `/reading-lists/bulk-add-comics`**: Adds comics across multiple lists.
+  - **Body:** `{ operations: [{ listId, comicIds }] }` or `{ listIds, comicIds }`
+- **POST `/reading-lists/bulk-remove-comics`**: Removes comics across multiple lists (same body shapes as bulk-add).
+- **POST `/reading-lists/mark-read-bulk`**: Marks all comics in the given lists as read.
+  - **Body:** `{ listIds, read? }` (`read` defaults to `true`)
+- **POST `/reading-lists/sync-defaults`**: Ensures the built-in default reading lists exist for the current user.
+- **POST `/admin/reading-lists/sync-to-all`**: Syncs the default reading lists to every registered user (admin only).
+  - **Body:** `{ overwrite?, prune? }`
+- **POST `/admin/reading-lists/delete-globally`**: Deletes a reading list by name or ID for all users (admin only).
+  - **Body:** `{ name?, listId? }`
+
 ---
 
 ## Metadata (ComicVine)
@@ -159,8 +175,15 @@ Returns the stored metadata (ComicInfo.xml contents) for a comic.
 **Query Params:** `query`
 Performs a live search on ComicVine for volumes or issues.
 
+### `GET /search/external`
+**Query Params:** `source` (source ID, default `all`), `query`
+Searches external metadata sources through the Tag Comics Now! service; configured credentials (ComicVine, Google Books, Metron) are applied server-side.
+
 ### `GET /comicvine/volume/:id` / `GET /comicvine/issue/:id`
 Fetches detailed metadata and creator credits for a specific ComicVine resource.
+
+### `GET /comicvine/volume/:volumeId/issues`
+Lists all issues in a ComicVine volume.
 
 ---
 
@@ -170,7 +193,15 @@ Fetches detailed metadata and creator credits for a specific ComicVine resource.
 - **GET `/users`**: List all registered users.
 - **GET `/users/:userId/access`**: Get a user's hierarchical access permissions.
 - **POST `/users/:userId/access`**: Update a user's access permissions for specific publishers or series.
+- **GET `/users/:userId/stats`**: Per-user reading stats (opened/completed/in-progress, active days, per-day activity, recent activity). **Query Params:** `days` (window in days, default 30).
 - **GET `/library-tree`**: Returns the full publisher/series hierarchy for access management.
+
+### Impersonation
+Guards judge the real admin identity, not the impersonated user.
+- **GET `/admin/impersonate/status`**: Returns the current impersonation state (drives the app-wide banner).
+- **POST `/admin/impersonate/:userId`**: Starts impersonating a non-admin user (sets a signed cookie; start and stop are audited).
+- **POST `/admin/impersonate/stop`**: Stops impersonating and clears the impersonation cookie.
+- **GET `/admin/impersonate/audit`**: Returns the recent impersonation audit trail (latest 100 entries).
 
 ### Library Management
 - **POST `/scan`**: Triggers a library scan for new files.
@@ -180,25 +211,65 @@ Fetches detailed metadata and creator credits for a specific ComicVine resource.
 - **GET `/comics-directories`**: Lists accessible local directories.
 - **POST `/rename-cbz`**: Renames a single comic archive.
 - **GET `/rename/stream`**: SSE stream for rename operations.
+- **POST `/rename/clear`**: Clears the rename operation output log.
 - **POST `/move-comics`**: Bulk moves or restructures comics.
 - **GET `/move/stream`**: SSE stream for move operations.
+- **POST `/move/clear`**: Clears the move operation output log.
+- **GET `/operation-errors`**: Combined error log from rename and move operations, newest first.
+- **POST `/comics/info`**: Saves metadata for a comic (`?path=`, Base64): updates the database and writes `ComicInfo.xml` back into the archive (skipped in Folder Mode).
 - **POST `/admin/metadata/migrate`**: Migrates metadata between formats/storage.
 
-### Automation (ComicTagger & ML)
-- **POST `/comictagger/run`**: Starts the automated metadata tagging process.
-- **GET `/comictagger/schedule`**: Returns current automation schedule.
-- **POST `/comictagger/schedule`**: Updates the automation schedule.
-- **GET `/comictagger/pending`**: Returns the current match awaiting manual review.
-- **GET `/comictagger/preview`**: Returns preview data for tagging.
-- **POST `/comictagger/apply`**: Applies a selected metadata match to a comic.
-- **POST `/comictagger/skip`**: Skips the current pending match.
-- **POST `/comictagger/match-covers`**: Initiates cover matching process.
+### Automation (Tag Comics Now! & ML)
+- **POST `/tag-comics-now/run`**: Starts the automated metadata tagging process.
+- **GET `/tag-comics-now/schedule`**: Returns current automation schedule.
+- **POST `/tag-comics-now/schedule`**: Updates the automation schedule.
+- **GET `/tag-comics-now/pending`**: Returns the current match awaiting manual review.
+- **GET `/tag-comics-now/preview`**: Returns preview data for tagging.
+- **POST `/tag-comics-now/apply`**: Applies a selected metadata match to a comic.
+- **POST `/tag-comics-now/skip`**: Skips the current pending match.
+- **POST `/tag-comics-now/match-covers`**: Initiates cover matching process.
+- **GET `/tag-comics-now/sources`**: Lists the available metadata sources and which are enabled.
+- **GET `/tag-comics-now/scope-counts`**: Returns scan-scope counts (e.g. unmatched).
+- **POST `/tag-comics-now/cancel`**: Cancels the running tagging scan.
+- **POST `/tag-comics-now/search`**: Searches a metadata source directly.
+  - **Body:** `{ source, query }`
+- **GET `/tag-comics-now/pending-details`**: Returns detailed match information for the pending match under review.
+- **GET `/tag-comics-now/scan-logs`** / **GET `/tag-comics-now/scan-logs/:id`**: Lists scan history / returns a single scan log.
+- **POST `/tag-comics-now/clear-history`**: Clears the enhanced tracking history.
+- **GET `/tag-comics-now/logs`**: Returns the in-memory tagger log buffer.
+- **GET `/tag-comics-now/naming-rules`** / **POST `/tag-comics-now/naming-rules`**: Gets/updates the filename naming rules.
+- **GET `/tag-comics-now/folder-rules`** / **POST `/tag-comics-now/folder-rules`**: Gets/updates the folder hierarchy rules.
+- **POST `/tag-comics-now/naming-preview`** / **POST `/tag-comics-now/folder-preview`**: Previews the resulting filename/folder path for given metadata and rules.
 - **POST `/guided/run`**: Starts the machine learning scan for panel detection.
 - **POST `/guided/run-scope`**: Starts ML scan restricted to specific items.
+- **POST `/guided/cancel`**: Cancels the whole guided queue.
+- **POST `/guided/cancel-current`**: Skips only the comic currently being processed.
 - **GET `/guided/status`**: Returns the status of the Guided Reader background worker.
+- **GET `/guided/settings`** / **POST `/guided/settings`**: Gets/updates guided-view automation settings (auto-on-add and scan schedule).
+- **GET `/guided/logs`** / **POST `/guided/logs/clear`**: Returns/clears the guided worker log buffer.
+
+### AI Metadata (Gemini)
+- **GET `/gemini/config`**: Returns the Gemini integration settings.
+- **POST `/gemini/config`**: Updates Gemini settings (API key, model, cover matching, daily cap, terms acceptance).
+- **GET `/gemini/models`**: Lists the available Gemini Flash-Lite models.
+- Legacy aliases for the browser extension are also served under `/api/v1/_ext/gemini/*` and `/api/v1/_ext/cover-match/config`.
+
+### MCP Tools
+Used by the bundled MCP server for AI-assisted guided-view authoring and metadata tagging.
+- **GET `/comics/:id/guided-pages`**: Lists a comic's page names and guided-view status.
+- **GET `/comics/:id/page-image`**: Streams one native-resolution page image (`?page=`).
+- **POST `/comics/:id/guided-view`**: Writes an AI-authored guided-view sidecar.
+  - **Body:** `{ type, pages, coords? }` (`coords`: `normalized` (default) or `absolute`)
+- **POST `/comics/tags/batch`**: Reads stored metadata for multiple comics.
+  - **Body:** `{ comicIds }`
+- **GET `/comics/:id/tags`**: Reads the current metadata for a comic.
+- **POST `/comics/tags/bulk`**: Writes ComicInfo metadata for many comics.
+  - **Body:** `{ items: [{ comicId, fields, storage? }] }` or `{ comicIds, fields, storage? }` (`storage`: `sidecar` | `archive` | `db`)
+- **POST `/comics/:id/tags`**: Writes ComicInfo metadata for a comic.
+  - **Body:** `{ fields, storage? }`
 
 ### System
 - **GET `/settings`**: Retrieves global server settings.
 - **POST `/settings`**: Updates global settings (ComicVine API key, scan interval).
 - **GET `/logs`**: Returns system event logs.
-- **GET `/comictagger/stream`** / **GET `/guided/stream`**: Server-Sent Events (SSE) streams for real-time operation logs.
+- **GET `/tag-comics-now/stream`** / **GET `/guided/stream`**: Server-Sent Events (SSE) streams for real-time operation logs.

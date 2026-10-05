@@ -32,6 +32,8 @@ cp .env.example .env
 | `COMICS_TIMEOUT` | `60` | HTTP request timeout in seconds. |
 | `COMICS_EXTRA_HEADERS` | `{}` | Optional JSON dictionary of extra headers (e.g. Cloudflare Service Tokens). |
 
+- **Network mode** (`MCP_TRANSPORT` / `MCP_HOST` / `MCP_PORT`): the default `stdio` transport has no listening port. For network transports (`sse` or `streamable-http`), set `MCP_TRANSPORT`, `MCP_HOST` (default `127.0.0.1`), and `MCP_PORT` (default `8000`) in `.env`.
+
 ---
 
 ## Client Integration
@@ -70,10 +72,10 @@ claude mcp add comics-now -- /path/to/comics-now/mcp/run.sh
 - **Library & Search**: `search_comics`, `library_tree`, `list_users`, `get_user_access`, `list_reading_lists`, `get_reading_list`, `get_settings`, `get_logs`.
 - **Reading Lists**: `create_reading_list`, `create_reading_lists_bulk`, `update_reading_list`, `delete_reading_list`, `delete_reading_lists_bulk`, `sync_reading_lists_to_all_users`, `add_comics_to_reading_list`, `remove_comics_from_reading_list`, `reorder_reading_list_comics`.
 - **Reading Status**: `set_comic_status`, `set_series_status`, `set_reading_list_read_status`.
-- **External Metadata & ComicTagger**:
+- **External Metadata & Tag Comics Now!**:
   - `external_metadata_search(query, source="all")`: Multi-source live search across ComicVine, Metron, AniList, MangaUpdates, League of Comic Geeks, Marvel, and Google Books.
-  - `get_metadata_sources()`: Get list and configuration status of supported ComicTagger metadata plugins.
-  - `get_comictagger_pending_details()`: Inspect pending ComicTagger background identification job candidate matches and status.
+  - `get_metadata_sources()`: Get list and configuration status of supported Tag Comics Now! metadata plugins.
+  - `get_tag_comics_now_pending_details()`: Inspect pending Tag Comics Now! background identification job candidate matches and status.
 - **Gemini AI Visual Cover Matching**:
   - `get_gemini_status()`: Get Gemini Vision API configuration and status (API key configured, default model, prompt version).
   - `list_gemini_models(api_key=None)`: List available Google Gemini models supported for visual cover matching.

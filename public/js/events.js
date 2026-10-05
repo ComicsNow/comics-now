@@ -265,36 +265,36 @@ function switchCtTab(activeTab, activeContent, routePath) {
 }
 
 ctTabOutput?.addEventListener('click', () => {
-  switchCtTab(ctTabOutput, ctContentOutput, '/comictagger/output');
+  switchCtTab(ctTabOutput, ctContentOutput, '/tag-comics-now/output');
   const ctSyncFn = state.ctSyncLogsAndState || window.ctSyncLogsAndState;
   if (typeof ctSyncFn === 'function') ctSyncFn();
 });
 
 ctTabMatches?.addEventListener('click', () => {
-  switchCtTab(ctTabMatches, ctContentMatches, '/comictagger/matches');
+  switchCtTab(ctTabMatches, ctContentMatches, '/tag-comics-now/matches');
   if (ctMatchesBadge) ctMatchesBadge.classList.add('hidden');
   const fetchPendingMatchDetailsFn = state.fetchPendingMatchDetails || window.fetchPendingMatchDetails;
   if (typeof fetchPendingMatchDetailsFn === 'function') fetchPendingMatchDetailsFn(true);
 });
 
 ctTabSettings?.addEventListener('click', () => {
-  switchCtTab(ctTabSettings, ctContentSettings, '/comictagger');
+  switchCtTab(ctTabSettings, ctContentSettings, '/tag-comics-now');
 });
 
 if (typeof ctTabGemini !== 'undefined' && ctTabGemini) {
   ctTabGemini.addEventListener('click', () => {
-    switchCtTab(ctTabGemini, ctContentGemini, '/comictagger/gemini');
+    switchCtTab(ctTabGemini, ctContentGemini, '/tag-comics-now/gemini');
   });
 }
 
 ctTabLogs?.addEventListener('click', () => {
-  switchCtTab(ctTabLogs, ctContentLogs, '/comictagger/logs');
+  switchCtTab(ctTabLogs, ctContentLogs, '/tag-comics-now/logs');
   const loadScanLogsFn = state.loadScanLogs || window.loadScanLogs;
   if (typeof loadScanLogsFn === 'function') loadScanLogsFn();
 });
 
 ctTabManagement?.addEventListener('click', () => {
-  switchCtTab(ctTabManagement, ctContentManagement, '/comictagger/management');
+  switchCtTab(ctTabManagement, ctContentManagement, '/tag-comics-now/management');
   const startRenameFn = state.startRenameStream || window.startRenameStream;
   const startMoveFn = state.startMoveStream || window.startMoveStream;
   if (typeof startRenameFn === 'function') startRenameFn();
