@@ -138,10 +138,14 @@ async function extractUserFromJWT(req, res, next) {
 
   // ===== AUTH DISABLED MODE =====
   if (!isAuthEnabled()) {
-    // For testing: Allow mocking different users via X-Test-User-Id header
-    const testUserId = req.headers['x-test-user-id'];
-    const testUserEmail = req.headers['x-test-user-email'];
-    const testUserRole = req.headers['x-test-user-role'];
+    // For testing: Allow mocking different users via X-Test-User-Id header.
+    // Issue #6: only honor these in the test harness, never in production
+    // images — otherwise any client can impersonate an arbitrary userId.
+    const allowTestUserHeaders =
+      process.env.NODE_ENV === 'test' || process.env.ALLOW_TEST_USER_HEADERS === '1';
+    const testUserId = allowTestUserHeaders ? req.headers['x-test-user-id'] : undefined;
+    const testUserEmail = allowTestUserHeaders ? req.headers['x-test-user-email'] : undefined;
+    const testUserRole = allowTestUserHeaders ? req.headers['x-test-user-role'] : undefined;
 
     let userId = 'default-user';
     let email = 'local@localhost';
