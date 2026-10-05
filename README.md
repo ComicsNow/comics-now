@@ -32,6 +32,7 @@ Most digital comic servers were built a decade ago as basic file browsers. **Com
 * 🛡️ **Cloudflare Zero Trust Ready**: Zero open ports needed. Full integration with Cloudflare Access JWT authentication, granular user permissions (down to publisher and series), and admin impersonation.
 * 📂 **Metadata Mode & Folder Mode**: Organize your library by metadata tags (Publisher → Series → Issue) or mirror your physical directory tree directly.
 * 💻 **Client-Side Local Reader**: Drag and drop local CBZ/CBR files directly into the browser to read instantly with WebAssembly—no file upload required.
+* 📖 **E-Ink & Color E-Reader Modes**: Purpose-built anti-ghosting display modes for e-paper devices. **Monochrome** applies grayscale + contrast for black-and-white screens; **Color** boosts saturation for color e-paper. Kindle, Kobo, Onyx Boox, and PocketBook are auto-detected, and the choice persists per device.
 
 ---
 
@@ -127,7 +128,7 @@ Looking for detailed setup guides, configuration tables, or workflow deep dives?
 - [Metadata Mode vs. Folder Mode](docs/WIKI.md#5-libraries-folder-structures--scanning)
 - [Sidecar vs. Database vs. Archive Write-Back](docs/WIKI.md#6-supported-formats-auto-conversion--metadata-storage)
 - [Multi-Source Tagging & Auto-Renaming Engine](docs/WIKI.md#7-the-tagging-engine--file-organization)
-- [Smart Guided View & Reading Modes (Continuous, Manga, Bubble Zoom)](docs/WIKI.md#8-smart-guided-view--reading-modes)
+- [Smart Guided View & Reading Modes (Continuous, Manga, Bubble Zoom, E-Ink)](docs/WIKI.md#8-smart-guided-view--reading-modes)
 - [Curating & Syncing Reading Lists to All Users](docs/WIKI.md#9-reading-lists)
 - [Progressive Web App (PWA) Offline Installation](docs/WIKI.md#10-devices-progress-syncing--offline-pwa)
 - [UI Long-Press Context Menus & Actions](docs/WIKI.md#11-ui-navigation-views--long-press-menus)

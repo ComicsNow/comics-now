@@ -6,7 +6,7 @@ const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 
-describe('ComicTagger Management UI (Name & Folder Tabs, Token Ordering, Confirmation Modal)', () => {
+describe('Tag Comics Now! Management UI (Name & Folder Tabs, Token Ordering, Confirmation Modal)', () => {
   beforeEach(() => {
     document.body.innerHTML = `
       <div id="ct-modal">
@@ -53,7 +53,7 @@ describe('ComicTagger Management UI (Name & Folder Tabs, Token Ordering, Confirm
     `;
 
     global.fetch = jest.fn((url) => {
-      if (url.includes('/api/v1/comictagger/naming-rules')) {
+      if (url.includes('/api/v1/tag-comics-now/naming-rules')) {
         return Promise.resolve({
           ok: true,
           json: () => Promise.resolve({
@@ -67,7 +67,7 @@ describe('ComicTagger Management UI (Name & Folder Tabs, Token Ordering, Confirm
           })
         });
       }
-      if (url.includes('/api/v1/comictagger/folder-rules')) {
+      if (url.includes('/api/v1/tag-comics-now/folder-rules')) {
         return Promise.resolve({
           ok: true,
           json: () => Promise.resolve({
@@ -78,7 +78,7 @@ describe('ComicTagger Management UI (Name & Folder Tabs, Token Ordering, Confirm
           })
         });
       }
-      if (url.includes('/api/v1/comictagger/naming-preview')) {
+      if (url.includes('/api/v1/tag-comics-now/naming-preview')) {
         return Promise.resolve({
           ok: true,
           json: () => Promise.resolve({
@@ -87,7 +87,7 @@ describe('ComicTagger Management UI (Name & Folder Tabs, Token Ordering, Confirm
           })
         });
       }
-      if (url.includes('/api/v1/comictagger/folder-preview')) {
+      if (url.includes('/api/v1/tag-comics-now/folder-preview')) {
         return Promise.resolve({
           ok: true,
           json: () => Promise.resolve({

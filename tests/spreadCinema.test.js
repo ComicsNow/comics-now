@@ -137,3 +137,289 @@ describe('Ultra-Wide Spread Recognition & Cinema Pan Mechanics', () => {
     });
   });
 });
+
+describe('Fullscreen auto-pan — real module behavior in jsdom', () => {
+  const fs = require('fs');
+  const path = require('path');
+  const vm = require('vm');
+
+  const MODULE_PATH = path.resolve(__dirname, '../public/js/viewer/fullscreen.js');
+  const WIDE = { w: 6000, h: 2000 }; // ratio 3.0 on a 1200x900 viewer
+  const OVERFLOW_X = 1500; // (6000/2000)*900 - 1200
+
+  // Loads the real fullscreen.js in a vm sandbox wired to the jsdom document,
+  // the way the browser loads it (globals.js singletons become window props).
+  function boot(state = {}) {
+    document.body.innerHTML = `
+      <div id="fullscreen-viewer"></div>
+      <img id="fullscreen-image">
+      <div id="fullscreen-progress-indicator"></div>
+      <div id="fullscreen-page-counter"></div>
+      <button id="fullscreen-spread-badge" class="hidden">
+        <span id="fullscreen-spread-badge-text">Cinema Pan Spread</span>
+      </button>
+    `;
+    const viewer = document.getElementById('fullscreen-viewer');
+    const image = document.getElementById('fullscreen-image');
+    Object.defineProperty(viewer, 'clientWidth', { value: 1200, configurable: true });
+    Object.defineProperty(viewer, 'clientHeight', { value: 900, configurable: true });
+
+    const sandbox = { window, document, state, console, setTimeout, clearTimeout };
+    sandbox.globalThis = sandbox;
+    vm.createContext(sandbox);
+    const source = fs
+      .readFileSync(MODULE_PATH, 'utf8')
+      .replace(/import\s+[\s\S]*?from\s+['"][^'"]+['"];?/g, '')
+      .replace(/export\s+\{[\s\S]*?\};?/g, '');
+    new vm.Script(source).runInContext(sandbox);
+
+    window.fullscreenViewer = viewer;
+    window.fullscreenImage = image;
+    window.fullscreenProgressIndicator = document.getElementById('fullscreen-progress-indicator');
+    window.fullscreenPageCounter = document.getElementById('fullscreen-page-counter');
+
+    return {
+      viewer,
+      image,
+      badge: document.getElementById('fullscreen-spread-badge'),
+      badgeText: document.getElementById('fullscreen-spread-badge-text')
+    };
+  }
+
+  function setDims(image, w, h) {
+    Object.defineProperty(image, 'naturalWidth', { value: w, configurable: true });
+    Object.defineProperty(image, 'naturalHeight', { value: h, configurable: true });
+    Object.defineProperty(image, 'complete', { value: true, configurable: true });
+  }
+
+  // Mimics the real display flow: the image element gets a page src; the pan
+  // decision is per displayed image, so distinct pages need distinct srcs.
+  function showPage(env, name, w, h) {
+    env.image.src = `https://test.invalid/${name}.jpg`;
+    if (w) setDims(env.image, w, h);
+  }
+
+  const panning = (image) => image.classList.contains('cinema-img');
+
+  // The real viewer swaps images in two phases: the page status is announced
+  // first (image still the previous page), then the src swaps and the load
+  // event drives the display. The auto-pan must fire on the loaded image.
+  function displayViaRealFlow(env, pageNumber, name, w, h) {
+    window.updateFullscreenPageStatus(pageNumber, 10); // phase 1: status first
+    Object.defineProperty(env.image, 'naturalWidth', { value: 0, configurable: true });
+    Object.defineProperty(env.image, 'naturalHeight', { value: 0, configurable: true });
+    Object.defineProperty(env.image, 'complete', { value: false, configurable: true });
+    showPage(env, name); // phase 2: src swaps, image now loading
+    window.updateFullscreenPageStatus(pageNumber, 10); // burst: counter re-report
+    window.updateFullscreenPageStatus(pageNumber, 10);
+    setDims(env.image, w, h);
+    env.image.onload(); // phase 3: load event
+  }
+
+  test('auto-pans a wide spread page the moment fullscreen displays it', () => {
+    const env = boot();
+    showPage(env, 'page-3', WIDE.w, WIDE.h);
+
+    window.updateFullscreenPageStatus(3, 10);
+
+    expect(panning(env.image)).toBe(true);
+    expect(env.viewer.classList.contains('cinema-stage')).toBe(true);
+    expect(env.image.style.transform).toBe('translate3d(0px, 0, 0)');
+    expect(env.badge.classList.contains('hidden')).toBe(true);
+  });
+
+  test('auto-pans manga spreads right-to-left', () => {
+    const env = boot({ currentComic: { mangaMode: true } });
+    showPage(env, 'page-3', WIDE.w, WIDE.h);
+
+    window.updateFullscreenPageStatus(3, 10);
+
+    expect(panning(env.image)).toBe(true);
+    expect(env.image.style.transform).toBe(`translate3d(-${OVERFLOW_X}px, 0, 0)`);
+  });
+
+  test('does not pan portrait pages', () => {
+    const env = boot();
+    showPage(env, 'page-2', 1988, 3056);
+
+    window.updateFullscreenPageStatus(3, 10);
+
+    expect(panning(env.image)).toBe(false);
+    expect(env.image.style.transform).toBe('');
+  });
+
+  test('does not auto-pan a spread that already fits the screen', () => {
+    const env = boot();
+    showPage(env, 'page-3', 1300, 1000); // scaled width ~1170px < 1200px viewer
+
+    window.updateFullscreenPageStatus(3, 10);
+
+    expect(panning(env.image)).toBe(false);
+    expect(env.image.style.transform).toBe('');
+  });
+
+  test('waits for the image to load, then auto-pans', () => {
+    const env = boot();
+    Object.defineProperty(env.image, 'naturalWidth', { value: 0, configurable: true });
+    Object.defineProperty(env.image, 'naturalHeight', { value: 0, configurable: true });
+    Object.defineProperty(env.image, 'complete', { value: false, configurable: true });
+    showPage(env, 'page-3');
+
+    window.updateFullscreenPageStatus(3, 10);
+    expect(panning(env.image)).toBe(false);
+
+    setDims(env.image, WIDE.w, WIDE.h);
+    env.image.onload(); // the display path wires onload for the badge/auto-pan check
+
+    expect(panning(env.image)).toBe(true);
+    expect(env.image.style.transform).toBe('translate3d(0px, 0, 0)');
+  });
+
+  test('a page change stops the running pan and auto-pans the next spread', () => {
+    const env = boot();
+    showPage(env, 'page-3', WIDE.w, WIDE.h);
+    window.updateFullscreenPageStatus(3, 10);
+    expect(panning(env.image)).toBe(true);
+
+    showPage(env, 'page-4', WIDE.w, WIDE.h); // next page, same spread dims
+    window.updateFullscreenPageStatus(4, 10);
+
+    expect(panning(env.image)).toBe(true);
+    expect(env.image.style.transform).toBe('translate3d(0px, 0, 0)');
+  });
+
+  test('auto-pans when the real viewer swaps the image after announcing the page', () => {
+    const env = boot();
+    showPage(env, 'page-1', 1988, 3056); // current display: portrait
+    window.updateFullscreenPageStatus(1, 10);
+    expect(panning(env.image)).toBe(false);
+
+    displayViaRealFlow(env, 3, 'page-3', WIDE.w, WIDE.h);
+
+    expect(panning(env.image)).toBe(true);
+    expect(env.image.style.transform).toBe('translate3d(0px, 0, 0)');
+  });
+
+  test('stopping the pan does not immediately restart it (no loop)', async () => {
+    const env = boot();
+    showPage(env, 'page-3', WIDE.w, WIDE.h);
+    window.updateFullscreenPageStatus(3, 10);
+    expect(panning(env.image)).toBe(true);
+
+    window.stopCinemaPan();
+    expect(panning(env.image)).toBe(false);
+    expect(env.image.style.transform).toBe('');
+
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(panning(env.image)).toBe(false);
+    expect(env.image.style.transform).toBe('');
+    expect(env.badgeText.textContent).toBe('Cinema Pan Spread');
+  });
+
+  test('does not auto-pan while the fullscreen viewer is closed', () => {
+    const env = boot();
+    env.viewer.classList.add('hidden');
+    showPage(env, 'page-3', WIDE.w, WIDE.h);
+
+    window.updateFullscreenPageStatus(3, 10);
+
+    expect(panning(env.image)).toBe(false);
+  });
+
+  test('the manual badge toggle still starts and stops the pan', () => {
+    const env = boot();
+    setDims(env.image, WIDE.w, WIDE.h);
+    window.checkSpreadCinemaStatus();
+    expect(env.badge.classList.contains('hidden')).toBe(false);
+
+    window.toggleCinemaPan();
+    expect(panning(env.image)).toBe(true);
+
+    window.toggleCinemaPan();
+    expect(panning(env.image)).toBe(false);
+  });
+
+  test('a re-render of the same page does not reset the running pan', () => {
+    const env = boot();
+    showPage(env, 'page-3', WIDE.w, WIDE.h);
+    window.updateFullscreenPageStatus(3, 10);
+    expect(panning(env.image)).toBe(true);
+
+    env.image.style.transform = 'translate3d(-100px, 0, 0)'; // mid-pan position
+    window.updateFullscreenPageStatus(3, 10); // same page, re-render burst
+
+    expect(panning(env.image)).toBe(true);
+    expect(env.image.style.transform).toBe('translate3d(-100px, 0, 0)');
+    expect(env.badge.classList.contains('hidden')).toBe(true);
+  });
+
+  test('a same-page status update does not restart a manually stopped pan', () => {
+    const env = boot();
+    showPage(env, 'page-3', WIDE.w, WIDE.h);
+    window.updateFullscreenPageStatus(3, 10);
+    window.stopCinemaPan();
+    expect(panning(env.image)).toBe(false);
+
+    window.updateFullscreenPageStatus(3, 10);
+
+    expect(panning(env.image)).toBe(false);
+    expect(env.image.style.transform).toBe('');
+  });
+
+  test('the badge stays hidden while a pan is running', () => {
+    const env = boot();
+    showPage(env, 'page-3', WIDE.w, WIDE.h);
+    window.updateFullscreenPageStatus(3, 10);
+    expect(panning(env.image)).toBe(true);
+
+    window.checkSpreadCinemaStatus();
+
+    expect(env.badge.classList.contains('hidden')).toBe(true);
+  });
+
+  test('closing and reopening fullscreen on the same page auto-pans again', async () => {
+    const env = boot();
+    showPage(env, 'page-3', WIDE.w, WIDE.h);
+    window.updateFullscreenPageStatus(3, 10);
+    expect(panning(env.image)).toBe(true);
+
+    await window.closeFullscreen();
+    expect(panning(env.image)).toBe(false);
+
+    env.viewer.classList.remove('hidden');
+    window.updateFullscreenPageStatus(3, 10);
+
+    expect(panning(env.image)).toBe(true);
+  });
+
+  test('navigating away and back re-arms the auto-pan for the spread', () => {
+    const env = boot();
+    showPage(env, 'page-3', WIDE.w, WIDE.h);
+    window.updateFullscreenPageStatus(3, 10);
+    expect(panning(env.image)).toBe(true);
+
+    window.stopCinemaPan();
+    showPage(env, 'page-2', 1988, 3056); // portrait page in between
+    window.updateFullscreenPageStatus(2, 10);
+    expect(panning(env.image)).toBe(false);
+
+    showPage(env, 'page-3', WIDE.w, WIDE.h); // back to the spread
+    window.updateFullscreenPageStatus(3, 10);
+
+    expect(panning(env.image)).toBe(true);
+  });
+
+  test('a page change while the viewer is closed does not consume the auto-pan', () => {
+    const env = boot();
+    showPage(env, 'page-3', WIDE.w, WIDE.h);
+    env.viewer.classList.add('hidden');
+
+    window.updateFullscreenPageStatus(3, 10); // status update while closed
+    expect(panning(env.image)).toBe(false);
+
+    env.viewer.classList.remove('hidden');
+    window.updateFullscreenPageStatus(3, 10);
+
+    expect(panning(env.image)).toBe(true);
+  });
+});

@@ -7,8 +7,8 @@ const path = require('path');
 const vm = require('vm');
 const attachComicTaggerRoutes = require('../server/routes/admin/comictagger');
 
-describe('ComicTagger Review & Cancellation Integration Tests', () => {
-  describe('Admin ComicTagger Route Endpoints', () => {
+describe('Tag Comics Now! Review & Cancellation Integration Tests', () => {
+  describe('Admin Tag Comics Now! Route Endpoints', () => {
     let router;
     let deps;
     let pendingHandler;
@@ -22,13 +22,13 @@ describe('ComicTagger Review & Cancellation Integration Tests', () => {
 
       router = {
         get: jest.fn((path, ...args) => {
-          if (path === '/api/v1/comictagger/pending') pendingHandler = args[args.length - 1];
-          if (path === '/api/v1/comictagger/pending-details') pendingDetailsHandler = args[args.length - 1];
+          if (path === '/api/v1/tag-comics-now/pending') pendingHandler = args[args.length - 1];
+          if (path === '/api/v1/tag-comics-now/pending-details') pendingDetailsHandler = args[args.length - 1];
         }),
         post: jest.fn((path, ...args) => {
-          if (path === '/api/v1/comictagger/cancel') cancelHandler = args[args.length - 1];
-          if (path === '/api/v1/comictagger/apply') applyHandler = args[args.length - 1];
-          if (path === '/api/v1/comictagger/skip') skipHandler = args[args.length - 1];
+          if (path === '/api/v1/tag-comics-now/cancel') cancelHandler = args[args.length - 1];
+          if (path === '/api/v1/tag-comics-now/apply') applyHandler = args[args.length - 1];
+          if (path === '/api/v1/tag-comics-now/skip') skipHandler = args[args.length - 1];
         })
       };
 
@@ -54,7 +54,7 @@ describe('ComicTagger Review & Cancellation Integration Tests', () => {
       attachComicTaggerRoutes(router, deps);
     });
 
-    test('GET /api/v1/comictagger/pending returns pending match details even when scan is not running', () => {
+    test('GET /api/v1/tag-comics-now/pending returns pending match details even when scan is not running', () => {
       const req = {};
       const res = { json: jest.fn() };
 
@@ -69,7 +69,7 @@ describe('ComicTagger Review & Cancellation Integration Tests', () => {
       );
     });
 
-    test('GET /api/v1/comictagger/pending-details omits bulky previewBuffer from JSON payload', async () => {
+    test('GET /api/v1/tag-comics-now/pending-details omits bulky previewBuffer from JSON payload', async () => {
       const req = {};
       const res = {
         json: jest.fn(),
@@ -89,7 +89,7 @@ describe('ComicTagger Review & Cancellation Integration Tests', () => {
       expect(jsonArg.previewBuffer).toBeUndefined();
     });
 
-    test('POST /api/v1/comictagger/cancel triggers cancelComicTagger and responds ok', async () => {
+    test('POST /api/v1/tag-comics-now/cancel triggers cancelComicTagger and responds ok', async () => {
       const req = {};
       const res = { json: jest.fn() };
 
@@ -99,7 +99,7 @@ describe('ComicTagger Review & Cancellation Integration Tests', () => {
       expect(res.json).toHaveBeenCalledWith({ ok: true, cancelled: true });
     });
 
-    test('POST /api/v1/comictagger/apply applies user selection and responds ok', async () => {
+    test('POST /api/v1/tag-comics-now/apply applies user selection and responds ok', async () => {
       const req = { body: { selections: ['1'] } };
       const res = { json: jest.fn() };
 
@@ -109,7 +109,7 @@ describe('ComicTagger Review & Cancellation Integration Tests', () => {
       expect(res.json).toHaveBeenCalledWith({ ok: true });
     });
 
-    test('POST /api/v1/comictagger/skip skips pending match and responds ok', async () => {
+    test('POST /api/v1/tag-comics-now/skip skips pending match and responds ok', async () => {
       const req = {};
       const res = { json: jest.fn() };
 
@@ -162,7 +162,7 @@ describe('ComicTagger Review & Cancellation Integration Tests', () => {
         fetch: jest.fn(),
         state: { API_BASE_URL: '' },
         escapeHtml,
-        getRelativePath: () => '/comictagger',
+        getRelativePath: () => '/tag-comics-now',
         ctButton: document.createElement('button'),
         ctModal: document.createElement('div'),
         ctScheduleInput: document.createElement('input'),

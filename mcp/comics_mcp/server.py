@@ -62,7 +62,7 @@ _DESTRUCTIVE = [
     ("POST", re.compile(r"/api/v1/move-comics$")),
     ("POST", re.compile(r"/api/v1/move/")),
     ("POST", re.compile(r"/api/v1/rename-cbz$")),
-    ("POST", re.compile(r"/api/v1/comictagger/(apply|run|match-covers|schedule|skip)$")),
+    ("POST", re.compile(r"/api/v1/tag-comics-now/(apply|run|match-covers|schedule|skip)$")),
     ("POST", re.compile(r"/api/v1/admin/metadata/migrate$")),
     ("POST", re.compile(r"/api/v1/guided/run")),
     # Config / bulk-mutating endpoints (not file-destroying, but high blast
@@ -251,9 +251,9 @@ def get_logs(level: str = "ALL", category: str = "ALL") -> str:
 
 
 @mcp.tool()
-def comictagger_pending() -> str:
-    """Get comics pending tagger review / the current pending match."""
-    return _dump(_request("GET", "/api/v1/comictagger/pending"))
+def tag_comics_now_pending() -> str:
+    """Get comics pending Tag Comics Now! review / the current pending match."""
+    return _dump(_request("GET", "/api/v1/tag-comics-now/pending"))
 
 
 @mcp.tool()
@@ -280,13 +280,13 @@ def external_metadata_search(query: str, source: str = "all") -> str:
 @mcp.tool()
 def get_metadata_sources() -> str:
     """Get all available external metadata sources and their configuration status."""
-    return _dump(_request("GET", "/api/v1/comictagger/sources"))
+    return _dump(_request("GET", "/api/v1/tag-comics-now/sources"))
 
 
 @mcp.tool()
-def get_comictagger_pending_details() -> str:
+def get_tag_comics_now_pending_details() -> str:
     """Get full details, candidates, cover URLs, and match confidence for the comic currently pending review."""
-    return _dump(_request("GET", "/api/v1/comictagger/pending-details"))
+    return _dump(_request("GET", "/api/v1/tag-comics-now/pending-details"))
 
 
 @mcp.tool()
@@ -307,8 +307,8 @@ def list_gemini_models(api_key: Optional[str] = None) -> str:
 @mcp.tool()
 def get_organization_rules() -> str:
     """Get active comic file naming tokens and folder hierarchy rules."""
-    naming = _request("GET", "/api/v1/comictagger/naming-rules")
-    folder = _request("GET", "/api/v1/comictagger/folder-rules")
+    naming = _request("GET", "/api/v1/tag-comics-now/naming-rules")
+    folder = _request("GET", "/api/v1/tag-comics-now/folder-rules")
     naming_rules = (
         naming.get("data", {}).get("rules")
         if isinstance(naming, dict) and isinstance(naming.get("data"), dict)
@@ -352,8 +352,8 @@ def preview_comic_organization(metadata: dict) -> str:
         elif target in metadata and src not in normalized:
             normalized[src] = metadata[target]
 
-    filename_resp = _request("POST", "/api/v1/comictagger/naming-preview", body={"metadata": normalized})
-    folder_resp = _request("POST", "/api/v1/comictagger/folder-preview", body={"metadata": normalized})
+    filename_resp = _request("POST", "/api/v1/tag-comics-now/naming-preview", body={"metadata": normalized})
+    folder_resp = _request("POST", "/api/v1/tag-comics-now/folder-preview", body={"metadata": normalized})
 
     filename = None
     if isinstance(filename_resp, dict):
@@ -703,13 +703,13 @@ def set_series_status(
 
 # --- Part C: tagging ---------------------------------------------------------
 #
-# Cover-driven identification (no ComicTagger/ComicVine): the model extracts the
+# Cover-driven identification (no Tag Comics Now!/ComicVine): the model extracts the
 # cover image, recognises it (title, issue #, publisher, cover artist, logos,
 # distinctive art), confirms the exact series/issue via web search, then writes
 # the metadata back with set_tags.
 
 TAG_WORKFLOW_DOC = """\
-Identify-and-tag a comic from its cover, without ComicTagger/ComicVine:
+Identify-and-tag a comic from its cover, without Tag Comics Now!/ComicVine:
 
 1. get_cover_image(comic_id) -> LOOK at the returned cover. Read every clue:
    series title, issue number, publisher/imprint logos, cover artist credit,

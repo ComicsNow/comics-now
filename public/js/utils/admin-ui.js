@@ -39,7 +39,7 @@ export function hideAdminUI() {
 
   // User is NOT admin - hide admin controls
 
-  // Hide CT (ComicTagger) button (admin only)
+  // Hide CT (Tag Comics Now!) button (admin only)
   const ctButton = document.getElementById('ct-button');
   if (ctButton) {
     ctButton.style.display = 'none';

@@ -6,7 +6,7 @@ const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 
-describe('ComicTagger scoped scan mode UI', () => {
+describe('Tag Comics Now! scoped scan mode UI', () => {
   let sandbox;
   let ctModule;
   let eventSourceInstances;
@@ -71,7 +71,7 @@ describe('ComicTagger scoped scan mode UI', () => {
       fetch: jest.fn(),
       state: { API_BASE_URL: '' },
       escapeHtml,
-      getRelativePath: () => '/comictagger',
+      getRelativePath: () => '/tag-comics-now',
       EventSource: FakeEventSource,
       setTimeout: jest.fn(() => 0),
       clearTimeout: jest.fn(),
@@ -124,7 +124,7 @@ describe('ComicTagger scoped scan mode UI', () => {
   }
 
   function lastRunBody() {
-    const calls = fetchCallsFor('/comictagger/run');
+    const calls = fetchCallsFor('/tag-comics-now/run');
     if (calls.length === 0) return null;
     return JSON.parse(calls[calls.length - 1][1].body);
   }
@@ -202,7 +202,7 @@ describe('ComicTagger scoped scan mode UI', () => {
   test('openCTModal refreshes the unmatched scope count', async () => {
     sandbox.fetch.mockImplementation(async (url) => {
       if (url.includes('/scope-counts')) return okJson({ ok: true, unmatched: 4 });
-      if (url.includes('/comictagger/logs')) return okJson([]);
+      if (url.includes('/tag-comics-now/logs')) return okJson([]);
       return okJson({ waitingForResponse: false, isRunning: false });
     });
 
@@ -230,11 +230,11 @@ describe('ComicTagger scoped scan mode UI', () => {
   test('a Results completion log line triggers a scope-count refresh', async () => {
     ctModule.ctModal.classList.remove('hidden');
     sandbox.fetch.mockImplementation(async (url) => {
-      if (url.includes('/comictagger/logs')) {
+      if (url.includes('/tag-comics-now/logs')) {
         return okJson([{ timestamp: '2026-10-03T10:00:00.000Z', message: 'Results: 10 comics processed' }]);
       }
       if (url.includes('/scope-counts')) return okJson({ ok: true, unmatched: 6 });
-      if (url.includes('/comictagger/pending')) {
+      if (url.includes('/tag-comics-now/pending')) {
         return okJson({ waitingForResponse: false, isRunning: true });
       }
       return okJson({});

@@ -124,34 +124,34 @@ function registerRoutes() {
       if (usersTab) usersTab.click();
     });
 
-    global.router.addRoute('/comictagger', () => {
+    global.router.addRoute('/tag-comics-now', () => {
       if (typeof global.openCTModal === 'function') global.openCTModal();
       if (ctTabSettings) ctTabSettings.click();
     });
  
-    global.router.addRoute('/comictagger/gemini', () => {
+    global.router.addRoute('/tag-comics-now/gemini', () => {
       if (typeof global.openCTModal === 'function') global.openCTModal();
       const tab = document.getElementById('ct-tab-gemini');
       if (tab) tab.click();
     });
 
-    global.router.addRoute('/comictagger/matches', () => {
+    global.router.addRoute('/tag-comics-now/matches', () => {
       if (typeof global.openCTModal === 'function') global.openCTModal();
       if (ctTabMatches) ctTabMatches.click();
     });
 
-    global.router.addRoute('/comictagger/output', () => {
+    global.router.addRoute('/tag-comics-now/output', () => {
       if (typeof global.openCTModal === 'function') global.openCTModal();
       if (ctTabOutput) ctTabOutput.click();
     });
 
-    global.router.addRoute('/comictagger/logs', () => {
+    global.router.addRoute('/tag-comics-now/logs', () => {
       if (typeof global.openCTModal === 'function') global.openCTModal();
       const tab = document.getElementById('ct-tab-logs');
       if (tab) tab.click();
     });
 
-    global.router.addRoute('/comictagger/management', () => {
+    global.router.addRoute('/tag-comics-now/management', () => {
       if (typeof global.openCTModal === 'function') global.openCTModal();
       if (ctTabManagement) ctTabManagement.click();
     });

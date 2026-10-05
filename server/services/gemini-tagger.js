@@ -1,10 +1,10 @@
 /**
- * Tagger Hook: Transparent Gemini Vision cover matching for standard ComicTagger scans
+ * Tagger Hook: Transparent Gemini Vision cover matching for standard Tag Comics Now! scans
  *
  * Hooks global fetch requests to the Python tagger sidecar (/api/tag-file-stream and /api/tag-file).
  * When Gemini API key is configured and daily quota is available:
  * 1. Adjusts request thresholds so Python gathers all candidates without prematurely auto-tagging with pHash.
- * 2. Streams progress in real-time to the ComicTagger console.
+ * 2. Streams progress in real-time to the Tag Comics Now! console.
  * 3. Compares the local cover art against candidate covers using Gemini Multimodal Vision.
  * 4. Respects live tagger thresholds (upperThreshold auto-accept, lowerThreshold review, below lower threshold reject).
  * 5. Calls /api/apply-tag on auto-accept so ComicInfo.xml is written.
@@ -478,7 +478,7 @@ function installTaggerHook(ctx) {
     }
   };
 
-  logger('INFO', 'EXT_COVER', '✓ Gemini Vision transparent cover matcher hooked into ComicTagger scan.');
+  logger('INFO', 'EXT_COVER', '✓ Gemini Vision transparent cover matcher hooked into Tag Comics Now! scan.');
 }
 
 module.exports = { installTaggerHook, installGeminiTagger: installTaggerHook };

@@ -6,7 +6,7 @@ const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 
-describe('ComicTagger frontend log rendering, dedupe, and confirm flow', () => {
+describe('Tag Comics Now! frontend log rendering, dedupe, and confirm flow', () => {
   let sandbox;
   let ctModule;
   let eventSourceInstances;
@@ -66,7 +66,7 @@ describe('ComicTagger frontend log rendering, dedupe, and confirm flow', () => {
       fetch: jest.fn(),
       state: { API_BASE_URL: '' },
       escapeHtml,
-      getRelativePath: () => '/comictagger',
+      getRelativePath: () => '/tag-comics-now',
       EventSource: FakeEventSource,
       // Timers are captured instead of scheduled so module-level polling
       // (interval for pending indicator, 2s initial check) never interferes.
@@ -148,7 +148,7 @@ describe('ComicTagger frontend log rendering, dedupe, and confirm flow', () => {
     ];
 
     sandbox.fetch.mockImplementation(async (url) => {
-      if (url.includes('/comictagger/logs')) {
+      if (url.includes('/tag-comics-now/logs')) {
         const payload = sandbox.fetch.mock.calls.filter(([u]) => u.includes('/logs')).length > 1
           ? resolvedLogs
           : waitingLogs;
@@ -185,10 +185,10 @@ describe('ComicTagger frontend log rendering, dedupe, and confirm flow', () => {
     ];
 
     sandbox.fetch.mockImplementation(async (url) => {
-      if (url.includes('/comictagger/logs')) {
+      if (url.includes('/tag-comics-now/logs')) {
         return { ok: true, status: 200, json: async () => logPayload };
       }
-      if (url.includes('/comictagger/pending')) {
+      if (url.includes('/tag-comics-now/pending')) {
         return { ok: true, status: 200, json: async () => ({ waitingForResponse: false, isRunning: false }) };
       }
       return { ok: true, status: 200, json: async () => ({}) };
@@ -221,7 +221,7 @@ describe('ComicTagger frontend log rendering, dedupe, and confirm flow', () => {
   test('SSE onmessage replaces an id-stamped line in place', async () => {
     const ts = '2026-10-03T10:00:00.000Z';
     sandbox.fetch.mockImplementation(async (url) => {
-      if (url.includes('/comictagger/logs')) {
+      if (url.includes('/tag-comics-now/logs')) {
         return { ok: true, status: 200, json: async () => [] };
       }
       return { ok: true, status: 200, json: async () => ({ waitingForResponse: false, isRunning: false }) };
@@ -262,7 +262,7 @@ describe('ComicTagger frontend log rendering, dedupe, and confirm flow', () => {
     const p2 = ctModule.handleCtConfirmYes();
     await Promise.all([p1, p2]);
 
-    expect(fetchCallsFor('/comictagger/apply').length).toBe(1);
+    expect(fetchCallsFor('/tag-comics-now/apply').length).toBe(1);
     expect(document.getElementById('ct-confirm-bar').classList.contains('hidden')).toBe(true);
   });
 
@@ -288,10 +288,10 @@ describe('ComicTagger frontend log rendering, dedupe, and confirm flow', () => {
 
     // The single-flight guard must release after a failure so the user can retry
     await ctModule.handleCtConfirmYes();
-    expect(fetchCallsFor('/comictagger/skip').length).toBe(2);
+    expect(fetchCallsFor('/tag-comics-now/skip').length).toBe(2);
   });
 
-  test('events.js no longer registers duplicate click listeners for ComicTagger controls', () => {
+  test('events.js no longer registers duplicate click listeners for Tag Comics Now! controls', () => {
     const eventsSource = fs.readFileSync(path.resolve(__dirname, '../public/js/events.js'), 'utf8');
     const ownedByComictagger = [
       'ctSaveBtn',
