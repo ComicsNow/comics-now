@@ -8,6 +8,9 @@ on:
     # (Path filters are not evaluated for tag pushes.)
     paths-ignore:
       - '.github/**'
+  # Run the test job on PRs too (publish is skipped for PRs, see the job's `if`).
+  pull_request:
+    branches: ['main']
   workflow_dispatch:
 
 env:
@@ -15,7 +18,27 @@ env:
   IMAGE_NAME: ${{ github.repository }}
 
 jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run test suite
+        run: npm test
+
   build-and-push-image:
+    needs: test
+    # Never publish an image for a pull request — PRs only run the test job.
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     permissions:
       contents: read
