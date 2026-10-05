@@ -2,37 +2,9 @@
 // Features: CBR→CBZ conversion, thumbnails, dynamic baseUrl injection, full API used by the SPA.
 // When the rain pours, cozy up with Comics Now.
 
-/**
- * Self-healing dependency check.
- * If a required module is missing, attempt to install it before booting.
- */
-(function checkDeps() {
-  // Critical modules that must be present for the app to start
-  const criticalDeps = ['express', 'cors', 'helmet', 'onnxruntime-node', 'sharp', 'better-sqlite3', 'express-rate-limit'];
-  let missing = false;
-  for (const dep of criticalDeps) {
-    try {
-      require.resolve(dep);
-    } catch (e) {
-      missing = true;
-      break;
-    }
-  }
-
-  if (missing) {
-    console.warn('\x1b[33m%s\x1b[0m', '--- MISSING NODE MODULES DETECTED ---');
-    console.log('Required modules are missing. Attempting to install them automatically...');
-    try {
-      require('child_process').execSync('npm install --production', { stdio: 'inherit' });
-      console.log('\x1b[32m%s\x1b[0m', '--- INSTALL COMPLETE ---');
-      console.log('Dependencies have been updated. Please restart the server.');
-      process.exit(0);
-    } catch (err) {
-      console.error('Failed to auto-install modules. Please run "npm install" manually.');
-      process.exit(1);
-    }
-  }
-})();
+// Fail fast (non-zero exit) if a critical module is missing, with a clear
+// "run npm ci" message. See server/startup/check-critical-deps.js (Issue #7).
+require('./server/startup/check-critical-deps').checkCriticalDeps();
 
 const express = require('express');
 const cors = require('cors');
