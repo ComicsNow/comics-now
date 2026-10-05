@@ -38,8 +38,6 @@
       "audience": "your-application-audience-tag-from-cloudflare"
     },
     "trustedIPs": [
-      "127.0.0.1",
-      "::1",
       "192.168.1.*"
     ]
   }
