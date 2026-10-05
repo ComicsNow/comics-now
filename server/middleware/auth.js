@@ -175,11 +175,21 @@ async function extractUserFromJWT(req, res, next) {
   if (!jwtToken) {
     const trustedIPs = getTrustedIPs();
     if (trustedIPs.length > 0) {
-      // Validate direct socket IP to prevent WAN X-Forwarded-For header spoofing
+      // Issue #10: the trusted-IP bypass must only apply to requests that are
+      // demonstrably DIRECT. Behind a local reverse proxy/tunnel (cloudflared,
+      // nginx, Caddy) the TCP peer is always the proxy (e.g. 127.0.0.1), so
+      // trusting the socket address would make every forwarded, unauthenticated
+      // request admin. Any forwarding header means we cannot prove the request
+      // is direct, so we refuse the bypass and fall through to JWT/401.
+      const isForwarded = Boolean(
+        req.headers['x-forwarded-for'] ||
+        req.headers['forwarded'] ||
+        req.headers['cf-connecting-ip']
+      );
       const directSocketIP = (req.socket?.remoteAddress || req.connection?.remoteAddress)?.replace(/^::ffff:/, '');
       const clientIP = req.ip?.replace(/^::ffff:/, '');
-      const isTrusted = isIPInTrustedList(directSocketIP, trustedIPs) ||
-                        (!req.headers['x-forwarded-for'] && isIPInTrustedList(clientIP, trustedIPs));
+      const isTrusted = !isForwarded &&
+        (isIPInTrustedList(directSocketIP, trustedIPs) || isIPInTrustedList(clientIP, trustedIPs));
 
       if (isTrusted) {
         req.user = {
