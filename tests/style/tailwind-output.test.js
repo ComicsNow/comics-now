@@ -22,9 +22,14 @@
  *     aspect-[2/3] -> aspect-2/3, z-[9999] -> z-9999,
  *     break-words -> wrap-break-word
  *
+ *   semantics-preserving rename applied (Phase 3 manual item):
+ *     outline-none -> outline-hidden — v4's outline-none is
+ *     `outline-style:none` and drops v3's forced-colours fallback
+ *     (transparent 2px outline); v4's outline-hidden restores it via an
+ *     `@media (forced-colors: active)` block, matching v3's outline-none.
+ *
  *   unchanged in v4 (no rename needed): bare rounded/shadow keep their v3
- *     values; outline-none still hides the outline; placeholder-<color>
- *     remains available.
+ *     values (probed against v4.3.3); placeholder-<color> remains available.
  *
  * Runs the same CLI binary the `build:css` script uses (node_modules/.bin/
  * `tailwindcss`) into a TEMP output file — public/tailwind.css is never
@@ -56,6 +61,8 @@ const RENAMED_SELECTORS = [
   'z-9999',
   'bg-gray-900/75',
   'bg-black/50',
+  'outline-hidden',
+  'focus:outline-hidden',
 ];
 
 // Utilities whose names are unchanged but that must keep working.
@@ -64,8 +71,6 @@ const KEPT_SELECTORS = [
   'border',
   'rounded',
   'shadow',
-  'outline-none',
-  'focus:outline-none',
   'hidden',
   'grid',
   'text-white',

@@ -13,3 +13,20 @@
 @import "tailwindcss" source(none);
 @source "../public/**/*.{html,js}";
 @source not "../public/dist";
+
+/**
+ * v3 parity shim, from the v4 upgrade guide: v3's Preflight defaulted border
+ * colors to gray-200, v4 defaults to `currentColor`. This restores the v3
+ * default for every `border-*` utility that doesn't set a color. The var()
+ * reference also keeps `--color-gray-200` in the emitted theme block (v4
+ * tree-shakes unused variables), so the fallback is only a safety net.
+ */
+@layer base {
+  *,
+  ::after,
+  ::before,
+  ::backdrop,
+  ::file-selector-button {
+    border-color: var(--color-gray-200, currentColor);
+  }
+}

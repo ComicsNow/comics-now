@@ -75,7 +75,7 @@ function createFormRow(name, value = '', type = 'text') {
   }
   input.name = name;
   input.id = `meta-${name}`;
-  input.className = 'bg-gray-700 text-white p-2 rounded-lg w-full focus:outline-none focus:ring-2 focus:ring-purple-500';
+  input.className = 'bg-gray-700 text-white p-2 rounded-lg w-full focus:outline-hidden focus:ring-2 focus:ring-purple-500';
   input.value = value ?? '';
 
   div.appendChild(input);
@@ -123,7 +123,7 @@ function createChipInputRow(name, initialCSV = '') {
   const input = document.createElement('input');
   input.type = 'text';
   input.placeholder = `Add ${name.toLowerCase()}…`;
-  input.className = 'bg-transparent outline-none flex-1 min-w-[120px]';
+  input.className = 'bg-transparent outline-hidden flex-1 min-w-[120px]';
   box.appendChild(input);
 
   const chips = [];
