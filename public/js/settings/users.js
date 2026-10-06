@@ -42,14 +42,14 @@ export async function refreshUsersList() {
         <div class="min-w-0">
           <div class="flex items-start justify-between gap-2 mb-2 min-w-0">
             <div class="flex items-center gap-2 min-w-0 flex-1">
-              <div class="p-2 rounded-full bg-purple-600/10 text-purple-400 flex-shrink-0">
+              <div class="p-2 rounded-full bg-purple-600/10 text-purple-400 shrink-0">
                 <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                 </svg>
               </div>
               <span class="text-white font-bold text-sm sm:text-base break-all leading-snug">${escapeHtml(user.email)}</span>
             </div>
-            <span class="px-2 py-0.5 text-[11px] font-bold rounded-full uppercase tracking-wider ${user.role === 'admin' ? 'bg-purple-600 text-white' : 'bg-gray-700 text-gray-300'} flex-shrink-0 ml-auto">
+            <span class="px-2 py-0.5 text-[11px] font-bold rounded-full uppercase tracking-wider ${user.role === 'admin' ? 'bg-purple-600 text-white' : 'bg-gray-700 text-gray-300'} shrink-0 ml-auto">
               ${escapeHtml(user.role)}
             </span>
           </div>
@@ -65,7 +65,7 @@ export async function refreshUsersList() {
           </div>
         </div>
         <div class="flex flex-wrap items-center gap-2 pt-1 pl-9 sm:pl-10 border-t border-gray-700/30">
-          <button type="button" class="user-permissions-btn px-3 py-1.5 text-xs font-semibold rounded-lg bg-purple-600/40 text-purple-100 hover:bg-purple-600/60 border border-purple-500/60 shadow-sm transition-all flex items-center gap-1.5" title="Edit Permissions">
+          <button type="button" class="user-permissions-btn px-3 py-1.5 text-xs font-semibold rounded-lg bg-purple-600/40 text-purple-100 hover:bg-purple-600/60 border border-purple-500/60 shadow-xs transition-all flex items-center gap-1.5" title="Edit Permissions">
             <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5 text-purple-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
             </svg>

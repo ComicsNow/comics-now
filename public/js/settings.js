@@ -135,7 +135,7 @@ async function refreshLibraryFolders() {
     list.innerHTML = data.libraries.map(lib => `
       <div class="flex items-center justify-between bg-gray-800/50 p-3 rounded-lg border border-gray-700/50 hover:border-purple-500/30 transition-all group">
         <div class="flex items-center min-w-0 flex-1">
-          <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 mr-3 text-purple-400 opacity-70 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 mr-3 text-purple-400 opacity-70 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
           </svg>
           <div class="min-w-0 flex-1">
@@ -143,7 +143,7 @@ async function refreshLibraryFolders() {
             <div class="text-[10px] uppercase tracking-wider text-gray-500 font-bold">${lib.hierarchyMode === 'folder' ? 'Folder Mode' : 'Metadata Mode'}</div>
           </div>
         </div>
-        <button class="remove-library-btn text-gray-500 hover:text-red-400 font-bold px-2 transition-colors flex-shrink-0" data-path="${lib.path}" title="Remove Library">&times;</button>
+        <button class="remove-library-btn text-gray-500 hover:text-red-400 font-bold px-2 transition-colors shrink-0" data-path="${lib.path}" title="Remove Library">&times;</button>
       </div>
     `).join('') || '<p class="text-sm text-gray-500 italic">No library folders added.</p>';
 
