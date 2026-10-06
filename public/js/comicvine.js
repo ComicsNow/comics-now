@@ -38,7 +38,7 @@ function renderMetadataDisplay(metadata, clearForm = true) {
 function openCoverPreviewModal(imageUrl, title) {
   const backdrop = document.createElement('div');
   backdrop.id = 'cover-preview-modal';
-  backdrop.className = 'fixed inset-0 flex items-center justify-center bg-black/85 backdrop-blur-sm transition-opacity duration-300 opacity-0';
+  backdrop.className = 'fixed inset-0 flex items-center justify-center bg-black/85 backdrop-blur-xs transition-opacity duration-300 opacity-0';
   backdrop.style.zIndex = '99999';
   
   const content = document.createElement('div');
@@ -145,7 +145,7 @@ function renderSourceFilterTabs(results) {
   const isAllActive = (cvState.activeSourceFilter || 'all') === 'all';
   allBtn.className = `px-2.5 py-1 text-xs font-semibold rounded-full transition-colors cursor-pointer ${
     isAllActive
-      ? 'bg-red-600 text-white shadow-sm'
+      ? 'bg-red-600 text-white shadow-xs'
       : 'bg-gray-800 text-gray-400 hover:bg-gray-700 hover:text-white'
   }`;
   allBtn.textContent = `All (${results.length})`;
@@ -164,7 +164,7 @@ function renderSourceFilterTabs(results) {
     const isActive = cvState.activeSourceFilter === src;
     btn.className = `px-2.5 py-1 text-xs font-semibold rounded-full transition-colors cursor-pointer ${
       isActive
-        ? 'bg-red-600 text-white shadow-sm'
+        ? 'bg-red-600 text-white shadow-xs'
         : 'bg-gray-800 text-gray-400 hover:bg-gray-700 hover:text-white'
     }`;
     btn.textContent = `${info.name} (${count})`;
@@ -226,7 +226,7 @@ function renderResultsList() {
     const baseRow = document.createElement('div');
     baseRow.className = 'flex items-center space-x-3 cursor-pointer';
     baseRow.innerHTML = `
-      ${coverUrl ? `<img src="${escapeHtml(coverUrl)}" alt="cover" class="w-10 h-14 object-cover rounded flex-shrink-0 hover:brightness-110 transition-all shadow hover:shadow-lg"/>` : ''}
+      ${coverUrl ? `<img src="${escapeHtml(coverUrl)}" alt="cover" class="w-10 h-14 object-cover rounded shrink-0 hover:brightness-110 transition-all shadow hover:shadow-lg"/>` : ''}
       <div class="flex-1 min-w-0">
         <span class="font-bold block truncate">${escapeHtml(displayName)}${badgeHtml}</span>
         <span class="text-sm text-gray-400 block truncate">${escapeHtml(subtitle)}</span>
@@ -302,7 +302,7 @@ function renderResultsList() {
                   const issueDisplayName = `${issue.name || 'Unknown'}${issue.issueNumber ? ` #${issue.issueNumber}` : ''}`;
 
                   issueLi.innerHTML = `
-                    ${issueCoverUrl ? `<img src="${escapeHtml(issueCoverUrl)}" class="w-8 h-12 object-cover rounded flex-shrink-0 hover:brightness-110 transition-all shadow"/>` : ''}
+                    ${issueCoverUrl ? `<img src="${escapeHtml(issueCoverUrl)}" class="w-8 h-12 object-cover rounded shrink-0 hover:brightness-110 transition-all shadow"/>` : ''}
                     <div class="flex-1 min-w-0">
                       <span class="font-bold block truncate">${escapeHtml(issueDisplayName)}</span>
                       <span class="text-sm text-gray-400 block truncate">${escapeHtml(issueSubtitle)}</span>

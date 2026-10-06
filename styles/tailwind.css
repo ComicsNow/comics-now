@@ -1,3 +1,15 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+/**
+ * Tailwind v4 entry.
+ *
+ * `source(none)` disables automatic content detection; the explicit @source
+ * below reproduces the scope of the v3 `content` config (the html/js files
+ * under public/) so the generated CSS stays deterministic — with
+ * auto-detection, unrelated files (docs/, tests/) would silently influence
+ * the output. Add @source lines here if sources ever live outside public/.
+ *
+ * public/dist is generated (and gitignored); it is excluded here so a build
+ * with a stale dist/ present produces the same CSS as a clean checkout.
+ */
+@import "tailwindcss" source(none);
+@source "../public/**/*.{html,js}";
+@source not "../public/dist";

@@ -171,10 +171,10 @@ function updateCtProgressFromLog(message) {
     if (activityText) activityText.textContent = 'Searching metadata sources...';
     if (badge) {
       badge.textContent = 'Searching';
-      badge.className = 'px-2 py-0.5 rounded text-[10px] font-medium bg-blue-900/60 text-blue-300 border border-blue-700/50 flex-shrink-0';
+      badge.className = 'px-2 py-0.5 rounded text-[10px] font-medium bg-blue-900/60 text-blue-300 border border-blue-700/50 shrink-0';
     }
     if (pulse) {
-      pulse.className = 'inline-block w-2 h-2 rounded-full bg-green-400 animate-pulse flex-shrink-0';
+      pulse.className = 'inline-block w-2 h-2 rounded-full bg-green-400 animate-pulse shrink-0';
     }
     setScanRunningUI(true);
     return;
@@ -190,18 +190,18 @@ function updateCtProgressFromLog(message) {
     if (isRateDefenseMessage(msg)) {
       if (badge) {
         badge.textContent = 'Rate Limit Wait';
-        badge.className = 'px-2 py-0.5 rounded text-[10px] font-medium bg-amber-900/60 text-amber-300 border border-amber-700/50 flex-shrink-0';
+        badge.className = 'px-2 py-0.5 rounded text-[10px] font-medium bg-amber-900/60 text-amber-300 border border-amber-700/50 shrink-0';
       }
       if (pulse) {
-        pulse.className = 'inline-block w-2 h-2 rounded-full bg-amber-400 animate-pulse flex-shrink-0';
+        pulse.className = 'inline-block w-2 h-2 rounded-full bg-amber-400 animate-pulse shrink-0';
       }
     } else if (/Candidate found|Match found|High-confidence/i.test(msg)) {
       if (badge) {
         badge.textContent = 'Match Found';
-        badge.className = 'px-2 py-0.5 rounded text-[10px] font-medium bg-emerald-900/60 text-emerald-300 border border-emerald-700/50 flex-shrink-0';
+        badge.className = 'px-2 py-0.5 rounded text-[10px] font-medium bg-emerald-900/60 text-emerald-300 border border-emerald-700/50 shrink-0';
       }
       if (pulse) {
-        pulse.className = 'inline-block w-2 h-2 rounded-full bg-emerald-400 flex-shrink-0';
+        pulse.className = 'inline-block w-2 h-2 rounded-full bg-emerald-400 shrink-0';
       }
     }
     return;
@@ -221,10 +221,10 @@ function updateCtProgressFromLog(message) {
     if (activityText) activityText.textContent = `Completed: ${statsMatch[1]} tagged, ${statsMatch[2]} review, ${statsMatch[3]} skipped`;
     if (badge) {
       badge.textContent = 'Done';
-      badge.className = 'px-2 py-0.5 rounded text-[10px] font-medium bg-green-900/60 text-green-300 border border-green-700/50 flex-shrink-0';
+      badge.className = 'px-2 py-0.5 rounded text-[10px] font-medium bg-green-900/60 text-green-300 border border-green-700/50 shrink-0';
     }
     if (pulse) {
-      pulse.className = 'inline-block w-2 h-2 rounded-full bg-green-500 flex-shrink-0';
+      pulse.className = 'inline-block w-2 h-2 rounded-full bg-green-500 shrink-0';
     }
     setScanRunningUI(false);
     return;
@@ -269,34 +269,34 @@ function formatCtLogMessage(timestamp, message) {
     const subMsg = streamStepMatch[2];
 
     const timeSpan = document.createElement('span');
-    timeSpan.className = 'text-gray-500 text-[11px] font-mono select-none flex-shrink-0';
+    timeSpan.className = 'text-gray-500 text-[11px] font-mono select-none shrink-0';
     timeSpan.textContent = `[${formatLogTime(timestamp)}]`;
     timeSpan.title = timestamp;
 
     const arrowSpan = document.createElement('span');
-    arrowSpan.className = 'text-gray-500 font-bold select-none text-[11px] flex-shrink-0';
+    arrowSpan.className = 'text-gray-500 font-bold select-none text-[11px] shrink-0';
     arrowSpan.textContent = '↳';
 
     const srcBadge = document.createElement('span');
-    srcBadge.className = 'px-1.5 py-0.5 rounded text-[10px] font-semibold bg-gray-800 text-blue-300 border border-blue-900/50 flex-shrink-0';
+    srcBadge.className = 'px-1.5 py-0.5 rounded text-[10px] font-semibold bg-gray-800 text-blue-300 border border-blue-900/50 shrink-0';
     srcBadge.textContent = src;
 
     const msgSpan = document.createElement('span');
     if (isRateDefenseMessage(subMsg)) {
       line.dataset.logType = 'rate-defense';
-      msgSpan.className = 'text-amber-400 break-words min-w-[180px] flex-1 flex items-center gap-1.5 leading-snug';
-      msgSpan.innerHTML = `<span class="flex-shrink-0">⏳</span> <span>${escapeHtml(subMsg)}</span>`;
+      msgSpan.className = 'text-amber-400 wrap-break-word min-w-[180px] flex-1 flex items-center gap-1.5 leading-snug';
+      msgSpan.innerHTML = `<span class="shrink-0">⏳</span> <span>${escapeHtml(subMsg)}</span>`;
     } else if (/Candidate found|Match found|High-confidence|Early exit/i.test(subMsg)) {
-      msgSpan.className = 'text-emerald-400 font-semibold break-words min-w-[180px] flex-1 leading-snug';
+      msgSpan.className = 'text-emerald-400 font-semibold wrap-break-word min-w-[180px] flex-1 leading-snug';
       msgSpan.textContent = `✓ ${subMsg}`;
     } else if (/No match found/i.test(subMsg)) {
-      msgSpan.className = 'text-gray-400 break-words min-w-[180px] flex-1 leading-snug';
+      msgSpan.className = 'text-gray-400 wrap-break-word min-w-[180px] flex-1 leading-snug';
       msgSpan.textContent = `✗ ${subMsg}`;
     } else if (/Search failed|Error/i.test(subMsg)) {
-      msgSpan.className = 'text-red-400 break-words min-w-[180px] flex-1 leading-snug';
+      msgSpan.className = 'text-red-400 wrap-break-word min-w-[180px] flex-1 leading-snug';
       msgSpan.textContent = `✗ ${subMsg}`;
     } else {
-      msgSpan.className = 'text-teal-300 break-words min-w-[180px] flex-1 leading-snug';
+      msgSpan.className = 'text-teal-300 wrap-break-word min-w-[180px] flex-1 leading-snug';
       msgSpan.textContent = subMsg;
     }
 
@@ -338,12 +338,12 @@ function formatCtLogMessage(timestamp, message) {
   line.className = 'ct-log-line py-1 font-mono text-xs sm:text-sm flex flex-wrap items-baseline gap-x-2 gap-y-0.5 border-b border-gray-800/20';
 
   const timeSpan = document.createElement('span');
-  timeSpan.className = 'text-gray-500 text-[11px] font-mono select-none flex-shrink-0';
+  timeSpan.className = 'text-gray-500 text-[11px] font-mono select-none shrink-0';
   timeSpan.textContent = `[${formatLogTime(timestamp)}]`;
   timeSpan.title = timestamp;
 
   const msgSpan = document.createElement('span');
-  msgSpan.className = colorClass + (bold ? ' font-semibold' : '') + ' break-words flex-1 min-w-[200px] leading-snug';
+  msgSpan.className = colorClass + (bold ? ' font-semibold' : '') + ' wrap-break-word flex-1 min-w-[200px] leading-snug';
 
   const hasIcon = /^[✓✗⚠⊘❯ⓘ➜→⏳📊]/.test(message);
   msgSpan.textContent = (hasIcon ? '' : icon) + message;
@@ -770,7 +770,7 @@ function getCtMatchHtml(match) {
       </td>
       <td class="py-4 pr-4">
         <div class="flex space-x-4">
-          <div class="flex-shrink-0 w-24">
+          <div class="shrink-0 w-24">
             ${coverUrl
               ? `<img src="${escapeHtml(coverUrl)}" alt="Cover" class="w-full h-auto rounded border border-gray-700 shadow-md object-cover" loading="lazy">`
               : `<div class="w-full h-32 rounded border border-gray-700 bg-gray-950 flex items-center justify-center text-[10px] text-gray-600 uppercase text-center p-1">No Cover</div>`
@@ -799,7 +799,7 @@ function renderComicPreview(url, fileName) {
 
   previewContainer.innerHTML = `
     <div class="bg-gray-800/80 rounded-xl p-4 border border-gray-700 flex flex-col md:flex-row items-center md:items-start space-y-4 md:space-y-0 md:space-x-6">
-      <div class="flex-shrink-0">
+      <div class="shrink-0">
         ${url 
           ? `<img src="${escapeHtml(url)}" class="w-40 h-auto rounded-lg shadow-xl border border-gray-600 object-cover" alt="Comic Preview">`
           : `<div class="w-40 h-56 rounded-lg bg-gray-950 flex items-center justify-center border border-dashed border-gray-700 text-gray-500 text-xs text-center px-2">Cover Preview</div>`
@@ -1231,7 +1231,7 @@ async function loadScanLogs() {
             <div class="font-bold text-white text-sm truncate">Scan: ${escapeHtml(log.id || 'Session')} ${target ? `<span class="text-xs text-gray-400 font-normal">(${escapeHtml(target)})</span>` : ''}</div>
             <div class="text-xs text-gray-400">${escapeHtml(dateStr)} • ${total} file(s) scanned</div>
           </div>
-          <div class="flex items-center gap-2 flex-shrink-0">
+          <div class="flex items-center gap-2 shrink-0">
             <span class="text-xs px-2.5 py-1 rounded bg-green-900/50 text-green-300 border border-green-700 font-medium">✓ ${tagged} Tagged</span>
             ${skipped > 0 ? `<span class="text-xs px-2 py-1 rounded bg-gray-700 text-gray-300 font-medium">${skipped} Skipped</span>` : ''}
             ${failed > 0 ? `<span class="text-xs px-2 py-1 rounded bg-red-900/50 text-red-300 border border-red-700 font-medium">✗ ${failed} Failed</span>` : ''}

@@ -105,7 +105,7 @@ export async function showUserStatsView(userId, userEmail) {
 
   const view = document.createElement('div');
   view.id = 'user-stats-view';
-  view.className = 'bg-gradient-to-r from-blue-900/30 to-purple-900/30 border-2 border-blue-700/50 rounded-xl p-6 shadow-lg';
+  view.className = 'bg-linear-to-r from-blue-900/30 to-purple-900/30 border-2 border-blue-700/50 rounded-xl p-6 shadow-lg';
   view.innerHTML = `
     <button id="back-to-users-from-stats" class="flex items-center text-gray-400 hover:text-white transition-colors mb-4 group">
       <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 mr-1 group-hover:-translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">

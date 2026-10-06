@@ -201,7 +201,7 @@ export function showRootFolderList(options = {}) {
       : ICONS.DOWNLOAD;
 
     const isLocalRoot = folderPath && String(folderPath).startsWith('device-');
-    const downloadButtonHtml = isLocalRoot ? '' : `<button class="download-btn absolute top-2 right-2 z-20 ${isLibraryDownloaded ? 'text-green-400' : 'text-gray-400 hover:text-white'} bg-gray-900/60 backdrop-blur-sm p-1.5 rounded-lg shadow-lg"
+    const downloadButtonHtml = isLocalRoot ? '' : `<button class="download-btn absolute top-2 right-2 z-20 ${isLibraryDownloaded ? 'text-green-400' : 'text-gray-400 hover:text-white'} bg-gray-900/60 backdrop-blur-xs p-1.5 rounded-lg shadow-lg"
           title="${isLibraryDownloaded ? 'Delete from device' : 'Download library'}"
           data-folder-path="${folderPath}"
           data-is-downloaded="${isLibraryDownloaded}"
@@ -956,7 +956,7 @@ export function renderPublisherReadingLists(publisherName) {
         </div>
         <div class="flex-1 min-w-0">
           <div class="flex flex-wrap items-start justify-between gap-2 mb-1">
-            <a href="#" class="reading-list-hotlink font-bold text-base sm:text-lg text-white group-hover:text-purple-300 hover:underline transition-colors leading-snug break-words flex-1 min-w-[140px]" title="Open ${escapeHtml(list.name)}">
+            <a href="#" class="reading-list-hotlink font-bold text-base sm:text-lg text-white group-hover:text-purple-300 hover:underline transition-colors leading-snug wrap-break-word flex-1 min-w-[140px]" title="Open ${escapeHtml(list.name)}">
               ${escapeHtml(list.name)}
             </a>
             <span class="text-xs px-2.5 py-0.5 rounded-full bg-purple-900/60 text-purple-300 font-semibold shrink-0">
@@ -976,7 +976,7 @@ export function renderPublisherReadingLists(publisherName) {
           <span class="font-bold ${progressPercent === 100 ? 'text-green-400' : 'text-purple-400'}">${progressPercent}%</span>
         </div>
         <div class="w-full bg-gray-700/80 h-2 rounded-full overflow-hidden">
-          <div class="bg-gradient-to-r from-purple-500 to-indigo-500 h-full rounded-full transition-all duration-300" style="width: ${progressPercent}%;"></div>
+          <div class="bg-linear-to-r from-purple-500 to-indigo-500 h-full rounded-full transition-all duration-300" style="width: ${progressPercent}%;"></div>
         </div>
       </div>
     `;
@@ -1536,7 +1536,7 @@ export function renderComicCards(comicsToRender, viewType, targetContainer) {
         ${coverHtml}
         ${pageCountLabel ? `<div class="page-count-badge">${pageCountLabel}</div>` : ''}
       </div>
-      <div class="p-2 flex-grow flex flex-col justify-between">
+      <div class="p-2 grow flex flex-col justify-between">
         <div>
           <p class="text-sm font-semibold text-white truncate">${titleIconHtml}${escapeHtml(displayTitle)}</p>
           ${subtitleText ? `<p class="text-xs text-gray-300 truncate">${escapeHtml(subtitleText)}</p>` : ''}

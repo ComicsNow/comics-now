@@ -71,7 +71,7 @@
   <div id="download-queue" class="hidden fixed bottom-16 right-4 sm:bottom-8 sm:right-8 z-40 w-[22rem] max-w-[calc(100vw-2rem)] rounded-2xl overflow-hidden ring-1 ring-white/10 shadow-2xl"></div>
 
   <!-- Directory Selection Modal -->
-  <div id="directory-selection-modal" class="hidden fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center" style="z-index: 9999;">
+  <div id="directory-selection-modal" class="hidden fixed inset-0 bg-gray-900/75 flex items-center justify-center" style="z-index: 9999;">
     <div class="bg-gray-800 rounded-lg p-6 w-96 max-w-lg mx-4 shadow-2xl border border-gray-700">
       <div class="flex justify-between items-center mb-4">
         <h3 class="text-xl font-bold text-white">Select Destination Directory</h3>
@@ -89,7 +89,7 @@
   </div>
 
   <!-- Settings Modal -->
-  <div id="settings-modal" class="hidden fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-40 p-4">
+  <div id="settings-modal" class="hidden fixed inset-0 bg-gray-900/75 flex items-center justify-center z-40 p-4">
     <div class="bg-gray-800 rounded-lg w-full h-full sm:h-auto sm:max-h-[90vh] max-w-4xl shadow-lg flex flex-col overflow-hidden">
         <div class="flex justify-between items-center p-4 sm:p-6 border-b border-gray-700">
           <div class="flex items-center gap-3">
@@ -101,7 +101,7 @@
           </div>
           <button onclick="closeSettingsModal()" class="modal-close-btn text-2xl font-bold hover:text-gray-300 transition-colors">&times;</button>
         </div>
-        <div class="flex overflow-x-auto border-b border-gray-600 px-4 sm:px-6 scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-gray-800 flex-shrink-0">
+        <div class="flex overflow-x-auto border-b border-gray-600 px-4 sm:px-6 scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-gray-800 shrink-0">
           <button id="settings-tab-general" data-text="General" class="tab-button active py-3 px-2 sm:px-4 text-xs sm:text-base whitespace-nowrap">
             <span>General</span>
           </button>
@@ -184,7 +184,7 @@
 
         <!-- Downloads Tab -->
         <div id="settings-content-downloads" class="hidden">
-          <div class="bg-gradient-to-r from-red-900/30 to-blue-900/30 border-2 border-red-700/50 rounded-xl p-6 shadow-lg hover:shadow-red-900/20 transition-all duration-300">
+          <div class="bg-linear-to-r from-red-900/30 to-blue-900/30 border-2 border-red-700/50 rounded-xl p-6 shadow-lg hover:shadow-red-900/20 transition-all duration-300">
             <div class="flex items-center mb-4">
               <div class="bg-red-600/20 p-2 rounded-lg mr-3">
                 <svg class="w-6 h-6 text-red-400" fill="none" stroke="currentColor" stroke-width="2"><use href="#icon-download"></use></svg>
@@ -196,7 +196,7 @@
             </div>
 
             <div class="flex items-start mb-6 pl-14">
-              <svg class="w-4 h-4 mr-2 text-blue-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" stroke-width="2"><use href="#icon-1"></use></svg>
+              <svg class="w-4 h-4 mr-2 text-blue-400 shrink-0 mt-0.5" fill="none" stroke="currentColor" stroke-width="2"><use href="#icon-1"></use></svg>
               <p class="text-xs text-gray-400 leading-relaxed">
                 Comics downloaded for offline reading are stored in your browser's local database. Clearing these will reclaim space but require re-downloading for offline access.
               </p>
@@ -271,9 +271,9 @@
               </h5>
               <p class="text-sm text-gray-400 mb-4">Choose which comic file formats to include in your library scans:</p>
 
-              <div class="bg-gradient-to-r from-green-900/30 to-emerald-900/30 border-2 border-green-700/50 rounded-xl p-6 shadow-lg hover:shadow-green-900/20 transition-all duration-300">
+              <div class="bg-linear-to-r from-green-900/30 to-emerald-900/30 border-2 border-green-700/50 rounded-xl p-6 shadow-lg hover:shadow-green-900/20 transition-all duration-300">
                 <div class="flex flex-col md:flex-row items-center justify-between gap-4">
-                  <div class="flex-grow">
+                  <div class="grow">
                     <p class="text-white font-medium">Select Formats</p>
                     <p class="text-xs text-gray-400">Library scanner will only include files with these extensions</p>
                   </div>
@@ -304,7 +304,7 @@
 
         <!-- Manage Devices Tab -->
         <div id="settings-content-devices" class="hidden">
-          <div class="bg-gradient-to-r from-blue-900/30 to-cyan-900/30 border-2 border-blue-700/50 rounded-xl p-6 shadow-lg hover:shadow-blue-900/20 transition-all duration-300">
+          <div class="bg-linear-to-r from-blue-900/30 to-cyan-900/30 border-2 border-blue-700/50 rounded-xl p-6 shadow-lg hover:shadow-blue-900/20 transition-all duration-300">
             <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
               <div class="flex items-center">
                 <div class="bg-blue-600/20 p-2 rounded-lg mr-3">
@@ -338,7 +338,7 @@
 
         <!-- Users Tab -->
         <div id="settings-content-users" class="hidden">
-          <div class="bg-gradient-to-r from-red-900/30 to-red-900/30 border-2 border-red-700/50 rounded-xl p-6 shadow-lg hover:shadow-red-900/20 transition-all duration-300">
+          <div class="bg-linear-to-r from-red-900/30 to-red-900/30 border-2 border-red-700/50 rounded-xl p-6 shadow-lg hover:shadow-red-900/20 transition-all duration-300">
             <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
               <div class="flex items-center">
                 <div class="bg-red-600/20 p-2 rounded-lg mr-3">
@@ -439,7 +439,7 @@
     </div>
 
   <!-- Tag Comics Now! Modal -->
-  <div id="ct-modal" class="hidden fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-40 p-4">
+  <div id="ct-modal" class="hidden fixed inset-0 bg-gray-900/75 flex items-center justify-center z-40 p-4">
     <div class="bg-gray-800 rounded-lg w-full h-full sm:h-auto sm:max-h-[90vh] max-w-4xl shadow-lg flex flex-col overflow-hidden">
       <div class="flex justify-between items-center p-4 sm:p-6 border-b border-gray-700">
         <div class="flex items-center gap-3">
@@ -448,7 +448,7 @@
         </div>
         <button id="ct-close-btn" class="modal-close-btn text-2xl font-bold hover:text-gray-300 transition-colors">&times;</button>
       </div>
-      <div class="flex overflow-x-auto border-b border-gray-600 px-4 sm:px-6 scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-gray-800 flex-shrink-0">
+      <div class="flex overflow-x-auto border-b border-gray-600 px-4 sm:px-6 scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-gray-800 shrink-0">
         <button id="ct-tab-output" class="tab-button active py-3 px-2 sm:px-4 text-xs sm:text-base whitespace-nowrap">
           <span>Scan & Output</span>
         </button>
@@ -498,22 +498,22 @@
             <div class="flex justify-between items-center text-xs mb-1.5">
               <div class="flex items-center gap-2 overflow-hidden">
                 <span id="ct-progress-file" class="font-semibold text-white truncate max-w-xs sm:max-w-md">Scanning...</span>
-                <span id="ct-progress-badge" class="px-2 py-0.5 rounded text-[10px] font-medium bg-blue-900/60 text-blue-300 border border-blue-700/50 flex-shrink-0" style="position: relative; left: -1.5px;">Processing</span>
+                <span id="ct-progress-badge" class="px-2 py-0.5 rounded text-[10px] font-medium bg-blue-900/60 text-blue-300 border border-blue-700/50 shrink-0" style="position: relative; left: -1.5px;">Processing</span>
               </div>
-              <div class="flex items-center gap-3 text-gray-400 flex-shrink-0">
+              <div class="flex items-center gap-3 text-gray-400 shrink-0">
                 <span id="ct-progress-counter" class="font-mono">0 / 0</span>
                 <span id="ct-progress-eta" class="text-amber-400 font-medium">ETA: --</span>
               </div>
             </div>
             <div class="w-full bg-gray-800 rounded-full h-2 overflow-hidden mb-1.5">
-              <div id="ct-progress-bar-fill" class="bg-gradient-to-r from-blue-500 to-indigo-500 h-2 rounded-full transition-all duration-300 ease-out" style="width: 0%"></div>
+              <div id="ct-progress-bar-fill" class="bg-linear-to-r from-blue-500 to-indigo-500 h-2 rounded-full transition-all duration-300 ease-out" style="width: 0%"></div>
             </div>
             <div class="flex justify-between items-center text-[11px] text-gray-400">
               <div class="truncate max-w-sm sm:max-w-lg text-gray-300 flex items-center gap-1.5">
-                <span id="ct-progress-pulse" class="inline-block w-2 h-2 rounded-full bg-green-400 animate-pulse flex-shrink-0"></span>
+                <span id="ct-progress-pulse" class="inline-block w-2 h-2 rounded-full bg-green-400 animate-pulse shrink-0"></span>
                 <span id="ct-progress-activity-text" class="truncate">Initializing search...</span>
               </div>
-              <div id="ct-progress-stats" class="flex gap-2 flex-shrink-0 font-mono text-[10px]">
+              <div id="ct-progress-stats" class="flex gap-2 shrink-0 font-mono text-[10px]">
                 <span id="ct-stat-tagged" class="text-green-400">0 Tagged</span>
                 <span class="text-gray-600">|</span>
                 <span id="ct-stat-review" class="text-yellow-400">0 Review</span>
@@ -522,7 +522,7 @@
               </div>
             </div>
           </div>
-          <div id="ct-output" class="h-96 overflow-y-auto overflow-x-hidden bg-gray-950 p-3 rounded-lg border border-gray-700 font-mono text-sm break-words"></div>
+          <div id="ct-output" class="h-96 overflow-y-auto overflow-x-hidden bg-gray-950 p-3 rounded-lg border border-gray-700 font-mono text-sm wrap-break-word"></div>
         </div>
 
         <!-- Matches & Review Tab -->
@@ -533,7 +533,7 @@
           <div class="mb-4">
             <div class="flex justify-between items-center mb-2">
               <h4 class="font-semibold text-white">Candidates Awaiting Confirmation</h4>
-              <button id="ct-grab-btn" class="text-xs bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded-full transition-colors flex items-center gap-1 shadow-sm border border-red-500/20">
+              <button id="ct-grab-btn" class="text-xs bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded-full transition-colors flex items-center gap-1 shadow-xs border border-red-500/20">
                 <svg class="w-3 h-3" fill="none" stroke="currentColor"><use href="#icon-8"></use></svg>
                 Refresh Candidates
               </button>
@@ -773,7 +773,7 @@
         <!-- Management Tab -->
         <div id="ct-content-management" class="hidden">
           <!-- Management sub-tabs: Operations, Errors, Name, Folder -->
-          <div class="flex overflow-x-auto border-b border-gray-700 mb-4 scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-gray-800 flex-shrink-0">
+          <div class="flex overflow-x-auto border-b border-gray-700 mb-4 scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-gray-800 shrink-0">
             <button id="mgmt-tab-operations" class="tab-button active py-2 px-4 text-xs sm:text-sm whitespace-nowrap">
               <span>Operations</span>
             </button>
@@ -907,7 +907,7 @@
           <div id="mgmt-confirm-modal" class="hidden fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
             <div class="bg-gray-800 border-2 border-amber-500 rounded-xl max-w-md w-full p-6 shadow-2xl space-y-4">
               <div class="flex items-center gap-3 text-amber-400">
-                <svg class="w-8 h-8 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+                <svg class="w-8 h-8 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
                 <h4 id="mgmt-confirm-title" class="text-lg font-bold text-white">Safety Warning</h4>
               </div>
               <p id="mgmt-confirm-warning" class="text-sm text-gray-300">
@@ -930,7 +930,7 @@
 
 
   <!-- Gemini Strict Compliance Modal -->
-  <div id="gemini-compliance-modal" class="hidden fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm" role="dialog" aria-modal="true">
+  <div id="gemini-compliance-modal" class="hidden fixed inset-0 z-9999 flex items-center justify-center p-4 bg-black/80 backdrop-blur-xs" role="dialog" aria-modal="true">
     <div class="bg-gray-900 border border-gray-700 rounded-xl shadow-2xl p-6 max-w-lg w-full text-gray-200">
       <div class="border-b border-gray-800 pb-3 mb-4">
         <h3 class="text-base font-bold text-white tracking-wide flex items-center gap-2">
@@ -974,7 +974,7 @@
 
 
   <!-- Reading List Modal -->
-  <div id="reading-list-modal" class="hidden fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-40 p-4">
+  <div id="reading-list-modal" class="hidden fixed inset-0 bg-gray-900/75 flex items-center justify-center z-40 p-4">
     <div class="bg-gray-800 rounded-lg w-full h-full sm:h-auto sm:max-h-[90vh] max-w-3xl shadow-lg flex flex-col overflow-hidden">
       <div class="flex justify-between items-center p-4 sm:p-6 border-b border-gray-700">
         <div class="flex items-center gap-3">
@@ -1031,7 +1031,7 @@
   </div>
 
   <!-- Add to Reading List Selection Modal -->
-  <div id="add-to-list-modal" class="hidden fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center p-4" style="z-index: 9999;">
+  <div id="add-to-list-modal" class="hidden fixed inset-0 bg-gray-900/75 flex items-center justify-center p-4" style="z-index: 9999;">
     <div class="bg-gray-800 rounded-lg w-full max-w-md shadow-lg flex flex-col overflow-hidden">
       <div class="flex justify-between items-center p-4 border-b border-gray-700">
         <h3 class="text-xl font-bold">Add to Reading List</h3>
@@ -1075,7 +1075,7 @@
       </button>
 
       <!-- Fullscreen loading spinner -->
-      <div id="fullscreen-page-loader" class="hidden absolute inset-0 items-center justify-center bg-black bg-opacity-50 z-10">
+      <div id="fullscreen-page-loader" class="hidden absolute inset-0 items-center justify-center bg-black/50 z-10">
         <svg class="animate-spin h-12 w-12 text-white" fill="none"><use href="#icon-10"></use></svg>
       </div>
 
@@ -1275,7 +1275,7 @@
       <!-- Floating Double-Page Spread Badge / Cinema Pan Button -->
       <button
         id="fullscreen-spread-badge"
-        class="hidden px-4 py-2 rounded-full bg-amber-500/90 hover:bg-amber-400 text-black font-bold text-xs uppercase tracking-wider shadow-lg transition-all flex items-center gap-2 cursor-pointer z-50 backdrop-blur-sm"
+        class="hidden px-4 py-2 rounded-full bg-amber-500/90 hover:bg-amber-400 text-black font-bold text-xs uppercase tracking-wider shadow-lg transition-all flex items-center gap-2 cursor-pointer z-50 backdrop-blur-xs"
         aria-label="Cinema Pan for Double-Page Spread"
       >
         <span class="animate-pulse">🎬</span>
@@ -1348,7 +1348,7 @@
       <form id="library-search-form" class="flex flex-row gap-2 items-stretch" role="search">
         <!-- Input with embedded search icon and inline clear button -->
         <div class="search-input-wrapper flex-1 min-w-0 flex items-center bg-gray-800 rounded-xl ring-1 ring-white/10 overflow-hidden">
-          <span class="pl-3 text-gray-500 pointer-events-none flex-shrink-0">
+          <span class="pl-3 text-gray-500 pointer-events-none shrink-0">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2"><use href="#icon-search"></use></svg>
           </span>
           <input type="search" id="library-search-query" class="flex-1 min-w-0 bg-transparent text-white text-sm px-3 py-2.5 focus:outline-none placeholder-gray-500" placeholder="Search the stacks..." autocomplete="off" enterkeyhint="search" inputmode="search">
@@ -1551,9 +1551,9 @@
     <!-- Comic Viewer View -->
     <div id="comic-viewer" class="hidden flex flex-col items-center">
       <div class="w-full flex flex-col items-center mb-2 gap-2">
-        <h2 id="comic-title" class="text-2xl font-bold text-center text-white break-words w-full px-2"></h2>
+        <h2 id="comic-title" class="text-2xl font-bold text-center text-white wrap-break-word w-full px-2"></h2>
       </div>
-      <p id="comic-subtitle" class="hidden w-full text-center text-sm text-gray-300 break-words mb-4 px-2"></p>
+      <p id="comic-subtitle" class="hidden w-full text-center text-sm text-gray-300 wrap-break-word mb-4 px-2"></p>
       <div id="comic-summary-section" class="hidden w-full mb-4">
         <div class="flex justify-center">
           <button
@@ -1647,7 +1647,7 @@
           <button id="next-page-btn" type="button" class="pill-button bg-gray-700 hover:bg-gray-600 text-white transition-colors" aria-label="Next page">→</button>
         </div>
         <div id="viewer-pages" class="relative">
-          <div id="page-loader" class="hidden absolute inset-0 items-center justify-center bg-black bg-opacity-50">
+          <div id="page-loader" class="hidden absolute inset-0 items-center justify-center bg-black/50">
             <svg class="animate-spin h-8 w-8 text-white" fill="none"><use href="#icon-10"></use></svg>
           </div>
         </div>

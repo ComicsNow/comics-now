@@ -141,10 +141,10 @@ describe('User Management Settings UI', () => {
     expect(emailSpan.textContent).toBe('an.exceptionally.long.email.address.that.would.overflow@somedomain.example.com');
     expect(emailSpan.className).toContain('leading-snug');
 
-    // Verify role badge has flex-shrink-0 and ml-auto to stay neatly inside the card boundary
+    // Verify role badge has shrink-0 and ml-auto to stay neatly inside the card boundary
     const roleBadge = card.querySelector('span.rounded-full');
     expect(roleBadge).not.toBeNull();
-    expect(roleBadge.className).toContain('flex-shrink-0');
+    expect(roleBadge.className).toContain('shrink-0');
     expect(roleBadge.className).toContain('ml-auto');
 
     // Verify header row has min-w-0 flex container

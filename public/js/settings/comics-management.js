@@ -772,7 +772,7 @@ document.addEventListener('DOMContentLoaded', () => {
         option.className = 'flex items-center space-x-3 p-3 rounded-lg border border-gray-600 hover:border-gray-500 hover:bg-gray-750 transition-colors cursor-pointer';
         option.innerHTML = `
           <input type="radio" id="dir-${index}" name="directory" value="${dir.fullPath}" class="w-4 h-4 text-green-600 bg-gray-700 border-gray-600 focus:ring-green-500 focus:ring-2">
-          <div class="flex-grow">
+          <div class="grow">
             <label for="dir-${index}" class="text-white cursor-pointer font-medium block">${dir.name}</label>
             <span class="text-gray-400 text-sm">${dir.fullPath}</span>
           </div>

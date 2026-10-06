@@ -1148,26 +1148,26 @@ async function showReadingListDetail(listId, listName) {
                 <button class="reorder-down-btn text-gray-500 hover:text-white p-0.5" title="Move Down">▼</button>
               </div>
             ` : ''}
-            <div class="flex-shrink-0 flex items-center justify-center" style="width: 1.5rem; height: 1.5rem;">
+            <div class="shrink-0 flex items-center justify-center" style="width: 1.5rem; height: 1.5rem;">
               <span class="${status === 'read' ? 'text-green-500' : status === 'in-progress' ? 'text-purple-400' : 'text-gray-600'} text-lg">
                 ${status === 'read' ? '●' : status === 'in-progress' ? '◐' : '○'}
               </span>
             </div>
             <div class="flex-1 min-w-0 flex items-center gap-2">
               <p class="text-sm font-medium text-gray-200 truncate group-hover:text-white transition-colors">${escapeHtml(title)}</p>
-              ${isDownloaded ? `<span class="text-green-400 flex-shrink-0 opacity-70" title="Downloaded">${ICONS.READ}</span>` : ''}
+              ${isDownloaded ? `<span class="text-green-400 shrink-0 opacity-70" title="Downloaded">${ICONS.READ}</span>` : ''}
             </div>
-            <div class="flex-shrink-0 text-[10px] font-bold text-gray-500 bg-black/20 px-2 py-0.5 rounded uppercase tracking-tighter">
+            <div class="shrink-0 text-[10px] font-bold text-gray-500 bg-black/20 px-2 py-0.5 rounded uppercase tracking-tighter">
               ${progressPercent}%
             </div>
             <div class="flex items-center gap-1 ml-2">
-              <button class="mark-read-btn ${isEditMode ? 'hidden' : ''} flex-shrink-0 text-gray-500 hover:text-green-400 transition-colors p-1.5 hover:bg-green-500/10 rounded" title="${status === 'read' ? 'Mark as unread' : 'Mark as read'}" data-comic-id="${escapeHtml(item.comicId)}" data-status="${status}">
+              <button class="mark-read-btn ${isEditMode ? 'hidden' : ''} shrink-0 text-gray-500 hover:text-green-400 transition-colors p-1.5 hover:bg-green-500/10 rounded" title="${status === 'read' ? 'Mark as unread' : 'Mark as read'}" data-comic-id="${escapeHtml(item.comicId)}" data-status="${status}">
                 <span class="text-lg">${status === 'read' ? '↩' : ICONS.READ}</span>
               </button>
-              <button class="download-comic-btn ${isEditMode ? 'hidden' : ''} block sm:hidden flex-shrink-0 text-gray-500 hover:text-blue-400 transition-colors p-1.5 hover:bg-blue-500/10 rounded" title="Download comic" data-comic-id="${escapeHtml(item.comicId)}">
+              <button class="download-comic-btn ${isEditMode ? 'hidden' : ''} block sm:hidden shrink-0 text-gray-500 hover:text-blue-400 transition-colors p-1.5 hover:bg-blue-500/10 rounded" title="Download comic" data-comic-id="${escapeHtml(item.comicId)}">
                 <span class="text-lg">${ICONS.DOWNLOAD}</span>
               </button>
-              <button class="delete-comic-btn ${isEditMode || isOffline ? 'hidden' : ''} flex-shrink-0 text-gray-600 hover:text-red-400 transition-colors p-1.5 hover:bg-red-500/10 rounded" title="Remove from list" data-comic-id="${escapeHtml(item.comicId)}">
+              <button class="delete-comic-btn ${isEditMode || isOffline ? 'hidden' : ''} shrink-0 text-gray-600 hover:text-red-400 transition-colors p-1.5 hover:bg-red-500/10 rounded" title="Remove from list" data-comic-id="${escapeHtml(item.comicId)}">
                 <span class="text-lg">🗑</span>
               </button>
             </div>
@@ -1203,7 +1203,7 @@ async function showReadingListDetail(listId, listName) {
               ` : ''}
               ${statusBanner}
               ${!isLocal ? downloadIndicatorGrid : ''}
-              <div class="aspect-[2/3] w-full bg-gray-700 overflow-hidden flex items-center justify-center">
+              <div class="aspect-2/3 w-full bg-gray-700 overflow-hidden flex items-center justify-center">
                 ${comic.thumbnailPath ? 
                   `<img src="${coverUrl}" alt="${escapeHtml(title)}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" loading="lazy">` :
                   (isLocal ? 
@@ -1237,7 +1237,7 @@ async function showReadingListDetail(listId, listName) {
                 </div>
               ` : ''}
             </div>
-            <div class="p-3 flex-grow flex flex-col justify-center min-w-0">
+            <div class="p-3 grow flex flex-col justify-center min-w-0">
               <p class="text-sm font-bold text-white truncate leading-tight">${escapeHtml(title)}</p>
               <div class="flex items-center gap-1.5 mt-1">
                  <span class="text-[10px] font-bold uppercase tracking-tighter text-gray-500">${progressPercent}% COMPLETE</span>

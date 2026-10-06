@@ -369,7 +369,7 @@ export class SyncManager {
     const serverDate = new Date(serverProgress.lastSyncTimestamp).toLocaleString();
 
     const modal = document.createElement('div');
-    modal.className = 'fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center';
+    modal.className = 'fixed inset-0 bg-gray-900/75 flex items-center justify-center';
     modal.style.zIndex = '10000';
 
     modal.innerHTML = `
@@ -461,7 +461,7 @@ export class SyncManager {
     const { comic, devices } = data;
 
     const modal = document.createElement('div');
-    modal.className = 'fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center';
+    modal.className = 'fixed inset-0 bg-gray-900/75 flex items-center justify-center';
     modal.style.zIndex = '10000';
 
     // Create device list HTML
