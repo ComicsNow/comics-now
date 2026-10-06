@@ -131,7 +131,7 @@
           <form id="settings-form" class="space-y-4">
             <div>
               <h4 class="text-lg font-semibold mb-2">Scan Interval (minutes)</h4>
-              <input type="number" id="scan-interval-input" class="w-full bg-gray-700 text-white p-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500" min="1" value="5">
+              <input type="number" id="scan-interval-input" class="w-full bg-gray-700 text-white p-2 rounded-lg focus:outline-hidden focus:ring-2 focus:ring-red-500" min="1" value="5">
             </div>
             <div id="admin-only-libraries" class="border-t border-gray-700 pt-4">
               <h4 class="text-lg font-semibold mb-2">Library Folders</h4>
@@ -140,9 +140,9 @@
                 <!-- Populated by JS -->
               </div>
               <div class="flex flex-col gap-2">
-                <input type="text" id="new-library-path" class="w-full bg-gray-700 text-white p-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500" placeholder="/path/to/comics">
+                <input type="text" id="new-library-path" class="w-full bg-gray-700 text-white p-2 rounded-lg focus:outline-hidden focus:ring-2 focus:ring-red-500" placeholder="/path/to/comics">
                 <div class="flex gap-2">
-                  <select id="new-library-mode" class="flex-1 bg-gray-700 text-white p-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500">
+                  <select id="new-library-mode" class="flex-1 bg-gray-700 text-white p-2 rounded-lg focus:outline-hidden focus:ring-2 focus:ring-red-500">
                     <option value="metadata">Metadata Mode (ComicInfo.xml)</option>
                     <option value="folder">Folder Mode (Physical Structure)</option>
                   </select>
@@ -323,7 +323,7 @@
             <!-- Admin-only user filter -->
             <div id="devices-user-filter" class="hidden mb-6 pl-14">
               <label class="block text-sm font-semibold text-gray-300 mb-2">Filter by User (Admin Only)</label>
-              <select id="devices-user-select" class="w-full sm:w-auto bg-gray-900 text-white border border-gray-600 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:outline-none">
+              <select id="devices-user-select" class="w-full sm:w-auto bg-gray-900 text-white border border-gray-600 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:outline-hidden">
                 <option value="">-- Select User --</option>
               </select>
             </div>
@@ -403,8 +403,8 @@
                 </label>
                 <div class="flex flex-col sm:flex-row gap-2 ml-6">
                   <span class="self-center text-sm text-gray-400">Every</span>
-                  <input type="number" id="guided-schedule-interval" min="1" max="8760" value="24" class="w-24 bg-gray-700 text-white p-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500">
-                  <select id="guided-schedule-unit" class="bg-gray-700 text-white p-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500">
+                  <input type="number" id="guided-schedule-interval" min="1" max="8760" value="24" class="w-24 bg-gray-700 text-white p-2 rounded-lg focus:outline-hidden focus:ring-2 focus:ring-red-500">
+                  <select id="guided-schedule-unit" class="bg-gray-700 text-white p-2 rounded-lg focus:outline-hidden focus:ring-2 focus:ring-red-500">
                     <option value="hours">hours</option>
                     <option value="days">days</option>
                   </select>
@@ -711,7 +711,7 @@
               </label>
               <div class="flex gap-2">
                 <input type="password" id="ct-gemini-key-input" placeholder="AIzaSy... (Gemini API Key)"
-                  class="w-full bg-gray-900 text-white p-2.5 rounded-lg text-xs border border-gray-700 focus:outline-none focus:border-blue-500 font-mono">
+                  class="w-full bg-gray-900 text-white p-2.5 rounded-lg text-xs border border-gray-700 focus:outline-hidden focus:border-blue-500 font-mono">
                 <button type="button" id="ct-gemini-key-toggle" class="px-3.5 py-1.5 bg-gray-700 hover:bg-gray-600 text-gray-200 rounded-lg text-xs font-medium cursor-pointer transition-colors">Show</button>
               </div>
               <p class="text-[11px] text-gray-400">
@@ -727,7 +727,7 @@
                 </label>
                 <span id="ct-gemini-models-status" class="text-[11px] text-gray-400">Default: 3.5 Flash-Lite</span>
               </div>
-              <select id="ct-gemini-model-select" class="w-full bg-gray-900 text-white p-2.5 rounded-lg text-xs border border-gray-700 focus:outline-none focus:border-blue-500 font-mono cursor-pointer">
+              <select id="ct-gemini-model-select" class="w-full bg-gray-900 text-white p-2.5 rounded-lg text-xs border border-gray-700 focus:outline-hidden focus:border-blue-500 font-mono cursor-pointer">
                 <option value="gemini-3.5-flash-lite">Gemini 3.5 Flash-Lite (Recommended Default)</option>
               </select>
               <p class="text-[11px] text-gray-400">
@@ -849,7 +849,7 @@
                 <div class="text-xs font-semibold text-amber-300 uppercase tracking-wider mb-2">Batch: Rename an Entire Library</div>
                 <p class="text-xs text-gray-400 mb-2">Applies the saved naming rules to every comic in the chosen library. Requires typed confirmation.</p>
                 <div class="flex flex-col sm:flex-row gap-2">
-                  <select id="rename-library-select" class="flex-1 bg-gray-800 text-gray-200 border border-gray-700 rounded text-sm px-2 py-1.5 focus:outline-none">
+                  <select id="rename-library-select" class="flex-1 bg-gray-800 text-gray-200 border border-gray-700 rounded text-sm px-2 py-1.5 focus:outline-hidden">
                     <!-- Populated from /api/v1/comics-directories -->
                   </select>
                   <button id="rename-library-btn" class="bg-red-600 hover:bg-red-700 text-white font-bold py-1.5 px-4 rounded-full text-sm transition-colors whitespace-nowrap">Rename Library</button>
@@ -873,7 +873,7 @@
                 <div class="flex justify-between items-center mb-3">
                   <span class="text-xs font-semibold text-gray-300 uppercase tracking-wider">Hierarchy Levels</span>
                   <div class="flex gap-2">
-                    <select id="add-folder-token-select" class="bg-gray-800 text-gray-200 border border-gray-700 rounded text-xs px-2 py-1 focus:outline-none">
+                    <select id="add-folder-token-select" class="bg-gray-800 text-gray-200 border border-gray-700 rounded text-xs px-2 py-1 focus:outline-hidden">
                       <option value="publisher">Publisher</option>
                       <option value="writer">Writer</option>
                       <option value="series">Series</option>
@@ -894,7 +894,7 @@
                 <div class="text-xs font-semibold text-amber-300 uppercase tracking-wider mb-2">Batch: Reorganize an Entire Library</div>
                 <p class="text-xs text-gray-400 mb-2">Moves every comic in the chosen library into the saved folder hierarchy. Requires typed confirmation.</p>
                 <div class="flex flex-col sm:flex-row gap-2">
-                  <select id="move-library-select" class="flex-1 bg-gray-800 text-gray-200 border border-gray-700 rounded text-sm px-2 py-1.5 focus:outline-none">
+                  <select id="move-library-select" class="flex-1 bg-gray-800 text-gray-200 border border-gray-700 rounded text-sm px-2 py-1.5 focus:outline-hidden">
                     <!-- Populated from /api/v1/comics-directories -->
                   </select>
                   <button id="move-library-btn" class="bg-red-600 hover:bg-red-700 text-white font-bold py-1.5 px-4 rounded-full text-sm transition-colors whitespace-nowrap">Reorganize Library</button>
@@ -916,7 +916,7 @@
               <div class="bg-gray-900 p-3 rounded border border-gray-700 text-xs text-gray-400">
                 To confirm, please type exactly: <span class="font-mono font-bold text-amber-300 select-all">i want to do this</span>
               </div>
-              <input type="text" id="mgmt-confirm-input" placeholder="Type: i want to do this" class="w-full bg-gray-950 border border-gray-700 rounded-lg px-3 py-2 text-white font-mono text-sm focus:border-amber-500 focus:outline-none">
+              <input type="text" id="mgmt-confirm-input" placeholder="Type: i want to do this" class="w-full bg-gray-950 border border-gray-700 rounded-lg px-3 py-2 text-white font-mono text-sm focus:border-amber-500 focus:outline-hidden">
               <div class="flex justify-end gap-3 pt-2">
                 <button id="mgmt-confirm-cancel-btn" class="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg text-sm font-medium transition-colors">Cancel</button>
                 <button id="mgmt-confirm-proceed-btn" disabled class="px-5 py-2 bg-red-600 hover:bg-red-700 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-lg text-sm font-bold transition-colors">Confirm &amp; Proceed</button>
@@ -943,7 +943,7 @@
             Enter API Key:
           </label>
           <input type="password" id="gemini-modal-key-input" placeholder="AIzaSy... (Gemini 3.5 Flash-Lite)"
-            class="w-full bg-gray-950 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-blue-500 font-mono">
+            class="w-full bg-gray-950 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-100 focus:outline-hidden focus:border-blue-500 font-mono">
         </div>
 
         <div class="p-3 bg-gray-950/80 border border-gray-800 rounded-lg flex items-start gap-3">
@@ -1015,9 +1015,9 @@
               <input id="reading-list-search"
                      type="search"
                      placeholder="Search lists…"
-                     class="flex-1 min-w-0 bg-gray-700 text-white text-sm px-3 py-1.5 rounded-lg focus:outline-none placeholder-gray-400" />
+                     class="flex-1 min-w-0 bg-gray-700 text-white text-sm px-3 py-1.5 rounded-lg focus:outline-hidden placeholder-gray-400" />
               <select id="reading-list-publisher-filter"
-                      class="w-36 sm:w-44 shrink-0 bg-gray-700 text-white text-sm pl-2.5 pr-8 py-1.5 rounded-lg focus:outline-none cursor-pointer truncate">
+                      class="w-36 sm:w-44 shrink-0 bg-gray-700 text-white text-sm pl-2.5 pr-8 py-1.5 rounded-lg focus:outline-hidden cursor-pointer truncate">
                 <option value="">All publishers</option>
               </select>
             </div>
@@ -1351,14 +1351,14 @@
           <span class="pl-3 text-gray-500 pointer-events-none shrink-0">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2"><use href="#icon-search"></use></svg>
           </span>
-          <input type="search" id="library-search-query" class="flex-1 min-w-0 bg-transparent text-white text-sm px-3 py-2.5 focus:outline-none placeholder-gray-500" placeholder="Search the stacks..." autocomplete="off" enterkeyhint="search" inputmode="search">
+          <input type="search" id="library-search-query" class="flex-1 min-w-0 bg-transparent text-white text-sm px-3 py-2.5 focus:outline-hidden placeholder-gray-500" placeholder="Search the stacks..." autocomplete="off" enterkeyhint="search" inputmode="search">
           <!-- Inline clear button — hidden when input is empty (CSS via :placeholder-shown) -->
           <button type="button" id="clear-search-btn" class="search-clear-btn" aria-label="Clear search">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5"><use href="#icon-close"></use></svg>
           </button>
         </div>
         <!-- Field selector - compact -->
-        <select id="library-search-field" class="search-by-select bg-gray-800 text-gray-300 text-sm rounded-xl ring-1 ring-white/10 focus:outline-none cursor-pointer">
+        <select id="library-search-field" class="search-by-select bg-gray-800 text-gray-300 text-sm rounded-xl ring-1 ring-white/10 focus:outline-hidden cursor-pointer">
           <option value="all">All</option>
           <option value="title">Title</option>
           <option value="series">Series</option>
@@ -1529,7 +1529,7 @@
           <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12"></path></svg>
           Order by:
         </label>
-        <select id="series-sort-select" class="bg-gray-800 text-white text-xs sm:text-sm px-3 py-1.5 rounded-lg border border-gray-700 hover:border-gray-500 focus:outline-none focus:border-purple-500 transition-colors cursor-pointer">
+        <select id="series-sort-select" class="bg-gray-800 text-white text-xs sm:text-sm px-3 py-1.5 rounded-lg border border-gray-700 hover:border-gray-500 focus:outline-hidden focus:border-purple-500 transition-colors cursor-pointer">
           <option value="name">Name (A-Z)</option>
           <option value="date-asc">Published Date (Oldest first)</option>
           <option value="date-desc">Published Date (Newest first)</option>
@@ -1728,11 +1728,11 @@
             <div class="col-span-2">
               <label for="search-query" class="text-xs text-gray-400">Search</label>
               <input id="search-query" type="text" placeholder="Title, series, etc."
-                     class="w-full bg-gray-700 text-white p-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500" />
+                     class="w-full bg-gray-700 text-white p-2 rounded-lg focus:outline-hidden focus:ring-2 focus:ring-red-500" />
             </div>
             <div>
               <label for="search-source" class="text-xs text-gray-400">Source</label>
-              <select id="search-source" class="w-full bg-gray-700 text-white p-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500">
+              <select id="search-source" class="w-full bg-gray-700 text-white p-2 rounded-lg focus:outline-hidden focus:ring-2 focus:ring-red-500">
                 <option value="all" selected>All Sources</option>
                 <option value="comicvine">ComicVine</option>
                 <option value="gcd">GCD</option>
@@ -1751,13 +1751,13 @@
           <div id="cv-issue-number-container">
             <label for="search-issue-number" class="text-xs text-gray-400">Issue #</label>
             <input id="search-issue-number" type="text" placeholder="e.g. 1"
-                   class="w-full bg-gray-700 text-white p-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500" />
+                   class="w-full bg-gray-700 text-white p-2 rounded-lg focus:outline-hidden focus:ring-2 focus:ring-red-500" />
           </div>
 
           <div id="cv-year-container">
             <label for="search-year" class="text-xs text-gray-400">Year</label>
             <input id="search-year" type="number" placeholder="e.g. 2026"
-                   class="w-full bg-gray-700 text-white p-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500" />
+                   class="w-full bg-gray-700 text-white p-2 rounded-lg focus:outline-hidden focus:ring-2 focus:ring-red-500" />
           </div>
 
           <div id="cv-resources-container">
