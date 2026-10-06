@@ -102,6 +102,20 @@ export function updateGuidedButtonCount() {
 
 let cachedReadingLists = [];
 
+// Lazy-load guards. A completed fetch (successful, empty, or failed) sets
+// readingListsLoaded so render-time callers never re-trigger a fetch for the
+// same result — without this, fetchAndCacheReadingLists() and
+// updateReadingListFilterButtonCount() call each other in an unbounded loop
+// whenever the reading-list collection is empty. Explicit callers (Reading
+// Lists modal, mutations) still refetch via fetchAndCacheReadingLists().
+let readingListsLoaded = false;
+let readingListsFetchInFlight = null;
+
+function maybeFetchReadingLists() {
+  if (readingListsLoaded || readingListsFetchInFlight) return;
+  fetchAndCacheReadingLists();
+}
+
 export function normalizePub(str) {
   return String(str || '').toLowerCase().replace(/[^a-z0-9]/g, '');
 }
@@ -138,32 +152,45 @@ export function matchesPublisher(list, publisherName) {
 }
 
 export async function fetchAndCacheReadingLists() {
-  try {
-    const fetchLists = (state.ReadingLists || window.ReadingLists)?.fetchReadingLists;
-    if (typeof fetchLists === 'function') {
-      cachedReadingLists = await fetchLists();
-    } else {
-      const resp = await fetch('/api/v1/reading-lists');
-      const data = await resp.json();
-      if (data && data.ok) {
-        cachedReadingLists = data.lists || [];
+  if (readingListsFetchInFlight) return readingListsFetchInFlight;
+
+  const inFlight = (async () => {
+    try {
+      const fetchLists = (state.ReadingLists || window.ReadingLists)?.fetchReadingLists;
+      if (typeof fetchLists === 'function') {
+        cachedReadingLists = await fetchLists();
+      } else {
+        const resp = await fetch('/api/v1/reading-lists');
+        const data = await resp.json();
+        if (data && data.ok) {
+          cachedReadingLists = data.lists || [];
+        }
+      }
+    } catch (err) {
+      console.warn('[smartlists] Error caching reading lists:', err);
+    } finally {
+      // Mark the attempt complete on every outcome so an empty or failed load
+      // is not auto-retried on each render (that retry cycle was the loop).
+      readingListsLoaded = true;
+      readingListsFetchInFlight = null;
+    }
+
+    updateReadingListFilterButtonCount();
+
+    const currentView = state.currentView || window.currentView;
+    const scope = state.activeSmartFilter || window.activeSmartFilter;
+    if (scope === 'reading-list' && (currentView === 'publishers' || currentView === 'series')) {
+      const applyFilter = state.applyFilterAndRender || window.applyFilterAndRender || state.LibraryRender?.applyFilterAndRender;
+      if (typeof applyFilter === 'function') {
+        applyFilter();
       }
     }
-  } catch (err) {
-    console.warn('[smartlists] Error caching reading lists:', err);
-  }
-  updateReadingListFilterButtonCount();
 
-  const currentView = state.currentView || window.currentView;
-  const scope = state.activeSmartFilter || window.activeSmartFilter;
-  if (scope === 'reading-list' && (currentView === 'publishers' || currentView === 'series')) {
-    const applyFilter = state.applyFilterAndRender || window.applyFilterAndRender || state.LibraryRender?.applyFilterAndRender;
-    if (typeof applyFilter === 'function') {
-      applyFilter();
-    }
-  }
+    return cachedReadingLists;
+  })();
 
-  return cachedReadingLists;
+  readingListsFetchInFlight = inFlight;
+  return inFlight;
 }
 
 export function getCachedReadingLists() {
@@ -172,13 +199,14 @@ export function getCachedReadingLists() {
 
 export function setCachedReadingLists(lists) {
   cachedReadingLists = Array.isArray(lists) ? lists : [];
+  readingListsLoaded = true;
   updateReadingListFilterButtonCount();
 }
 
 export function getReadingListsForPublisher(publisherName) {
   if (!publisherName) return [];
   if (cachedReadingLists.length === 0) {
-    fetchAndCacheReadingLists();
+    maybeFetchReadingLists();
   }
   return cachedReadingLists.filter(list => matchesPublisher(list, publisherName));
 }
@@ -194,7 +222,7 @@ export function updateReadingListFilterButtonCount() {
   const library = state.library || window.library;
 
   if (cachedReadingLists.length === 0) {
-    fetchAndCacheReadingLists();
+    maybeFetchReadingLists();
   }
 
   if (currentView === 'series' && currentPublisher) {
