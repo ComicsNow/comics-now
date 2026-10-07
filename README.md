@@ -22,7 +22,7 @@
 
 Most digital comic servers were built a decade ago as basic file browsers. **Comics Now!** re-imagines your comic library as a modern, intelligent web application designed for desktops, tablets, and phones:
 
-* 🧠 **Smart Guided View**: Automatically detects panels and dialogue bubbles using deep learning neural networks (`manga.onnx` and speech bubble detectors) for an immersive panel-by-panel reading experience. Features incremental scoping and auto-detection on library scan.
+* 🧠 **Smart Guided View**: Automatically detects panels and dialogue bubbles using deep learning neural networks (`manga.onnx` and speech bubble detectors) for an immersive panel-by-panel reading experience. Features incremental scoping, auto-detection on library scan, and visual authoring/fine-tuning via the companion editor **[GVE Now!](https://github.com/ComicsNow/gve-now-editor)**.
 * 🖼️ **Fullscreen Page Preview Grid & WebP Cache**: Navigate issues visually with a dynamic, lazy-loaded page preview grid. Full-resolution WebP on-the-fly transcoding backed by an LRU disk cache cuts bandwidth and memory while keeping 1:1 pixel coordinates for panel zoom.
 * 🔄 **True Cross-Device Sync**: Pick up right where you left off. Reading progress syncs in real-time between your phone, tablet, and PC.
 * 📱 **Resumable Offline PWA & Background Fetch**: Install Comics Now! to your iOS, iPadOS, Android, or desktop home screen. Queue comics with HTTP `Range` resumable transfers, and enjoy native Android Background Fetch so downloads keep running with the browser closed.
@@ -129,10 +129,25 @@ Looking for detailed setup guides, configuration tables, or workflow deep dives?
 - [Sidecar vs. Database vs. Archive Write-Back](docs/WIKI.md#6-supported-formats-auto-conversion--metadata-storage)
 - [Multi-Source Tagging & Auto-Renaming Engine](docs/WIKI.md#7-the-tagging-engine--file-organization)
 - [Smart Guided View & Reading Modes (Continuous, Manga, Bubble Zoom, E-Ink)](docs/WIKI.md#8-smart-guided-view--reading-modes)
+- [Authoring & Editing Guided View with GVE Now!](docs/WIKI.md#authoring--editing-guided-view-with-gve-now)
 - [Curating & Syncing Reading Lists to All Users](docs/WIKI.md#9-reading-lists)
 - [Progressive Web App (PWA) Offline Installation](docs/WIKI.md#10-devices-progress-syncing--offline-pwa)
 - [UI Long-Press Context Menus & Actions](docs/WIKI.md#11-ui-navigation-views--long-press-menus)
 - [Model Context Protocol (MCP) Setup for Claude & Cursor](docs/WIKI.md#13-model-context-protocol-mcp-server)
+
+---
+
+## 🎨 Companion App: GVE Now! (Guided View Editor)
+
+Looking to visually fine-tune, re-sequence, or author panel coordinates from scratch? Meet **[GVE Now!](https://github.com/ComicsNow/gve-now-editor)** — the dedicated visual editor companion for Comics Now!:
+
+* 🖌️ **Visual Bounding Box Editor**: Click, drag, resize, and nudge panels and speech bubbles with 1:1 pixel precision.
+* 🔢 **Sequence & Flow Reordering**: Drag-and-drop to adjust reading order for complex double-page spreads or dynamic layouts.
+* ⚡ **Shared Storage Architecture**: Connects directly to Comics Now! via your `comicsNowRoot` path — shares the SQLite database, metadata sidecars, and WebP page cache without duplicate files.
+* 🔄 **Instant Live Sync**: Saves directly to your collection; refresh Comics Now! to read your updated guided view immediately.
+* 📦 **Import & Export**: Backup or share panel definitions across your library with JSON export/import.
+
+👉 **[Explore the GVE Now! Repository & Setup Guide](https://github.com/ComicsNow/gve-now-editor)**
 
 ---
 

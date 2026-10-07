@@ -40,6 +40,7 @@ For the complete REST endpoint reference — every route under `/api/v1` with pa
    - [Admin-Generated, Community Shared](#admin-generated-community-shared)
    - [Reading Modes](#reading-modes)
    - [Display & Viewport Controls](#display--viewport-controls)
+   - [Authoring & Editing Guided View with GVE Now!](#authoring--editing-guided-view-with-gve-now)
 9. [Reading Lists](#9-reading-lists)
    - [Creating & Managing Lists](#creating--managing-lists)
    - [Reordering Comics & Lists](#reordering-comics--lists)
@@ -347,6 +348,19 @@ Switch between reading modes instantly in the reader overlay:
 - **Full Page Overview**: Double-tap in Guided View to view the full page before stepping to the next page's panels.
 - **E-Ink Anti-Ghosting Mode**: Toggle in the fullscreen toolbar cycles **Off → Monochrome → Color**, saved per device (Kindle, Kobo, Onyx Boox, and PocketBook are auto-detected on first visit). **Monochrome** applies a grayscale + contrast filter for black-and-white e-readers; **Color** boosts saturation for color e-paper displays. Both modes disable animations and flash the screen black on each page turn to prevent ghosting.
 - **Cinema Pan (Spreads)**: In Fullscreen, wide double-page spreads pan across automatically when they overflow the screen, starting once per displayed page (a re-render never restarts a pan you've stopped; navigating away and back re-arms it). A **Cinema Pan Spread** badge indicates the spread — tap it to toggle panning manually; spreads that already fit the screen don't pan.
+
+### Authoring & Editing Guided View with GVE Now!
+While Comics Now! automatically extracts panels and dialogue balloons via deep learning (`manga.onnx` and `western.onnx`), you can inspect, author, and fine-tune panel coordinates using the official companion application: **[GVE Now! (Guided View Editor)](https://github.com/ComicsNow/gve-now-editor)**.
+
+#### Key Features:
+- **Visual Bounding Box Canvas**: Interactive editor allowing you to draw, resize, snap, and nudge panel borders and speech bubbles with 1:1 pixel accuracy.
+- **Reading Order Sequencing**: Drag-and-drop sequencing to adjust panel transitions (critical for complex multi-tier layouts, splash pages, and non-linear storytelling).
+- **Direct Database & Cache Integration**: Points directly at your Comics Now! installation via `comicsNowRoot` in `config.json` — shares the SQLite database, metadata sidecars, and WebP page cache without file duplication.
+- **Live Sync to Reader**: Any edits saved in GVE Now! are instantly reflected in the Comics Now! web reader upon page reload.
+- **Sidecar Management**: Generates and updates standalone `.guided.json` sidecar files adjacent to your `.cbz` archives, enabling portable guided-view metadata across setups.
+- **Import & Export**: Backup panel coordinate maps or share community-authored guided views as clean JSON definitions.
+
+To install and run GVE Now! alongside Comics Now!, follow the instructions in the [GVE Now! Repository](https://github.com/ComicsNow/gve-now-editor).
 
 ---
 
