@@ -1,18 +1,24 @@
 /**
  * Phase 0.1 — Tailwind class inventory snapshot (characterization).
  *
- * Scans every HTML/JS source under public/ and snapshots the sorted set of
- * unique class tokens in use. This locks the exact utility vocabulary so the
- * v3→v4 codemod renames show up as a reviewable diff in the snapshot.
+ * Scans the repository's HTML/JS sources under public/ and snapshots the
+ * sorted set of unique class tokens in use. This locks the exact utility
+ * vocabulary so the v3→v4 codemod renames show up as a reviewable diff in
+ * the snapshot.
  *
- * Vendor files (jszip.min.js) and the Vite build output (public/dist) are
- * excluded: they are not hand-written UI markup.
+ * The file list comes from the git index (`git ls-files public`), not a raw
+ * directory walk: only files that are part of the repository may influence
+ * the snapshot, so it stays reproducible on any clean checkout. (A raw walk
+ * also picked up locally added, uncommitted files, which made this test
+ * fail on CI during the v1.3.0 release with tokens that exist nowhere in
+ * the repo.) Vendor files (jszip.min.js) are excluded: they are not
+ * hand-written UI markup.
  */
+const { execFileSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 
 const ROOT = path.resolve(__dirname, '..', '..');
-const PUBLIC_DIR = path.join(ROOT, 'public');
 
 const EXCLUDED_FILES = new Set(['jszip.min.js']);
 
@@ -23,17 +29,12 @@ const CLASSLIST_OP = /classList\.(?:add|remove|toggle)\(([^)]*)\)/g;
 /** Plausible utility token: letters/digits plus the punctuation Tailwind uses. */
 const VALID_TOKEN = /^[-\w[\]#/:%.()]+$/;
 
-function walk(dir, out = []) {
-  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-    const full = path.join(dir, entry.name);
-    if (entry.isDirectory()) {
-      if (entry.name === 'dist') continue; // Vite build output, derived from the sources
-      walk(full, out);
-    } else if (!EXCLUDED_FILES.has(entry.name) && /\.(html|js)$/.test(entry.name)) {
-      out.push(full);
-    }
-  }
-  return out;
+/** Repository files under public/ that the snapshot covers. */
+function sourceFiles() {
+  return execFileSync('git', ['ls-files', 'public'], { cwd: ROOT, encoding: 'utf8' })
+    .split('\n')
+    .filter((f) => f && /\.(html|js)$/.test(f) && !EXCLUDED_FILES.has(path.basename(f)))
+    .sort();
 }
 
 function collectTokens(file) {
@@ -65,7 +66,7 @@ function collectTokens(file) {
 
 describe('Tailwind class inventory (public/**/*.{html,js})', () => {
   it('snapshots the sorted unique set of class tokens in use', () => {
-    const files = walk(PUBLIC_DIR).map((f) => path.relative(ROOT, f)).sort();
+    const files = sourceFiles();
     const tokens = new Set();
     for (const file of files) {
       for (const token of collectTokens(path.join(ROOT, file))) tokens.add(token);
