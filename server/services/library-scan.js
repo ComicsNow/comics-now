@@ -194,6 +194,37 @@ async function scanLibrary(force = false) {
           guidedViewStatus = 'completed';
           guidedViewPath = sidecarPath;
           log('INFO', 'SCAN', `Reconnected guided-view sidecar: ${path.basename(filePath)}`);
+        } else {
+          // If moved outside the app, check if a missing comic record has an existing sidecar to migrate
+          const baseName = path.basename(filePath);
+          for (const [oldPath, oldRec] of dbComicsMap.entries()) {
+            if (path.basename(oldPath) === baseName && oldRec.id !== id && !fs.existsSync(oldPath)) {
+              const oldSidecar = path.join(GUIDED_VIEW_DIR, `${oldRec.id}.json`);
+              if (fs.existsSync(oldSidecar)) {
+                try {
+                  try {
+                    const raw = fs.readFileSync(oldSidecar, 'utf8');
+                    const parsed = JSON.parse(raw);
+                    if (parsed && typeof parsed === 'object' && parsed.pages) {
+                      parsed.comicId = id;
+                      fs.writeFileSync(sidecarPath, JSON.stringify(parsed, null, 2), 'utf8');
+                      if (oldSidecar !== sidecarPath && fs.existsSync(oldSidecar)) {
+                        try { fs.unlinkSync(oldSidecar); } catch (_) {}
+                      }
+                    } else {
+                      fs.renameSync(oldSidecar, sidecarPath);
+                    }
+                  } catch (_) {
+                    fs.renameSync(oldSidecar, sidecarPath);
+                  }
+                  guidedViewStatus = 'completed';
+                  guidedViewPath = sidecarPath;
+                  log('INFO', 'SCAN', `Migrated moved comic guided-view sidecar: ${baseName}`);
+                  break;
+                } catch (_) {}
+              }
+            }
+          }
         }
 
         let thumbnailPath;

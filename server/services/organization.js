@@ -291,27 +291,95 @@ async function updateComicIdentity({
   }
 
   // 4. Rename Guided View sidecar in guidedViewDir if it exists
-  let newGvPath = null;
+  let newGvPath = undefined;
+  let newGvStatus = undefined;
   if (guidedViewDir && oldId !== newId) {
     const oldGv = path.join(guidedViewDir, `${oldId}.json`);
     const newGv = path.join(guidedViewDir, `${newId}.json`);
     if (fs.existsSync(oldGv)) {
       try {
-        fs.renameSync(oldGv, newGv);
-        newGvPath = path.join('metadata', 'guided_view', `${newId}.json`);
+        let sidecarData = null;
+        try {
+          const raw = fs.readFileSync(oldGv, 'utf8');
+          sidecarData = JSON.parse(raw);
+        } catch (_) {}
+
+        if (sidecarData && typeof sidecarData === 'object' && sidecarData.pages) {
+          sidecarData.comicId = newId;
+          fs.writeFileSync(newGv, JSON.stringify(sidecarData, null, 2), 'utf8');
+          if (oldGv !== newGv && fs.existsSync(oldGv)) {
+            try { fs.unlinkSync(oldGv); } catch (_) {}
+          }
+          newGvPath = newGv;
+          newGvStatus = 'completed';
+        } else {
+          // Corrupt or invalid JSON sidecar, clean up and flag for regeneration
+          if (fs.existsSync(oldGv)) try { fs.unlinkSync(oldGv); } catch (_) {}
+          if (fs.existsSync(newGv)) try { fs.unlinkSync(newGv); } catch (_) {}
+          newGvPath = null;
+          newGvStatus = 'pending';
+        }
       } catch (gErr) {
-        console.warn(`[ORGANIZATION] Failed to rename guided view sidecar: ${gErr.message}`);
+        console.warn(`[ORGANIZATION] Failed to migrate guided view sidecar: ${gErr.message}`);
+        newGvPath = null;
+        newGvStatus = 'pending';
       }
+    } else if (fs.existsSync(newGv)) {
+      // Sidecar already exists at target ID
+      try {
+        const raw = fs.readFileSync(newGv, 'utf8');
+        const sidecarData = JSON.parse(raw);
+        if (sidecarData && typeof sidecarData === 'object' && sidecarData.pages) {
+          newGvPath = newGv;
+          newGvStatus = 'completed';
+        } else {
+          try { fs.unlinkSync(newGv); } catch (_) {}
+          newGvPath = null;
+          newGvStatus = 'pending';
+        }
+      } catch (_) {
+        try { fs.unlinkSync(newGv); } catch (_) {}
+        newGvPath = null;
+        newGvStatus = 'pending';
+      }
+    } else {
+      // Sidecar is missing: ensure any stale reference is cleared and queue regeneration
+      newGvPath = null;
+      newGvStatus = 'pending';
     }
   }
 
   // 5. Update Database Records
   if (typeof dbRun === 'function') {
     const newThumbFilename = `${newId}.jpg`;
-    await dbRun(
-      'UPDATE comics SET id = ?, path = ?, name = ?, thumbnailPath = ?, guidedViewPath = COALESCE(?, guidedViewPath) WHERE id = ?',
-      [newId, newPath, newName, newThumbFilename, newGvPath, oldId]
-    );
+    if (oldId !== newId) {
+      if (guidedViewDir) {
+        await dbRun(
+          'UPDATE comics SET id = ?, path = ?, name = ?, thumbnailPath = ?, guidedViewPath = ?, guidedViewStatus = COALESCE(?, guidedViewStatus) WHERE id = ?',
+          [newId, newPath, newName, newThumbFilename, newGvPath, newGvStatus, oldId]
+        );
+      } else {
+        await dbRun(
+          'UPDATE comics SET id = ?, path = ?, name = ?, thumbnailPath = ? WHERE id = ?',
+          [newId, newPath, newName, newThumbFilename, oldId]
+        );
+      }
+    } else {
+      await dbRun(
+        'UPDATE comics SET path = ?, name = ?, thumbnailPath = ? WHERE id = ?',
+        [newPath, newName, newThumbFilename, oldId]
+      );
+    }
+
+    // If guided view was missing, trigger generation
+    if (newGvStatus === 'pending') {
+      try {
+        const guidedReader = require('./guided-reader');
+        guidedReader.startRunForScope('comic', newId).catch(() => {
+          guidedReader.onLibraryScanComplete([newId]).catch(() => {});
+        });
+      } catch (_) {}
+    }
 
     // Update cascading/related tables — only those present in this schema, so we
     // don't log "no such table" errors for tables a deployment doesn't have.
