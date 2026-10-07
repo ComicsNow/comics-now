@@ -205,7 +205,6 @@ function buildGeminiPayload({ localBase64, localMime, candidatesWithImages }) {
       }
     ],
     generationConfig: {
-      temperature: 0.1,
       responseMimeType: 'application/json',
       responseSchema: {
         type: 'OBJECT',

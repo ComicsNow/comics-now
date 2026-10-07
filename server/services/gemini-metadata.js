@@ -176,7 +176,6 @@ Return a JSON object adhering exactly to the requested schema.
       }
     ],
     generationConfig: {
-      temperature: 0.1,
       responseMimeType: 'application/json',
       responseSchema: {
         type: 'OBJECT',
