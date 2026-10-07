@@ -296,7 +296,44 @@ async function detectBubbles(buffer, type = 'western') {
   }
 }
 
-function buildMangaSequence(allBoxes) {
+function buildMangaSequence(allBoxes, explicitBubbles = []) {
+  if (Array.isArray(explicitBubbles) && explicitBubbles.length > 0) {
+    const panels = sortReadingOrder(allBoxes, 'manga');
+    const sequence = [];
+    const assigned = new Set();
+    const panelObjects = [];
+
+    for (const panel of panels) {
+      const pBubbles = [];
+      for (let i = 0; i < explicitBubbles.length; i++) {
+        if (!assigned.has(i) && (isBubbleInPanel(explicitBubbles[i], panel) || intersectionOverArea(explicitBubbles[i], panel) >= 0.6)) {
+          pBubbles.push(explicitBubbles[i]);
+          assigned.add(i);
+        }
+      }
+      const sortedBubbles = sortReadingOrder(pBubbles, 'manga');
+      panelObjects.push({ ...panel, isPanel: true, bubbles: sortedBubbles, raw: panel });
+    }
+
+    const orphans = [];
+    for (let i = 0; i < explicitBubbles.length; i++) {
+      if (!assigned.has(i)) orphans.push({ ...explicitBubbles[i], isBubble: true, raw: explicitBubbles[i] });
+    }
+
+    const allFlowItems = [...panelObjects, ...orphans];
+    const sortedFlow = sortReadingOrder(allFlowItems, 'manga');
+
+    for (const item of sortedFlow) {
+      if (item.isPanel) {
+        sequence.push(...item.bubbles.map(b => b.raw || b));
+        sequence.push(item.raw || item);
+      } else {
+        sequence.push(item.raw || item);
+      }
+    }
+    return sequence;
+  }
+
   if (!allBoxes || allBoxes.length === 0) return [];
   const isChild = new Array(allBoxes.length).fill(false);
   for (let i = 0; i < allBoxes.length; i++) {
@@ -413,8 +450,8 @@ async function processComic(id, comicPath, type, opts = {}) {
       );
       const rawPanels = (type === 'manga') ? await detectPanels(buffer, 'manga', 0.1) : await detectPanels(buffer, 'manga', 0.5, 0);
       const panels = sortReadingOrder(rawPanels, type);
-      const bubbles = type === 'western' ? await detectBubbles(buffer, type) : [];
-      let sequence = (type === 'manga') ? buildMangaSequence(rawPanels) : buildHybridWesternSequence(panels, bubbles);
+      const bubbles = await detectBubbles(buffer, type);
+      let sequence = (type === 'manga') ? buildMangaSequence(rawPanels, bubbles) : buildHybridWesternSequence(panels, bubbles);
       result.pages[pageName] = { panels, bubbles, sequence: sequence.length > 0 ? sequence : panels };
       totalPanels += panels.length;
       pagesProcessed++;

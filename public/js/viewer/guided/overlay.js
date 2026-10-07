@@ -64,12 +64,17 @@ export function applyTransform(targetBox, isManga) {
   if (pw <= 0) pw = img.naturalWidth;
   if (ph <= 0) ph = img.naturalHeight;
 
-  const margin = 0.04;
+  const margin = 0.02;
   const targetW = stageW * (1 - margin * 2);
   const targetH = stageH * (1 - margin * 2);
   
-  // Cap scale to 4x
+  const baseScale = Math.min(stageW / img.naturalWidth, stageH / img.naturalHeight);
   let s = Math.min(targetW / pw, targetH / ph);
+  // Ensure full width panels and panels in general are visibly zoomed in compared to full page
+  const minPanelZoom = baseScale * 1.35;
+  if (s < minPanelZoom && pw > img.naturalWidth * 0.6) {
+    s = minPanelZoom;
+  }
   if (s > 4.0) s = 4.0;
 
   const cx = px + pw / 2;
@@ -82,7 +87,7 @@ export function applyTransform(targetBox, isManga) {
 /**
  * Renders the "magnifier" overlay for Bubble Zoom, Hot Zoom, and Western sequential.
  * targetBox: [x, y, w, h] in natural image coords.
- * isPanelZoom: boolean, if true fits box to overlay (Manga style), else fixed 2.5x magnification.
+ * isPanelZoom: boolean, if true fits box to overlay (Manga style), else fixed magnification.
  */
 export function applyBubbleOverlay(targetBox, isPanelZoom) {
   const stage = getStage();
@@ -170,33 +175,64 @@ export function applyBubbleOverlay(targetBox, isPanelZoom) {
   
   let overlayW, overlayH, innerScale, targetX, targetY, overlayScale;
   if (isPanelZoom) {
-    overlayW = Math.min(stageW * 0.95, 1100);
-    overlayH = Math.min(stageH * 0.85, 1400);
-    const padding = 24;
-    const fitScale = Math.min(
-      (overlayW - padding * 2) / pw,
-      (overlayH - padding * 2) / ph
-    );
-    innerScale = Math.max(baseScale, Math.min(fitScale, baseScale * 4));
-    targetX = (stageW - overlayW) / 2;
-    targetY = (stageH - overlayH) / 2;
+    // A) More zoomed in on panels
+    // B) More zoomed in on full-width panels
+    const maxPanelW = Math.min(stageW - 12, 1200);
+    const maxPanelH = Math.min(stageH * 0.88, 1400);
+    const pad = 12;
+
+    const fitScaleW = (maxPanelW - pad * 2) / pw;
+    const fitScaleH = (maxPanelH - pad * 2) / ph;
+    const fitScale = Math.min(fitScaleW, fitScaleH);
+
+    // Boost zoom: for panels, ensure at least 1.35x baseScale (or higher if fitScale allows).
+    // Full-width panels previously had fitScale <= baseScale (zero zoom).
+    const minZoomMultiplier = 1.35;
+    let targetScale = Math.max(fitScale, baseScale * minZoomMultiplier);
+    targetScale = Math.min(targetScale, baseScale * 4.0);
+    if (ph * targetScale > maxPanelH * 1.25) {
+      targetScale = Math.max(baseScale, maxPanelH / ph);
+    }
+    innerScale = targetScale;
+
+    // Adapt overlay dimensions to the actual rendered panel dimensions, avoiding giant black voids
+    overlayW = Math.min(maxPanelW, Math.round(pw * innerScale + pad * 2));
+    overlayH = Math.min(maxPanelH, Math.round(ph * innerScale + pad * 2));
+    const minPanelW = Math.min(280, maxPanelW);
+    const minPanelH = 160;
+    overlayW = Math.max(overlayW, minPanelW);
+    overlayH = Math.max(overlayH, minPanelH);
+
+    targetX = Math.max(6, Math.min(stageW - overlayW - 6, (stageW - overlayW) / 2));
+    targetY = Math.max(50, Math.min(stageH - overlayH - 80, (stageH - overlayH) / 2));
     overlayScale = 1;
   } else {
-    const magScale = 2.5;
-    const bubbleDisplayW = pw * baseScale * magScale;
-    const bubbleDisplayH = ph * baseScale * magScale;
+    // C) More zoomed in on speech bubbles
+    // D) Zoomed in on full width bubbles and not cutting off text
+    const maxBubbleW = Math.min(stageW - 12, 700);
+    const maxBubbleH = Math.min(stageH * 0.52, 420);
+    const padX = 20;
+    const padY = 16;
+    const minBubbleW = Math.min(260, maxBubbleW);
+    const minBubbleH = 140;
 
-    overlayW = bubbleDisplayW + 60;
-    overlayH = bubbleDisplayH + 60;
+    // Increased target magnification (3.2x vs 2.5x previously)
+    const targetMag = 3.2;
+    const desiredScale = baseScale * targetMag;
 
-    const maxW = Math.min(stageW * 0.85, 550);
-    const maxH = Math.min(stageH * 0.45, 350);
-    const minW = 280;
-    const minH = 160;
-    overlayW = Math.min(Math.max(overlayW, minW), maxW);
-    overlayH = Math.min(Math.max(overlayH, minH), maxH);
+    // Calculate maximum fit scale inside overlay bounds to guarantee text is NEVER cut off
+    const maxFitX = (maxBubbleW - padX * 2) / pw;
+    const maxFitY = (maxBubbleH - padY * 2) / ph;
+    const maxFit = Math.min(maxFitX, maxFitY);
 
-    targetX = (stageW - overlayW) / 2;
+    // Zoom in as much as possible up to desiredScale, safely capped by maxFit
+    innerScale = Math.min(desiredScale, maxFit);
+
+    // Ensure overlay accommodates the bubble width and height with padding
+    overlayW = Math.min(maxBubbleW, Math.max(minBubbleW, Math.round(pw * innerScale + padX * 2)));
+    overlayH = Math.min(maxBubbleH, Math.max(minBubbleH, Math.round(ph * innerScale + padY * 2)));
+
+    targetX = Math.max(6, Math.min(stageW - overlayW - 6, (stageW - overlayW) / 2));
     
     // STABILIZATION: Use a more stable positioning logic to prevent jumpiness.
     // Instead of a hard flip at center, we use a 20% deadzone.
@@ -218,9 +254,9 @@ export function applyBubbleOverlay(targetBox, isPanelZoom) {
     } else {
       targetY = stageH - overlayH - 100;
     }
+    targetY = Math.max(10, Math.min(stageH - overlayH - 10, targetY));
 
-    innerScale = baseScale * magScale;
-    overlayScale = 1.1;
+    overlayScale = 1;
   }
 
   overlay.style.width = `${Math.round(overlayW)}px`;
