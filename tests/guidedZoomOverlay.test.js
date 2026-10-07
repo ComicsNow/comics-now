@@ -178,4 +178,33 @@ describe('Guided View Zoom & Overlay Scaling', () => {
     // BaseScale = 0.40. Sequential transform must zoom in on full-width panels (>= 0.40 * 1.35)
     expect(scale).toBeGreaterThanOrEqual(0.40 * 1.35);
   });
+
+  test('E) Custom zoom box (25% width x 22% height) zooms in at 3.5x - 4.0x magnification', () => {
+    // Natural page: 1000x1500. baseScale = min(400/1000, 800/1500) = 0.40
+    // 25% width = 250, 22% height = 330
+    const customZoomBox = [375, 585, 250, 330];
+    state.GuidedView.applyBubbleOverlay(customZoomBox, true);
+
+    const overlay = document.getElementById('bubble-magnifier-overlay');
+    const innerImg = document.getElementById('bubble-magnifier-img');
+    expect(overlay).toBeTruthy();
+    expect(innerImg).toBeTruthy();
+
+    const transform = innerImg.style.transform;
+    const scaleMatch = transform.match(/scale\(([^)]+)\)/);
+    const scale = parseFloat(scaleMatch[1]);
+
+    // Magnification relative to baseScale (0.40):
+    // fitScaleW = (400 - 12 - 24) / 250 = 364 / 250 = 1.456
+    // magnification = 1.456 / 0.40 = 3.64x
+    const magnification = scale / 0.40;
+    expect(magnification).toBeGreaterThanOrEqual(3.5);
+    expect(magnification).toBeLessThanOrEqual(4.0);
+
+    // Overlay expands to fit the screen width
+    const overlayW = parseFloat(overlay.style.width);
+    expect(overlayW).toBeGreaterThanOrEqual(350);
+    expect(overlayW).toBeLessThanOrEqual(400);
+  });
 });
+

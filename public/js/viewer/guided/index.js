@@ -20,7 +20,7 @@ export function getRenderState() {
   const registry = state.GuidedView.ModeRegistry;
   const manualOverrideBox = registry.getManualOverrideBox();
   if (manualOverrideBox) {
-    return { targetBox: manualOverrideBox, isPanelZoom: false };
+    return { targetBox: manualOverrideBox, isPanelZoom: true };
   }
 
   const activeMode = registry.getActiveMode();

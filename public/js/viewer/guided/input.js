@@ -115,11 +115,15 @@ export function handleDoubleClickZoom(event) {
   if (!rect.width || !rect.height) return;
   const ratioX = Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width));
   const ratioY = Math.max(0, Math.min(1, (event.clientY - rect.top) / rect.height));
-  const boxW = img.naturalWidth * 0.4;
-  const boxH = img.naturalHeight * 0.4;
+  const boxW = Math.round(img.naturalWidth * 0.25);
+  const boxH = Math.round(img.naturalHeight * 0.22);
   const cx = ratioX * img.naturalWidth;
   const cy = ratioY * img.naturalHeight;
-  registry.setManualOverrideBox([cx - boxW / 2, cy - boxH / 2, boxW, boxH]);
+  const maxX = Math.max(0, img.naturalWidth - boxW);
+  const maxY = Math.max(0, img.naturalHeight - boxH);
+  const x = Math.max(0, Math.min(maxX, Math.round(cx - boxW / 2)));
+  const y = Math.max(0, Math.min(maxY, Math.round(cy - boxH / 2)));
+  registry.setManualOverrideBox([x, y, boxW, boxH]);
   if (!isPointerEvt) { event.preventDefault?.(); event.stopPropagation?.(); }
   if (typeof state.GuidedView.refreshRender === 'function') {
     state.GuidedView.refreshRender();
