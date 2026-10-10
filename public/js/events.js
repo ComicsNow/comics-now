@@ -352,15 +352,6 @@ metadataForm?.addEventListener('submit', async (e) => {
     state.currentMetadata[key] = value;
   }
 
-  const checkTitleSame = state.isTitleSameAsSeries || window.isTitleSameAsSeries;
-  if (typeof checkTitleSame === 'function') {
-    if (state.currentMetadata.Title && (checkTitleSame(state.currentMetadata.Title, state.currentMetadata.Series) || (!state.currentMetadata.Series && checkTitleSame(state.currentMetadata.Title, '')))) {
-      state.currentMetadata.Title = '';
-      const titleInput = metadataForm.querySelector('[name="Title"]');
-      if (titleInput) titleInput.value = '';
-    }
-  }
-
   try {
     const response = await fetch(`${state.API_BASE_URL}/api/v1/comics/info?path=${encodeURIComponent(encodePath(state.currentComic.path))}`, {
       method: 'POST',
@@ -380,6 +371,34 @@ metadataForm?.addEventListener('submit', async (e) => {
 
     if (state.currentComic) {
       state.currentComic.metadata = JSON.stringify(state.currentMetadata);
+      if (state.currentMetadata.Title !== undefined) {
+        state.currentComic.title = state.currentMetadata.Title;
+      }
+      if (state.currentMetadata.Series !== undefined) {
+        state.currentComic.series = state.currentMetadata.Series;
+      }
+
+      // Recompute display info and update viewer title / subtitle immediately
+      const applyDisplayInfoFn = state.applyDisplayInfoToComic || window.applyDisplayInfoToComic;
+      const displayInfo = typeof applyDisplayInfoFn === 'function' ? applyDisplayInfoFn(state.currentComic) : null;
+
+      const comicTitleEl = state.comicTitleH2 || (typeof document !== 'undefined' ? document.getElementById('comic-title') : null);
+      if (comicTitleEl && displayInfo) {
+        comicTitleEl.textContent = displayInfo.displayTitle || state.currentComic.name || '';
+      }
+
+      const comicSubtitleEl = state.comicSubtitleP || (typeof document !== 'undefined' ? document.getElementById('comic-subtitle') : null);
+      if (comicSubtitleEl && displayInfo) {
+        const subtitleText = displayInfo.subtitle;
+        if (subtitleText) {
+          comicSubtitleEl.textContent = subtitleText;
+          comicSubtitleEl.classList.remove('hidden');
+        } else {
+          comicSubtitleEl.textContent = '';
+          comicSubtitleEl.classList.add('hidden');
+        }
+      }
+
       const hasSeries = ((state.currentMetadata.Series || '').toString().trim().length > 0) || ((state.currentMetadata.Title || '').toString().trim().length > 0);
       const hasPublisher = (state.currentMetadata.Publisher || '').toString().trim().length > 0;
       const hasDate = (state.currentMetadata.Year || state.currentMetadata.CoverDate || state.currentMetadata.StoreDate || state.currentMetadata['Cover Date'] || state.currentMetadata['Store Date'] || '').toString().trim().length > 0;
@@ -393,6 +412,9 @@ metadataForm?.addEventListener('submit', async (e) => {
         if (mapped) {
           mapped.metadata = state.currentComic.metadata;
           mapped.tagStatus = newTag;
+          if (state.currentComic.title !== undefined) mapped.title = state.currentComic.title;
+          if (state.currentComic.series !== undefined) mapped.series = state.currentComic.series;
+          if (typeof applyDisplayInfoFn === 'function') applyDisplayInfoFn(mapped);
         }
       }
 

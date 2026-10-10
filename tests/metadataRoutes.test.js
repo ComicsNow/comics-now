@@ -79,4 +79,49 @@ describe('User Metadata Routes - External Search', () => {
     );
     expect(res.json).toHaveBeenCalled();
   });
+
+  it('should return exact title for comic info without stripping it', async () => {
+    let comicInfoHandler;
+    router.get.mockImplementation((path, ...args) => {
+      if (path === '/api/v1/comics/info') {
+        comicInfoHandler = args[args.length - 1];
+      }
+    });
+
+    attachMetadataRoutes(router, deps);
+
+    deps.dbGet.mockImplementation(async (sql) => {
+      if (sql.includes('SELECT metadata FROM comics')) {
+        return {
+          metadata: JSON.stringify({
+            Title: 'Batman #45',
+            Series: 'Batman',
+            Number: '45'
+          })
+        };
+      }
+      return null;
+    });
+
+    const b64Path = Buffer.from('/comics/Batman 45.cbz').toString('base64');
+    const req = {
+      query: { path: b64Path },
+      user: { userId: 'admin', role: 'admin' }
+    };
+    const res = {
+      json: jest.fn(),
+      status: jest.fn().mockReturnThis()
+    };
+
+    await comicInfoHandler(req, res);
+
+    expect(res.json).toHaveBeenCalledWith(
+      expect.objectContaining({
+        Title: 'Batman #45',
+        Series: 'Batman',
+        Number: '45'
+      })
+    );
+  });
 });
+
