@@ -54,10 +54,6 @@ module.exports = function attach(router, deps) {
       const row = await dbGet('SELECT metadata FROM comics WHERE id = ?', [id]);
       let meta = {};
       try { meta = JSON.parse(row?.metadata || '{}'); } catch {}
-      const { isTitleSameAsSeries } = require('../../services/metadata');
-      if (meta.Title && (isTitleSameAsSeries(meta.Title, meta.Series) || (!meta.Series && isTitleSameAsSeries(meta.Title, '')))) {
-        meta.Title = '';
-      }
       return res.json(meta);
     } catch (e) {
       return res.status(500).json({ message: formatErrorMessage(e, req, 'Failed to fetch comic info') });

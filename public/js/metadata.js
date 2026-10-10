@@ -258,11 +258,6 @@ function renderMetadataDisplay(metadata, clearForm = true) {
   // Show only fields that have values (for both admin and non-admin)
   const merged = { ...(metadata || {}) };
 
-  // Rule: If Title is the same as Series (even with issue numbers, #3, 3, volume suffixes), leave it blank!
-  if (merged.Title && (isTitleSameAsSeries(merged.Title, merged.Series) || (!merged.Series && isTitleSameAsSeries(merged.Title, '')))) {
-    merged.Title = '';
-  }
-
   // Which keys should be chip inputs
   const chipFields = new Set(['Characters', 'Teams', 'Locations', 'StoryArc', 'Genre']);
 

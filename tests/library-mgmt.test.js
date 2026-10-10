@@ -191,4 +191,43 @@ describe('Admin Library Management - Metadata Migration', () => {
     expect(unlinkSpy).toHaveBeenCalledWith('/comics/Action Comics.ComicInfo.xml');
     expect(unlinkSpy).toHaveBeenCalledWith('/comics/Action Comics.xml');
   });
+
+  it('should preserve and save user-entered Title in POST /api/v1/comics/info', async () => {
+    let saveInfoHandler;
+    router.post.mockImplementation((path, ...args) => {
+      if (path === '/api/v1/comics/info') {
+        saveInfoHandler = args[args.length - 1];
+      }
+    });
+
+    attachLibraryMgmtRoutes(router, deps);
+
+    deps.dbGet.mockResolvedValue({ libraryMode: 'folder' });
+    jest.spyOn(fs, 'existsSync').mockReturnValue(true);
+
+    const b64Path = Buffer.from('/comics/Batman 45.cbz').toString('base64');
+    const req = {
+      query: { path: b64Path },
+      body: {
+        Title: 'Batman #45',
+        Series: 'Batman',
+        Number: '45',
+        Publisher: 'DC Comics'
+      }
+    };
+    const res = {
+      json: jest.fn(),
+      status: jest.fn().mockReturnThis()
+    };
+
+    await saveInfoHandler(req, res);
+
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ ok: true }));
+    expect(deps.dbRun).toHaveBeenCalledWith(
+      expect.stringContaining('UPDATE comics SET metadata = ?'),
+      expect.arrayContaining([
+        expect.stringContaining('"Title":"Batman #45"')
+      ])
+    );
+  });
 });
