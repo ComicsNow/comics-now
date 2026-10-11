@@ -86,6 +86,12 @@ claude mcp add comics-now -- /path/to/comics-now/mcp/run.sh
   - `get_guided_status()`: Get Guided View panel detector status, queue size, and active job.
   - `get_guided_logs()`: Retrieve recent logs from the Guided View panel detection worker.
   - `trigger_guided_detection(scope, target, force=False)`: Trigger panel detection across a library, publisher, series, or single comic.
+- **Guided View Visual & Coordinate Editing (GVE Now companion)**:
+  - `inspect_guided_page(comic_id, page=0)`: Returns the overlaid page image (visual bounding boxes and reading order badges) alongside the structured sequence coordinates.
+  - `get_guided_page_image(comic_id, page=0, overlay=True)`: Extracts a page image, optionally rendering speech bubble and panel overlays.
+  - `get_guided_page_data(comic_id, page=0)`: Retrieves page dimensions, reading sequence order, and speech/panel bounding boxes.
+  - `apply_guided_page_fix(comic_id, page, items, order=None)`: Applies validated speech/panel coordinates and reading sequence fixes to GVE Now with automatic backup.
+  - `reorder_guided_page(comic_id, page, order)`: Reorders the active reading sequence for a page without changing box coordinates.
 - **Administration & Diagnostics**:
   - `list_libraries()`: List all configured comic root library folders.
   - `get_user_stats(user_id)`: Get detailed reading statistics, read/unread counts, and total pages read for a user.
