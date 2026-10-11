@@ -57,5 +57,6 @@ pnpm-workspace.yaml
 .pnpm-store/
 
 # MCP virtual environment
+mcp/.venv
 mcp/.venv/
 
