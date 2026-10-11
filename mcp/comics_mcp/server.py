@@ -23,9 +23,12 @@ import httpx
 from mcp.server.fastmcp import FastMCP, Image
 from mcp.server.transport_security import TransportSecuritySettings
 
+from comics_mcp.guided_overlay import render_guided_overlay
+
 # --- Configuration (env-driven) ---------------------------------------------
 
 BASE_URL = os.environ.get("COMICS_BASE_URL", "http://localhost:3000").rstrip("/")
+GVE_BASE_URL = os.environ.get("GVE_BASE_URL", "http://localhost:3100").rstrip("/")
 _DEFAULT_DB = os.path.abspath(
     os.path.join(os.path.dirname(__file__), "..", "..", "comics-now.db")
 )
@@ -45,6 +48,7 @@ mcp = FastMCP("comics-now")
 # --- HTTP helper -------------------------------------------------------------
 
 _client: Optional[httpx.Client] = None
+_gve_client: Optional[httpx.Client] = None
 
 
 def _http() -> httpx.Client:
@@ -54,6 +58,62 @@ def _http() -> httpx.Client:
             base_url=BASE_URL, timeout=TIMEOUT, headers=EXTRA_HEADERS
         )
     return _client
+
+
+def _gve_http() -> httpx.Client:
+    global _gve_client
+    if _gve_client is None:
+        _gve_client = httpx.Client(
+            base_url=GVE_BASE_URL, timeout=TIMEOUT, headers=EXTRA_HEADERS
+        )
+    return _gve_client
+
+
+def _gve_request(
+    method: str,
+    path: str,
+    params: Optional[dict] = None,
+    body: Optional[dict] = None,
+) -> dict:
+    try:
+        resp = _gve_http().request(
+            method, path, params=params, json=body if body is not None else None
+        )
+    except httpx.RequestError as exc:
+        return {"status": 0, "ok": False, "error": f"GVE Now HTTP error: {exc}"}
+
+    ctype = resp.headers.get("content-type", "")
+    if "application/json" in ctype:
+        try:
+            payload = resp.json()
+        except Exception:
+            payload = resp.text
+    else:
+        payload = resp.text
+    return {
+        "status": resp.status_code,
+        "ok": resp.is_success,
+        "data": payload,
+    }
+
+
+def _gve_page_image(comic_id: str, page_name: str) -> tuple[bytes, str]:
+    url = f"/api/comics/{comic_id}/page-image"
+    resp = _gve_http().request("GET", url, params={"page": page_name})
+    resp.raise_for_status()
+    ctype = resp.headers.get("content-type", "image/jpeg")
+    fmt = "png" if "png" in ctype else ("webp" if "webp" in ctype else "jpeg")
+    return resp.content, fmt
+
+
+def _resolve_guided_page(pages_dict: dict, page: int) -> Optional[tuple[int, str, dict]]:
+    if not pages_dict:
+        return None
+    sorted_keys = sorted(pages_dict.keys())
+    if page < 0 or page >= len(sorted_keys):
+        return None
+    page_name = sorted_keys[page]
+    return page, page_name, pages_dict[page_name]
 
 
 # Endpoints that mutate/destroy data on disk. Blocked via call_api unless
@@ -834,6 +894,256 @@ def set_tags_bulk(
     if fields is not None:
         body["fields"] = fields
     return _dump(_request("POST", "/api/v1/comics/tags/bulk", body=body))
+
+
+# --- Part D: Guided View Visual & Coordinate Editing -------------------------
+
+
+@mcp.tool()
+def get_guided_page_data(comic_id: str, page: int = 0) -> str:
+    """Retrieve speech and panel coordinates for a specific comic page as structured data.
+
+    Args:
+        comic_id: Target comic id.
+        page: 0-based page index (0 = first page).
+
+    Returns:
+        JSON string containing comic ID, page index, page file name, comic reading type,
+        dimensions, and items sorted in active reading sequence.
+    """
+    res = _gve_request("GET", f"/api/comics/{comic_id}/guided")
+    if not res.get("ok"):
+        return _dump({
+            "ok": False,
+            "error": f"Failed to retrieve guided data for comic {comic_id}: {res.get('data') or res.get('error')}",
+        })
+
+    doc = res.get("data") if isinstance(res.get("data"), dict) else {}
+    pages = doc.get("pages", {})
+    resolved = _resolve_guided_page(pages, int(page))
+    if not resolved:
+        return _dump({
+            "ok": False,
+            "error": f"Page index {page} is out of bounds (total pages: {len(pages)})",
+        })
+
+    page_idx, page_name, page_info = resolved
+    items = page_info.get("items", [])
+    order = page_info.get("order", [])
+
+    item_map = {it["id"]: it for it in items if isinstance(it, dict) and "id" in it}
+    sequence = []
+    for seq_idx, item_id in enumerate(order, start=1):
+        if item_id in item_map:
+            it = item_map[item_id]
+            sequence.append({
+                "order": seq_idx,
+                "id": it.get("id"),
+                "kind": it.get("kind"),
+                "box": it.get("box"),
+            })
+
+    return _dump({
+        "ok": True,
+        "data": {
+            "comicId": comic_id,
+            "pageIndex": page_idx,
+            "pageName": page_name,
+            "type": doc.get("type", "western"),
+            "dimensions": {
+                "width": page_info.get("width"),
+                "height": page_info.get("height"),
+            },
+            "sequence": sequence,
+            "items": items,
+            "order": order,
+            "warnings": doc.get("warnings", []),
+        },
+    })
+
+
+@mcp.tool()
+def get_guided_page_image(comic_id: str, page: int = 0, overlay: bool = True) -> Image:
+    """Retrieve a comic page image, optionally with guided-view coordinates rendered as an overlay.
+
+    Args:
+        comic_id: Target comic id.
+        page: 0-based page index.
+        overlay: If True (default), renders panel boxes, speech bubble boxes, and sequence badges on top of the image.
+                 If False, returns the clean original page image.
+    """
+    res = _gve_request("GET", f"/api/comics/{comic_id}/guided")
+    if not res.get("ok"):
+        raise ValueError(
+            f"Could not retrieve guided data for comic {comic_id}: {res.get('data') or res.get('error')}"
+        )
+
+    doc = res.get("data") if isinstance(res.get("data"), dict) else {}
+    pages = doc.get("pages", {})
+    resolved = _resolve_guided_page(pages, int(page))
+    if not resolved:
+        raise ValueError(f"Page index {page} is out of bounds (total pages: {len(pages)})")
+
+    page_idx, page_name, page_info = resolved
+    raw_bytes, fmt = _gve_page_image(comic_id, page_name)
+
+    if not overlay:
+        return Image(data=raw_bytes, format=fmt)
+
+    overlaid_bytes = render_guided_overlay(
+        raw_bytes,
+        items=page_info.get("items", []),
+        order=page_info.get("order", []),
+        output_format="PNG",
+    )
+    return Image(data=overlaid_bytes, format="png")
+
+
+@mcp.tool()
+def inspect_guided_page(comic_id: str, page: int = 0) -> list:
+    """Inspect a comic page with visual guided-view overlays and structured coordinate data in a single call.
+
+    Returns the overlaid page image (visual boxes and reading order badges) alongside the structured JSON
+    metadata and sequence coordinates for AI visual analysis and user review.
+
+    Args:
+        comic_id: Target comic id.
+        page: 0-based page index.
+    """
+    image_obj = get_guided_page_image(comic_id, page=page, overlay=True)
+    data_str = get_guided_page_data(comic_id, page=page)
+    return [image_obj, data_str]
+
+
+@mcp.tool()
+def apply_guided_page_fix(
+    comic_id: str,
+    page: int,
+    items: list[dict],
+    order: Optional[list[str]] = None,
+) -> str:
+    """Apply updated speech bubble and panel coordinates or ordering to a comic page in GVE Now.
+
+    Args:
+        comic_id: Target comic id.
+        page: 0-based page index.
+        items: List of item dictionaries for the page, each with:
+               id: str (e.g. "b1", "p1")
+               kind: "bubble" | "panel"
+               box: [x, y, w, h] (integer pixel coordinates)
+        order: Optional list of item IDs representing reading sequence order.
+               If omitted, defaults to the order of items provided.
+    """
+    res = _gve_request("GET", f"/api/comics/{comic_id}/guided")
+    if not res.get("ok"):
+        return _dump({
+            "ok": False,
+            "error": f"Failed to retrieve current guided data for comic {comic_id}",
+        })
+
+    doc = res.get("data") if isinstance(res.get("data"), dict) else {}
+    pages = doc.get("pages", {})
+    resolved = _resolve_guided_page(pages, int(page))
+    if not resolved:
+        return _dump({
+            "ok": False,
+            "error": f"Page index {page} is out of bounds (total pages: {len(pages)})",
+        })
+
+    page_idx, page_name, page_info = resolved
+    item_ids = [it["id"] for it in items if isinstance(it, dict) and "id" in it]
+
+    if order is None:
+        order = list(item_ids)
+    else:
+        if sorted(order) != sorted(item_ids):
+            return _dump({
+                "ok": False,
+                "error": f"order list {order} must be an exact permutation of item ids {item_ids}",
+            })
+
+    # Update only the targeted page, leaving all other pages verbatim
+    doc["pages"][page_name]["items"] = items
+    doc["pages"][page_name]["order"] = order
+
+    put_res = _gve_request("PUT", f"/api/comics/{comic_id}/guided", body=doc)
+    if not put_res.get("ok"):
+        return _dump({
+            "ok": False,
+            "error": f"GVE Now rejected update: {put_res.get('data') or put_res.get('error')}",
+        })
+
+    return _dump({
+        "ok": True,
+        "data": {
+            "comicId": comic_id,
+            "pageIndex": page_idx,
+            "pageName": page_name,
+            "itemCount": len(items),
+            "order": order,
+            "warnings": put_res.get("data", {}).get("warnings", []) if isinstance(put_res.get("data"), dict) else [],
+        },
+    })
+
+
+@mcp.tool()
+def reorder_guided_page(
+    comic_id: str,
+    page: int,
+    order: list[str],
+) -> str:
+    """Reorder the guided view reading sequence for a specific comic page without altering coordinates.
+
+    Args:
+        comic_id: Target comic id.
+        page: 0-based page index.
+        order: List of existing item IDs representing the desired 1-based reading sequence.
+    """
+    res = _gve_request("GET", f"/api/comics/{comic_id}/guided")
+    if not res.get("ok"):
+        return _dump({
+            "ok": False,
+            "error": f"Failed to retrieve current guided data for comic {comic_id}",
+        })
+
+    doc = res.get("data") if isinstance(res.get("data"), dict) else {}
+    pages = doc.get("pages", {})
+    resolved = _resolve_guided_page(pages, int(page))
+    if not resolved:
+        return _dump({
+            "ok": False,
+            "error": f"Page index {page} is out of bounds (total pages: {len(pages)})",
+        })
+
+    page_idx, page_name, page_info = resolved
+    existing_items = page_info.get("items", [])
+    existing_ids = [it["id"] for it in existing_items if isinstance(it, dict) and "id" in it]
+
+    if sorted(order) != sorted(existing_ids):
+        return _dump({
+            "ok": False,
+            "error": f"order list {order} must be an exact permutation of existing item ids {existing_ids}",
+        })
+
+    doc["pages"][page_name]["order"] = order
+
+    put_res = _gve_request("PUT", f"/api/comics/{comic_id}/guided", body=doc)
+    if not put_res.get("ok"):
+        return _dump({
+            "ok": False,
+            "error": f"GVE Now rejected update: {put_res.get('data') or put_res.get('error')}",
+        })
+
+    return _dump({
+        "ok": True,
+        "data": {
+            "comicId": comic_id,
+            "pageIndex": page_idx,
+            "pageName": page_name,
+            "order": order,
+            "warnings": put_res.get("data", {}).get("warnings", []) if isinstance(put_res.get("data"), dict) else [],
+        },
+    })
 
 
 def main() -> None:
