@@ -3329,8 +3329,18 @@ body.eink-color-mode #bubble-magnifier-img {
     overflow-x: auto;
     overflow-y: hidden;
     -webkit-overflow-scrolling: touch;
+    touch-action: pan-x;
+    overscroll-behavior-x: contain;
     scroll-behavior: smooth;
     padding-bottom: 2px;
+    cursor: grab;
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+.reader-filmstrip-scroll.is-dragging {
+    cursor: grabbing;
+    scroll-behavior: auto;
 }
 
 .reader-filmstrip-scroll::-webkit-scrollbar {
@@ -3357,6 +3367,7 @@ body.eink-color-mode #bubble-magnifier-img {
     align-items: center;
     min-width: min-content;
     padding: 0.25rem 0.25rem 0.1rem;
+    touch-action: pan-x;
 }
 
 .comic-filmstrip-card {
@@ -3370,6 +3381,9 @@ body.eink-color-mode #bubble-magnifier-img {
     border-radius: 0.5rem;
     padding: 0.2rem;
     cursor: pointer;
+    touch-action: pan-x;
+    user-select: none;
+    -webkit-user-select: none;
     transition: transform 0.18s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.18s ease, box-shadow 0.18s ease;
     text-align: center;
     color: inherit;

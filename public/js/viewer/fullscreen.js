@@ -851,11 +851,11 @@ const global = new Proxy(typeof window !== 'undefined' ? window : globalThis, {
     const image = global.fullscreenImage;
     if (!viewer || !image) return;
 
-    // The page-preview grid is a modal inside the viewer: its own scroll and
-    // click handling must win. Skip pan/pinch/zoom bookkeeping for its events
-    // (this also keeps viewer.setPointerCapture off grid gestures).
+    // The page-preview grid, filmstrip, and scrubber are interactive reader overlays:
+    // their own scroll and click handling must win. Skip pan/pinch/zoom bookkeeping for their events
+    // (this also keeps viewer.setPointerCapture off grid/filmstrip gestures).
     if (event.target && typeof event.target.closest === 'function'
-        && event.target.closest('#comic-page-grid-overlay')) return;
+        && event.target.closest('#comic-page-grid-overlay, #reader-thumbnail-filmstrip, #fullscreen-scrubber-container, #reader-scrubber-preview')) return;
 
     fsStartX = event.clientX;
     fsStartY = event.clientY;

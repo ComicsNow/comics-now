@@ -512,6 +512,11 @@ export function renderThumbnailFilmstrip() {
     card.appendChild(label);
 
     card.addEventListener('click', (e) => {
+      if (isFilmstripDragging) {
+        e.preventDefault();
+        e.stopPropagation();
+        return;
+      }
       e.stopPropagation();
       goToPage(i);
       updateFilmstripActiveCard(i, pages.length);
@@ -570,7 +575,81 @@ export function toggleFilmstrip(triggerEl = null) {
   }
 }
 
+let isFilmstripDragging = false;
+let filmstripDragStartX = 0;
+let filmstripDragStartScroll = 0;
+
+function setupFilmstripDragScroll(scrollEl) {
+  if (!scrollEl || scrollEl._dragScrollBound) return;
+  scrollEl._dragScrollBound = true;
+
+  // Touch tracking to distinguish horizontal swipe/flick from card tap
+  let touchStartX = 0;
+  let touchStartY = 0;
+
+  scrollEl.addEventListener('touchstart', (e) => {
+    if (e.touches && e.touches.length > 0) {
+      touchStartX = e.touches[0].clientX;
+      touchStartY = e.touches[0].clientY;
+      isFilmstripDragging = false;
+    }
+  }, { passive: true });
+
+  scrollEl.addEventListener('touchmove', (e) => {
+    if (e.touches && e.touches.length > 0) {
+      const dx = Math.abs(e.touches[0].clientX - touchStartX);
+      const dy = Math.abs(e.touches[0].clientY - touchStartY);
+      if (dx > 7 || dy > 7) {
+        isFilmstripDragging = true;
+      }
+    }
+  }, { passive: true });
+
+  scrollEl.addEventListener('touchend', () => {
+    if (isFilmstripDragging) {
+      setTimeout(() => { isFilmstripDragging = false; }, 80);
+    }
+  }, { passive: true });
+
+  // Mouse drag-to-scroll on desktop
+  let isMouseDown = false;
+
+  scrollEl.addEventListener('mousedown', (e) => {
+    if (e.button !== 0) return;
+    isMouseDown = true;
+    isFilmstripDragging = false;
+    filmstripDragStartX = e.pageX - scrollEl.offsetLeft;
+    filmstripDragStartScroll = scrollEl.scrollLeft;
+    scrollEl.classList.add('is-dragging');
+  });
+
+  window.addEventListener('mousemove', (e) => {
+    if (!isMouseDown) return;
+    const x = e.pageX - scrollEl.offsetLeft;
+    const walk = (x - filmstripDragStartX);
+    if (Math.abs(walk) > 4) {
+      isFilmstripDragging = true;
+      scrollEl.scrollLeft = filmstripDragStartScroll - walk;
+    }
+  });
+
+  window.addEventListener('mouseup', () => {
+    if (isMouseDown) {
+      isMouseDown = false;
+      scrollEl.classList.remove('is-dragging');
+      if (isFilmstripDragging) {
+        setTimeout(() => { isFilmstripDragging = false; }, 80);
+      }
+    }
+  });
+}
+
 function initReaderFilmstrip() {
+  const scrollEl = document.getElementById('reader-filmstrip-scroll');
+  if (scrollEl) {
+    setupFilmstripDragScroll(scrollEl);
+  }
+
   const filmstripBtns = [
     document.getElementById('fullscreen-filmstrip-btn'),
     document.getElementById('page-filmstrip-btn'),

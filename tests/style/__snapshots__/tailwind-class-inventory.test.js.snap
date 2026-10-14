@@ -455,6 +455,7 @@ exports[`Tailwind class inventory (public/**/*.{html,js}) snapshots the sorted u
   "inline-flex",
   "inset-0",
   "inset-x-0",
+  "is-dragging",
   "is-editing",
   "is-offline",
   "isActive",
