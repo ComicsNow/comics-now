@@ -926,10 +926,10 @@ const global = new Proxy(typeof window !== 'undefined' ? window : globalThis, {
     const image = global.fullscreenImage;
     if (!viewer || !image) return;
 
-    // Ignore moves whose target is the page-preview grid (its own scrolling
-    // must not promote a pending viewer pan or pinch).
+    // Ignore moves whose target is the page-preview grid, filmstrip, or scrubber (their own scrolling
+    // must not promote a pending viewer pan or pinch, and must not preventDefault).
     if (event.target && typeof event.target.closest === 'function'
-        && event.target.closest('#comic-page-grid-overlay')) return;
+        && event.target.closest('#comic-page-grid-overlay, #reader-thumbnail-filmstrip, #fullscreen-scrubber-container, #reader-scrubber-preview')) return;
 
     if (!hasDragged) {
       const dx = event.clientX - fsStartX;
@@ -1011,11 +1011,11 @@ const global = new Proxy(typeof window !== 'undefined' ? window : globalThis, {
   function handleFullscreenPointerUp(event) {
     const image = global.fullscreenImage;
 
-    // Events targeting the page-preview grid: run cleanup for this pointer (a
+    // Events targeting the page-preview grid, filmstrip, or scrubber: run cleanup for this pointer (a
     // pending pan armed on the image must not stay stale) but never start a
-    // fresh pan from a finger that is over the grid.
+    // fresh pan from a finger that is over them.
     if (event.target && typeof event.target.closest === 'function'
-        && event.target.closest('#comic-page-grid-overlay')) {
+        && event.target.closest('#comic-page-grid-overlay, #reader-thumbnail-filmstrip, #fullscreen-scrubber-container, #reader-scrubber-preview')) {
       fullscreenTouchPointers.delete(event.pointerId);
       if (event.pointerId === fullscreenPanPointerId) endFullscreenPan(event.pointerId);
       if (event.pointerId === landscapePanPointerId) endLandscapePan();

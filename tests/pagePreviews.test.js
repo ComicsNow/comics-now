@@ -21,19 +21,17 @@ describe('Comic Page Previews & Thumbnail Grid Navigator', () => {
         <div class="viewer-nav">
           <button id="prev-page-btn" type="button" aria-label="Previous page">←</button>
           <button id="page-grid-btn" type="button" aria-label="View all pages in a grid">⊞</button>
-          <button id="page-filmstrip-btn" type="button" aria-label="Toggle thumbnail filmstrip">🎞️</button>
           <button id="next-page-btn" type="button" aria-label="Next page">→</button>
         </div>
         <div id="viewer-pages"></div>
         <button id="page-grid-btn-bottom" type="button">⊞</button>
-        <button id="page-filmstrip-btn-bottom" type="button">🎞️</button>
       </div>
 
       <div id="fullscreen-viewer" class="hidden fullscreen-viewer">
         <img id="fullscreen-image" src="" alt="Fullscreen Comic Page" />
         <div id="fullscreen-info-bar" class="fullscreen-info-bar">
           <button id="fullscreen-page-grid-btn" type="button" aria-label="View all pages in a grid">⊞</button>
-          <button id="fullscreen-filmstrip-btn" type="button" aria-label="Toggle thumbnail filmstrip">🎞️</button>
+          <button id="fullscreen-filmstrip-btn" type="button" aria-label="Toggle thumbnail filmstrip"></button>
           <button id="fullscreen-close-btn-bottom" type="button">&times;</button>
         </div>
 

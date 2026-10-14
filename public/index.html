@@ -1161,10 +1161,22 @@
           type="button"
           class="fullscreen-nav-button"
           aria-label="Toggle thumbnail filmstrip"
-          title="Thumbnail filmstrip (🎞️)"
+          title="Thumbnail filmstrip"
           aria-pressed="false"
         >
-          <span aria-hidden="true">🎞️</span>
+          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <rect x="2" y="4" width="20" height="16" rx="2"/>
+            <path d="M2 8h20"/>
+            <path d="M2 16h20"/>
+            <path d="M6 4v4"/>
+            <path d="M6 16v4"/>
+            <path d="M10 4v4"/>
+            <path d="M10 16v4"/>
+            <path d="M14 4v4"/>
+            <path d="M14 16v4"/>
+            <path d="M18 4v4"/>
+            <path d="M18 16v4"/>
+          </svg>
         </button>
 
         <!-- Close button -->
@@ -1213,8 +1225,20 @@
       <div id="reader-thumbnail-filmstrip" class="reader-thumbnail-filmstrip hidden" role="dialog" aria-label="Thumbnail Filmstrip">
         <div class="reader-filmstrip-header">
           <div class="flex items-center gap-2">
-            <span class="text-xs font-bold uppercase tracking-wider text-purple-400 flex items-center gap-1.5">
-              <span>🎞️</span>
+            <span class="text-xs font-bold uppercase tracking-wider text-gray-300 flex items-center gap-1.5">
+              <svg class="w-3.5 h-3.5 text-gray-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <rect x="2" y="4" width="20" height="16" rx="2"/>
+                <path d="M2 8h20"/>
+                <path d="M2 16h20"/>
+                <path d="M6 4v4"/>
+                <path d="M6 16v4"/>
+                <path d="M10 4v4"/>
+                <path d="M10 16v4"/>
+                <path d="M14 4v4"/>
+                <path d="M14 16v4"/>
+                <path d="M18 4v4"/>
+                <path d="M18 16v4"/>
+              </svg>
               <span>Filmstrip</span>
             </span>
             <span class="w-1 h-1 rounded-full bg-gray-600"></span>
@@ -1710,15 +1734,6 @@
             >
               ⊞
             </button>
-            <button
-              id="page-filmstrip-btn"
-              type="button"
-              class="pill-button bg-gray-700 hover:bg-gray-600 text-white transition-colors text-sm font-semibold px-2.5 py-1"
-              title="Thumbnail filmstrip (🎞️)"
-              aria-label="Toggle thumbnail filmstrip"
-            >
-              🎞️
-            </button>
           </div>
           <button id="next-page-btn" type="button" class="pill-button bg-gray-700 hover:bg-gray-600 text-white transition-colors" aria-label="Next page">→</button>
         </div>
@@ -1766,15 +1781,6 @@
               aria-label="View all pages in a grid"
             >
               ⊞
-            </button>
-            <button
-              id="page-filmstrip-btn-bottom"
-              type="button"
-              class="pill-button bg-gray-700 hover:bg-gray-600 text-white transition-colors text-sm font-semibold px-2.5 py-1"
-              title="Thumbnail filmstrip (🎞️)"
-              aria-label="Toggle thumbnail filmstrip"
-            >
-              🎞️
             </button>
           </div>
           <button id="next-page-btn-bottom" type="button" class="pill-button bg-gray-700 hover:bg-gray-600 text-white transition-colors" aria-label="Next page">→</button>

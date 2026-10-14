@@ -541,14 +541,11 @@ export function openFilmstrip(triggerEl = null) {
   if (!el) return;
   el.classList.remove('hidden');
 
-  const buttons = [
-    document.getElementById('fullscreen-filmstrip-btn'),
-    document.getElementById('page-filmstrip-btn'),
-    document.getElementById('page-filmstrip-btn-bottom')
-  ];
-  buttons.forEach((btn) => {
-    if (btn) btn.setAttribute('aria-pressed', 'true');
-  });
+  const btn = document.getElementById('fullscreen-filmstrip-btn');
+  if (btn) btn.setAttribute('aria-pressed', 'true');
+
+  const scrollEl = document.getElementById('reader-filmstrip-scroll');
+  if (scrollEl) setupFilmstripDragScroll(scrollEl);
 
   renderThumbnailFilmstrip();
 }
@@ -557,14 +554,8 @@ export function closeFilmstrip() {
   const el = document.getElementById('reader-thumbnail-filmstrip');
   if (el) el.classList.add('hidden');
 
-  const buttons = [
-    document.getElementById('fullscreen-filmstrip-btn'),
-    document.getElementById('page-filmstrip-btn'),
-    document.getElementById('page-filmstrip-btn-bottom')
-  ];
-  buttons.forEach((btn) => {
-    if (btn) btn.setAttribute('aria-pressed', 'false');
-  });
+  const btn = document.getElementById('fullscreen-filmstrip-btn');
+  if (btn) btn.setAttribute('aria-pressed', 'false');
 }
 
 export function toggleFilmstrip(triggerEl = null) {
@@ -583,33 +574,51 @@ function setupFilmstripDragScroll(scrollEl) {
   if (!scrollEl || scrollEl._dragScrollBound) return;
   scrollEl._dragScrollBound = true;
 
-  // Touch tracking to distinguish horizontal swipe/flick from card tap
+  const filmstripEl = document.getElementById('reader-thumbnail-filmstrip');
+  if (filmstripEl && !filmstripEl._stopPropBound) {
+    filmstripEl._stopPropBound = true;
+    // Stop all touch and pointer events from propagating to fullscreenViewer
+    // so viewer gestures (zoom/pan/autohide) never interfere with filmstrip scrolling.
+    ['pointerdown', 'pointermove', 'pointerup', 'pointercancel', 'touchstart', 'touchmove', 'touchend'].forEach((evt) => {
+      filmstripEl.addEventListener(evt, (e) => {
+        e.stopPropagation();
+      }, { passive: evt.startsWith('touch') });
+    });
+  }
+
+  // Direct finger touch tracking: smoothly updates scrollLeft in real time
   let touchStartX = 0;
-  let touchStartY = 0;
+  let touchStartScroll = 0;
+  let isTouchDown = false;
 
   scrollEl.addEventListener('touchstart', (e) => {
-    if (e.touches && e.touches.length > 0) {
+    if (e.touches && e.touches.length === 1) {
+      isTouchDown = true;
       touchStartX = e.touches[0].clientX;
-      touchStartY = e.touches[0].clientY;
+      touchStartScroll = scrollEl.scrollLeft;
       isFilmstripDragging = false;
     }
   }, { passive: true });
 
   scrollEl.addEventListener('touchmove', (e) => {
-    if (e.touches && e.touches.length > 0) {
-      const dx = Math.abs(e.touches[0].clientX - touchStartX);
-      const dy = Math.abs(e.touches[0].clientY - touchStartY);
-      if (dx > 7 || dy > 7) {
-        isFilmstripDragging = true;
-      }
+    if (!isTouchDown || !e.touches || e.touches.length !== 1) return;
+    const currentX = e.touches[0].clientX;
+    const diff = currentX - touchStartX;
+    if (Math.abs(diff) > 4) {
+      isFilmstripDragging = true;
+      scrollEl.scrollLeft = touchStartScroll - diff;
     }
   }, { passive: true });
 
-  scrollEl.addEventListener('touchend', () => {
+  const onTouchEnd = () => {
+    isTouchDown = false;
     if (isFilmstripDragging) {
-      setTimeout(() => { isFilmstripDragging = false; }, 80);
+      setTimeout(() => { isFilmstripDragging = false; }, 100);
     }
-  }, { passive: true });
+  };
+
+  scrollEl.addEventListener('touchend', onTouchEnd, { passive: true });
+  scrollEl.addEventListener('touchcancel', onTouchEnd, { passive: true });
 
   // Mouse drag-to-scroll on desktop
   let isMouseDown = false;
@@ -618,18 +627,17 @@ function setupFilmstripDragScroll(scrollEl) {
     if (e.button !== 0) return;
     isMouseDown = true;
     isFilmstripDragging = false;
-    filmstripDragStartX = e.pageX - scrollEl.offsetLeft;
+    filmstripDragStartX = e.clientX;
     filmstripDragStartScroll = scrollEl.scrollLeft;
     scrollEl.classList.add('is-dragging');
   });
 
   window.addEventListener('mousemove', (e) => {
     if (!isMouseDown) return;
-    const x = e.pageX - scrollEl.offsetLeft;
-    const walk = (x - filmstripDragStartX);
-    if (Math.abs(walk) > 4) {
+    const diff = e.clientX - filmstripDragStartX;
+    if (Math.abs(diff) > 4) {
       isFilmstripDragging = true;
-      scrollEl.scrollLeft = filmstripDragStartScroll - walk;
+      scrollEl.scrollLeft = filmstripDragStartScroll - diff;
     }
   });
 
@@ -638,7 +646,7 @@ function setupFilmstripDragScroll(scrollEl) {
       isMouseDown = false;
       scrollEl.classList.remove('is-dragging');
       if (isFilmstripDragging) {
-        setTimeout(() => { isFilmstripDragging = false; }, 80);
+        setTimeout(() => { isFilmstripDragging = false; }, 100);
       }
     }
   });
@@ -650,21 +658,15 @@ function initReaderFilmstrip() {
     setupFilmstripDragScroll(scrollEl);
   }
 
-  const filmstripBtns = [
-    document.getElementById('fullscreen-filmstrip-btn'),
-    document.getElementById('page-filmstrip-btn'),
-    document.getElementById('page-filmstrip-btn-bottom')
-  ];
-  filmstripBtns.forEach((btn) => {
-    if (btn && !btn._filmstripBound) {
-      btn._filmstripBound = true;
-      btn.addEventListener('click', (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        toggleFilmstrip(btn);
-      });
-    }
-  });
+  const filmstripBtn = document.getElementById('fullscreen-filmstrip-btn');
+  if (filmstripBtn && !filmstripBtn._filmstripBound) {
+    filmstripBtn._filmstripBound = true;
+    filmstripBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      toggleFilmstrip(filmstripBtn);
+    });
+  }
 
   const gridBtn = document.getElementById('reader-filmstrip-grid-btn');
   if (gridBtn && !gridBtn._gridBound) {
