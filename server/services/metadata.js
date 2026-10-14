@@ -63,6 +63,16 @@ async function getComicInfoFromArchive(comicPath) {
       if (info.Title && (isTitleSameAsSeries(info.Title, info.Series) || (!info.Series && isTitleSameAsSeries(info.Title, '')))) {
         info.Title = '';
       }
+      if (info.Genre) {
+        const cg = cleanGenreAndTags(info.Genre);
+        if (cg) info.Genre = cg;
+        else delete info.Genre;
+      }
+      if (info.Tags) {
+        const ct = cleanGenreAndTags(info.Tags);
+        if (ct) info.Tags = ct;
+        else delete info.Tags;
+      }
       return info;
     } catch (err) {
       log('ERROR', 'META', `Failed to read ComicInfo.xml sidecar from ${path.basename(sidecarPath)}: ${err.message}`);
@@ -85,6 +95,16 @@ async function getComicInfoFromArchive(comicPath) {
         const info = trimObjectStrings(result.ComicInfo || {});
         if (info.Title && (isTitleSameAsSeries(info.Title, info.Series) || (!info.Series && isTitleSameAsSeries(info.Title, '')))) {
           info.Title = '';
+        }
+        if (info.Genre) {
+          const cg = cleanGenreAndTags(info.Genre);
+          if (cg) info.Genre = cg;
+          else delete info.Genre;
+        }
+        if (info.Tags) {
+          const ct = cleanGenreAndTags(info.Tags);
+          if (ct) info.Tags = ct;
+          else delete info.Tags;
         }
         return info;
       } catch {
@@ -509,11 +529,21 @@ function splitVolumeSeriesAndTitle(series, title) {
   return { series: s, title: t, number: null, volume: null };
 }
 
+function cleanGenreAndTags(val) {
+  if (!val) return '';
+  const items = Array.isArray(val) ? val : String(val).split(',');
+  return items
+    .map(s => String(s || '').trim())
+    .filter(s => s && s.toLowerCase() !== 'comic' && s.toLowerCase() !== 'comics')
+    .join(', ');
+}
+
 /**
- * Sanitizes metadata fields (Series, Title, Number, Volume) according to standard rules:
+ * Sanitizes metadata fields (Series, Title, Number, Volume, Genre, Tags) according to standard rules:
  * 1. Strips format/edition tags (TPB, HC, Softcover, Hardcover, Graphic Novel, etc.) from Series and Title.
  * 2. Strips volume/issue numbers from Series (e.g. "#1", "01", "Vol. 1") and extracts number/volume.
  * 3. Clears Title if it is redundant with Series, just Series + issue number, or a generic issue label.
+ * 4. Cleans Genre and Tags to remove redundant "comic" and "comics" values.
  *
  * @param {Object} metadata
  * @returns {Object} Sanitized metadata (modified in-place and returned)
@@ -559,6 +589,18 @@ function sanitizeMetadata(metadata) {
   // 3. Check isTitleSameAsSeries(Title, Series): if Title is the same as Series (or if Title is just Series + Issue Number, or if Title is empty/generic issue number like "#1" or "Issue 1"), clear Title (Title = '')
   if (metadata.Title && (isTitleSameAsSeries(metadata.Title, metadata.Series) || (!metadata.Series && isTitleSameAsSeries(metadata.Title, '')))) {
     metadata.Title = '';
+  }
+
+  // 4. Strip redundant "comic" / "comics" from Genre and Tags
+  if (metadata.Genre) {
+    const cg = cleanGenreAndTags(metadata.Genre);
+    if (cg) metadata.Genre = cg;
+    else delete metadata.Genre;
+  }
+  if (metadata.Tags) {
+    const ct = cleanGenreAndTags(metadata.Tags);
+    if (ct) metadata.Tags = ct;
+    else delete metadata.Tags;
   }
 
   return metadata;
@@ -816,6 +858,18 @@ function buildComicInfoXml(metadataObj) {
   // Disambiguate creator roles (Writer, Penciller, Inker, Colorist, Letterer)
   resolveCreatorRoles(safeObj);
 
+  // Clean Genre and Tags to remove redundant "comic" and "comics"
+  if (safeObj.Genre) {
+    const cg = cleanGenreAndTags(safeObj.Genre);
+    if (cg) safeObj.Genre = cg;
+    else delete safeObj.Genre;
+  }
+  if (safeObj.Tags) {
+    const ct = cleanGenreAndTags(safeObj.Tags);
+    if (ct) safeObj.Tags = ct;
+    else delete safeObj.Tags;
+  }
+
   if (Object.keys(safeObj).length === 0) {
     return null;
   }
@@ -1013,6 +1067,7 @@ module.exports = {
   cleanFormatAndEdition,
   normalizePublisher,
   cleanDescription,
+  cleanGenreAndTags,
   splitVolumeSeriesAndTitle,
   isTitleSameAsSeries,
   sanitizeMetadata,

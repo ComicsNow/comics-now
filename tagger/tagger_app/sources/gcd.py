@@ -11,13 +11,45 @@ from tagger_app.core.cache import tagger_cache
 from tagger_app.core.limiter import domain_limiter
 
 
-def find_fallback_cover(series, number=None, comicvine_api_key=None, metron_user=None, metron_pass=None):
+def text_similarity(a: str, b: str) -> float:
+    """Calculate token-based Jaccard similarity between two descriptions."""
+    if not a or not b:
+        return 0.0
+    import re
+    tokens_a = set(re.findall(r'\b\w+\b', str(a).lower()))
+    tokens_b = set(re.findall(r'\b\w+\b', str(b).lower()))
+    if not tokens_a or not tokens_b:
+        return 0.0
+    intersect = tokens_a.intersection(tokens_b)
+    union = tokens_a.union(tokens_b)
+    return len(intersect) / len(union) if union else 0.0
+
+
+def is_gcd_cover_accessible(url: str) -> bool:
+    """Attempt to verify if the GCD cover URL is accessible without 403."""
+    if not url:
+        return False
+    try:
+        r = requests.head(url, headers={
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+            "Referer": "https://www.comics.org/"
+        }, timeout=2, allow_redirects=True)
+        if r.status_code == 200 and r.headers.get("content-type", "").startswith("image/"):
+            return True
+    except Exception:
+        pass
+    return False
+
+
+def find_fallback_cover(series, number=None, description=None, comicvine_api_key=None, metron_user=None, metron_pass=None):
     """Attempt to retrieve a valid cover image URL from Metron or ComicVine
-    when GCD doesn't have a cover or points to files1.comics.org (protected by Cloudflare 403)."""
+    when GCD doesn't have a cover or points to files1.comics.org (protected by Cloudflare 403).
+    If multiple candidates exist, selects the candidate whose description is closest to GCD's description."""
     if not series:
         return None
 
-    cache_key = f"{str(series).strip().lower()}|{str(number or '').strip()}"
+    desc_key = hash(description or "")
+    cache_key = f"{str(series).strip().lower()}|{str(number or '').strip()}|{desc_key}"
     cached_cov = tagger_cache.get_query("gcd_fallback_cover", cache_key)
     if cached_cov is not None:
         return cached_cov or None
@@ -38,11 +70,17 @@ def find_fallback_cover(series, number=None, comicvine_api_key=None, metron_user
             from tagger_app.sources.metron import search_metron_multi
             m_query = f"{series} #{number}" if number else series
             metron_results = search_metron_multi(m_query, m_user, m_pass)
+            candidates = []
             for item in metron_results:
                 cov = item.get("cover_image_url")
                 if cov and "comics.org" not in cov:
-                    tagger_cache.set_query("gcd_fallback_cover", cache_key, cov)
-                    return cov
+                    sim = text_similarity(item.get("description") or item.get("summary") or "", description or "")
+                    candidates.append((sim, cov))
+            if candidates:
+                candidates.sort(key=lambda x: x[0], reverse=True)
+                best_cov = candidates[0][1]
+                tagger_cache.set_query("gcd_fallback_cover", cache_key, best_cov)
+                return best_cov
         except Exception as e:
             print(f"[-] Metron cover fallback failed: {e}")
 
@@ -51,12 +89,18 @@ def find_fallback_cover(series, number=None, comicvine_api_key=None, metron_user
         try:
             from tagger_app.sources.comicvine import search_comicvine_multi
             cv_query = f"{series} #{number}" if number else series
-            cv_results = search_comicvine_multi(cv_query, cv_key, limit=3)
+            cv_results = search_comicvine_multi(cv_query, cv_key, limit=5)
+            candidates = []
             for item in cv_results:
                 cov = item.get("cover_image_url")
                 if cov and "comics.org" not in cov:
-                    tagger_cache.set_query("gcd_fallback_cover", cache_key, cov)
-                    return cov
+                    sim = text_similarity(item.get("description") or item.get("summary") or "", description or "")
+                    candidates.append((sim, cov))
+            if candidates:
+                candidates.sort(key=lambda x: x[0], reverse=True)
+                best_cov = candidates[0][1]
+                tagger_cache.set_query("gcd_fallback_cover", cache_key, best_cov)
+                return best_cov
         except Exception as e:
             print(f"[-] ComicVine cover fallback failed: {e}")
 
@@ -64,15 +108,37 @@ def find_fallback_cover(series, number=None, comicvine_api_key=None, metron_user
     return None
 
 
-def search_gcd_multi(query, comicvine_api_key=None, metron_user=None, metron_pass=None):
+def search_gcd_multi(query, gcd_user=None, gcd_pass=None, comicvine_api_key=None, metron_user=None, metron_pass=None):
+    import os
+    try:
+        from tagger_app.scheduler.state import scheduler_config
+    except Exception:
+        scheduler_config = {}
+
+    g_user = gcd_user or scheduler_config.get("gcd_user") or os.environ.get("GCD_USER")
+    g_pass = gcd_pass or scheduler_config.get("gcd_pass") or os.environ.get("GCD_PASSWORD") or os.environ.get("GCD_PASS")
+
+    # Rate limiting: 0.5s when login details available (authenticated); 1.5s for free/anonymous version
+    if g_user and g_pass:
+        domain_limiter.set_domain_delay("comics.org", 0.5)
+        auth = (g_user, g_pass)
+    else:
+        domain_limiter.set_domain_delay("comics.org", 1.5)
+        auth = None
+
     cached = tagger_cache.get_query("gcd", query)
     if cached is not None:
         for it in cached:
-            if not it.get("cover_image_url") or "comics.org" in str(it.get("cover_image_url")):
+            cov = it.get("cover_image_url")
+            # 1. Try to get cover from GCD API
+            if not cov or ("comics.org" in str(cov) and not is_gcd_cover_accessible(str(cov))):
+                # 2. If cover not available, do series/number match with description closeness on Metron/ComicVine
                 fb = find_fallback_cover(it.get("series"), it.get("number"),
+                                         description=it.get("description"),
                                          comicvine_api_key=comicvine_api_key,
                                          metron_user=metron_user,
                                          metron_pass=metron_pass)
+                # 3. If neither available, None (fallback default placeholder)
                 it["cover_image_url"] = fb if fb else None
         return cached
 
@@ -84,7 +150,7 @@ def search_gcd_multi(query, comicvine_api_key=None, metron_user=None, metron_pas
         series_query = re.sub(r'\s*#\s*[\d.]+\s*$', '', query).strip() or query
         url = f"https://www.comics.org/api/series/name/{requests.utils.quote(series_query)}/"
         domain_limiter.wait_for_domain("comics.org")
-        r = requests.get(url, headers={"Accept": "application/json", "User-Agent": "comic-tagger-bench/1.0"}, timeout=10)
+        r = requests.get(url, auth=auth, headers={"Accept": "application/json", "User-Agent": "comic-tagger-bench/1.0"}, timeout=10)
         if r.status_code == 200:
             results = r.json().get("results", [])
             for s in results[:3]:
@@ -92,8 +158,10 @@ def search_gcd_multi(query, comicvine_api_key=None, metron_user=None, metron_pas
                 for iss_url in s.get("active_issues", [])[:3]:
                     cached_iss = tagger_cache.get_entity("gcd_issue", iss_url)
                     if cached_iss is not None:
-                        if not cached_iss.get("cover_image_url") or "comics.org" in str(cached_iss.get("cover_image_url")):
+                        cov = cached_iss.get("cover_image_url")
+                        if not cov or ("comics.org" in str(cov) and not is_gcd_cover_accessible(str(cov))):
                             fb = find_fallback_cover(cached_iss.get("series"), cached_iss.get("number"),
+                                                     description=cached_iss.get("description"),
                                                      comicvine_api_key=comicvine_api_key,
                                                      metron_user=metron_user,
                                                      metron_pass=metron_pass)
@@ -102,24 +170,31 @@ def search_gcd_multi(query, comicvine_api_key=None, metron_user=None, metron_pas
                         continue
 
                     domain_limiter.wait_for_domain("comics.org")
-                    ir = requests.get(iss_url, headers={"Accept": "application/json", "User-Agent": "comic-tagger-bench/1.0"}, timeout=10)
+                    ir = requests.get(iss_url, auth=auth, headers={"Accept": "application/json", "User-Agent": "comic-tagger-bench/1.0"}, timeout=10)
                     if ir.status_code == 200:
                         d = ir.json()
-                        cov = d.get('cover')
-                        if cov and '://' in cov:
-                            parts = cov.split('://', 1)
-                            cov = parts[0] + '://' + parts[1].replace('//', '/')
-                        # Do not use images from GCD (comics.org) as they are Cloudflare protected.
-                        # Match via Metron or ComicVine; if that does not find a cover, set to None.
-                        fb = find_fallback_cover(d.get('series_name'), str(d.get('number', '')),
-                                                 comicvine_api_key=comicvine_api_key,
-                                                 metron_user=metron_user,
-                                                 metron_pass=metron_pass)
-                        cov = fb if fb else None
+                        raw_cov = d.get('cover')
+                        if raw_cov and '://' in raw_cov:
+                            parts = raw_cov.split('://', 1)
+                            raw_cov = parts[0] + '://' + parts[1].replace('//', '/')
+                        
+                        # 1. Try to get cover from GCD API
+                        if raw_cov and is_gcd_cover_accessible(raw_cov):
+                            final_cov = raw_cov
+                        else:
+                            # 2. If cover not available, match series/number on Metron/ComicVine with description closeness
+                            issue_desc = d.get("notes") or ""
+                            fb = find_fallback_cover(d.get('series_name'), str(d.get('number', '')),
+                                                     description=issue_desc,
+                                                     comicvine_api_key=comicvine_api_key,
+                                                     metron_user=metron_user,
+                                                     metron_pass=metron_pass)
+                            # 3. If neither available, None (fallback default placeholder)
+                            final_cov = fb if fb else None
+
                         writers, pencillers, inkers, colorists, letterers, editors = [], [], [], [], [], []
                         total_pages = 0
                         stories = d.get('story_set') or d.get('stories') or []
-                        import re
                         for story in stories:
                             if not isinstance(story, dict):
                                 continue
@@ -162,8 +237,8 @@ def search_gcd_multi(query, comicvine_api_key=None, metron_user=None, metron_pas
                             "letterer": ", ".join(letterers) if letterers else None,
                             "editor": ", ".join(editors) if editors else None,
                             "source_url": iss_url.replace("/api", ""),
-                            "cover_image_url": cov,
-                            "genres": [g.strip() for g in series_genre.split(',') if g.strip()] or ["Comics"],
+                            "cover_image_url": final_cov,
+                            "genres": [g.strip() for g in series_genre.split(',') if g.strip() and g.strip().lower() not in ["comic", "comics"]],
                             "pages": str(total_pages) if total_pages > 0 else None
                         }
                         tagger_cache.set_entity("gcd_issue", iss_url, item_meta)
@@ -177,16 +252,20 @@ def search_gcd_multi(query, comicvine_api_key=None, metron_user=None, metron_pas
 
 
 def resolve_gcd(filename, cover_path=None, on_progress=None, existing_meta=None,
+                gcd_user=None, gcd_pass=None,
                 comicvine_api_key=None, metron_user=None, metron_pass=None):
     if on_progress:
         on_progress("Searching GCD...")
     query = clean_search_query(filename)
 
-    res = search_gcd_multi(query, comicvine_api_key=comicvine_api_key, metron_user=metron_user, metron_pass=metron_pass)
+    res = search_gcd_multi(query, gcd_user=gcd_user, gcd_pass=gcd_pass,
+                           comicvine_api_key=comicvine_api_key, metron_user=metron_user, metron_pass=metron_pass)
     candidates = []
     for r in res:
-        if not r.get("cover_image_url") or "comics.org" in str(r.get("cover_image_url")):
+        cov = r.get("cover_image_url")
+        if not cov or ("comics.org" in str(cov) and not is_gcd_cover_accessible(str(cov))):
             fb = find_fallback_cover(r.get("series"), r.get("number"),
+                                     description=r.get("description"),
                                      comicvine_api_key=comicvine_api_key,
                                      metron_user=metron_user,
                                      metron_pass=metron_pass)

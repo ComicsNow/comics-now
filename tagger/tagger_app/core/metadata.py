@@ -1136,12 +1136,12 @@ def merge_best_metadata_fields(candidates_data: list, existing_meta: dict = None
                     _add_source(c["source"])
         result[lore_field] = ", ".join(lore_items) if lore_items else ""
 
-    # 9. Genres (Union of sets)
-    genres = _split_items(result.get("genres") or result.get("genre"))
+    # 9. Genres (Union of sets, filtering out redundant 'comic' / 'comics')
+    genres = [g for g in _split_items(result.get("genres") or result.get("genre")) if g.lower() not in ["comic", "comics"]]
     for c in norm_candidates:
         c_genres = _split_items(c["meta"].get("genres") or c["meta"].get("genre"))
         for g in c_genres:
-            if not any(g.lower() == eg.lower() for eg in genres):
+            if g.lower() not in ["comic", "comics"] and not any(g.lower() == eg.lower() for eg in genres):
                 genres.append(g)
                 _add_source(c["source"])
     result["genres"] = genres

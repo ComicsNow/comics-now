@@ -62,6 +62,10 @@ const {
   setMetronUser,
   getMetronPassword,
   setMetronPassword,
+  getGcdUser,
+  setGcdUser,
+  getGcdPassword,
+  setGcdPassword,
   getTaggerForceReprocess,
   setTaggerForceReprocess
 } = require('./server/config');
@@ -251,6 +255,10 @@ const apiRouter = createApiRouter({
   setMetronUser,
   getMetronPassword,
   setMetronPassword,
+  getGcdUser,
+  setGcdUser,
+  getGcdPassword,
+  setGcdPassword,
   getTaggerForceReprocess,
   setTaggerForceReprocess,
   getComicsDirectories,

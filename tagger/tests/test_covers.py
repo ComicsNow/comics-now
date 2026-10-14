@@ -103,3 +103,37 @@ def test_gcd_find_fallback_cover_metron(monkeypatch):
     cov = gcd.find_fallback_cover("Spawn", "1", metron_user="u", metron_pass="p")
     assert cov == "https://metron.cloud/cover456.jpg"
 
+
+def test_gcd_find_fallback_cover_description_similarity(monkeypatch):
+    from tagger_app.sources import gcd
+    # Two candidates returned: Candidate B has description matching GCD's description
+    candidates = [
+        {"cover_image_url": "https://comicvine.gamespot.com/cover_wrong.jpg", "description": "Totally different unrelated storyline in space."},
+        {"cover_image_url": "https://comicvine.gamespot.com/cover_correct.jpg", "description": "The Court of Owls attacks Gotham City and Bruce Wayne."}
+    ]
+    monkeypatch.setattr(
+        "tagger_app.sources.comicvine.search_comicvine_multi",
+        lambda query, api_key, limit=5: candidates
+    )
+    cov = gcd.find_fallback_cover(
+        "Batman", "1",
+        description="Batman fights the Court of Owls across Gotham City.",
+        comicvine_api_key="mock_key"
+    )
+    assert cov == "https://comicvine.gamespot.com/cover_correct.jpg"
+
+
+def test_gcd_rate_limiting_auth(monkeypatch):
+    from tagger_app.sources import gcd
+    from tagger_app.core.limiter import domain_limiter
+
+    # Anonymous search -> 1.5s delay
+    monkeypatch.setattr("requests.get", lambda *a, **k: type("Resp", (), {"status_code": 404})())
+    gcd.search_gcd_multi("Test Series")
+    assert domain_limiter._delays["comics.org"] == 1.5
+
+    # Authenticated search -> 0.5s delay
+    gcd.search_gcd_multi("Test Series", gcd_user="user", gcd_pass="pass")
+    assert domain_limiter._delays["comics.org"] == 0.5
+
+

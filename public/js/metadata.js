@@ -282,6 +282,23 @@ function splitVolumeSeriesAndTitle(series, title) {
  * 1. Strips format/edition tags (TPB, HC, Softcover, Hardcover, Graphic Novel, etc.) from Series and Title.
  * 2. Strips volume/issue numbers from Series (e.g. "#1", "01", "Vol. 1") and extracts number/volume.
  * 3. Clears Title if it is redundant with Series, just Series + issue number, or a generic issue label.
+ */
+function cleanGenreAndTags(val) {
+  if (!val) return '';
+  const items = String(val).split(',').map(s => s.trim()).filter(Boolean);
+  const filtered = items.filter(s => {
+    const lower = s.toLowerCase();
+    return lower !== 'comic' && lower !== 'comics';
+  });
+  return filtered.join(', ');
+}
+
+/**
+ * Sanitizes metadata fields according to library and cataloging rules:
+ * 1. Strips format and edition tags (e.g. TPB, HC, Softcover) from Series and Title
+ * 2. Splits volume and subtitle from Series if present
+ * 3. Clears Title if identical to Series or redundant issue number
+ * 4. Strips redundant "Comic" / "Comics" tags from Genre and Tags
  *
  * @param {Object} metadata
  * @returns {Object} Sanitized metadata (modified in-place and returned)
@@ -327,6 +344,26 @@ function sanitizeMetadata(metadata) {
   // 3. Check isTitleSameAsSeries(Title, Series): if Title is the same as Series (or if Title is just Series + Issue Number, or if Title is empty/generic issue number like "#1" or "Issue 1"), clear Title (Title = '')
   if (metadata.Title && (isTitleSameAsSeries(metadata.Title, metadata.Series) || (!metadata.Series && isTitleSameAsSeries(metadata.Title, '')))) {
     metadata.Title = '';
+  }
+
+  // 4. Strip redundant "Comic" and "Comics" from Genre and Tags
+  if (metadata.Genre) {
+    metadata.Genre = cleanGenreAndTags(metadata.Genre);
+  }
+  if (metadata.Tags) {
+    metadata.Tags = cleanGenreAndTags(metadata.Tags);
+  }
+  if (metadata.genre) {
+    metadata.genre = cleanGenreAndTags(metadata.genre);
+  }
+  if (metadata.tags) {
+    metadata.tags = cleanGenreAndTags(metadata.tags);
+  }
+  if (Array.isArray(metadata.genres)) {
+    metadata.genres = metadata.genres.filter(s => {
+      const lower = String(s || '').trim().toLowerCase();
+      return lower && lower !== 'comic' && lower !== 'comics';
+    });
   }
 
   return metadata;
@@ -558,7 +595,8 @@ export {
   isTitleSameAsSeries,
   cleanFormatAndEdition,
   splitVolumeSeriesAndTitle,
-  sanitizeMetadata
+  sanitizeMetadata,
+  cleanGenreAndTags
 };
 
 state.loadMetadata = loadMetadata;
@@ -569,6 +607,7 @@ state.isTitleSameAsSeries = isTitleSameAsSeries;
 state.cleanFormatAndEdition = cleanFormatAndEdition;
 state.splitVolumeSeriesAndTitle = splitVolumeSeriesAndTitle;
 state.sanitizeMetadata = sanitizeMetadata;
+state.cleanGenreAndTags = cleanGenreAndTags;
 
 if (typeof window !== 'undefined') {
   window.loadMetadata = loadMetadata;
@@ -579,5 +618,6 @@ if (typeof window !== 'undefined') {
   window.cleanFormatAndEdition = cleanFormatAndEdition;
   window.splitVolumeSeriesAndTitle = splitVolumeSeriesAndTitle;
   window.sanitizeMetadata = sanitizeMetadata;
+  window.cleanGenreAndTags = cleanGenreAndTags;
 }
 

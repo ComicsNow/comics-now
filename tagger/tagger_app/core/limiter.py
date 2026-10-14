@@ -18,7 +18,7 @@ class DomainRateLimiter:
         self._delays = {
             "comicvine.gamespot.com": 1.0,  # 1 req/sec max (well within 200/hr limit)
             "metron.cloud": 0.5,
-            "comics.org": 0.5,
+            "comics.org": 1.5,  # 1.5s default for free/anonymous; 0.5s when authenticated
             "leagueofcomicgeeks.com": 1.0,
             "goodreads.com": 2.0,
             "blackwells.co.uk": 2.0,
@@ -32,6 +32,11 @@ class DomainRateLimiter:
         }
         self._local = threading.local()
         self._default_delay = 0.5
+
+    def set_domain_delay(self, domain: str, delay: float):
+        """Dynamically update rate limiting delay for a domain (e.g. auth vs free tier)."""
+        with self._lock:
+            self._delays[domain.lower()] = float(delay)
 
     def set_thread_callback(self, cb):
         self._local.callback = cb
