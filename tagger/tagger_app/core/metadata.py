@@ -807,6 +807,15 @@ def score_candidate(filename: str, raw_item: dict, cover_path: str = None, defau
         elif ser:
             candidate_title = ser
 
+    # Discard unnumbered GCD issues with [nn]
+    import re
+    cand_num = str(norm.get("number") or raw_item.get("number") or "")
+    cand_title_str = str(candidate_title or "")
+    if re.search(r'\[\s*nn\s*\]', cand_num, re.IGNORECASE) or re.search(r'\[\s*nn\s*\]', cand_title_str, re.IGNORECASE):
+        src_label = str(default_source or raw_item.get("source") or "").lower()
+        if "gcd" in src_label:
+            return (norm, 0.0, raw_item.get("source_url") or "")
+
     title_score = calculate_similarity(filename, candidate_title or "")
 
     # Also evaluate series alone similarity:

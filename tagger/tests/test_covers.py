@@ -137,3 +137,61 @@ def test_gcd_rate_limiting_auth(monkeypatch):
     assert domain_limiter._delays["comics.org"] == 0.5
 
 
+def test_gcd_filters_nn_issues(monkeypatch):
+    from tagger_app.sources import gcd
+    from tagger_app.core.cache import tagger_cache
+    tagger_cache.clear()
+
+    # Mock series response with 3 issue URLs
+    series_resp = {
+        "results": [{
+            "name": "3-D Batman",
+            "active_issues": ["https://www.comics.org/api/issue/1/", "https://www.comics.org/api/issue/2/", "https://www.comics.org/api/issue/3/"]
+        }]
+    }
+
+    issue_1 = {"series_name": "3-D Batman", "number": "[nn]", "notes": "Slipcase"}
+    issue_2 = {"series_name": "3-D Batman", "number": "#[nn] #[nn]", "notes": "Double"}
+    issue_3 = {"series_name": "3-D Batman", "number": "1", "notes": "Regular issue"}
+
+    def fake_get(url, *args, **kwargs):
+        class Resp:
+            status_code = 200
+            def json(self):
+                if "series/name" in url:
+                    return series_resp
+                if "/issue/1/" in url:
+                    return issue_1
+                if "/issue/2/" in url:
+                    return issue_2
+                if "/issue/3/" in url:
+                    return issue_3
+                return {}
+        return Resp()
+
+    monkeypatch.setattr("requests.get", fake_get)
+    results = gcd.search_gcd_multi("3-D Batman")
+    assert len(results) == 1
+    assert results[0]["number"] == "1"
+
+
+def test_gcd_resolve_skips_nn_candidates(monkeypatch):
+    from tagger_app.sources import gcd
+    # Mock search_gcd_multi returning an item with [nn] and a regular item
+    monkeypatch.setattr(
+        gcd,
+        "search_gcd_multi",
+        lambda *args, **kwargs: [
+            {"series": "3-D Batman", "number": "#[nn] #[nn]", "title": "3-D Batman #[nn] #[nn]"},
+            {"series": "3-D Batman", "number": "[nn]", "title": "3-D Batman #[nn]"},
+            {"series": "3-D Batman", "number": "1", "title": "3-D Batman #1"}
+        ]
+    )
+    candidates = gcd.resolve_gcd("3-D Batman 01.cbz")
+    assert len(candidates) == 1
+    meta, score, source_url = candidates[0]
+    assert meta.get("number") == "1"
+
+
+
+

@@ -373,7 +373,19 @@ module.exports = function attach(router, deps) {
 
       const results = await response.json();
       
-      const mappedResults = results.map((item, idx) => {
+      const filteredResults = Array.isArray(results) ? results.filter(item => {
+        const itemSource = item.source || source;
+        if (itemSource === 'gcd') {
+          const num = String(item.number || item.issue_number || '');
+          const title = String(item.title || '');
+          if (/#?\[\s*nn\s*\]/i.test(num) || /#?\[\s*nn\s*\]/i.test(title)) {
+            return false;
+          }
+        }
+        return true;
+      }) : [];
+
+      const mappedResults = filteredResults.map((item, idx) => {
         const rawCover = item.cover_image_url || item.cover_url || '';
         // Never keep or use comics.org covers directly as they are Cloudflare protected
         const coverUrl = (rawCover && !rawCover.includes('comics.org')) ? rawCover : '';

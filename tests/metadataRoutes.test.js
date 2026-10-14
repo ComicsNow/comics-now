@@ -334,6 +334,48 @@ describe('User Metadata Routes - External Search', () => {
     expect(data.Series).toBe('Batman: The Court of Owls');
     expect(data.Title).toBe('');
   });
+
+  it('should filter out GCD results that contain [nn] or #[nn] text in number or title in /api/v1/search/external', async () => {
+    attachMetadataRoutes(router, deps);
+
+    const mockFetch = jest.fn().mockResolvedValue({
+      ok: true,
+      json: jest.fn().mockResolvedValue([
+        {
+          source: 'gcd',
+          title: '3-D Batman (1953 series) #[nn]',
+          series: '3-D Batman (1953 series)',
+          number: '[nn]'
+        },
+        {
+          source: 'gcd',
+          title: '3-D Batman (1966 series) #[nn]',
+          series: '3-D Batman (1966 series)',
+          number: '#[nn] #[nn]'
+        },
+        {
+          source: 'gcd',
+          title: 'Batman #1',
+          series: 'Batman',
+          number: '1'
+        }
+      ])
+    });
+    global.fetch = mockFetch;
+
+    const req = { query: { source: 'gcd', query: 'Batman' } };
+    const res = { json: jest.fn(), status: jest.fn().mockReturnThis() };
+
+    await externalSearchHandler(req, res);
+
+    expect(res.json).toHaveBeenCalled();
+    const data = res.json.mock.calls[0][0];
+    const results = data.results;
+    expect(results.length).toBe(1);
+    expect(results[0].issueNumber).toBe('1');
+    expect(results[0].name).not.toContain('[nn]');
+  });
 });
+
 
 

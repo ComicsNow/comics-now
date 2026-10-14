@@ -128,7 +128,13 @@ def search_gcd_multi(query, gcd_user=None, gcd_pass=None, comicvine_api_key=None
 
     cached = tagger_cache.get_query("gcd", query)
     if cached is not None:
+        import re
+        valid_cached = []
         for it in cached:
+            num = str(it.get("number") or "")
+            title = str(it.get("title") or "")
+            if re.search(r'\[\s*nn\s*\]', num, re.IGNORECASE) or re.search(r'\[\s*nn\s*\]', title, re.IGNORECASE):
+                continue
             cov = it.get("cover_image_url")
             # 1. Try to get cover from GCD API
             if not cov or ("comics.org" in str(cov) and not is_gcd_cover_accessible(str(cov))):
@@ -140,7 +146,8 @@ def search_gcd_multi(query, gcd_user=None, gcd_pass=None, comicvine_api_key=None
                                          metron_pass=metron_pass)
                 # 3. If neither available, None (fallback default placeholder)
                 it["cover_image_url"] = fb if fb else None
-        return cached
+            valid_cached.append(it)
+        return valid_cached
 
     out = []
     try:
@@ -158,6 +165,10 @@ def search_gcd_multi(query, gcd_user=None, gcd_pass=None, comicvine_api_key=None
                 for iss_url in s.get("active_issues", [])[:3]:
                     cached_iss = tagger_cache.get_entity("gcd_issue", iss_url)
                     if cached_iss is not None:
+                        num = str(cached_iss.get("number") or "")
+                        title = str(cached_iss.get("title") or "")
+                        if re.search(r'\[\s*nn\s*\]', num, re.IGNORECASE) or re.search(r'\[\s*nn\s*\]', title, re.IGNORECASE):
+                            continue
                         cov = cached_iss.get("cover_image_url")
                         if not cov or ("comics.org" in str(cov) and not is_gcd_cover_accessible(str(cov))):
                             fb = find_fallback_cover(cached_iss.get("series"), cached_iss.get("number"),
@@ -173,6 +184,9 @@ def search_gcd_multi(query, gcd_user=None, gcd_pass=None, comicvine_api_key=None
                     ir = requests.get(iss_url, auth=auth, headers={"Accept": "application/json", "User-Agent": "comic-tagger-bench/1.0"}, timeout=10)
                     if ir.status_code == 200:
                         d = ir.json()
+                        raw_num = str(d.get('number') or '')
+                        if re.search(r'\[\s*nn\s*\]', raw_num, re.IGNORECASE):
+                            continue
                         raw_cov = d.get('cover')
                         if raw_cov and '://' in raw_cov:
                             parts = raw_cov.split('://', 1)
@@ -261,7 +275,12 @@ def resolve_gcd(filename, cover_path=None, on_progress=None, existing_meta=None,
     res = search_gcd_multi(query, gcd_user=gcd_user, gcd_pass=gcd_pass,
                            comicvine_api_key=comicvine_api_key, metron_user=metron_user, metron_pass=metron_pass)
     candidates = []
+    import re
     for r in res:
+        num = str(r.get("number") or "")
+        title = str(r.get("title") or "")
+        if re.search(r'\[\s*nn\s*\]', num, re.IGNORECASE) or re.search(r'\[\s*nn\s*\]', title, re.IGNORECASE):
+            continue
         cov = r.get("cover_image_url")
         if not cov or ("comics.org" in str(cov) and not is_gcd_cover_accessible(str(cov))):
             fb = find_fallback_cover(r.get("series"), r.get("number"),

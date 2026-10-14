@@ -429,7 +429,18 @@ export async function performCvSearch() {
 
     // normalize response shape
     const raw     = Array.isArray(payload) ? payload : payload?.results;
-    const results = Array.isArray(raw) ? raw : [];
+    let results   = Array.isArray(raw) ? raw : [];
+    results = results.filter(item => {
+      const src = String(item?.source || source).toLowerCase();
+      if (src === 'gcd') {
+        const num = String(item?.issueNumber || item?.number || '');
+        const name = String(item?.name || item?.title || '');
+        if (/#?\[\s*nn\s*\]/i.test(num) || /#?\[\s*nn\s*\]/i.test(name)) {
+          return false;
+        }
+      }
+      return true;
+    });
     const total   = Number.isFinite(payload?.total) ? payload.total : results.length;
     cvState.total = total;
     cvState.allResults = results;
