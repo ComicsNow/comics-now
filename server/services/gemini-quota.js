@@ -114,7 +114,7 @@ function startMidnightPacificScheduler(ctx = {}) {
   stopMidnightPacificScheduler();
 
   const db = ctx.db || {};
-  const logger = ctx.log || ((lvl, tag, msg) => console.log(`[${lvl}][${tag}] ${msg}`));
+  const logger = ctx.log || (() => {});
 
   function scheduleNextMidnight() {
     const msUntilMidnight = getMsUntilNextPacificMidnight();

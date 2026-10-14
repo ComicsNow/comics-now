@@ -27,7 +27,7 @@ function installTaggerHook(ctx) {
   isHookInstalled = true;
 
   const originalFetch = globalThis.fetch;
-  const logger = ctx.log || ((lvl, tag, msg) => console.log(`[${lvl}][${tag}] ${msg}`));
+  const logger = ctx.log || (() => {});
 
   function getConfig() {
     let fileConfig = {};
