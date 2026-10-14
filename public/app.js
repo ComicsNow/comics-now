@@ -10,8 +10,10 @@ import {
 
 import { registerRoutes } from './js/routes.js';
 import { hideAdminUI } from './js/utils/admin-ui.js';
+import { renderReadingListDAG } from './js/reading-list-dag.js';
 
 // Side-effect imports to load and register all other ES Modules in order
+import './js/reading-list-dag.js';
 import './js/router.js';
 import './js/utils/device-detection.js';
 import './js/offline/db-core.js';
@@ -587,6 +589,11 @@ function closeReadingListModal() {
   const modal = document.getElementById('reading-list-modal');
   if (modal) {
     modal.classList.add('hidden');
+    const modalContainer = modal.querySelector('.bg-gray-800');
+    if (modalContainer) {
+      modalContainer.classList.remove('max-w-6xl', 'h-[92vh]');
+      modalContainer.classList.add('max-w-3xl');
+    }
     if (global.router && getRelativePath() === '/reading-lists') {
       const path = global.getPathForCurrentView ? global.getPathForCurrentView() : '/';
       global.router.navigate(path, true);
@@ -687,30 +694,49 @@ async function refreshReadingListModal() {
         const readCount = list.readComics || 0;
         const createdDate = list.created ? new Date(list.created).toLocaleDateString() : '';
         const progressPercent = list.progressPercent || 0;
+        const baseUrl = (typeof global !== 'undefined' && global.API_BASE_URL) ? global.API_BASE_URL : '';
+        const thumbUrl = list.thumbnailPath
+          ? `${baseUrl}/thumbnails/${encodeURIComponent(list.thumbnailPath)}`
+          : null;
 
         // Determine read status
         const allRead = readCount === itemCount && itemCount > 0;
         const hasProgress = readCount > 0;
 
         listDiv.innerHTML = `
-          <div class="flex justify-between items-start">
-            <div class="flex items-center gap-3 flex-1 min-w-0">
+          <div class="flex justify-between items-start gap-2">
+            <div class="flex items-start gap-3.5 flex-1 min-w-0">
               ${isListEditMode ? `
-                <div class="flex flex-col gap-1">
+                <div class="flex flex-col gap-1 self-center">
                   <button class="reorder-up-btn text-gray-500 hover:text-white p-0.5" title="Move Up">▲</button>
                   <button class="reorder-down-btn text-gray-500 hover:text-white p-0.5" title="Move Down">▼</button>
                 </div>
               ` : ''}
-              <div class="flex-1 min-w-0">
+
+              <!-- Cover artwork thumbnail in reading list widget -->
+              <div class="relative w-14 h-20 sm:w-16 sm:h-22 shrink-0 rounded-lg overflow-hidden bg-gray-950 border border-gray-700/60 shadow group-hover:border-purple-500/50 transition-all">
+                ${thumbUrl ? `
+                  <img src="${thumbUrl}" alt="${escapeHtml(list.name)}" class="w-full h-full object-cover object-top opacity-85 group-hover:opacity-100 group-hover:scale-105 transition-all duration-300" loading="lazy">
+                  <div class="absolute inset-0 bg-gradient-to-t from-gray-950/70 via-transparent to-transparent"></div>
+                ` : `
+                  <div class="w-full h-full flex items-center justify-center text-xl bg-purple-950/40 text-purple-400">📚</div>
+                `}
+              </div>
+
+              <div class="flex-1 min-w-0 self-center">
                 <div class="flex items-center gap-2 mb-1">
-                  <span class="text-xl group-hover:scale-110 transition-transform inline-block">📚</span>
-                  <h5 class="font-bold text-lg text-white truncate">${escapeHtml(list.name)}</h5>
+                  <h5 class="font-bold text-base sm:text-lg text-white truncate group-hover:text-purple-300 transition-colors">${escapeHtml(list.name)}</h5>
                 </div>
-                <div class="flex items-center gap-2 text-[10px] uppercase tracking-wider text-gray-500 font-bold">
+                <div class="flex flex-wrap items-center gap-2 text-[10px] uppercase tracking-wider text-gray-400 font-bold mb-1">
                   <span>Created ${escapeHtml(createdDate)}</span>
-                  <span class="w-1 h-1 rounded-full bg-gray-700"></span>
-                  <span class="${allRead ? 'text-green-500' : hasProgress ? 'text-purple-400' : 'text-gray-500'}">${readCount} / ${itemCount} Read</span>
+                  <span class="w-1 h-1 rounded-full bg-gray-600"></span>
+                  <span class="${allRead ? 'text-green-500' : hasProgress ? 'text-purple-400' : 'text-gray-400'}">${readCount} / ${itemCount} Read</span>
+                  ${list.seriesCount ? `
+                    <span class="w-1 h-1 rounded-full bg-gray-600"></span>
+                    <span class="text-purple-300/80">${list.seriesCount} ${list.seriesCount === 1 ? 'series' : 'series'}</span>
+                  ` : ''}
                 </div>
+                ${list.description ? `<p class="text-xs text-gray-400 line-clamp-1 mt-0.5">${escapeHtml(list.description)}</p>` : ''}
               </div>
             </div>
             <button class="text-gray-600 hover:text-red-400 transition-colors p-1 delete-list-btn ${isListEditMode || isOffline ? 'hidden' : ''}" data-list-id="${escapeHtml(list.id)}" title="Delete List">
@@ -742,6 +768,14 @@ async function refreshReadingListModal() {
                 <span>${allRead ? 'Unread' : 'Read'}</span>
               </button>
             `}
+
+            <button class="flex-1 flex items-center justify-center gap-1.5 bg-gray-700 hover:bg-purple-900/60 hover:text-purple-300 text-white text-xs font-bold py-2 px-3 rounded-lg transition-colors dag-list-btn"
+                    data-list-id="${escapeHtml(list.id)}"
+                    data-list-name="${escapeHtml(list.name)}"
+                    title="View Continuity DAG">
+              <span>🔀</span>
+              <span>DAG</span>
+            </button>
 
             <button class="flex-1 flex items-center justify-center gap-2 bg-gray-700 hover:bg-gray-600 text-white text-xs font-bold py-2 px-3 rounded-lg transition-colors download-list-btn"
                     data-list-id="${escapeHtml(list.id)}"
@@ -819,6 +853,15 @@ async function refreshReadingListModal() {
             } catch (error) {
               alert('Failed to update reading status. Please try again.');
             }
+          });
+        }
+
+        // DAG view handler
+        const dagBtn = listDiv.querySelector('.dag-list-btn');
+        if (dagBtn) {
+          dagBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            showReadingListDetail(list.id, list.name, 'dag');
           });
         }
 
@@ -977,14 +1020,34 @@ async function deleteReadingList(listId) {
  * @param {string} listId - The reading list ID
  * @param {string} listName - The reading list name
  */
-async function showReadingListDetail(listId, listName) {
-  const modalContent = document.getElementById('reading-lists-container').parentElement;
+async function showReadingListDetail(listId, listName, initialViewMode = null) {
+  const modal = document.getElementById('reading-list-modal');
+  const modalContent = document.getElementById('reading-lists-container')?.parentElement;
   if (!modalContent) return;
 
+  const modalContainer = modal?.querySelector('.bg-gray-800');
   const isOffline = typeof navigator !== 'undefined' && navigator && navigator.onLine === false;
+
+  // View mode state (detailed, compact, or dag)
+  let viewMode = initialViewMode || localStorage.getItem('readingListViewMode') || 'detailed';
+
+  // Resize modal container if DAG mode is active
+  if (modalContainer) {
+    if (viewMode === 'dag') {
+      modalContainer.classList.remove('max-w-3xl');
+      modalContainer.classList.add('max-w-6xl', 'w-full', 'h-[92vh]');
+    } else {
+      modalContainer.classList.remove('max-w-6xl', 'h-[92vh]');
+      modalContainer.classList.add('max-w-3xl');
+    }
+  }
 
   // Hide main list view
   document.getElementById('reading-lists-container').classList.add('hidden');
+
+  // Remove existing detail view if present
+  const existingDetail = document.getElementById('reading-list-detail-view');
+  if (existingDetail) existingDetail.remove();
 
   // Create detail view
   const detailView = document.createElement('div');
@@ -992,17 +1055,17 @@ async function showReadingListDetail(listId, listName) {
   detailView.className = 'flex-1 overflow-y-auto p-4 sm:p-6';
 
   detailView.innerHTML = `
-    <div class="mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-      <div class="flex items-center gap-4">
-        <button id="back-to-lists-btn" class="bg-gray-700 hover:bg-gray-600 text-white p-2 rounded-full transition-all hover:scale-110 shadow-lg" title="Back to lists">
+    <div class="mb-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div class="flex items-center gap-4 min-w-0">
+        <button id="back-to-lists-btn" class="bg-gray-700 hover:bg-gray-600 text-white p-2 rounded-full transition-all hover:scale-110 shadow-lg shrink-0" title="Back to lists">
           <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
           </svg>
         </button>
-        <div>
-          <h2 class="text-2xl font-bold text-white flex items-center gap-2">
-            <span class="text-purple-400">📚</span>
-            <span>${escapeHtml(listName)}</span>
+        <div class="min-w-0">
+          <h2 class="text-2xl font-bold text-white flex items-center gap-2 truncate">
+            <span class="text-purple-400 shrink-0">📚</span>
+            <span class="truncate">${escapeHtml(listName)}</span>
           </h2>
           <div class="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-gray-500 mt-0.5">
             <span>Reading List Detail</span>
@@ -1012,26 +1075,39 @@ async function showReadingListDetail(listId, listName) {
           </div>
         </div>
       </div>
-      <div class="flex items-center gap-2">
-        <button id="view-toggle-btn" class="bg-gray-700 hover:bg-gray-600 text-white p-2.5 rounded-lg transition-all shadow-lg" title="Toggle view">
-          <span id="view-toggle-icon" class="text-lg">☰</span>
-        </button>
-        <button id="download-all-list-btn" class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2.5 px-4 rounded-lg transition-all shadow-lg hover:shadow-purple-900/40 flex items-center gap-2">
+      <div class="flex items-center gap-2 flex-wrap">
+        <!-- View Mode Segmented Controls: Grid / List / DAG -->
+        <div class="flex items-center bg-gray-700/80 p-0.5 rounded-lg border border-gray-600/80 text-xs shadow-md">
+          <button id="view-mode-grid-btn" class="px-2.5 py-1.5 rounded-md font-bold transition-all flex items-center gap-1 ${viewMode === 'detailed' ? 'bg-purple-600 text-white shadow' : 'text-gray-300 hover:text-white'}" title="Grid View">
+            <span>⊞</span>
+            <span class="hidden sm:inline">Grid</span>
+          </button>
+          <button id="view-mode-compact-btn" class="px-2.5 py-1.5 rounded-md font-bold transition-all flex items-center gap-1 ${viewMode === 'compact' ? 'bg-purple-600 text-white shadow' : 'text-gray-300 hover:text-white'}" title="Compact List View">
+            <span>☰</span>
+            <span class="hidden sm:inline">List</span>
+          </button>
+          <button id="view-mode-dag-btn" class="px-2.5 py-1.5 rounded-md font-bold transition-all flex items-center gap-1 ${viewMode === 'dag' ? 'bg-purple-600 text-white shadow' : 'text-gray-300 hover:text-white'}" title="Interactive Continuity DAG">
+            <span>🔀</span>
+            <span class="hidden sm:inline">DAG</span>
+          </button>
+        </div>
+
+        <button id="download-all-list-btn" class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-3 rounded-lg transition-all shadow-lg hover:shadow-purple-900/40 flex items-center gap-1.5 text-xs">
           <span>⬇</span>
-          <span class="hidden sm:inline">Download All</span>
+          <span class="hidden sm:inline">Download</span>
         </button>
-        <button id="export-list-btn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 px-4 rounded-lg transition-all shadow-lg hover:shadow-blue-900/40 flex items-center gap-2">
+        <button id="export-list-btn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-3 rounded-lg transition-all shadow-lg hover:shadow-blue-900/40 flex items-center gap-1.5 text-xs">
           <span>📤</span>
           <span class="hidden sm:inline">Export</span>
         </button>
-        <button id="edit-list-btn" class="bg-gray-700 hover:bg-gray-600 text-white font-bold py-2.5 px-4 rounded-lg transition-all border border-gray-600 shadow-lg flex items-center gap-2 ${isOffline ? 'hidden' : ''}">
+        <button id="edit-list-btn" class="bg-gray-700 hover:bg-gray-600 text-white font-bold py-2 px-3 rounded-lg transition-all border border-gray-600 shadow-lg flex items-center gap-1.5 text-xs ${isOffline || viewMode === 'dag' ? 'hidden' : ''}">
           <span>✏️</span>
           <span class="hidden sm:inline">Edit</span>
         </button>
-        <button id="save-order-btn" class="hidden bg-green-600 hover:bg-green-700 text-white font-bold py-2.5 px-6 rounded-lg transition-all shadow-lg hover:shadow-green-900/40">
+        <button id="save-order-btn" class="hidden bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-5 rounded-lg transition-all shadow-lg hover:shadow-green-900/40 text-xs">
           Save Order
         </button>
-        <button id="cancel-edit-btn" class="hidden bg-gray-600 hover:bg-gray-700 text-white font-bold py-2.5 px-4 rounded-lg transition-all border border-gray-500">
+        <button id="cancel-edit-btn" class="hidden bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-3 rounded-lg transition-all border border-gray-500 text-xs">
           Cancel
         </button>
       </div>
@@ -1047,32 +1123,52 @@ async function showReadingListDetail(listId, listName) {
   // Add back button handler
   document.getElementById('back-to-lists-btn').addEventListener('click', hideReadingListDetail);
 
-  // View mode state (detailed or compact)
-  let viewMode = localStorage.getItem('readingListViewMode') || 'detailed';
+  const updateViewModeControls = () => {
+    const gridBtn = document.getElementById('view-mode-grid-btn');
+    const compactBtn = document.getElementById('view-mode-compact-btn');
+    const dagBtn = document.getElementById('view-mode-dag-btn');
+    const editBtn = document.getElementById('edit-list-btn');
 
-  // Update toggle icon based on current view
-  const updateViewToggleIcon = () => {
-    const icon = document.getElementById('view-toggle-icon');
-    const btn = document.getElementById('view-toggle-btn');
-    if (icon && btn) {
-      if (viewMode === 'detailed') {
-        icon.textContent = '☰';
-        btn.title = 'Switch to compact view';
+    if (gridBtn) gridBtn.className = `px-2.5 py-1.5 rounded-md font-bold transition-all flex items-center gap-1 ${viewMode === 'detailed' ? 'bg-purple-600 text-white shadow' : 'text-gray-300 hover:text-white'}`;
+    if (compactBtn) compactBtn.className = `px-2.5 py-1.5 rounded-md font-bold transition-all flex items-center gap-1 ${viewMode === 'compact' ? 'bg-purple-600 text-white shadow' : 'text-gray-300 hover:text-white'}`;
+    if (dagBtn) dagBtn.className = `px-2.5 py-1.5 rounded-md font-bold transition-all flex items-center gap-1 ${viewMode === 'dag' ? 'bg-purple-600 text-white shadow' : 'text-gray-300 hover:text-white'}`;
+
+    if (modalContainer) {
+      if (viewMode === 'dag') {
+        modalContainer.classList.remove('max-w-3xl');
+        modalContainer.classList.add('max-w-6xl', 'w-full', 'h-[92vh]');
       } else {
-        icon.textContent = '▤';
-        btn.title = 'Switch to detailed view';
+        modalContainer.classList.remove('max-w-6xl', 'h-[92vh]');
+        modalContainer.classList.add('max-w-3xl');
       }
+    }
+
+    if (editBtn) {
+      editBtn.classList.toggle('hidden', viewMode === 'dag' || isOffline);
     }
   };
 
-  // Initialize icon
-  updateViewToggleIcon();
-
-  // View toggle handler
-  document.getElementById('view-toggle-btn').addEventListener('click', () => {
-    viewMode = viewMode === 'detailed' ? 'compact' : 'detailed';
+  document.getElementById('view-mode-grid-btn')?.addEventListener('click', () => {
+    if (viewMode === 'detailed') return;
+    viewMode = 'detailed';
     localStorage.setItem('readingListViewMode', viewMode);
-    updateViewToggleIcon();
+    updateViewModeControls();
+    renderComics();
+  });
+
+  document.getElementById('view-mode-compact-btn')?.addEventListener('click', () => {
+    if (viewMode === 'compact') return;
+    viewMode = 'compact';
+    localStorage.setItem('readingListViewMode', viewMode);
+    updateViewModeControls();
+    renderComics();
+  });
+
+  document.getElementById('view-mode-dag-btn')?.addEventListener('click', () => {
+    if (viewMode === 'dag') return;
+    viewMode = 'dag';
+    localStorage.setItem('readingListViewMode', viewMode);
+    updateViewModeControls();
     renderComics();
   });
 
@@ -1094,6 +1190,15 @@ async function showReadingListDetail(listId, listName) {
 
       if (countBadge) countBadge.textContent = `${details.items.length} item${details.items.length === 1 ? '' : 's'}`;
       comicsContainer.innerHTML = '';
+
+      // DAG view mode
+      if (viewMode === 'dag') {
+        comicsContainer.className = 'w-full h-full';
+        comicsContainer.innerHTML = '<p class="text-sm text-gray-400 text-center py-8 animate-pulse italic">Generating Continuity DAG...</p>';
+        const dagData = await (global.ReadingLists?.fetchReadingListDAG ? global.ReadingLists.fetchReadingListDAG(listId, details) : null);
+        renderReadingListDAG(comicsContainer, dagData, { listId, listName });
+        return;
+      }
 
       // Set container layout based on view mode
       if (viewMode === 'compact') {
@@ -1469,6 +1574,15 @@ async function showReadingListDetail(listId, listName) {
  * Hide reading list detail view and return to main list
  */
 function hideReadingListDetail() {
+  const modal = document.getElementById('reading-list-modal');
+  if (modal) {
+    const modalContainer = modal.querySelector('.bg-gray-800');
+    if (modalContainer) {
+      modalContainer.classList.remove('max-w-6xl', 'h-[92vh]');
+      modalContainer.classList.add('max-w-3xl');
+    }
+  }
+
   const detailView = document.getElementById('reading-list-detail-view');
   if (detailView) {
     detailView.remove();

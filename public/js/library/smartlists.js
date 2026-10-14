@@ -116,37 +116,69 @@ function maybeFetchReadingLists() {
   fetchAndCacheReadingLists();
 }
 
+export const PUB_SUFFIX_REGEX = /\b(comics?|publishing|press|studios?|books?|entertainment|productions?|inc|llc|ltd)\b/gi;
+
 export function normalizePub(str) {
   return String(str || '').toLowerCase().replace(/[^a-z0-9]/g, '');
 }
 
+export function stemPublisher(str) {
+  if (!str) return '';
+  return String(str)
+    .toLowerCase()
+    .replace(PUB_SUFFIX_REGEX, ' ')
+    .replace(/[^a-z0-9]/g, '');
+}
+
+export function isPubMatch(pubA, pubB) {
+  if (!pubA || !pubB) return false;
+  const normA = normalizePub(pubA);
+  const normB = normalizePub(pubB);
+  if (normA && normB && normA === normB) return true;
+  const stemA = stemPublisher(pubA);
+  const stemB = stemPublisher(pubB);
+  if (stemA && stemB && stemA === stemB) return true;
+  return false;
+}
+
 export function matchesPublisher(list, publisherName) {
   if (!list || !publisherName) return false;
-  const normTarget = normalizePub(publisherName);
-  if (!normTarget) return false;
 
-  // 1. Direct or fuzzy match against list.publishers
+  // 1. Direct or stem match against list.publishers
   if (Array.isArray(list.publishers)) {
     for (const p of list.publishers) {
-      const normP = normalizePub(p);
-      if (normP && (normP === normTarget || normP.includes(normTarget) || normTarget.includes(normP))) {
-        return true;
-      }
+      if (isPubMatch(p, publisherName)) return true;
     }
   }
 
-  // 2. Name prefix match e.g. "DC: ..." or "Dark Horse: ..." or "Image: ..."
-  const colonIdx = list.name.indexOf(':');
+  // 2. Name prefix match e.g. "DC: ..." or "Dark Horse: ..." or "Image: ..." or "Boom! Studios: ..."
+  const listName = String(list.name || '');
+  const colonIdx = listName.indexOf(':');
   if (colonIdx > 0) {
-    const prefix = normalizePub(list.name.substring(0, colonIdx));
-    if (prefix && (prefix === normTarget || prefix.includes(normTarget) || normTarget.includes(prefix))) {
+    const prefix = listName.substring(0, colonIdx).trim();
+    if (isPubMatch(prefix, publisherName)) return true;
+    // Also support prefix variations like "DC Event: ..." matching "DC Comics"
+    const prefixStem = stemPublisher(prefix);
+    const targetStem = stemPublisher(publisherName);
+    if (prefixStem && targetStem && (prefixStem === targetStem || prefixStem.startsWith(targetStem))) {
       return true;
     }
   }
 
-  // 3. Fallback name contains
-  const normName = normalizePub(list.name);
-  if (normName.includes(normTarget)) return true;
+  // 3. Fallback: whole word boundary matching of target publisher in list name
+  const cleanTarget = String(publisherName).trim();
+  if (cleanTarget.length >= 2) {
+    const escaped = cleanTarget.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const wordPattern = new RegExp('\\b' + escaped + '\\b', 'i');
+    if (wordPattern.test(listName)) return true;
+
+    // Check stemmed target (e.g. "Dark Horse" from "Dark Horse Comics") as whole word
+    const stem = stemPublisher(cleanTarget);
+    if (stem.length >= 3) {
+      const stemPattern = new RegExp('\\b' + stem + '\\b', 'i');
+      if (stemPattern.test(listName)) return true;
+    }
+  }
 
   return false;
 }
