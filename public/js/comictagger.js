@@ -462,13 +462,9 @@ function openCTModal() {
 
   global.ctEventSource = new EventSource(`${global.API_BASE_URL}/api/v1/tag-comics-now/stream`);
   
-  global.ctEventSource.onopen = () => {
-    console.log('[CT] SSE stream connected');
-  };
+  global.ctEventSource.onopen = () => {};
 
-  global.ctEventSource.onerror = (err) => {
-    console.warn('[CT] SSE stream disconnected, relying on live polling fallback');
-  };
+  global.ctEventSource.onerror = () => {};
 
   global.ctEventSource.onmessage = (e) => {
     try {
@@ -772,7 +768,7 @@ function getCtMatchHtml(match) {
         <div class="flex space-x-4">
           <div class="shrink-0 w-24">
             ${coverUrl
-              ? `<img src="${escapeHtml(coverUrl)}" alt="Cover" class="w-full h-auto rounded border border-gray-700 shadow-md object-cover" loading="lazy">`
+              ? `<img src="${escapeHtml(coverUrl)}" alt="Cover" class="w-full h-auto rounded border border-gray-700 shadow-md object-cover" loading="lazy" referrerpolicy="no-referrer" onerror="this.onerror=null; this.parentElement.innerHTML='<div class=\\'w-full h-32 rounded border border-gray-700 bg-gray-950 flex items-center justify-center text-[10px] text-gray-500 uppercase text-center p-1\\'>No Cover</div>';">`
               : `<div class="w-full h-32 rounded border border-gray-700 bg-gray-950 flex items-center justify-center text-[10px] text-gray-600 uppercase text-center p-1">No Cover</div>`
             }
           </div>

@@ -308,3 +308,31 @@ def test_resolve_creator_roles_extracts_from_description():
     assert "Martin Simmonds" in out["penciller"]
     assert "Letizia Cadonici" in out["penciller"]
 
+
+def test_score_candidate_when_title_matches_series():
+    raw = {
+        "title": "High Crimes #1",
+        "series": "High Crimes",
+        "number": "1",
+        "publish_date": "2013",
+        "publisher": "Monkeybrain Comics"
+    }
+    norm, score, src = metadata.score_candidate("High Crimes (2021) ( Fan Made TPB).cbz", raw)
+    assert score >= 0.80
+    assert norm["series"] == "High Crimes"
+    # Ensure input dict was not mutated
+    assert raw["title"] == "High Crimes #1"
+
+
+def test_score_candidate_fallback_when_cover_download_fails():
+    raw = {
+        "title": "Batman #1",
+        "series": "Batman",
+        "number": "1",
+        "cover_image_url": "https://files1.comics.org/img/gcd/covers_by_id/1/w400/123.jpg"
+    }
+    # Even if cover comparison returns 0 (e.g. 403 on GCD), title similarity must not be dropped to 0
+    norm, score, src = metadata.score_candidate("Batman #1.cbz", raw, cover_path="/nonexistent/cover.jpg")
+    assert score >= 0.85
+
+
