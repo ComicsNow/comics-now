@@ -3,6 +3,8 @@
  * 
  * Handles comic metadata retrieval and ComicVine searching.
  */
+const { cleanFormatAndEdition, splitVolumeSeriesAndTitle, isTitleSameAsSeries, sanitizeMetadata } = require('../../services/metadata');
+
 module.exports = function attach(router, deps) {
   const {
     dbGet,
@@ -339,15 +341,17 @@ module.exports = function attach(router, deps) {
       const sidecarUrl = config.taggerServiceUrl || 'http://localhost:5000';
       const requestBody = { source, query };
       const cvApiKey = (typeof getComicVineApiKey === 'function' ? getComicVineApiKey() : null) || config.comicVineApiKey || process.env.COMICVINE_API_KEY || '';
-      if ((source === 'all' || source === 'comicvine') && cvApiKey) {
+      if ((source === 'all' || source === 'comicvine' || source === 'gcd') && cvApiKey) {
         requestBody.comicvine_api_key = cvApiKey;
       }
       if (config.googleBooksApiKey) {
         requestBody.google_books_api_key = config.googleBooksApiKey;
       }
-      if (config.metronUser && config.metronPass) {
-        requestBody.metron_user = config.metronUser;
-        requestBody.metron_pass = config.metronPass;
+      const metronUser = config.metronUser || (typeof config.getMetronUser === 'function' ? config.getMetronUser() : '') || process.env.METRON_USER || '';
+      const metronPass = config.metronPassword || config.metronPass || (typeof config.getMetronPassword === 'function' ? config.getMetronPassword() : '') || process.env.METRON_PASSWORD || process.env.METRON_PASS || '';
+      if ((source === 'all' || source === 'metron' || source === 'gcd') && metronUser && metronPass) {
+        requestBody.metron_user = metronUser;
+        requestBody.metron_pass = metronPass;
       }
 
       const response = await fetch(`${sidecarUrl}/api/search`, {
@@ -388,14 +392,16 @@ module.exports = function attach(router, deps) {
           Web: item.source_url || ''
         };
 
+        sanitizeMetadata(fullMetadata);
+
         return {
           type: 'issue',
           id: `external-${itemSource}-${idx}`,
           source: itemSource,
-          name: item.title || 'Unknown Title',
-          volumeName: item.series || '',
-          issueNumber: item.number || item.issue_number || '',
-          publisher: item.publisher || '',
+          name: fullMetadata.Title || fullMetadata.Series || item.title || 'Unknown Title',
+          volumeName: fullMetadata.Series || item.series || '',
+          issueNumber: fullMetadata.Number || item.number || item.issue_number || '',
+          publisher: fullMetadata.Publisher || item.publisher || '',
           coverDate: item.publish_date || '',
           image: {
             thumb_url: coverUrl,
@@ -427,10 +433,128 @@ module.exports = function attach(router, deps) {
         }
       }
 
-      // For any items still referencing comics.org covers, route through proxy with fallback
+      // If any items are still blocked or missing covers (e.g. GCD results without a batch partner),
+      // cross-enrich via OpenLibrary, ComicVine, or Metron
+      for (const item of mappedResults) {
+        const isBlocked = !item.image?.thumb_url || item.image.thumb_url.includes('comics.org');
+        if (isBlocked) {
+          const sName = (item.volumeName || query || '').trim();
+          const issNum = (item.issueNumber || '').trim();
+          const cleanIsbn = (item.fullMetadata?.ISBN || '').replace(/[^0-9X]/gi, '');
+
+          let enrichedCoverUrl = null;
+
+          // 1. Try OpenLibrary if ISBN is present
+          if (cleanIsbn) {
+            try {
+              const olUrl = `https://covers.openlibrary.org/b/isbn/${encodeURIComponent(cleanIsbn)}-M.jpg?default=false`;
+              const olCheck = await fetch(olUrl, { method: 'HEAD', signal: AbortSignal.timeout(2500) });
+              if (olCheck.ok && (olCheck.headers.get('content-type') || '').startsWith('image/')) {
+                enrichedCoverUrl = `https://covers.openlibrary.org/b/isbn/${encodeURIComponent(cleanIsbn)}-L.jpg`;
+              }
+            } catch {}
+          }
+
+          // 2. Try ComicVine
+          if (!enrichedCoverUrl && cvApiKey && sName) {
+            try {
+              const cvQuery = `${sName} ${issNum}`.trim();
+              const cvUrl = `${COMICVINE_API_URL}/search/?api_key=${encodeURIComponent(cvApiKey)}&format=json&resources=issue&query=${encodeURIComponent(cvQuery)}&limit=5`;
+              const cvData = await cvFetchJson(cvUrl);
+              const matches = cvData?.results || [];
+              const bestMatch = matches.find(m => {
+                const volName = m.volume?.name || '';
+                const mNum = m.issue_number != null ? String(m.issue_number).trim() : '';
+                const volMatch = volName.toLowerCase() === sName.toLowerCase();
+                const numMatch = !issNum || mNum === issNum;
+                return volMatch && numMatch && (m.image?.medium_url || m.image?.super_url || m.image?.thumb_url);
+              }) || matches.find(m => m.image?.medium_url || m.image?.super_url || m.image?.thumb_url);
+
+              if (bestMatch?.image) {
+                const cvImg = bestMatch.image;
+                item.image = {
+                  thumb_url: cvImg.thumb_url || cvImg.medium_url,
+                  medium_url: cvImg.medium_url || cvImg.super_url || cvImg.thumb_url,
+                  super_url: cvImg.super_url || cvImg.medium_url || cvImg.thumb_url,
+                  original_url: cvImg.original_url || cvImg.super_url || cvImg.medium_url
+                };
+                enrichedCoverUrl = item.image.medium_url;
+              }
+            } catch {}
+          }
+
+          // 3. Try Metron via sidecar
+          if (!enrichedCoverUrl && metronUser && metronPass && sName) {
+            try {
+              const mQuery = `${sName} ${issNum ? '#' + issNum : ''}`.trim();
+              const mRes = await fetch(`${sidecarUrl}/api/search`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  source: 'metron',
+                  query: mQuery,
+                  metron_user: metronUser,
+                  metron_pass: metronPass
+                }),
+                signal: AbortSignal.timeout(4000)
+              });
+              if (mRes.ok) {
+                const mItems = await mRes.json();
+                const mMatch = (mItems || []).find(m => {
+                  const mCov = m.cover_image_url || m.cover_url;
+                  return mCov && !mCov.includes('comics.org');
+                });
+                if (mMatch) {
+                  const mCov = mMatch.cover_image_url || mMatch.cover_url;
+                  enrichedCoverUrl = mCov;
+                  item.image = {
+                    thumb_url: mCov,
+                    medium_url: mCov,
+                    super_url: mCov,
+                    original_url: mCov
+                  };
+                }
+              }
+            } catch {}
+          }
+
+          // 4. Try OpenLibrary Search by title
+          if (!enrichedCoverUrl && sName) {
+            try {
+              const olSearchUrl = `https://openlibrary.org/search.json?title=${encodeURIComponent(sName)}&limit=3`;
+              const olRes = await fetch(olSearchUrl, { signal: AbortSignal.timeout(3000) });
+              if (olRes.ok) {
+                const olData = await olRes.json();
+                const docWithCover = (olData?.docs || []).find(d => d.cover_i);
+                if (docWithCover?.cover_i) {
+                  const olCover = `https://covers.openlibrary.org/b/id/${docWithCover.cover_i}-M.jpg`;
+                  item.image = {
+                    thumb_url: olCover,
+                    medium_url: `https://covers.openlibrary.org/b/id/${docWithCover.cover_i}-L.jpg`,
+                    super_url: `https://covers.openlibrary.org/b/id/${docWithCover.cover_i}-L.jpg`,
+                    original_url: `https://covers.openlibrary.org/b/id/${docWithCover.cover_i}-L.jpg`
+                  };
+                  enrichedCoverUrl = olCover;
+                }
+              }
+            } catch {}
+          }
+
+          if (enrichedCoverUrl && !item.image?.thumb_url) {
+            item.image = {
+              thumb_url: enrichedCoverUrl,
+              medium_url: enrichedCoverUrl,
+              super_url: enrichedCoverUrl,
+              original_url: enrichedCoverUrl
+            };
+          }
+        }
+      }
+
+      // For any items still referencing comics.org covers, route through proxy with context
       for (const item of mappedResults) {
         if (item.image?.thumb_url && item.image.thumb_url.includes('comics.org')) {
-          const proxied = `/api/v1/proxy/cover?url=${encodeURIComponent(item.image.thumb_url)}`;
+          const proxied = `/api/v1/proxy/cover?url=${encodeURIComponent(item.image.thumb_url)}&series=${encodeURIComponent(item.volumeName || '')}&issue=${encodeURIComponent(item.issueNumber || '')}&query=${encodeURIComponent(query || '')}`;
           item.image = {
             thumb_url: proxied,
             medium_url: proxied,
@@ -445,6 +569,149 @@ module.exports = function attach(router, deps) {
       return res.status(500).json({ message: formatErrorMessage(e, req, 'Failed to search external source') });
     }
   });
+
+  async function resolveFallbackCoverImage(series, issueNumber, queryContext, reqTargetUrl = '') {
+    const { getConfig } = require('../../config');
+    const config = getConfig();
+    const sidecarUrl = config.taggerServiceUrl || 'http://localhost:5000';
+    const cvApiKey = (typeof getComicVineApiKey === 'function' ? getComicVineApiKey() : null) || config.comicVineApiKey || process.env.COMICVINE_API_KEY || '';
+    const metronUser = config.metronUser || (typeof config.getMetronUser === 'function' ? config.getMetronUser() : '') || process.env.METRON_USER || '';
+    const metronPass = config.metronPassword || config.metronPass || (typeof config.getMetronPassword === 'function' ? config.getMetronPassword() : '') || process.env.METRON_PASSWORD || process.env.METRON_PASS || '';
+
+    let sName = (series || '').trim();
+    let issNum = (issueNumber || '').trim();
+
+    if (!sName && queryContext) {
+      const m = queryContext.trim().match(/^(.*?)(?:\s*#\s*([\d.]+))?$/);
+      if (m) {
+        sName = m[1].trim();
+        if (!issNum && m[2]) issNum = m[2].trim();
+      } else {
+        sName = queryContext.trim();
+      }
+    }
+
+    // If still no series, try extracting GCD issue ID from the targetUrl if it was from comics.org
+    if (!sName && reqTargetUrl && reqTargetUrl.includes('comics.org')) {
+      const gcdIssueMatch = reqTargetUrl.match(/(?:covers_by_id\/\d+\/(?:w\d+\/)?|issue\/)(\d+)/);
+      if (gcdIssueMatch) {
+        try {
+          const gcdIssueRes = await fetch(`https://www.comics.org/api/issue/${gcdIssueMatch[1]}/`, {
+            headers: { 'Accept': 'application/json', 'User-Agent': 'ComicsNow/1.0' },
+            signal: AbortSignal.timeout(3000)
+          });
+          if (gcdIssueRes.ok) {
+            const gcdIssueData = await gcdIssueRes.json();
+            if (gcdIssueData.series_name) {
+              sName = gcdIssueData.series_name;
+              if (!issNum && gcdIssueData.number) issNum = String(gcdIssueData.number);
+            }
+          }
+        } catch {}
+      }
+    }
+
+    if (!sName) return null;
+
+    async function fetchCoverBuffer(imgUrl) {
+      if (!imgUrl || typeof imgUrl !== 'string' || imgUrl.includes('comics.org')) return null;
+      try {
+        const r = await fetch(imgUrl, {
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept': 'image/avif,image/webp,image/apng,image/*,*/*;q=0.8'
+          },
+          signal: AbortSignal.timeout(5000)
+        });
+        if (!r.ok) return null;
+        const cType = r.headers.get('content-type') || 'image/jpeg';
+        if (!cType.startsWith('image/')) return null;
+        const buf = Buffer.from(await r.arrayBuffer());
+        if (buf.length < 100) return null;
+        return { buffer: buf, contentType: cType };
+      } catch {
+        return null;
+      }
+    }
+
+    // 1. Try ComicVine
+    if (cvApiKey) {
+      try {
+        const cvQuery = `${sName} ${issNum}`.trim();
+        const searchUrl = `${COMICVINE_API_URL}/search/?api_key=${encodeURIComponent(cvApiKey)}&format=json&resources=issue&query=${encodeURIComponent(cvQuery)}&limit=5`;
+        const sdata = await cvFetchJson(searchUrl);
+        const matches = sdata?.results || [];
+        const best = matches.find(m => {
+          const vName = m.volume?.name || '';
+          const mNum = m.issue_number != null ? String(m.issue_number).trim() : '';
+          const vMatch = vName.toLowerCase() === sName.toLowerCase();
+          const nMatch = !issNum || mNum === issNum;
+          return vMatch && nMatch && (m.image?.medium_url || m.image?.super_url || m.image?.thumb_url);
+        }) || matches.find(m => m.image?.medium_url || m.image?.super_url || m.image?.thumb_url);
+
+        const imgCandidate = best?.image?.medium_url || best?.image?.super_url || best?.image?.thumb_url;
+        if (imgCandidate) {
+          const resImg = await fetchCoverBuffer(imgCandidate);
+          if (resImg) return resImg;
+        }
+
+        const volUrl = `${COMICVINE_API_URL}/volumes/?api_key=${encodeURIComponent(cvApiKey)}&format=json&filter=name:${encodeURIComponent(sName)}&limit=1&field_list=image`;
+        const vdata = await cvFetchJson(volUrl);
+        const vMatch = (vdata?.results || [])[0];
+        const vImg = vMatch?.image?.medium_url || vMatch?.image?.super_url || vMatch?.image?.thumb_url;
+        if (vImg) {
+          const resImg = await fetchCoverBuffer(vImg);
+          if (resImg) return resImg;
+        }
+      } catch {}
+    }
+
+    // 2. Try Metron via sidecar
+    if (metronUser && metronPass) {
+      try {
+        const mQuery = `${sName} ${issNum ? '#' + issNum : ''}`.trim();
+        const mRes = await fetch(`${sidecarUrl}/api/search`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            source: 'metron',
+            query: mQuery,
+            metron_user: metronUser,
+            metron_pass: metronPass
+          }),
+          signal: AbortSignal.timeout(4000)
+        });
+        if (mRes.ok) {
+          const mItems = await mRes.json();
+          for (const item of (mItems || [])) {
+            const mCov = item.cover_image_url || item.cover_url;
+            if (mCov && !mCov.includes('comics.org')) {
+              const resImg = await fetchCoverBuffer(mCov);
+              if (resImg) return resImg;
+            }
+          }
+        }
+      } catch {}
+    }
+
+    // 3. Try OpenLibrary Search
+    try {
+      const olSearchUrl = `https://openlibrary.org/search.json?title=${encodeURIComponent(sName)}&limit=3`;
+      const olRes = await fetch(olSearchUrl, { signal: AbortSignal.timeout(3000) });
+      if (olRes.ok) {
+        const olData = await olRes.json();
+        for (const doc of (olData?.docs || [])) {
+          if (doc.cover_i) {
+            const olCover = `https://covers.openlibrary.org/b/id/${doc.cover_i}-M.jpg`;
+            const resImg = await fetchCoverBuffer(olCover);
+            if (resImg) return resImg;
+          }
+        }
+      }
+    } catch {}
+
+    return null;
+  }
 
   router.get('/api/v1/proxy/cover', async (req, res) => {
     try {
@@ -485,26 +752,51 @@ module.exports = function attach(router, deps) {
         return res.status(403).end();
       }
 
-      // If domain is comics.org (blocked by Cloudflare bot protection), return clean SVG cover placeholder
+      const fallbackSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="80" height="112" viewBox="0 0 80 112"><rect width="100%" height="100%" fill="#1f2937"/><rect x="2" y="2" width="76" height="108" fill="none" stroke="#374151" stroke-width="1.5" rx="4"/><text x="50%" y="45%" fill="#9ca3af" font-size="11" font-weight="bold" font-family="sans-serif" text-anchor="middle" dominant-baseline="middle">GCD</text><text x="50%" y="62%" fill="#6b7280" font-size="8" font-family="sans-serif" text-anchor="middle" dominant-baseline="middle">NO COVER</text></svg>`;
+
+      // If domain is comics.org (blocked by Cloudflare bot protection), attempt dynamic fallback from ComicVine/Metron/OpenLibrary
       if (parsed.hostname.includes('comics.org')) {
+        const fallback = await resolveFallbackCoverImage(req.query.series, req.query.issue || req.query.number, req.query.query, targetUrl);
+        if (fallback) {
+          res.setHeader('Content-Type', fallback.contentType);
+          res.setHeader('Cache-Control', 'public, max-age=86400');
+          return res.send(fallback.buffer);
+        }
         res.setHeader('Content-Type', 'image/svg+xml; charset=utf-8');
         res.setHeader('Cache-Control', 'public, max-age=86400');
-        const fallbackSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="80" height="112" viewBox="0 0 80 112"><rect width="100%" height="100%" fill="#1f2937"/><rect x="2" y="2" width="76" height="108" fill="none" stroke="#374151" stroke-width="1.5" rx="4"/><text x="50%" y="45%" fill="#9ca3af" font-size="11" font-weight="bold" font-family="sans-serif" text-anchor="middle" dominant-baseline="middle">GCD</text><text x="50%" y="62%" fill="#6b7280" font-size="8" font-family="sans-serif" text-anchor="middle" dominant-baseline="middle">NO COVER</text></svg>`;
         return res.send(fallbackSvg);
       }
 
-      const fetchRes = await fetch(targetUrl, {
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-          'Accept': 'image/avif,image/webp,image/apng,image/*,*/*;q=0.8'
-        },
-        signal: AbortSignal.timeout(5000)
-      });
+      let fetchRes;
+      try {
+        fetchRes = await fetch(targetUrl, {
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept': 'image/avif,image/webp,image/apng,image/*,*/*;q=0.8'
+          },
+          signal: AbortSignal.timeout(5000)
+        });
+      } catch (err) {
+        // Failed to fetch targetUrl: attempt dynamic fallback
+        const fallback = await resolveFallbackCoverImage(req.query.series, req.query.issue || req.query.number, req.query.query, targetUrl);
+        if (fallback) {
+          res.setHeader('Content-Type', fallback.contentType);
+          res.setHeader('Cache-Control', 'public, max-age=86400');
+          return res.send(fallback.buffer);
+        }
+        res.setHeader('Content-Type', 'image/svg+xml; charset=utf-8');
+        return res.send(fallbackSvg);
+      }
 
       if (!fetchRes.ok) {
+        const fallback = await resolveFallbackCoverImage(req.query.series, req.query.issue || req.query.number, req.query.query, targetUrl);
+        if (fallback) {
+          res.setHeader('Content-Type', fallback.contentType);
+          res.setHeader('Cache-Control', 'public, max-age=86400');
+          return res.send(fallback.buffer);
+        }
         res.setHeader('Content-Type', 'image/svg+xml; charset=utf-8');
         res.setHeader('Cache-Control', 'public, max-age=3600');
-        const fallbackSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="80" height="112" viewBox="0 0 80 112"><rect width="100%" height="100%" fill="#1f2937"/><text x="50%" y="50%" fill="#9ca3af" font-size="9" font-family="sans-serif" text-anchor="middle" dominant-baseline="middle">NO COVER</text></svg>`;
         return res.send(fallbackSvg);
       }
 
@@ -664,6 +956,7 @@ module.exports = function attach(router, deps) {
         // Creator enrichment failed
       }
 
+      sanitizeMetadata(normalized);
       return res.json(normalized);
     } catch (e) {
       return res.status(e.status || 500).json({ message: formatErrorMessage(e, req, 'Failed to fetch volume details') });
@@ -712,7 +1005,7 @@ module.exports = function attach(router, deps) {
         }
       }
 
-      const title = issue?.name || issue?.volume?.name || 'Unknown';
+      const title = issue?.name || '';
       const series = issue?.volume?.name || '';
       const number = issue?.issue_number || '';
       const summary = stripHtml(issue?.description || '');
@@ -733,7 +1026,7 @@ module.exports = function attach(router, deps) {
       const teams      = (issue?.team_credits || []).map(t => t.name).join(', ');
       const locations  = (issue?.location_credits || []).map(l => l.name).join(', ');
 
-      res.json({
+      const issueMeta = {
         Title: title,
         Series: series,
         Number: number,
@@ -751,7 +1044,11 @@ module.exports = function attach(router, deps) {
         Locations: locations,
         'Cover Date': issue?.cover_date || '',
         'Store Date': issue?.store_date || ''
-      });
+      };
+
+      sanitizeMetadata(issueMeta);
+
+      res.json(issueMeta);
     } catch (e) {
       res.status(e.status || 500).json({ message: formatErrorMessage(e, req, 'Failed to fetch issue details') });
     }

@@ -66,7 +66,8 @@ SOURCES = [
         frozenset({"src-gcd", "gcd", "src-metron-gcd", "metron-gcd"}),
         "Searching Grand Comics Database (GCD)...",
         lambda f, ctx, prog: gcd.resolve_gcd(
-            f, cover_path=ctx.cover_path, on_progress=prog, existing_meta=ctx.existing_meta),
+            f, cover_path=ctx.cover_path, on_progress=prog, existing_meta=ctx.existing_meta,
+            comicvine_api_key=ctx.comicvine_api_key, metron_user=ctx.metron_user, metron_pass=ctx.metron_pass),
         tier=1,
     ),
     Source(

@@ -82,3 +82,24 @@ def test_download_failure_returns_zero(monkeypatch, tmp_path):
     monkeypatch.setattr(covers.requests, "get",
                         lambda url, headers=None, timeout=None: _FakeResp(b"", status=404))
     assert covers.compare_covers_python(str(local), "http://x/cover.jpg") == 0.0
+
+
+def test_gcd_find_fallback_cover_comicvine(monkeypatch):
+    from tagger_app.sources import gcd
+    monkeypatch.setattr(
+        "tagger_app.sources.comicvine.search_comicvine_multi",
+        lambda query, api_key, limit=3: [{"cover_image_url": "https://comicvine.gamespot.com/cover123.jpg"}]
+    )
+    cov = gcd.find_fallback_cover("Batman", "1", comicvine_api_key="mock_cv_key")
+    assert cov == "https://comicvine.gamespot.com/cover123.jpg"
+
+
+def test_gcd_find_fallback_cover_metron(monkeypatch):
+    from tagger_app.sources import gcd
+    monkeypatch.setattr(
+        "tagger_app.sources.metron.search_metron_multi",
+        lambda query, user, pwd: [{"cover_image_url": "https://metron.cloud/cover456.jpg"}]
+    )
+    cov = gcd.find_fallback_cover("Spawn", "1", metron_user="u", metron_pass="p")
+    assert cov == "https://metron.cloud/cover456.jpg"
+

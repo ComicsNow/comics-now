@@ -427,10 +427,10 @@ function cleanFormatAndEdition(text) {
   let s = String(text);
 
   // 1. Bracketed format/edition tags: (TPB), [HC], (Paperback), (digital), {HB}, etc.
-  s = s.replace(/[\(\[\{]\s*(?:(?:the|a|an)\s+)?(?:trade\s+paperback|digital(?:\s+edition)?|paperback(?:\s*\/\s*softback)?|hardcover|hardback(?:\s*\/\s*hardcover)?|softcover|graphic\s+novel|tpb|tp|hb|hc|sc|gn)\s*[\)\]\}]/gi, ' ');
+  s = s.replace(/[\(\[\{]\s*(?:(?:the|a|an)\s+)?(?:trade\s+paperback|digital(?:\s+edition)?|paperback(?:\s*\/\s*softback)?|hardcover|hardback(?:\s*\/\s*hardcover)?|softcover|graphic\s+novel|tpb|tp|hb|hc|sc|gn)(?:\s+edition)?\s*[\)\]\}]/gi, ' ');
 
   // 2. Delimited format tokens: " - TPB", " TPB", " HC", " - Hardcover", ": A Graphic Novel", etc.
-  s = s.replace(/(?:^|[\s,:;/|\-\u2010-\u2015]+)(?:(?:the|a|an)\s+)?(?:trade\s+paperback|digital\s+edition|paperback(?:\s*\/\s*softback)?|hardcover|hardback(?:\s*\/\s*hardcover)?|softcover|graphic\s+novel|tpb|tp|hb|hc|sc|gn)(?=$|[\s,:;/|\-\u2010-\u2015]+$|[\s,:;/|\-\u2010-\u2015]*[\(\[\{]|[\s,:;/|\-\u2010-\u2015]+(?:v(?:ol)?\.?\s*\d+|#\d+|\bpart\b|\bbook\b|\bvolume\b)|[\s,:;/|\-\u2010-\u2015]+(?=[\-_/|:,;]))/gi, ' ');
+  s = s.replace(/(?:^|[\s,:;/|\-\u2010-\u2015]+)(?:(?:the|a|an)\s+)?(?:trade\s+paperback|digital|paperback(?:\s*\/\s*softback)?|hardcover|hardback(?:\s*\/\s*hardcover)?|softcover|graphic\s+novel|tpb|tp|hb|hc|sc|gn)(?:\s+edition)?(?=$|[\s,:;/|\-\u2010-\u2015]+$|[\s,:;/|\-\u2010-\u2015]*[\(\[\{]|[\s,:;/|\-\u2010-\u2015]+(?:v(?:ol)?\.?\s*\d+|#\d+|\bpart\b|\bbook\b|\bvolume\b)|[\s,:;/|\-\u2010-\u2015]+(?=[\-_/|:,;]))/gi, ' ');
 
   // 3. Trailing digital indicator: " - digital" or ", digital" at end of string or before brackets
   s = s.replace(/[\s,:;/|\-\u2010-\u2015]+digital(?=$|[\s,:;/|\-\u2010-\u2015]+$|[\s,:;/|\-\u2010-\u2015]*[\(\[\{])/gi, ' ');
@@ -448,6 +448,7 @@ function cleanFormatAndEdition(text) {
 
 const VOL_SPLIT_PATTERN = /^(?<series>.+?)[\s,:;\-–—]+\b(?<vol_token>(?<vol_prefix>Vol(?:ume|\.)?|Book|Bk\.?|v)\s*0*(?<vol_num>\d+)(?:(?<sub_sep>\s*[:\-–—,;]\s*|\s+)(?<subtitle>.+))?)$/i;
 const STANDALONE_VOL_PATTERN = /^(?<vol_token>(?<vol_prefix>Vol(?:ume|\.)?|Book|Bk\.?|v)\s*0*(?<vol_num>\d+)(?:(?<sub_sep>\s*[:\-–—,;]\s*|\s+)(?<subtitle>.+))?)$/i;
+const SERIES_ISSUE_PATTERN = /^(?<series>.+?)(?:[\s,:;\-–—]+|\s*)(?:(?:#|(?:issue|no\.?)\s*#?)\s*0*(?<issue_num>\d+)|[\s,:;\-–—]+0+(?<leading_zero_num>[1-9]\d*))$/i;
 
 function splitVolumeSeriesAndTitle(series, title) {
   let s = (series || '').trim();
@@ -492,7 +493,75 @@ function splitVolumeSeriesAndTitle(series, title) {
     };
   }
 
+  // Check if series ends with an issue number (e.g. "Batman #1", "Batman #01", "Batman 01", "Batman Issue 1")
+  const issueMatch = s.match(SERIES_ISSUE_PATTERN);
+  if (issueMatch && issueMatch.groups) {
+    const extSeries = issueMatch.groups.series.replace(/[\s,:;\-–—]+$/, '').trim();
+    const num = String(parseInt(issueMatch.groups.issue_num || issueMatch.groups.leading_zero_num, 10));
+    return {
+      series: extSeries,
+      title: t,
+      number: num,
+      volume: null
+    };
+  }
+
   return { series: s, title: t, number: null, volume: null };
+}
+
+/**
+ * Sanitizes metadata fields (Series, Title, Number, Volume) according to standard rules:
+ * 1. Strips format/edition tags (TPB, HC, Softcover, Hardcover, Graphic Novel, etc.) from Series and Title.
+ * 2. Strips volume/issue numbers from Series (e.g. "#1", "01", "Vol. 1") and extracts number/volume.
+ * 3. Clears Title if it is redundant with Series, just Series + issue number, or a generic issue label.
+ *
+ * @param {Object} metadata
+ * @returns {Object} Sanitized metadata (modified in-place and returned)
+ */
+function sanitizeMetadata(metadata) {
+  if (!metadata || typeof metadata !== 'object') return metadata;
+
+  // 1. Strip format/edition words like TPB, HC, Hardcover, Softcover, Graphic Novel, etc. from Series and Title
+  if (metadata.Series) {
+    metadata.Series = cleanFormatAndEdition(metadata.Series);
+  }
+  if (metadata.Title) {
+    metadata.Title = cleanFormatAndEdition(metadata.Title);
+  }
+
+  // 2. Strip volume/issue numbers from Series (e.g. if Series has "#1" or "01" or "Vol. 1", extract number to Number/Volume and clean Series)
+  const volSplit = splitVolumeSeriesAndTitle(metadata.Series, metadata.Title);
+  if (volSplit.series && (volSplit.number || volSplit.series !== metadata.Series)) {
+    metadata.Series = volSplit.series;
+    if (volSplit.title !== undefined) {
+      metadata.Title = volSplit.title;
+    }
+    if (!metadata.Number || metadata.Number === '1' || metadata.Number === '01') {
+      if (volSplit.number) metadata.Number = volSplit.number;
+    }
+    if (!metadata.Volume && volSplit.volume) {
+      metadata.Volume = volSplit.volume;
+    }
+  }
+  if (!metadata.Number && metadata.Volume) {
+    metadata.Number = metadata.Volume;
+  }
+
+  // If Number is still empty, check if Title has an issue number before clearing Title
+  if (!metadata.Number && metadata.Title) {
+    const issueMatch = metadata.Title.match(/^(?:.*[\s,:;\-–—]+)?(?:#|(?:issue|no\.?)\s*#?)\s*0*(\d+)/i) ||
+                       metadata.Title.match(/^(?:.*[\s,:;\-–—]+)?0*(\d+)$/);
+    if (issueMatch) {
+      metadata.Number = String(parseInt(issueMatch[1], 10));
+    }
+  }
+
+  // 3. Check isTitleSameAsSeries(Title, Series): if Title is the same as Series (or if Title is just Series + Issue Number, or if Title is empty/generic issue number like "#1" or "Issue 1"), clear Title (Title = '')
+  if (metadata.Title && (isTitleSameAsSeries(metadata.Title, metadata.Series) || (!metadata.Series && isTitleSameAsSeries(metadata.Title, '')))) {
+    metadata.Title = '';
+  }
+
+  return metadata;
 }
 
 /**
@@ -509,8 +578,8 @@ function isTitleSameAsSeries(title, series) {
   const tRaw = cleanFormatAndEdition(String(title)).trim();
   if (!tRaw) return true; // Title was just a format tag (e.g. "HC", "TPB") -> blank it!
 
-  // If title is just a generic issue/volume label without subtitle (e.g. "Volume", "Vol. 1", "Issue 3", "#3")
-  if (/^(?:#|(?:issue|no\.?|vol(?:ume)?\.?|pt\.?|part|book|bk\.?)\s*#?)\s*\d*\s*$/i.test(tRaw)) {
+  // If title is just a generic issue/volume label without subtitle (e.g. "Volume", "Vol. 1", "Issue 3", "#3", "1", "01")
+  if (/^(?:(?:#|(?:issue|no\.?|vol(?:ume)?\.?|pt\.?|part|book|bk\.?)\s*#?)\s*\d*|\d+)\s*$/i.test(tRaw)) {
     return true;
   }
 
@@ -946,6 +1015,7 @@ module.exports = {
   cleanDescription,
   splitVolumeSeriesAndTitle,
   isTitleSameAsSeries,
+  sanitizeMetadata,
   resolveCreatorRoles
 };
 

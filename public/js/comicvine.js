@@ -34,6 +34,16 @@ function renderMetadataDisplay(metadata, clearForm = true) {
   }
 }
 
+// Helper to sanitize metadata before rendering or saving
+function sanitizeMetadata(metadata) {
+  if (typeof state.sanitizeMetadata === 'function') {
+    return state.sanitizeMetadata(metadata);
+  } else if (typeof window.sanitizeMetadata === 'function') {
+    return window.sanitizeMetadata(metadata);
+  }
+  return metadata;
+}
+
 // Opens a beautiful, premium modal previewing the full cover image with scale and fade animations
 function openCoverPreviewModal(imageUrl, title) {
   const backdrop = document.createElement('div');
@@ -250,6 +260,7 @@ function renderResultsList() {
 
     baseRow.addEventListener('click', () => {
       if (result.fullMetadata) {
+        sanitizeMetadata(result.fullMetadata);
         renderMetadataDisplay(result.fullMetadata, true);
         state.metadataHasUnsavedChanges = true;
         const metaForm = document.getElementById('metadata-form-container') || document.getElementById('metadata-form');
@@ -589,6 +600,7 @@ export async function applyMetadataFromSearch(volumeId) {
     const response = await fetch(`${state.API_BASE_URL || ''}/api/v1/comicvine/volume/${volumeId}`);
     if (!response.ok) throw new Error('Could not fetch details.');
     const detailedMetadata = await response.json();
+    sanitizeMetadata(detailedMetadata);
     renderMetadataDisplay(detailedMetadata, true);
     state.metadataHasUnsavedChanges = true; // Mark as having unsaved changes
     if (searchStatusDiv) searchStatusDiv.textContent = prevStatus;
@@ -609,6 +621,7 @@ export async function applyIssueMetadataFromSearch(issueId) {
     const response = await fetch(`${state.API_BASE_URL || ''}/api/v1/comicvine/issue/${issueId}`);
     if (!response.ok) throw new Error('Could not fetch issue details.');
     const detailedMetadata = await response.json();
+    sanitizeMetadata(detailedMetadata);
     renderMetadataDisplay(detailedMetadata, true);
     state.metadataHasUnsavedChanges = true; // Mark as having unsaved changes
     if (searchStatusDiv) searchStatusDiv.textContent = prevStatus;

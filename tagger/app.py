@@ -1929,8 +1929,12 @@ def api_search_external():
     try:
         results = []
         if source == "all":
+            cv_key = data.get("comicvine_api_key") or scheduler_config.get("comicvine_api_key")
+            metron_user = data.get("metron_user") or scheduler_config.get("metron_user")
+            metron_pass = data.get("metron_pass") or scheduler_config.get("metron_pass")
+
             sources_to_run = [
-                ("gcd", lambda: search_gcd_multi(query)),
+                ("gcd", lambda: search_gcd_multi(query, comicvine_api_key=cv_key, metron_user=metron_user, metron_pass=metron_pass)),
                 ("lcg", lambda: search_lcg_multi(query)),
                 ("forbiddenplanet", lambda: search_forbiddenplanet_multi(query)),
                 ("googlebooks", lambda: search_googlebooks_multi(query, api_key=data.get("google_books_api_key") or scheduler_config.get("google_books_api_key"))),
@@ -1940,13 +1944,9 @@ def api_search_external():
                 ("amazon", lambda: search_amazon_multi(query)),
             ]
 
-
-            cv_key = data.get("comicvine_api_key") or scheduler_config.get("comicvine_api_key")
             if cv_key:
                 sources_to_run.append(("comicvine", lambda: search_comicvine_multi(query, cv_key)))
 
-            metron_user = data.get("metron_user") or scheduler_config.get("metron_user")
-            metron_pass = data.get("metron_pass") or scheduler_config.get("metron_pass")
             if metron_user and metron_pass:
                 sources_to_run.append(("metron", lambda: search_metron_multi(query, metron_user, metron_pass)))
 
@@ -1976,7 +1976,10 @@ def api_search_external():
                     results.append(item)
 
         elif source == "gcd":
-            res = search_gcd_multi(query)
+            cv_key = data.get("comicvine_api_key") or scheduler_config.get("comicvine_api_key")
+            metron_user = data.get("metron_user") or scheduler_config.get("metron_user")
+            metron_pass = data.get("metron_pass") or scheduler_config.get("metron_pass")
+            res = search_gcd_multi(query, comicvine_api_key=cv_key, metron_user=metron_user, metron_pass=metron_pass)
             for item in (res or []):
                 if isinstance(item, dict):
                     item["source"] = "gcd"

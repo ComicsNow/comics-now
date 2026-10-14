@@ -11,9 +11,70 @@ from tagger_app.core.cache import tagger_cache
 from tagger_app.core.limiter import domain_limiter
 
 
-def search_gcd_multi(query):
+def find_fallback_cover(series, number=None, comicvine_api_key=None, metron_user=None, metron_pass=None):
+    """Attempt to retrieve a valid cover image URL from Metron or ComicVine
+    when GCD doesn't have a cover or points to files1.comics.org (protected by Cloudflare 403)."""
+    if not series:
+        return None
+
+    cache_key = f"{str(series).strip().lower()}|{str(number or '').strip()}"
+    cached_cov = tagger_cache.get_query("gcd_fallback_cover", cache_key)
+    if cached_cov is not None:
+        return cached_cov or None
+
+    import os
+    try:
+        from tagger_app.scheduler.state import scheduler_config
+    except Exception:
+        scheduler_config = {}
+
+    cv_key = comicvine_api_key or scheduler_config.get("comicvine_api_key") or os.environ.get("COMICVINE_API_KEY")
+    m_user = metron_user or scheduler_config.get("metron_user") or os.environ.get("METRON_USER")
+    m_pass = metron_pass or scheduler_config.get("metron_pass") or os.environ.get("METRON_PASSWORD") or os.environ.get("METRON_PASS")
+
+    # 1. Try Metron
+    if m_user and m_pass:
+        try:
+            from tagger_app.sources.metron import search_metron_multi
+            m_query = f"{series} #{number}" if number else series
+            metron_results = search_metron_multi(m_query, m_user, m_pass)
+            for item in metron_results:
+                cov = item.get("cover_image_url")
+                if cov and "comics.org" not in cov:
+                    tagger_cache.set_query("gcd_fallback_cover", cache_key, cov)
+                    return cov
+        except Exception as e:
+            print(f"[-] Metron cover fallback failed: {e}")
+
+    # 2. Try ComicVine
+    if cv_key:
+        try:
+            from tagger_app.sources.comicvine import search_comicvine_multi
+            cv_query = f"{series} #{number}" if number else series
+            cv_results = search_comicvine_multi(cv_query, cv_key, limit=3)
+            for item in cv_results:
+                cov = item.get("cover_image_url")
+                if cov and "comics.org" not in cov:
+                    tagger_cache.set_query("gcd_fallback_cover", cache_key, cov)
+                    return cov
+        except Exception as e:
+            print(f"[-] ComicVine cover fallback failed: {e}")
+
+    tagger_cache.set_query("gcd_fallback_cover", cache_key, "")
+    return None
+
+
+def search_gcd_multi(query, comicvine_api_key=None, metron_user=None, metron_pass=None):
     cached = tagger_cache.get_query("gcd", query)
     if cached is not None:
+        for it in cached:
+            if not it.get("cover_image_url") or "comics.org" in str(it.get("cover_image_url")):
+                fb = find_fallback_cover(it.get("series"), it.get("number"),
+                                         comicvine_api_key=comicvine_api_key,
+                                         metron_user=metron_user,
+                                         metron_pass=metron_pass)
+                if fb:
+                    it["cover_image_url"] = fb
         return cached
 
     out = []
@@ -32,6 +93,13 @@ def search_gcd_multi(query):
                 for iss_url in s.get("active_issues", [])[:3]:
                     cached_iss = tagger_cache.get_entity("gcd_issue", iss_url)
                     if cached_iss is not None:
+                        if not cached_iss.get("cover_image_url") or "comics.org" in str(cached_iss.get("cover_image_url")):
+                            fb = find_fallback_cover(cached_iss.get("series"), cached_iss.get("number"),
+                                                     comicvine_api_key=comicvine_api_key,
+                                                     metron_user=metron_user,
+                                                     metron_pass=metron_pass)
+                            if fb:
+                                cached_iss["cover_image_url"] = fb
                         out.append(cached_iss)
                         continue
 
@@ -43,6 +111,13 @@ def search_gcd_multi(query):
                         if cov and '://' in cov:
                             parts = cov.split('://', 1)
                             cov = parts[0] + '://' + parts[1].replace('//', '/')
+                        if not cov or 'comics.org' in cov:
+                            fb = find_fallback_cover(d.get('series_name'), str(d.get('number', '')),
+                                                     comicvine_api_key=comicvine_api_key,
+                                                     metron_user=metron_user,
+                                                     metron_pass=metron_pass)
+                            if fb:
+                                cov = fb
                         writers, pencillers, inkers, colorists, letterers, editors = [], [], [], [], [], []
                         total_pages = 0
                         stories = d.get('story_set') or d.get('stories') or []
@@ -103,13 +178,21 @@ def search_gcd_multi(query):
         return []
 
 
-def resolve_gcd(filename, cover_path=None, on_progress=None, existing_meta=None):
+def resolve_gcd(filename, cover_path=None, on_progress=None, existing_meta=None,
+                comicvine_api_key=None, metron_user=None, metron_pass=None):
     if on_progress:
         on_progress("Searching GCD...")
     query = clean_search_query(filename)
 
-    res = search_gcd_multi(query)
+    res = search_gcd_multi(query, comicvine_api_key=comicvine_api_key, metron_user=metron_user, metron_pass=metron_pass)
     candidates = []
     for r in res:
+        if not r.get("cover_image_url") or "comics.org" in str(r.get("cover_image_url")):
+            fb = find_fallback_cover(r.get("series"), r.get("number"),
+                                     comicvine_api_key=comicvine_api_key,
+                                     metron_user=metron_user,
+                                     metron_pass=metron_pass)
+            if fb:
+                r["cover_image_url"] = fb
         candidates.append(score_candidate(filename, r, cover_path=cover_path, default_source="GCD"))
     return candidates
