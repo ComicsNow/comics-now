@@ -13,7 +13,9 @@ module.exports = function attach(router, deps) {
     dbGet,
     createId,
     formatErrorMessage, validateComicId,
-    log
+    log,
+    checkComicAccess,
+    getComicsDirectories
   } = deps;
 
   // ============================================================================
@@ -26,6 +28,12 @@ module.exports = function attach(router, deps) {
       const listsWithStats = await dbAll(
         `SELECT 
             rl.*,
+            (SELECT c2.thumbnailPath 
+             FROM reading_list_items rli2 
+             JOIN comics c2 ON rli2.comicId = c2.id 
+             WHERE rli2.listId = rl.id AND c2.thumbnailPath IS NOT NULL AND c2.thumbnailPath != '' 
+             ORDER BY rli2.sortOrder ASC LIMIT 1) AS thumbnailPath,
+            COUNT(DISTINCT c.series) as seriesCount,
             COUNT(rli.comicId) as totalComics,
             GROUP_CONCAT(DISTINCT c.publisher) as publishers,
             SUM(CASE WHEN ucs.lastReadPage >= ucs.totalPages - 1 AND ucs.totalPages > 0 THEN 1 ELSE 0 END) as readComics,
@@ -44,7 +52,9 @@ module.exports = function attach(router, deps) {
       const processedLists = listsWithStats.map(list => ({
         ...list,
         publishers: list.publishers ? list.publishers.split(',').filter(Boolean) : [],
-        progressPercent: list.totalComics > 0 ? Math.round((list.readComics / list.totalComics) * 100) : 0
+        progressPercent: list.totalComics > 0 ? Math.round((list.readComics / list.totalComics) * 100) : 0,
+        seriesCount: list.seriesCount || 0,
+        thumbnailPath: list.thumbnailPath || null
       }));
 
       res.json({ ok: true, lists: processedLists });
@@ -485,6 +495,183 @@ module.exports = function attach(router, deps) {
     } catch (error) {
       res.status(500).json({
         message: formatErrorMessage(error, req, 'Failed to load reading list')
+      });
+    }
+  });
+
+  // Get reading list DAG graph data (nodes, edges, lanes, reading order)
+  router.get('/api/v1/reading-lists/:id/dag', requireAuth, async (req, res) => {
+    try {
+      const list = await dbGet(
+        'SELECT * FROM reading_lists WHERE id = ? AND userId = ?',
+        [req.params.id, req.user.userId]
+      );
+
+      if (!list) {
+        return res.status(404).json({ ok: false, message: 'Reading list not found' });
+      }
+
+      // Fetch items joined with comic details and user status
+      const items = await dbAll(
+        `SELECT rli.comicId, rli.addedAt, rli.sortOrder,
+                c.name, c.series, c.publisher, c.path, c.thumbnailPath, c.metadata,
+                COALESCE(ucs.totalPages, c.totalPages, 0) as totalPages,
+                COALESCE(ucs.lastReadPage, 0) as lastReadPage
+         FROM reading_list_items rli
+         LEFT JOIN comics c ON rli.comicId = c.id
+         LEFT JOIN user_comic_status ucs ON rli.comicId = ucs.comicId AND ucs.userId = ?
+         WHERE rli.listId = ?
+         ORDER BY rli.sortOrder ASC, rli.addedAt ASC`,
+        [req.user.userId, req.params.id]
+      );
+
+      // Verify access control for each item
+      const userRole = req.user.role || 'user';
+      const dirs = typeof getComicsDirectories === 'function' ? getComicsDirectories() : [];
+      
+      const accessibleItems = [];
+      for (const item of items) {
+        if (!item.comicId) continue;
+        if (typeof checkComicAccess === 'function' && item.path) {
+          const hasAccess = await checkComicAccess(
+            req.user.userId,
+            userRole,
+            item.path,
+            item.publisher,
+            item.series,
+            dirs,
+            item.comicId
+          );
+          if (!hasAccess) continue;
+        }
+        accessibleItems.push(item);
+      }
+
+      // Build DAG nodes
+      const seriesCounts = new Map();
+      const nodes = accessibleItems.map((item, index) => {
+        let meta = {};
+        try { if (item.metadata) meta = JSON.parse(item.metadata); } catch {}
+
+        const total = item.totalPages || 0;
+        const last = item.lastReadPage || 0;
+        const isComplete = total > 0 && last >= total - 1;
+        const isInProgress = last > 0 && !isComplete;
+        const readStatus = isComplete ? 'read' : isInProgress ? 'in-progress' : 'unread';
+        const progressPercent = total > 0 ? Math.round((last / total) * 100) : (last > 0 ? 50 : 0);
+
+        const seriesName = item.series || meta.Series || 'Single Issue';
+        seriesCounts.set(seriesName, (seriesCounts.get(seriesName) || 0) + 1);
+
+        const issueNum = meta.Number || meta.issue_number || '';
+        const year = meta.Year ? parseInt(meta.Year, 10) : null;
+
+        return {
+          id: item.comicId,
+          step: index + 1,
+          sortOrder: item.sortOrder ?? index,
+          name: item.name || meta.Title || seriesName,
+          series: seriesName,
+          number: issueNum,
+          publisher: item.publisher || meta.Publisher || '',
+          thumbnailPath: item.thumbnailPath || '',
+          summary: meta.Summary || meta.Description || '',
+          year,
+          totalPages: total,
+          lastReadPage: last,
+          readStatus,
+          progressPercent
+        };
+      });
+
+      // Calculate distinct series and assign lanes
+      const sortedSeries = Array.from(seriesCounts.entries())
+        .sort((a, b) => b[1] - a[1])
+        .map(([s]) => s);
+
+      const LANE_COLORS = [
+        '#f59e0b', // amber (spine)
+        '#3b82f6', // blue
+        '#ec4899', // pink
+        '#10b981', // emerald
+        '#8b5cf6', // purple
+        '#06b6d4', // cyan
+        '#f97316', // orange
+        '#14b8a6'  // teal
+      ];
+
+      const seriesLanes = sortedSeries.map((series, idx) => ({
+        series,
+        lane: idx,
+        count: seriesCounts.get(series) || 0,
+        color: LANE_COLORS[idx % LANE_COLORS.length]
+      }));
+
+      const seriesLaneMap = new Map(seriesLanes.map(l => [l.series, l.lane]));
+
+      nodes.forEach(node => {
+        node.lane = seriesLaneMap.get(node.series) ?? 0;
+        node.isCore = node.lane === 0;
+      });
+
+      // Construct Edges:
+      // 1. Reading-order sequence edges: step i -> step i+1
+      const edges = [];
+      for (let i = 0; i < nodes.length - 1; i++) {
+        edges.push({
+          id: `edge-step-${i}`,
+          from: nodes[i].id,
+          to: nodes[i + 1].id,
+          type: 'reading-order'
+        });
+      }
+
+      // 2. Series continuity edges: link consecutive issues of the SAME series if not already directly adjacent
+      const seriesGroups = new Map();
+      nodes.forEach(n => {
+        if (!seriesGroups.has(n.series)) seriesGroups.set(n.series, []);
+        seriesGroups.get(n.series).push(n);
+      });
+
+      seriesGroups.forEach((groupNodes, series) => {
+        if (groupNodes.length > 1) {
+          for (let i = 0; i < groupNodes.length - 1; i++) {
+            const curr = groupNodes[i];
+            const next = groupNodes[i + 1];
+            if (next.step !== curr.step + 1) {
+              edges.push({
+                id: `edge-series-${curr.id}-${next.id}`,
+                from: curr.id,
+                to: next.id,
+                type: 'series-track',
+                series
+              });
+            }
+          }
+        }
+      });
+
+      res.json({
+        ok: true,
+        list: {
+          id: list.id,
+          name: list.name,
+          description: list.description,
+          created: list.created,
+          updated: list.updated
+        },
+        totalIssues: nodes.length,
+        readCount: nodes.filter(n => n.readStatus === 'read').length,
+        inProgressCount: nodes.filter(n => n.readStatus === 'in-progress').length,
+        nodes,
+        edges,
+        seriesLanes
+      });
+    } catch (error) {
+      log('ERROR', 'READING_LISTS', `Failed to generate DAG for list ${req.params.id}: ${error.message}`);
+      res.status(500).json({
+        ok: false,
+        message: formatErrorMessage(error, req, 'Failed to generate reading list DAG')
       });
     }
   });
