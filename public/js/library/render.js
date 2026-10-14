@@ -943,40 +943,67 @@ export function renderPublisherReadingLists(publisherName) {
 
   for (const list of readingLists) {
     const card = document.createElement('div');
-    card.className = 'reading-list-card bg-gray-800 rounded-xl shadow-lg p-4 sm:p-5 border border-gray-700/60 hover:border-purple-500/60 transition-all duration-200 group cursor-pointer flex flex-col justify-between gap-3';
+    card.className = 'reading-list-card bg-gray-800/90 hover:bg-gray-800 rounded-2xl shadow-xl overflow-hidden border border-gray-700/60 hover:border-purple-500/60 transition-all duration-300 group cursor-pointer flex flex-col justify-between';
     
     const progressPercent = list.progressPercent || (list.totalComics > 0 ? Math.round(((list.readComics || 0) / list.totalComics) * 100) : 0);
     const totalComics = list.totalComics || 0;
     const readComics = list.readComics || 0;
+    const thumbUrl = list.thumbnailPath
+      ? `${API_BASE_URL}/thumbnails/${encodeURIComponent(list.thumbnailPath)}`
+      : null;
+    const publisherText = (list.publishers && list.publishers.length > 0)
+      ? list.publishers.slice(0, 2).join(', ')
+      : (publisherName || 'Reading List');
 
     card.innerHTML = `
-      <div class="flex items-start gap-3">
-        <div class="w-10 h-10 rounded-xl bg-purple-900/40 border border-purple-500/30 flex items-center justify-center text-xl shrink-0 group-hover:scale-105 transition-transform mt-0.5">
-          📚
-        </div>
-        <div class="flex-1 min-w-0">
-          <div class="flex flex-wrap items-start justify-between gap-2 mb-1">
-            <a href="#" class="reading-list-hotlink font-bold text-base sm:text-lg text-white group-hover:text-purple-300 hover:underline transition-colors leading-snug wrap-break-word flex-1 min-w-[140px]" title="Open ${escapeHtml(list.name)}">
-              ${escapeHtml(list.name)}
-            </a>
-            <span class="text-xs px-2.5 py-0.5 rounded-full bg-purple-900/60 text-purple-300 font-semibold shrink-0">
+      <div class="relative h-48 sm:h-52 w-full overflow-hidden bg-black/40">
+        ${thumbUrl ? `
+          <img src="${thumbUrl}" alt="${escapeHtml(list.name)}" class="w-full h-full object-cover object-top opacity-80 group-hover:opacity-100 group-hover:scale-105 transition-all duration-500" loading="lazy">
+        ` : `
+          <div class="w-full h-full flex items-center justify-center bg-gradient-to-br from-purple-950/60 via-gray-900 to-gray-950">
+            <span class="text-4xl opacity-30 group-hover:scale-110 transition-transform">📚</span>
+          </div>
+        `}
+        <div class="absolute inset-0 bg-gradient-to-t from-gray-900 via-gray-900/40 to-transparent"></div>
+
+        <div class="absolute top-3 left-3 right-3 flex items-center justify-between gap-2 pointer-events-none">
+          <span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-purple-600/90 text-white backdrop-blur-sm shadow">${escapeHtml(publisherText)}</span>
+          <div class="flex items-center gap-1.5 pointer-events-auto">
+            <button class="reading-list-dag-btn px-2.5 py-1 rounded-full bg-purple-900/80 hover:bg-purple-600 text-purple-200 hover:text-white font-semibold text-xs border border-purple-500/40 backdrop-blur-md transition-all flex items-center gap-1 shadow cursor-pointer" title="View Continuity DAG">
+              <span>🔀</span>
+              <span>DAG</span>
+            </button>
+            <span class="text-xs px-2.5 py-0.5 rounded-full bg-black/60 text-purple-300 font-semibold backdrop-blur-sm border border-white/10 shrink-0">
               ${totalComics} ${totalComics === 1 ? 'comic' : 'comics'}
             </span>
           </div>
-          ${list.description ? `<p class="text-xs sm:text-sm text-gray-400 line-clamp-3 mt-1.5 leading-relaxed">${escapeHtml(list.description)}</p>` : ''}
+        </div>
+
+        <div class="absolute bottom-3 left-3 right-3">
+          <a href="#" class="reading-list-hotlink font-bold text-lg text-white group-hover:text-purple-300 transition-colors leading-snug line-clamp-1 block" title="Open ${escapeHtml(list.name)}">
+            ${escapeHtml(list.name)}
+          </a>
+          <div class="text-xs text-gray-300 flex items-center gap-2 mt-1">
+            <span>${totalComics} ${totalComics === 1 ? 'issue' : 'issues'}</span>
+            ${list.seriesCount ? `<span>•</span><span>${list.seriesCount} ${list.seriesCount === 1 ? 'series' : 'series'}</span>` : ''}
+          </div>
         </div>
       </div>
 
-      <div class="mt-2 pt-3 border-t border-gray-700/50">
-        <div class="flex justify-between items-center text-xs text-gray-400 mb-1.5">
-          <span class="flex items-center gap-1.5">
-            <span class="w-2 h-2 rounded-full ${progressPercent === 100 ? 'bg-green-400' : progressPercent > 0 ? 'bg-purple-400' : 'bg-gray-500'}"></span>
-            <span>${readComics} of ${totalComics} read</span>
-          </span>
-          <span class="font-bold ${progressPercent === 100 ? 'text-green-400' : 'text-purple-400'}">${progressPercent}%</span>
-        </div>
-        <div class="w-full bg-gray-700/80 h-2 rounded-full overflow-hidden">
-          <div class="bg-linear-to-r from-purple-500 to-indigo-500 h-full rounded-full transition-all duration-300" style="width: ${progressPercent}%;"></div>
+      <div class="p-4 flex-1 flex flex-col justify-between gap-3">
+        ${list.description ? `<p class="text-xs sm:text-sm text-gray-400 line-clamp-2 leading-relaxed">${escapeHtml(list.description)}</p>` : ''}
+
+        <div class="mt-auto pt-2 border-t border-gray-700/50">
+          <div class="flex justify-between items-center text-xs text-gray-400 mb-1.5 font-medium">
+            <span class="flex items-center gap-1.5">
+              <span class="w-2 h-2 rounded-full ${progressPercent === 100 ? 'bg-green-400' : progressPercent > 0 ? 'bg-purple-400' : 'bg-gray-500'}"></span>
+              <span>${readComics} of ${totalComics} read</span>
+            </span>
+            <span class="font-bold ${progressPercent === 100 ? 'text-green-400' : 'text-purple-400'}">${progressPercent}%</span>
+          </div>
+          <div class="w-full bg-gray-700/80 h-2 rounded-full overflow-hidden">
+            <div class="bg-linear-to-r from-purple-500 to-indigo-500 h-full rounded-full transition-all duration-300" style="width: ${progressPercent}%;"></div>
+          </div>
         </div>
       </div>
     `;
@@ -989,6 +1016,18 @@ export function renderPublisherReadingLists(publisherName) {
       if (typeof openModal === 'function') openModal();
       if (typeof showDetail === 'function') showDetail(list.id, list.name);
     };
+
+    const dagBtn = card.querySelector('.reading-list-dag-btn');
+    if (dagBtn) {
+      dagBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const openModal = state.openReadingListModal || window.openReadingListModal;
+        const showDetail = state.showReadingListDetail || window.showReadingListDetail;
+        if (typeof openModal === 'function') openModal();
+        if (typeof showDetail === 'function') showDetail(list.id, list.name, 'dag');
+      });
+    }
 
     card.addEventListener('click', openListHandler);
     const hotlink = card.querySelector('.reading-list-hotlink');

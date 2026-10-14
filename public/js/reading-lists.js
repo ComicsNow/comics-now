@@ -221,6 +221,35 @@ async function getReadingListDetails(listId) {
 }
 
 /**
+ * Fetch DAG data for a specific reading list
+ * @param {string} listId - Reading list ID
+ * @param {Object} [cachedDetails] - Optional cached details
+ * @returns {Promise<Object>} DAG data with nodes, edges, lanes, stats
+ */
+async function fetchReadingListDAG(listId, cachedDetails = null) {
+  const baseUrl = getBaseUrl();
+  try {
+    const res = await fetch(`${baseUrl}/api/v1/reading-lists/${listId}/dag`);
+    if (res.ok) {
+      const data = await res.json();
+      if (data && data.ok) return data;
+    }
+  } catch (err) {
+    console.warn('[Reading Lists] Network fetch for DAG failed:', err);
+  }
+
+  // Fallback: build from details (offline or API error)
+  try {
+    const details = cachedDetails || await getReadingListDetails(listId);
+    const builder = state.buildDAGFromDetails || (typeof window !== 'undefined' && window.buildDAGFromDetails);
+    if (typeof builder === 'function') {
+      return builder(details);
+    }
+  } catch (e) {}
+  return null;
+}
+
+/**
  * Mark all comics in a reading list as read or unread
  * @param {string} listId - Reading list ID
  * @param {boolean} read - True to mark as read, false for unread
@@ -604,6 +633,7 @@ const ReadingLists = {
   importLists,
   openAddToListModal,
   closeAddToListModal,
+  fetchReadingListDAG,
   isOffline
 };
 
@@ -620,6 +650,7 @@ export {
   importLists,
   openAddToListModal,
   closeAddToListModal,
+  fetchReadingListDAG,
   ReadingLists
 };
 
