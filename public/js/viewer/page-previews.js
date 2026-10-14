@@ -125,12 +125,18 @@ function buildOverlay() {
 function ensureEscHandler() {
   if (escHandlerBound) return;
   escHandlerBound = true;
-  // Capture phase so Escape closes the grid before the fullscreen reader reacts.
+  // Capture phase so Escape closes the grid or filmstrip before the fullscreen reader reacts.
   document.addEventListener('keydown', (event) => {
-    if (event.key === 'Escape' && isPagePreviewGridOpen()) {
-      event.preventDefault();
-      event.stopImmediatePropagation?.();
-      closePagePreviewGrid();
+    if (event.key === 'Escape') {
+      if (isPagePreviewGridOpen()) {
+        event.preventDefault();
+        event.stopImmediatePropagation?.();
+        closePagePreviewGrid();
+      } else if (isFilmstripOpen()) {
+        event.preventDefault();
+        event.stopImmediatePropagation?.();
+        closeFilmstrip();
+      }
     }
   }, true);
 }
@@ -240,6 +246,368 @@ export function closePagePreviewGrid() {
   }
 }
 
+/* ==========================================================================
+   Reader Scrubber Bar & Thumbnail Popover
+   ========================================================================== */
+let scrubberBound = false;
+let isScrubbing = false;
+let scrubberHideTimeout = null;
+let scrubberThumbRequestSeq = 0;
+
+async function updateScrubberPreviewThumb(pageIndex) {
+  const currentSeq = ++scrubberThumbRequestSeq;
+  const global = state;
+  const pages = global.getViewerPages?.() || [];
+  if (pageIndex < 0 || pageIndex >= pages.length) return;
+  const pageName = pages[pageIndex];
+  const comic = global.currentComic;
+
+  const previewSpread = document.getElementById('reader-scrubber-preview-spread');
+  if (previewSpread) {
+    const isSpread = global.isSpreadPage?.(pageIndex) || (global.spreadPages && global.spreadPages.has?.(pageIndex));
+    if (isSpread) {
+      previewSpread.classList.remove('hidden');
+    } else {
+      previewSpread.classList.add('hidden');
+    }
+  }
+
+  const previewImg = document.getElementById('reader-scrubber-preview-img');
+  try {
+    const url = await getThumbnailUrl(comic, pageName, global);
+    if (currentSeq === scrubberThumbRequestSeq && previewImg && url) {
+      previewImg.src = url;
+    }
+  } catch (e) {}
+}
+
+export function initReaderScrubber() {
+  const slider = document.getElementById('fullscreen-scrubber-slider');
+  const trackFill = document.getElementById('fullscreen-scrubber-track-fill');
+  const currentNum = document.getElementById('fullscreen-scrubber-current-page');
+  const preview = document.getElementById('reader-scrubber-preview');
+  const previewPageText = document.getElementById('reader-scrubber-preview-page-text');
+
+  if (!slider || scrubberBound) return;
+  scrubberBound = true;
+
+  function updatePreviewPosition(targetPage, pct, clientX = null) {
+    if (!preview) return;
+    const rect = (typeof slider.getBoundingClientRect === 'function')
+      ? slider.getBoundingClientRect()
+      : { left: 0, right: 300, width: 300 };
+    const sliderWidth = rect.width > 0 ? rect.width : 300;
+    const thumbX = (clientX !== null)
+      ? clientX
+      : (rect.left + pct * sliderWidth);
+
+    preview.style.left = `${thumbX}px`;
+    preview.classList.remove('hidden');
+
+    if (previewPageText) {
+      previewPageText.textContent = `Page ${targetPage}`;
+    }
+
+    updateScrubberPreviewThumb(targetPage - 1);
+  }
+
+  slider.addEventListener('input', () => {
+    isScrubbing = true;
+    clearTimeout(scrubberHideTimeout);
+    const val = parseInt(slider.value, 10) || 1;
+    const max = parseInt(slider.max, 10) || 1;
+    const pct = max > 1 ? (val - 1) / (max - 1) : 0;
+
+    if (currentNum) currentNum.textContent = String(val);
+    if (trackFill) trackFill.style.width = `${pct * 100}%`;
+
+    updatePreviewPosition(val, pct);
+  });
+
+  slider.addEventListener('change', async () => {
+    isScrubbing = false;
+    const val = parseInt(slider.value, 10) || 1;
+    await goToPage(val - 1);
+    scrubberHideTimeout = setTimeout(() => {
+      if (!isScrubbing && preview) preview.classList.add('hidden');
+    }, 350);
+  });
+
+  slider.addEventListener('pointerdown', () => {
+    isScrubbing = true;
+    clearTimeout(scrubberHideTimeout);
+  });
+
+  slider.addEventListener('pointerup', () => {
+    isScrubbing = false;
+    scrubberHideTimeout = setTimeout(() => {
+      if (!isScrubbing && preview) preview.classList.add('hidden');
+    }, 400);
+  });
+
+  slider.addEventListener('pointercancel', () => {
+    isScrubbing = false;
+    if (preview) preview.classList.add('hidden');
+  });
+
+  slider.addEventListener('pointermove', (e) => {
+    if (isScrubbing) return;
+    const rect = (typeof slider.getBoundingClientRect === 'function')
+      ? slider.getBoundingClientRect()
+      : { left: 0, right: 300, width: 300 };
+    const sliderWidth = rect.width > 0 ? rect.width : 300;
+    const max = parseInt(slider.max, 10) || 1;
+    const ratio = Math.max(0, Math.min(1, (e.clientX - rect.left) / sliderWidth));
+    const targetPage = Math.round(ratio * (max - 1)) + 1;
+    const targetPct = max > 1 ? (targetPage - 1) / (max - 1) : 0;
+
+    clearTimeout(scrubberHideTimeout);
+    updatePreviewPosition(targetPage, targetPct, e.clientX);
+  });
+
+  slider.addEventListener('pointerleave', () => {
+    if (!isScrubbing && preview) {
+      preview.classList.add('hidden');
+    }
+  });
+}
+
+export function updateReaderScrubberStatus(currentPage, totalPages) {
+  const slider = document.getElementById('fullscreen-scrubber-slider');
+  const trackFill = document.getElementById('fullscreen-scrubber-track-fill');
+  const currentNum = document.getElementById('fullscreen-scrubber-current-page');
+  const totalNum = document.getElementById('fullscreen-scrubber-total-pages');
+
+  const cur = Math.max(1, currentPage || 1);
+  const tot = Math.max(1, totalPages || 1);
+
+  if (slider) {
+    slider.min = '1';
+    slider.max = String(tot);
+    slider.value = String(cur);
+  }
+  if (currentNum) currentNum.textContent = String(cur);
+  if (totalNum) totalNum.textContent = String(tot);
+  if (trackFill) {
+    const pct = tot > 1 ? ((cur - 1) / (tot - 1)) * 100 : 0;
+    trackFill.style.width = `${pct}%`;
+  }
+
+  updateFilmstripActiveCard(cur - 1, tot);
+}
+
+/* ==========================================================================
+   Reader Thumbnail Filmstrip Drawer (Horizontal skimmable thumbnails)
+   ========================================================================== */
+let filmstripObserver = null;
+let lastRenderedComicId = null;
+let lastRenderedPageCount = 0;
+
+export function updateFilmstripActiveCard(currentIndex, totalPages) {
+  const itemsContainer = document.getElementById('reader-filmstrip-items');
+  const indicator = document.getElementById('reader-filmstrip-page-indicator');
+  if (indicator && typeof currentIndex === 'number') {
+    indicator.textContent = `Page ${currentIndex + 1} of ${totalPages || 1}`;
+  }
+  if (!itemsContainer) return;
+
+  let activeCard = null;
+  const cards = itemsContainer.querySelectorAll('.comic-filmstrip-card');
+  cards.forEach((card) => {
+    const cardIdx = parseInt(card.getAttribute('data-page-index'), 10);
+    if (cardIdx === currentIndex) {
+      card.classList.add('active-filmstrip-card');
+      card.setAttribute('aria-label', `Page ${cardIdx + 1} (current)`);
+      activeCard = card;
+    } else {
+      card.classList.remove('active-filmstrip-card');
+      card.setAttribute('aria-label', `Page ${cardIdx + 1}`);
+    }
+  });
+
+  if (activeCard && typeof activeCard.scrollIntoView === 'function') {
+    try {
+      activeCard.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' });
+    } catch (e) {
+      try { activeCard.scrollIntoView(); } catch (err) {}
+    }
+  }
+}
+
+export function renderThumbnailFilmstrip() {
+  const global = state;
+  const itemsContainer = document.getElementById('reader-filmstrip-items');
+  const scrollEl = document.getElementById('reader-filmstrip-scroll');
+  const indicator = document.getElementById('reader-filmstrip-page-indicator');
+  if (!itemsContainer) return;
+
+  const pages = global.getViewerPages?.() || [];
+  const comic = global.currentComic;
+  const comicId = comic?.id || comic?.path || 'unknown';
+  const currentIndex = typeof global.currentPageIndex === 'number' ? global.currentPageIndex : 0;
+
+  if (indicator) {
+    indicator.textContent = `Page ${currentIndex + 1} of ${pages.length || 1}`;
+  }
+
+  if (lastRenderedComicId === comicId && lastRenderedPageCount === pages.length && itemsContainer.children.length === pages.length) {
+    updateFilmstripActiveCard(currentIndex, pages.length);
+    return;
+  }
+
+  if (filmstripObserver) {
+    try { filmstripObserver.disconnect(); } catch (e) {}
+    filmstripObserver = null;
+  }
+
+  itemsContainer.innerHTML = '';
+  lastRenderedComicId = comicId;
+  lastRenderedPageCount = pages.length;
+
+  const IO = (typeof IntersectionObserver !== 'undefined') ? IntersectionObserver : null;
+  if (IO) {
+    filmstripObserver = new IO((entries) => {
+      for (const entry of entries) {
+        if (entry.isIntersecting) {
+          entry.target._loadThumb?.();
+          filmstripObserver.unobserve(entry.target);
+        }
+      }
+    }, { root: scrollEl || null, rootMargin: '300px' });
+  }
+
+  for (let i = 0; i < pages.length; i++) {
+    const pageName = pages[i];
+    const pageNumber = i + 1;
+    const isActive = (i === currentIndex);
+
+    const card = document.createElement('button');
+    card.type = 'button';
+    card.className = `comic-filmstrip-card ${isActive ? 'active-filmstrip-card' : ''}`.trim();
+    card.setAttribute('data-page-index', String(i));
+    card.setAttribute('aria-label', `Page ${pageNumber}${isActive ? ' (current)' : ''}`);
+
+    const thumbWrap = document.createElement('div');
+    thumbWrap.className = 'comic-filmstrip-thumb-wrap';
+
+    const img = document.createElement('img');
+    img.alt = `Page ${pageNumber}`;
+    img.loading = 'lazy';
+    img.decoding = 'async';
+    img.className = 'comic-filmstrip-img';
+
+    img._loadThumb = () => {
+      if (img._thumbRequested) return;
+      img._thumbRequested = true;
+      getThumbnailUrl(comic, pageName, global).then((url) => { if (url) img.src = url; });
+    };
+
+    thumbWrap.appendChild(img);
+
+    const label = document.createElement('div');
+    label.className = 'comic-filmstrip-number';
+    label.textContent = String(pageNumber);
+
+    card.appendChild(thumbWrap);
+    card.appendChild(label);
+
+    card.addEventListener('click', (e) => {
+      e.stopPropagation();
+      goToPage(i);
+      updateFilmstripActiveCard(i, pages.length);
+    });
+
+    itemsContainer.appendChild(card);
+
+    if (filmstripObserver) filmstripObserver.observe(img);
+    else img._loadThumb();
+  }
+
+  updateFilmstripActiveCard(currentIndex, pages.length);
+}
+
+export function isFilmstripOpen() {
+  const el = document.getElementById('reader-thumbnail-filmstrip');
+  return !!(el && !el.classList.contains('hidden'));
+}
+
+export function openFilmstrip(triggerEl = null) {
+  const el = document.getElementById('reader-thumbnail-filmstrip');
+  if (!el) return;
+  el.classList.remove('hidden');
+
+  const buttons = [
+    document.getElementById('fullscreen-filmstrip-btn'),
+    document.getElementById('page-filmstrip-btn'),
+    document.getElementById('page-filmstrip-btn-bottom')
+  ];
+  buttons.forEach((btn) => {
+    if (btn) btn.setAttribute('aria-pressed', 'true');
+  });
+
+  renderThumbnailFilmstrip();
+}
+
+export function closeFilmstrip() {
+  const el = document.getElementById('reader-thumbnail-filmstrip');
+  if (el) el.classList.add('hidden');
+
+  const buttons = [
+    document.getElementById('fullscreen-filmstrip-btn'),
+    document.getElementById('page-filmstrip-btn'),
+    document.getElementById('page-filmstrip-btn-bottom')
+  ];
+  buttons.forEach((btn) => {
+    if (btn) btn.setAttribute('aria-pressed', 'false');
+  });
+}
+
+export function toggleFilmstrip(triggerEl = null) {
+  if (isFilmstripOpen()) {
+    closeFilmstrip();
+  } else {
+    openFilmstrip(triggerEl);
+  }
+}
+
+function initReaderFilmstrip() {
+  const filmstripBtns = [
+    document.getElementById('fullscreen-filmstrip-btn'),
+    document.getElementById('page-filmstrip-btn'),
+    document.getElementById('page-filmstrip-btn-bottom')
+  ];
+  filmstripBtns.forEach((btn) => {
+    if (btn && !btn._filmstripBound) {
+      btn._filmstripBound = true;
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        toggleFilmstrip(btn);
+      });
+    }
+  });
+
+  const gridBtn = document.getElementById('reader-filmstrip-grid-btn');
+  if (gridBtn && !gridBtn._gridBound) {
+    gridBtn._gridBound = true;
+    gridBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      openPagePreviewGrid(gridBtn);
+    });
+  }
+
+  const closeBtn = document.getElementById('reader-filmstrip-close-btn');
+  if (closeBtn && !closeBtn._closeBound) {
+    closeBtn._closeBound = true;
+    closeBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      closeFilmstrip();
+    });
+  }
+}
+
 export function initPagePreviews() {
   ensureEscHandler();
 
@@ -255,6 +623,9 @@ export function initPagePreviews() {
       btn.addEventListener('click', (e) => { e.preventDefault(); openPagePreviewGrid(btn); });
     }
   });
+
+  initReaderScrubber();
+  initReaderFilmstrip();
 }
 
 if (typeof state !== 'undefined') {
@@ -264,6 +635,14 @@ if (typeof state !== 'undefined') {
   state.isPagePreviewGridOpen = isPagePreviewGridOpen;
   state.goToPage = goToPage;
   state.initPagePreviews = initPagePreviews;
+  state.initReaderScrubber = initReaderScrubber;
+  state.updateReaderScrubberStatus = updateReaderScrubberStatus;
+  state.openFilmstrip = openFilmstrip;
+  state.closeFilmstrip = closeFilmstrip;
+  state.toggleFilmstrip = toggleFilmstrip;
+  state.isFilmstripOpen = isFilmstripOpen;
+  state.renderThumbnailFilmstrip = renderThumbnailFilmstrip;
+  state.updateFilmstripActiveCard = updateFilmstripActiveCard;
 }
 if (typeof window !== 'undefined') {
   window.openPagePreviewGrid = openPagePreviewGrid;
@@ -272,4 +651,12 @@ if (typeof window !== 'undefined') {
   window.isPagePreviewGridOpen = isPagePreviewGridOpen;
   window.goToPage = goToPage;
   window.initPagePreviews = initPagePreviews;
+  window.initReaderScrubber = initReaderScrubber;
+  window.updateReaderScrubberStatus = updateReaderScrubberStatus;
+  window.openFilmstrip = openFilmstrip;
+  window.closeFilmstrip = closeFilmstrip;
+  window.toggleFilmstrip = toggleFilmstrip;
+  window.isFilmstripOpen = isFilmstripOpen;
+  window.renderThumbnailFilmstrip = renderThumbnailFilmstrip;
+  window.updateFilmstripActiveCard = updateFilmstripActiveCard;
 }

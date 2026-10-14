@@ -21,16 +21,59 @@ describe('Comic Page Previews & Thumbnail Grid Navigator', () => {
         <div class="viewer-nav">
           <button id="prev-page-btn" type="button" aria-label="Previous page">←</button>
           <button id="page-grid-btn" type="button" aria-label="View all pages in a grid">⊞</button>
+          <button id="page-filmstrip-btn" type="button" aria-label="Toggle thumbnail filmstrip">🎞️</button>
           <button id="next-page-btn" type="button" aria-label="Next page">→</button>
         </div>
         <div id="viewer-pages"></div>
+        <button id="page-grid-btn-bottom" type="button">⊞</button>
+        <button id="page-filmstrip-btn-bottom" type="button">🎞️</button>
       </div>
 
       <div id="fullscreen-viewer" class="hidden fullscreen-viewer">
         <img id="fullscreen-image" src="" alt="Fullscreen Comic Page" />
         <div id="fullscreen-info-bar" class="fullscreen-info-bar">
           <button id="fullscreen-page-grid-btn" type="button" aria-label="View all pages in a grid">⊞</button>
+          <button id="fullscreen-filmstrip-btn" type="button" aria-label="Toggle thumbnail filmstrip">🎞️</button>
           <button id="fullscreen-close-btn-bottom" type="button">&times;</button>
+        </div>
+
+        <div id="fullscreen-scrubber-container" class="fullscreen-scrubber-container hidden" role="region" aria-label="Page Scrubber">
+          <span id="fullscreen-scrubber-current-page" class="scrubber-page-num">1</span>
+          <div class="scrubber-slider-wrapper">
+            <div id="fullscreen-scrubber-track-fill" class="scrubber-track-fill" style="width: 0%;"></div>
+            <input
+              type="range"
+              id="fullscreen-scrubber-slider"
+              class="reader-scrubber-slider"
+              min="1"
+              max="5"
+              value="1"
+              step="1"
+              aria-label="Reader Page Scrubber"
+            />
+          </div>
+          <span id="fullscreen-scrubber-total-pages" class="scrubber-page-num">5</span>
+        </div>
+
+        <div id="reader-scrubber-preview" class="reader-scrubber-preview hidden">
+          <div class="reader-scrubber-preview-thumb-wrap">
+            <img id="reader-scrubber-preview-img" src="" alt="Page Preview" class="reader-scrubber-preview-img" />
+          </div>
+          <div class="reader-scrubber-preview-label">
+            <span id="reader-scrubber-preview-page-text">Page 1</span>
+            <span id="reader-scrubber-preview-spread" class="hidden">🎬 Spread</span>
+          </div>
+        </div>
+
+        <div id="reader-thumbnail-filmstrip" class="reader-thumbnail-filmstrip hidden">
+          <div class="reader-filmstrip-header">
+            <span id="reader-filmstrip-page-indicator">Page 1 of 5</span>
+            <button id="reader-filmstrip-grid-btn" type="button">⊞ Grid View</button>
+            <button id="reader-filmstrip-close-btn" type="button">&times;</button>
+          </div>
+          <div id="reader-filmstrip-scroll" class="reader-filmstrip-scroll">
+            <div id="reader-filmstrip-items" class="reader-filmstrip-items"></div>
+          </div>
         </div>
       </div>
     `;
@@ -217,5 +260,129 @@ describe('Comic Page Previews & Thumbnail Grid Navigator', () => {
     const spy = jest.spyOn(observer, 'disconnect');
     sandbox.state.closePagePreviewGrid();
     expect(spy).toHaveBeenCalled();
+  });
+
+  describe('Reader Scrubber Bar & Preview Popover', () => {
+    test('updateReaderScrubberStatus correctly updates slider, labels, and track fill', () => {
+      loadModule();
+      sandbox.state.updateReaderScrubberStatus(3, 5);
+
+      const slider = document.getElementById('fullscreen-scrubber-slider');
+      const trackFill = document.getElementById('fullscreen-scrubber-track-fill');
+      const cur = document.getElementById('fullscreen-scrubber-current-page');
+      const tot = document.getElementById('fullscreen-scrubber-total-pages');
+
+      expect(slider.value).toBe('3');
+      expect(slider.max).toBe('5');
+      expect(cur.textContent).toBe('3');
+      expect(tot.textContent).toBe('5');
+      // Page 3 of 5 is (3-1)/(5-1) = 2/4 = 50%
+      expect(trackFill.style.width).toBe('50%');
+    });
+
+    test('sliding the scrubber updates preview popover and releasing navigates to page', async () => {
+      loadModule();
+      sandbox.state.initPagePreviews();
+
+      const slider = document.getElementById('fullscreen-scrubber-slider');
+      const preview = document.getElementById('reader-scrubber-preview');
+      const previewPageText = document.getElementById('reader-scrubber-preview-page-text');
+
+      slider.value = '4';
+      slider.dispatchEvent(new window.Event('input'));
+      await flush();
+
+      expect(preview.classList.contains('hidden')).toBe(false);
+      expect(previewPageText.textContent).toBe('Page 4');
+
+      slider.dispatchEvent(new window.Event('change'));
+      await flush();
+
+      expect(sandbox.state.renderPage).toHaveBeenCalled();
+      expect(sandbox.state.currentPageIndex).toBe(3); // 0-indexed for page 4
+    });
+  });
+
+  describe('Reader Thumbnail Filmstrip Drawer', () => {
+    test('openFilmstrip renders all cards, highlights active page, and observes thumbnails', async () => {
+      loadModule();
+      sandbox.state.currentPageIndex = 2; // page 3
+      sandbox.state.openFilmstrip();
+
+      const filmstrip = document.getElementById('reader-thumbnail-filmstrip');
+      const items = document.getElementById('reader-filmstrip-items');
+      const indicator = document.getElementById('reader-filmstrip-page-indicator');
+
+      expect(filmstrip.classList.contains('hidden')).toBe(false);
+      expect(items.children.length).toBe(5);
+      expect(indicator.textContent).toBe('Page 3 of 5');
+
+      const activeCard = items.querySelector('.active-filmstrip-card');
+      expect(activeCard).not.toBeNull();
+      expect(activeCard.getAttribute('data-page-index')).toBe('2');
+
+      // Check first image loaded thumb
+      await flush();
+      const firstImg = items.querySelector('img');
+      expect(firstImg.src).toContain('api/v1/comics/pages/image');
+    });
+
+    test('clicking a filmstrip card navigates to target page and updates active card', async () => {
+      loadModule();
+      sandbox.state.currentPageIndex = 0;
+      sandbox.state.openFilmstrip();
+
+      const items = document.getElementById('reader-filmstrip-items');
+      const card4 = items.children[3]; // page 4 (index 3)
+
+      card4.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+      await flush();
+
+      expect(sandbox.state.currentPageIndex).toBe(3);
+      expect(card4.classList.contains('active-filmstrip-card')).toBe(true);
+      expect(items.children[0].classList.contains('active-filmstrip-card')).toBe(false);
+    });
+
+    test('preserves Grid View: clicking Grid View button inside filmstrip opens full page grid', async () => {
+      loadModule();
+      sandbox.state.initPagePreviews();
+      sandbox.state.openFilmstrip();
+
+      expect(overlay()).toBeNull();
+
+      const gridBtn = document.getElementById('reader-filmstrip-grid-btn');
+      gridBtn.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+      await flush();
+
+      // Full Grid overlay opens successfully!
+      expect(overlay()).not.toBeNull();
+      expect(sandbox.state.isPagePreviewGridOpen()).toBe(true);
+    });
+
+    test('toggle button and Escape close the filmstrip', async () => {
+      loadModule();
+      sandbox.state.initPagePreviews();
+
+      const toggleBtn = document.getElementById('fullscreen-filmstrip-btn');
+      const filmstrip = document.getElementById('reader-thumbnail-filmstrip');
+
+      // Click to open
+      toggleBtn.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+      expect(sandbox.state.isFilmstripOpen()).toBe(true);
+      expect(toggleBtn.getAttribute('aria-pressed')).toBe('true');
+
+      // Escape key closes filmstrip
+      document.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+      expect(sandbox.state.isFilmstripOpen()).toBe(false);
+      expect(toggleBtn.getAttribute('aria-pressed')).toBe('false');
+
+      // Click to open, close button closes it
+      toggleBtn.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+      expect(sandbox.state.isFilmstripOpen()).toBe(true);
+
+      const closeBtn = document.getElementById('reader-filmstrip-close-btn');
+      closeBtn.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+      expect(sandbox.state.isFilmstripOpen()).toBe(false);
+    });
   });
 });
