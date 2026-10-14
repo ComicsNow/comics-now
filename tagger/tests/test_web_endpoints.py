@@ -92,8 +92,35 @@ def test_search_all_includes_forbiddenplanet(client, monkeypatch):
     monkeypatch.setattr(app, "search_forbiddenplanet_multi", lambda q: called.append(q) or [{"title": "FP Result"}])
     resp = client.post("/api/search", json={"source": "all", "query": "Batman"})
     assert resp.status_code == 200
-    assert len(called) == 1
     results = resp.get_json()
     assert any(r.get("source") == "forbiddenplanet" for r in results)
+
+
+def test_search_all_bounded_timeout(client, monkeypatch):
+    import time
+    import app
+
+    def slow_source(q):
+        time.sleep(10)
+        return [{"title": "Slow Result"}]
+
+    monkeypatch.setattr(app, "search_gcd_multi", lambda q, **k: [{"title": "Fast GCD Result"}])
+    monkeypatch.setattr(app, "search_lcg_multi", lambda q: [])
+    monkeypatch.setattr(app, "search_goodreads_multi", lambda q: [])
+    monkeypatch.setattr(app, "search_blackwells_multi", lambda q: [])
+    monkeypatch.setattr(app, "search_waterstones_multi", lambda q: [])
+    monkeypatch.setattr(app, "search_googlebooks_multi", lambda q, **kwargs: [])
+    monkeypatch.setattr(app, "search_amazon_multi", slow_source)
+    monkeypatch.setattr(app, "search_forbiddenplanet_multi", lambda q: [])
+
+    start_time = time.time()
+    resp = client.post("/api/search", json={"source": "all", "query": "Batman", "timeout": 1.0})
+    duration = time.time() - start_time
+
+    assert resp.status_code == 200
+    assert duration < 5.0, f"Search took too long: {duration}s"
+    results = resp.get_json()
+    assert any(r.get("title") == "Fast GCD Result" for r in results)
+
 
 

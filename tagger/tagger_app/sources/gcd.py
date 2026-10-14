@@ -29,6 +29,8 @@ def is_gcd_cover_accessible(url: str) -> bool:
     """Attempt to verify if the GCD cover URL is accessible without 403."""
     if not url:
         return False
+    if "comics.org" in str(url):
+        return False
     try:
         r = requests.head(url, headers={
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
@@ -169,14 +171,8 @@ def search_gcd_multi(query, gcd_user=None, gcd_pass=None, comicvine_api_key=None
                         title = str(cached_iss.get("title") or "")
                         if re.search(r'\[\s*nn\s*\]', num, re.IGNORECASE) or re.search(r'\[\s*nn\s*\]', title, re.IGNORECASE):
                             continue
-                        cov = cached_iss.get("cover_image_url")
-                        if not cov or ("comics.org" in str(cov) and not is_gcd_cover_accessible(str(cov))):
-                            fb = find_fallback_cover(cached_iss.get("series"), cached_iss.get("number"),
-                                                     description=cached_iss.get("description"),
-                                                     comicvine_api_key=comicvine_api_key,
-                                                     metron_user=metron_user,
-                                                     metron_pass=metron_pass)
-                            cached_iss["cover_image_url"] = fb if fb else None
+                        if not is_gcd_cover_accessible(cached_iss.get("cover_image_url")):
+                            cached_iss["cover_image_url"] = None
                         out.append(cached_iss)
                         continue
 
@@ -192,19 +188,7 @@ def search_gcd_multi(query, gcd_user=None, gcd_pass=None, comicvine_api_key=None
                             parts = raw_cov.split('://', 1)
                             raw_cov = parts[0] + '://' + parts[1].replace('//', '/')
                         
-                        # 1. Try to get cover from GCD API
-                        if raw_cov and is_gcd_cover_accessible(raw_cov):
-                            final_cov = raw_cov
-                        else:
-                            # 2. If cover not available, match series/number on Metron/ComicVine with description closeness
-                            issue_desc = d.get("notes") or ""
-                            fb = find_fallback_cover(d.get('series_name'), str(d.get('number', '')),
-                                                     description=issue_desc,
-                                                     comicvine_api_key=comicvine_api_key,
-                                                     metron_user=metron_user,
-                                                     metron_pass=metron_pass)
-                            # 3. If neither available, None (fallback default placeholder)
-                            final_cov = fb if fb else None
+                        final_cov = raw_cov if is_gcd_cover_accessible(raw_cov) else None
 
                         writers, pencillers, inkers, colorists, letterers, editors = [], [], [], [], [], []
                         total_pages = 0

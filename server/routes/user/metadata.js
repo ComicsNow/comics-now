@@ -453,142 +453,49 @@ module.exports = function attach(router, deps) {
         }
       }
 
-      // If any items are still blocked or missing covers (e.g. GCD results without a batch partner),
-      // cross-enrich via OpenLibrary, ComicVine, or Metron
-      for (const item of mappedResults) {
-        const isBlocked = !item.image?.thumb_url || item.image.thumb_url.includes('comics.org');
-        if (isBlocked) {
+      // Cross-enrich any remaining blocked items (e.g. GCD items without batch partners) via ComicVine in parallel
+      const blockedItems = mappedResults.filter(item => !item.image?.thumb_url || item.image.thumb_url.includes('comics.org')).slice(0, 5);
+      if (blockedItems.length > 0 && cvApiKey) {
+        await Promise.allSettled(blockedItems.map(async (item) => {
           const sName = (item.volumeName || query || '').trim();
           const issNum = (item.issueNumber || '').trim();
-          const cleanIsbn = (item.fullMetadata?.ISBN || '').replace(/[^0-9X]/gi, '');
-
-          let enrichedCoverUrl = null;
-
-          // 1. Try OpenLibrary if ISBN is present
-          if (cleanIsbn) {
-            try {
-              const olUrl = `https://covers.openlibrary.org/b/isbn/${encodeURIComponent(cleanIsbn)}-M.jpg?default=false`;
-              const olCheck = await fetch(olUrl, { method: 'HEAD', signal: AbortSignal.timeout(2500) });
-              if (olCheck.ok && (olCheck.headers.get('content-type') || '').startsWith('image/')) {
-                enrichedCoverUrl = `https://covers.openlibrary.org/b/isbn/${encodeURIComponent(cleanIsbn)}-L.jpg`;
-              }
-            } catch {}
-          }
-
           const itemDesc = item.fullMetadata?.Summary || item.description || item.notes || '';
+          if (!sName) return;
 
-          // 2. Try ComicVine with description similarity
-          if (!enrichedCoverUrl && cvApiKey && sName) {
-            try {
-              const cvQuery = `${sName} ${issNum}`.trim();
-              const cvUrl = `${COMICVINE_API_URL}/search/?api_key=${encodeURIComponent(cvApiKey)}&format=json&resources=issue&query=${encodeURIComponent(cvQuery)}&limit=10`;
-              const cvData = await cvFetchJson(cvUrl);
-              const matches = (cvData?.results || []).filter(m => {
-                const volName = m.volume?.name || '';
-                const mNum = m.issue_number != null ? String(m.issue_number).trim() : '';
-                const volMatch = volName.toLowerCase().includes(sName.toLowerCase()) || sName.toLowerCase().includes(volName.toLowerCase());
-                const numMatch = !issNum || mNum === issNum;
-                const hasImg = !!(m.image?.medium_url || m.image?.super_url || m.image?.thumb_url);
-                return volMatch && numMatch && hasImg;
-              });
+          try {
+            const cvQuery = `${sName} ${issNum}`.trim();
+            const cvUrl = `${COMICVINE_API_URL}/search/?api_key=${encodeURIComponent(cvApiKey)}&format=json&resources=issue&query=${encodeURIComponent(cvQuery)}&limit=5`;
+            const cvData = await cvFetchJson(cvUrl);
+            const matches = (cvData?.results || []).filter(m => {
+              const volName = m.volume?.name || '';
+              const mNum = m.issue_number != null ? String(m.issue_number).trim() : '';
+              const volMatch = volName.toLowerCase().includes(sName.toLowerCase()) || sName.toLowerCase().includes(volName.toLowerCase());
+              const numMatch = !issNum || mNum === issNum;
+              const hasImg = !!(m.image?.medium_url || m.image?.super_url || m.image?.thumb_url);
+              return volMatch && numMatch && hasImg;
+            });
 
-              if (matches.length > 0) {
-                if (itemDesc && matches.length > 1) {
-                  matches.sort((a, b) => {
-                    const descA = (a.description || a.deck || '').replace(/<[^>]*>/g, '');
-                    const descB = (b.description || b.deck || '').replace(/<[^>]*>/g, '');
-                    return computeTextSimilarity(descB, itemDesc) - computeTextSimilarity(descA, itemDesc);
-                  });
-                }
-                const bestMatch = matches[0];
-                if (bestMatch?.image) {
-                  const cvImg = bestMatch.image;
-                  item.image = {
-                    thumb_url: cvImg.thumb_url || cvImg.medium_url,
-                    medium_url: cvImg.medium_url || cvImg.super_url || cvImg.thumb_url,
-                    super_url: cvImg.super_url || cvImg.medium_url || cvImg.thumb_url,
-                    original_url: cvImg.original_url || cvImg.super_url || cvImg.medium_url
-                  };
-                  enrichedCoverUrl = item.image.medium_url;
-                }
-              }
-            } catch {}
-          }
-
-          // 3. Try Metron via sidecar with description similarity
-          if (!enrichedCoverUrl && metronUser && metronPass && sName) {
-            try {
-              const mQuery = `${sName} ${issNum ? '#' + issNum : ''}`.trim();
-              const mRes = await fetch(`${sidecarUrl}/api/search`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  source: 'metron',
-                  query: mQuery,
-                  metron_user: metronUser,
-                  metron_pass: metronPass
-                }),
-                signal: AbortSignal.timeout(4000)
-              });
-              if (mRes.ok) {
-                const mItems = await mRes.json();
-                const mCandidates = (mItems || []).filter(m => {
-                  const mCov = m.cover_image_url || m.cover_url;
-                  return mCov && !mCov.includes('comics.org');
+            if (matches.length > 0) {
+              if (itemDesc && matches.length > 1) {
+                matches.sort((a, b) => {
+                  const descA = (a.description || a.deck || '').replace(/<[^>]*>/g, '');
+                  const descB = (b.description || b.deck || '').replace(/<[^>]*>/g, '');
+                  return computeTextSimilarity(descB, itemDesc) - computeTextSimilarity(descA, itemDesc);
                 });
-                if (mCandidates.length > 0) {
-                  if (itemDesc && mCandidates.length > 1) {
-                    mCandidates.sort((a, b) => {
-                      const descA = a.description || a.summary || '';
-                      const descB = b.description || b.summary || '';
-                      return computeTextSimilarity(descB, itemDesc) - computeTextSimilarity(descA, itemDesc);
-                    });
-                  }
-                  const mMatch = mCandidates[0];
-                  const mCov = mMatch.cover_image_url || mMatch.cover_url;
-                  enrichedCoverUrl = mCov;
-                  item.image = {
-                    thumb_url: mCov,
-                    medium_url: mCov,
-                    super_url: mCov,
-                    original_url: mCov
-                  };
-                }
               }
-            } catch {}
-          }
-
-          // 4. Try OpenLibrary Search by title
-          if (!enrichedCoverUrl && sName) {
-            try {
-              const olSearchUrl = `https://openlibrary.org/search.json?title=${encodeURIComponent(sName)}&limit=3`;
-              const olRes = await fetch(olSearchUrl, { signal: AbortSignal.timeout(3000) });
-              if (olRes.ok) {
-                const olData = await olRes.json();
-                const docWithCover = (olData?.docs || []).find(d => d.cover_i);
-                if (docWithCover?.cover_i) {
-                  const olCover = `https://covers.openlibrary.org/b/id/${docWithCover.cover_i}-M.jpg`;
-                  item.image = {
-                    thumb_url: olCover,
-                    medium_url: `https://covers.openlibrary.org/b/id/${docWithCover.cover_i}-L.jpg`,
-                    super_url: `https://covers.openlibrary.org/b/id/${docWithCover.cover_i}-L.jpg`,
-                    original_url: `https://covers.openlibrary.org/b/id/${docWithCover.cover_i}-L.jpg`
-                  };
-                  enrichedCoverUrl = olCover;
-                }
+              const bestMatch = matches[0];
+              if (bestMatch?.image) {
+                const cvImg = bestMatch.image;
+                item.image = {
+                  thumb_url: cvImg.thumb_url || cvImg.medium_url,
+                  medium_url: cvImg.medium_url || cvImg.super_url || cvImg.thumb_url,
+                  super_url: cvImg.super_url || cvImg.medium_url || cvImg.thumb_url,
+                  original_url: cvImg.original_url || cvImg.super_url || cvImg.medium_url
+                };
               }
-            } catch {}
-          }
-
-          if (enrichedCoverUrl && !item.image?.thumb_url) {
-            item.image = {
-              thumb_url: enrichedCoverUrl,
-              medium_url: enrichedCoverUrl,
-              super_url: enrichedCoverUrl,
-              original_url: enrichedCoverUrl
-            };
-          }
-        }
+            }
+          } catch {}
+        }));
       }
 
       // For any items still referencing comics.org covers or without a cover, set image to null
