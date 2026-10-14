@@ -73,8 +73,7 @@ def search_gcd_multi(query, comicvine_api_key=None, metron_user=None, metron_pas
                                          comicvine_api_key=comicvine_api_key,
                                          metron_user=metron_user,
                                          metron_pass=metron_pass)
-                if fb:
-                    it["cover_image_url"] = fb
+                it["cover_image_url"] = fb if fb else None
         return cached
 
     out = []
@@ -98,8 +97,7 @@ def search_gcd_multi(query, comicvine_api_key=None, metron_user=None, metron_pas
                                                      comicvine_api_key=comicvine_api_key,
                                                      metron_user=metron_user,
                                                      metron_pass=metron_pass)
-                            if fb:
-                                cached_iss["cover_image_url"] = fb
+                            cached_iss["cover_image_url"] = fb if fb else None
                         out.append(cached_iss)
                         continue
 
@@ -111,13 +109,13 @@ def search_gcd_multi(query, comicvine_api_key=None, metron_user=None, metron_pas
                         if cov and '://' in cov:
                             parts = cov.split('://', 1)
                             cov = parts[0] + '://' + parts[1].replace('//', '/')
-                        if not cov or 'comics.org' in cov:
-                            fb = find_fallback_cover(d.get('series_name'), str(d.get('number', '')),
-                                                     comicvine_api_key=comicvine_api_key,
-                                                     metron_user=metron_user,
-                                                     metron_pass=metron_pass)
-                            if fb:
-                                cov = fb
+                        # Do not use images from GCD (comics.org) as they are Cloudflare protected.
+                        # Match via Metron or ComicVine; if that does not find a cover, set to None.
+                        fb = find_fallback_cover(d.get('series_name'), str(d.get('number', '')),
+                                                 comicvine_api_key=comicvine_api_key,
+                                                 metron_user=metron_user,
+                                                 metron_pass=metron_pass)
+                        cov = fb if fb else None
                         writers, pencillers, inkers, colorists, letterers, editors = [], [], [], [], [], []
                         total_pages = 0
                         stories = d.get('story_set') or d.get('stories') or []
@@ -192,7 +190,6 @@ def resolve_gcd(filename, cover_path=None, on_progress=None, existing_meta=None,
                                      comicvine_api_key=comicvine_api_key,
                                      metron_user=metron_user,
                                      metron_pass=metron_pass)
-            if fb:
-                r["cover_image_url"] = fb
+            r["cover_image_url"] = fb if fb else None
         candidates.append(score_candidate(filename, r, cover_path=cover_path, default_source="GCD"))
     return candidates

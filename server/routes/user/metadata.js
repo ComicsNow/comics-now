@@ -368,7 +368,9 @@ module.exports = function attach(router, deps) {
       const results = await response.json();
       
       const mappedResults = results.map((item, idx) => {
-        const coverUrl = item.cover_image_url || item.cover_url || '';
+        const rawCover = item.cover_image_url || item.cover_url || '';
+        // Never keep or use comics.org covers directly as they are Cloudflare protected
+        const coverUrl = (rawCover && !rawCover.includes('comics.org')) ? rawCover : '';
         const itemSource = item.source || source;
         
         const fullMetadata = {
@@ -551,16 +553,11 @@ module.exports = function attach(router, deps) {
         }
       }
 
-      // For any items still referencing comics.org covers, route through proxy with context
+      // For any items still referencing comics.org covers or without a cover, set image to null
+      // so the UI uses a clean placeholder without making requests to comics.org
       for (const item of mappedResults) {
-        if (item.image?.thumb_url && item.image.thumb_url.includes('comics.org')) {
-          const proxied = `/api/v1/proxy/cover?url=${encodeURIComponent(item.image.thumb_url)}&series=${encodeURIComponent(item.volumeName || '')}&issue=${encodeURIComponent(item.issueNumber || '')}&query=${encodeURIComponent(query || '')}`;
-          item.image = {
-            thumb_url: proxied,
-            medium_url: proxied,
-            super_url: proxied,
-            original_url: proxied
-          };
+        if (!item.image?.thumb_url || item.image.thumb_url.includes('comics.org')) {
+          item.image = null;
         }
       }
 
@@ -754,30 +751,33 @@ module.exports = function attach(router, deps) {
 
       const fallbackSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="80" height="112" viewBox="0 0 80 112"><rect width="100%" height="100%" fill="#1f2937"/><rect x="2" y="2" width="76" height="108" fill="none" stroke="#374151" stroke-width="1.5" rx="4"/><text x="50%" y="45%" fill="#9ca3af" font-size="11" font-weight="bold" font-family="sans-serif" text-anchor="middle" dominant-baseline="middle">GCD</text><text x="50%" y="62%" fill="#6b7280" font-size="8" font-family="sans-serif" text-anchor="middle" dominant-baseline="middle">NO COVER</text></svg>`;
 
-      // Attempt direct fetch first with Google Search result headers (Referer: https://www.google.com/)
-      const googleSearchHeaders = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-        'Referer': 'https://www.google.com/',
-        'Accept': 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
-        'Accept-Language': 'en-US,en;q=0.9',
-        'sec-ch-ua': '"Chromium";v="124", "Google Chrome";v="124", "Not-A.Brand";v="99"',
-        'sec-ch-ua-mobile': '?0',
-        'sec-ch-ua-platform': '"Windows"',
-        'sec-fetch-dest': 'image',
-        'sec-fetch-mode': 'no-cors',
-        'sec-fetch-site': 'cross-site'
-      };
+      // If domain is comics.org (GCD), do NOT attempt to get any images from GCD directly.
+      // Match via ComicVine or Metron; if that doesn't work, serve the clean placeholder image.
+      if (parsed.hostname.includes('comics.org')) {
+        const fallback = await resolveFallbackCoverImage(req.query.series, req.query.issue || req.query.number, req.query.query, targetUrl);
+        if (fallback) {
+          res.setHeader('Content-Type', fallback.contentType);
+          res.setHeader('Cache-Control', 'public, max-age=86400');
+          return res.send(fallback.buffer);
+        }
+        res.setHeader('Content-Type', 'image/svg+xml; charset=utf-8');
+        res.setHeader('Cache-Control', 'public, max-age=86400');
+        return res.send(fallbackSvg);
+      }
 
-      let directFetchRes = null;
+      // For other allowed hosts (ComicVine, Metron, OpenLibrary, Amazon, etc.), fetch directly
       try {
-        directFetchRes = await fetch(targetUrl, {
-          headers: googleSearchHeaders,
-          signal: AbortSignal.timeout(4000)
+        const fetchRes = await fetch(targetUrl, {
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+            'Accept': 'image/avif,image/webp,image/apng,image/*,*/*;q=0.8'
+          },
+          signal: AbortSignal.timeout(5000)
         });
-        if (directFetchRes && directFetchRes.ok) {
-          const ct = directFetchRes.headers.get('content-type') || '';
+        if (fetchRes.ok) {
+          const ct = fetchRes.headers.get('content-type') || 'image/jpeg';
           if (ct.startsWith('image/')) {
-            const ab = await directFetchRes.arrayBuffer();
+            const ab = await fetchRes.arrayBuffer();
             const buf = Buffer.from(ab);
             if (buf.length > 100) {
               res.setHeader('Content-Type', ct);
@@ -787,10 +787,10 @@ module.exports = function attach(router, deps) {
           }
         }
       } catch (err) {
-        // Direct fetch failed or timed out
+        // Direct fetch failed
       }
 
-      // If direct fetch was blocked (e.g. Cloudflare 403) or failed, attempt dynamic fallback from ComicVine/Metron/OpenLibrary
+      // If direct fetch failed, try fallback
       const fallback = await resolveFallbackCoverImage(req.query.series, req.query.issue || req.query.number, req.query.query, targetUrl);
       if (fallback) {
         res.setHeader('Content-Type', fallback.contentType);
