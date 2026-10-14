@@ -407,9 +407,116 @@ module.exports = function attach(router, deps) {
         };
       });
 
+      // Cross-enrich covers: if a candidate (e.g. GCD) has a Cloudflare-blocked cover,
+      // borrow an accessible cover from another candidate in this batch (e.g. ComicVine, Metron)
+      for (const item of mappedResults) {
+        const isBlocked = !item.image?.thumb_url || item.image.thumb_url.includes('comics.org');
+        if (isBlocked) {
+          const partner = mappedResults.find(other =>
+            other !== item &&
+            other.image?.thumb_url &&
+            !other.image.thumb_url.includes('comics.org') &&
+            other.volumeName &&
+            item.volumeName &&
+            other.volumeName.toLowerCase().trim() === item.volumeName.toLowerCase().trim() &&
+            (!item.issueNumber || !other.issueNumber || String(item.issueNumber).trim() === String(other.issueNumber).trim())
+          );
+          if (partner) {
+            item.image = { ...partner.image };
+          }
+        }
+      }
+
+      // For any items still referencing comics.org covers, route through proxy with fallback
+      for (const item of mappedResults) {
+        if (item.image?.thumb_url && item.image.thumb_url.includes('comics.org')) {
+          const proxied = `/api/v1/proxy/cover?url=${encodeURIComponent(item.image.thumb_url)}`;
+          item.image = {
+            thumb_url: proxied,
+            medium_url: proxied,
+            super_url: proxied,
+            original_url: proxied
+          };
+        }
+      }
+
       return res.json({ results: mappedResults, total: mappedResults.length });
     } catch (e) {
       return res.status(500).json({ message: formatErrorMessage(e, req, 'Failed to search external source') });
+    }
+  });
+
+  router.get('/api/v1/proxy/cover', async (req, res) => {
+    try {
+      const targetUrl = req.query.url;
+      if (!targetUrl || typeof targetUrl !== 'string') {
+        return res.status(400).end();
+      }
+
+      if (!targetUrl.startsWith('http://') && !targetUrl.startsWith('https://')) {
+        return res.status(400).end();
+      }
+
+      let parsed;
+      try {
+        parsed = new URL(targetUrl);
+      } catch {
+        return res.status(400).end();
+      }
+
+      const allowedHosts = [
+        'comics.org',
+        'files1.comics.org',
+        'files.comics.org',
+        'comicvine.gamespot.com',
+        'metron.cloud',
+        'covers.openlibrary.org',
+        'books.google.com',
+        'googleusercontent.com',
+        'media-amazon.com',
+        'images.amazon.com',
+        'forbiddenplanet.com',
+        'waterstones.com',
+        'blackwells.co.uk'
+      ];
+
+      const isAllowed = allowedHosts.some(h => parsed.hostname === h || parsed.hostname.endsWith('.' + h));
+      if (!isAllowed) {
+        return res.status(403).end();
+      }
+
+      // If domain is comics.org (blocked by Cloudflare bot protection), return clean SVG cover placeholder
+      if (parsed.hostname.includes('comics.org')) {
+        res.setHeader('Content-Type', 'image/svg+xml; charset=utf-8');
+        res.setHeader('Cache-Control', 'public, max-age=86400');
+        const fallbackSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="80" height="112" viewBox="0 0 80 112"><rect width="100%" height="100%" fill="#1f2937"/><rect x="2" y="2" width="76" height="108" fill="none" stroke="#374151" stroke-width="1.5" rx="4"/><text x="50%" y="45%" fill="#9ca3af" font-size="11" font-weight="bold" font-family="sans-serif" text-anchor="middle" dominant-baseline="middle">GCD</text><text x="50%" y="62%" fill="#6b7280" font-size="8" font-family="sans-serif" text-anchor="middle" dominant-baseline="middle">NO COVER</text></svg>`;
+        return res.send(fallbackSvg);
+      }
+
+      const fetchRes = await fetch(targetUrl, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'Accept': 'image/avif,image/webp,image/apng,image/*,*/*;q=0.8'
+        },
+        signal: AbortSignal.timeout(5000)
+      });
+
+      if (!fetchRes.ok) {
+        res.setHeader('Content-Type', 'image/svg+xml; charset=utf-8');
+        res.setHeader('Cache-Control', 'public, max-age=3600');
+        const fallbackSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="80" height="112" viewBox="0 0 80 112"><rect width="100%" height="100%" fill="#1f2937"/><text x="50%" y="50%" fill="#9ca3af" font-size="9" font-family="sans-serif" text-anchor="middle" dominant-baseline="middle">NO COVER</text></svg>`;
+        return res.send(fallbackSvg);
+      }
+
+      const mimeType = fetchRes.headers.get('content-type') || 'image/jpeg';
+      res.setHeader('Content-Type', mimeType);
+      res.setHeader('Cache-Control', 'public, max-age=86400');
+      const buf = Buffer.from(await fetchRes.arrayBuffer());
+      return res.send(buf);
+    } catch {
+      res.setHeader('Content-Type', 'image/svg+xml; charset=utf-8');
+      const fallbackSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="80" height="112" viewBox="0 0 80 112"><rect width="100%" height="100%" fill="#1f2937"/><text x="50%" y="50%" fill="#9ca3af" font-size="9" font-family="sans-serif" text-anchor="middle" dominant-baseline="middle">NO COVER</text></svg>`;
+      return res.send(fallbackSvg);
     }
   });
 
