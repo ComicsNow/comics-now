@@ -49,3 +49,14 @@ Whenever auditing, creating, or modifying reading lists in Comics Now (`/opt/com
   - Build frontend bundles: `npm run build` (Vite)
   - Restart service: `sudo systemctl restart comics-now`
   - Base URL: `http://127.0.0.1:3000/comics/`
+
+## Development Methodology: Test-Driven Development (TDD)
+- **Strict TDD Workflow**: All development (new features, bug fixes, refactoring, and API endpoints) must be Test-Driven.
+- **Red-Green-Refactor Cycle**:
+  1. **Red**: Write or update failing unit and/or integration tests first, defining requirements and edge cases before writing implementation code. Verify the new tests fail for the right reason.
+  2. **Green**: Implement the minimal, clean code required to make the tests pass.
+  3. **Refactor**: Clean up code and optimize while maintaining passing tests.
+- **Regression Testing**: Ensure 100% test pass rate across both test runners before finalizing changes:
+  - Node.js / Jest: `npm test`
+  - Python / Pytest: `pytest tagger/tests`
+
