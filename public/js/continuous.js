@@ -209,6 +209,8 @@ export async function enableContinuousMode() {
     return;
   }
 
+  fullscreenViewer.classList.add('continuous-active');
+
   // Hide fullscreen single image
   const fullscreenImage = document.getElementById('fullscreen-image');
   if (fullscreenImage) {
@@ -324,6 +326,9 @@ export async function disableContinuousMode() {
   const isFullscreen = fullscreenViewer && !fullscreenViewer.classList.contains('hidden');
 
   if (isFullscreen) {
+    if (fullscreenViewer) {
+      fullscreenViewer.classList.remove('continuous-active');
+    }
     // Show fullscreen single image
     const fullscreenImage = document.getElementById('fullscreen-image');
     if (fullscreenImage) {

@@ -212,6 +212,7 @@ exports[`Tailwind class inventory (public/**/*.{html,js}) snapshots the sorted u
   "comic-summary-toggle",
   "container",
   "context-menu-overlay",
+  "continuous-active",
   "continuous-mode-btn",
   "count-badge",
   "ct-log-line",
