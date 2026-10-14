@@ -26,21 +26,8 @@ def text_similarity(a: str, b: str) -> float:
 
 
 def is_gcd_cover_accessible(url: str) -> bool:
-    """Attempt to verify if the GCD cover URL is accessible without 403."""
-    if not url:
-        return False
-    if "comics.org" in str(url):
-        return False
-    try:
-        r = requests.head(url, headers={
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-            "Referer": "https://www.comics.org/"
-        }, timeout=2, allow_redirects=True)
-        if r.status_code == 200 and r.headers.get("content-type", "").startswith("image/"):
-            return True
-    except Exception:
-        pass
-    return False
+    """Check if cover URL is present."""
+    return bool(url and str(url).strip())
 
 
 def find_fallback_cover(series, number=None, description=None, comicvine_api_key=None, metron_user=None, metron_pass=None):

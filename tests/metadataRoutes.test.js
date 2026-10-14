@@ -124,7 +124,7 @@ describe('User Metadata Routes - External Search', () => {
     );
   });
 
-  it('should cross-enrich GCD results with ComicVine cover when GCD cover points to comics.org', async () => {
+  it('should return GCD cover directly in external search without blocking ComicVine calls', async () => {
     attachMetadataRoutes(router, deps);
 
     const mockFetch = jest.fn().mockResolvedValue({
@@ -142,19 +142,6 @@ describe('User Metadata Routes - External Search', () => {
     });
     global.fetch = mockFetch;
 
-    deps.cvFetchJson.mockResolvedValue({
-      results: [
-        {
-          volume: { name: 'Spawn' },
-          issue_number: '1',
-          image: {
-            thumb_url: 'https://comicvine.gamespot.com/spawn1_thumb.jpg',
-            medium_url: 'https://comicvine.gamespot.com/spawn1_medium.jpg'
-          }
-        }
-      ]
-    });
-
     const req = {
       query: {
         source: 'gcd',
@@ -170,8 +157,8 @@ describe('User Metadata Routes - External Search', () => {
 
     expect(res.json).toHaveBeenCalled();
     const responseData = res.json.mock.calls[0][0];
-    expect(responseData.results[0].image.medium_url).toBe('https://comicvine.gamespot.com/spawn1_medium.jpg');
-    expect(responseData.results[0].image.thumb_url).not.toContain('comics.org');
+    expect(responseData.results[0].image.medium_url).toBe('https://files1.comics.org/img/gcd/covers_by_id/1/w400/123.jpg');
+    expect(deps.cvFetchJson).not.toHaveBeenCalled();
   });
 
   it('should dynamically proxy ComicVine cover when proxy/cover targets comics.org', async () => {

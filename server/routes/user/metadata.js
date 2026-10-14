@@ -387,8 +387,7 @@ module.exports = function attach(router, deps) {
 
       const mappedResults = filteredResults.map((item, idx) => {
         const rawCover = item.cover_image_url || item.cover_url || '';
-        // Never keep or use comics.org covers directly as they are Cloudflare protected
-        const coverUrl = (rawCover && !rawCover.includes('comics.org')) ? rawCover : '';
+        const coverUrl = rawCover || '';
         const itemSource = item.source || source;
         
         const fullMetadata = {
@@ -423,88 +422,15 @@ module.exports = function attach(router, deps) {
           issueNumber: fullMetadata.Number || item.number || item.issue_number || '',
           publisher: fullMetadata.Publisher || item.publisher || '',
           coverDate: item.publish_date || '',
-          image: {
+          image: coverUrl ? {
             thumb_url: coverUrl,
             medium_url: coverUrl,
             super_url: coverUrl,
             original_url: coverUrl
-          },
+          } : null,
           fullMetadata
         };
       });
-
-      // Cross-enrich covers: if a candidate (e.g. GCD) has a Cloudflare-blocked cover,
-      // borrow an accessible cover from another candidate in this batch (e.g. ComicVine, Metron)
-      for (const item of mappedResults) {
-        const isBlocked = !item.image?.thumb_url || item.image.thumb_url.includes('comics.org');
-        if (isBlocked) {
-          const partner = mappedResults.find(other =>
-            other !== item &&
-            other.image?.thumb_url &&
-            !other.image.thumb_url.includes('comics.org') &&
-            other.volumeName &&
-            item.volumeName &&
-            other.volumeName.toLowerCase().trim() === item.volumeName.toLowerCase().trim() &&
-            (!item.issueNumber || !other.issueNumber || String(item.issueNumber).trim() === String(other.issueNumber).trim())
-          );
-          if (partner) {
-            item.image = { ...partner.image };
-          }
-        }
-      }
-
-      // Cross-enrich any remaining blocked items (e.g. GCD items without batch partners) via ComicVine in parallel
-      const blockedItems = mappedResults.filter(item => !item.image?.thumb_url || item.image.thumb_url.includes('comics.org')).slice(0, 5);
-      if (blockedItems.length > 0 && cvApiKey) {
-        await Promise.allSettled(blockedItems.map(async (item) => {
-          const sName = (item.volumeName || query || '').trim();
-          const issNum = (item.issueNumber || '').trim();
-          const itemDesc = item.fullMetadata?.Summary || item.description || item.notes || '';
-          if (!sName) return;
-
-          try {
-            const cvQuery = `${sName} ${issNum}`.trim();
-            const cvUrl = `${COMICVINE_API_URL}/search/?api_key=${encodeURIComponent(cvApiKey)}&format=json&resources=issue&query=${encodeURIComponent(cvQuery)}&limit=5`;
-            const cvData = await cvFetchJson(cvUrl);
-            const matches = (cvData?.results || []).filter(m => {
-              const volName = m.volume?.name || '';
-              const mNum = m.issue_number != null ? String(m.issue_number).trim() : '';
-              const volMatch = volName.toLowerCase().includes(sName.toLowerCase()) || sName.toLowerCase().includes(volName.toLowerCase());
-              const numMatch = !issNum || mNum === issNum;
-              const hasImg = !!(m.image?.medium_url || m.image?.super_url || m.image?.thumb_url);
-              return volMatch && numMatch && hasImg;
-            });
-
-            if (matches.length > 0) {
-              if (itemDesc && matches.length > 1) {
-                matches.sort((a, b) => {
-                  const descA = (a.description || a.deck || '').replace(/<[^>]*>/g, '');
-                  const descB = (b.description || b.deck || '').replace(/<[^>]*>/g, '');
-                  return computeTextSimilarity(descB, itemDesc) - computeTextSimilarity(descA, itemDesc);
-                });
-              }
-              const bestMatch = matches[0];
-              if (bestMatch?.image) {
-                const cvImg = bestMatch.image;
-                item.image = {
-                  thumb_url: cvImg.thumb_url || cvImg.medium_url,
-                  medium_url: cvImg.medium_url || cvImg.super_url || cvImg.thumb_url,
-                  super_url: cvImg.super_url || cvImg.medium_url || cvImg.thumb_url,
-                  original_url: cvImg.original_url || cvImg.super_url || cvImg.medium_url
-                };
-              }
-            }
-          } catch {}
-        }));
-      }
-
-      // For any items still referencing comics.org covers or without a cover, set image to null
-      // so the UI uses a clean placeholder without making requests to comics.org
-      for (const item of mappedResults) {
-        if (!item.image?.thumb_url || item.image.thumb_url.includes('comics.org')) {
-          item.image = null;
-        }
-      }
 
       return res.json({ results: mappedResults, total: mappedResults.length });
     } catch (e) {

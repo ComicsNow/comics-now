@@ -1964,13 +1964,9 @@ def api_search_external():
             if metron_user and metron_pass:
                 sources_to_run.append(("metron", lambda: search_metron_multi(query, metron_user, metron_pass)))
 
-            search_timeout = float(data.get("timeout") or 8.0)
-            from concurrent.futures import wait
-            executor = ThreadPoolExecutor(max_workers=max(len(sources_to_run), 1))
-            try:
+            with ThreadPoolExecutor(max_workers=min(len(sources_to_run), 8)) as executor:
                 future_to_src = {executor.submit(fn): src_name for src_name, fn in sources_to_run}
-                done, not_done = wait(future_to_src.keys(), timeout=search_timeout)
-                for future in done:
+                for future in as_completed(future_to_src):
                     src_name = future_to_src[future]
                     try:
                         res = future.result()
@@ -1982,15 +1978,6 @@ def api_search_external():
                                     results.append(item)
                     except Exception as exc:
                         print(f"[-] Search source '{src_name}' error: {exc}")
-                for future in not_done:
-                    src_name = future_to_src[future]
-                    print(f"[-] Search source '{src_name}' timed out after {search_timeout}s")
-                    future.cancel()
-            finally:
-                try:
-                    executor.shutdown(wait=False, cancel_futures=True)
-                except TypeError:
-                    executor.shutdown(wait=False)
 
         elif source == "comicvine":
             api_key = data.get("comicvine_api_key") or scheduler_config.get("comicvine_api_key")

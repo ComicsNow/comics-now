@@ -60,3 +60,12 @@ Whenever auditing, creating, or modifying reading lists in Comics Now (`/opt/com
   - Node.js / Jest: `npm test`
   - Python / Pytest: `pytest tagger/tests`
 
+## Bug Fixing & Root Cause Analysis Protocol
+1. **Always Inspect the Last 5 Commits First**:
+   - Before diagnosing regressions or attempting fixes, ALWAYS check `git log -n 5` and inspect recent diffs (`git diff HEAD~5..HEAD` or `git log -p -n 5`).
+   - Identify whether recent commits, newly introduced nested loops, or speculative changes broke existing functionality.
+2. **One Fix at a Time (Never Bundle Multiple Fixes)**:
+   - NEVER apply multiple fixes at once.
+   - Apply exactly one isolated fix at a time, then test the bug immediately to verify if it is resolved before touching anything else.
+
+
