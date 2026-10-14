@@ -101,6 +101,45 @@ claude mcp add comics-now -- /path/to/comics-now/mcp/run.sh
   - `get_tags(comic_id)` / `get_tags_bulk(comic_ids)`: Reads ComicInfo + database tags.
   - `set_tags(comic_id, fields, storage)` / `set_tags_bulk(...)`: Writes ComicInfo (sidecar XML, CBZ archive, or DB).
   - `tag_workflow()`: Returns step-by-step guidance for cover-driven tagging.
-- **Database Query**: `query_db(sql, limit)`: Runs read-only SELECT / PRAGMA queries.
-- **REST API Escape Hatch**: `call_api(method, path, query, body)`: Directly invokes REST endpoints (destructive paths require `COMICS_ALLOW_DESTRUCTIVE=1`).
+- **AI Reading List Curation**:
+  - `curate_reading_order_event(event_name, apply_changes=False)`: Curate an event or crossover reading order (e.g., 'Civil War', 'Knightfall', 'Absolute DC'). Scrapes canonical orders from DC Universe Infinite, Comic Book Reading Orders, Comic Book Herald, and Wikipedia, matches your library's single issues and omnibuses, and enforces multi-series rules.
+  - `curate_recent_comics_reading_lists(months=3, apply_changes=False)`: Analyzes newly added/updated comics in the last *X* months. Checks if they complete gaps in your existing reading lists or form new multi-series reading orders.
+  - `curate_full_library_reading_lists(unassigned_only=True, apply_changes=False)`: Audits your entire comic collection against major community and editorial reading orders.
+
+---
+
+## AI Reading List Curation
+
+Comics Now! includes an automated reading list curation engine that pulls canonical reading orders from **DC Universe Infinite** (official app collections), **Comic Book Reading Orders**, **Comic Book Herald**, and **Wikipedia**, and matches them against your library.
+
+### Key Rules & Constraints
+- **Minimum 3 Comics:** Discards candidate lists if your library contains fewer than 3 matching comics.
+- **Multi-Series Required:** Rejects lists where all issues belong to the exact same Series (single-series runs belong in the native Series browser).
+- **Cross-Publisher Allowed:** Fully supports cross-publisher events (e.g. DC/Marvel, Batman/TMNT, Aliens vs Predator vs Judge Dredd).
+- **Omnibus & Collected Edition Support:** Mappings automatically resolve multi-issue omnibuses and TPBs (e.g. *Batman: Knightfall Vol. 1* covering Batman #491–497) and place them at their earliest chronological position.
+
+### Chat Prompts (Claude Desktop, Claude Code, Gemini CLI)
+- *"Curate a reading list for Knightfall in preview mode"*
+- *"Check comics added in the last 3 months: should they be added to existing reading lists, or can we create new ones?"*
+- *"Audit my whole library for unassigned reading orders"*
+
+### Standalone CLI
+You can also run curation directly from the terminal without an LLM:
+
+```bash
+cd mcp
+
+# 1. Curate a specific event (dry-run preview)
+PYTHONPATH=. .venv/bin/python3 -m comics_mcp.curate --event "Knightfall"
+
+# 2. Check comics added in the last 3 months
+PYTHONPATH=. .venv/bin/python3 -m comics_mcp.curate --months 3
+
+# 3. Full library audit
+PYTHONPATH=. .venv/bin/python3 -m comics_mcp.curate --all
+
+# 4. Commit changes to Comics Now! and sync across all users
+PYTHONPATH=. .venv/bin/python3 -m comics_mcp.curate --event "Knightfall" --commit
+```
+
 

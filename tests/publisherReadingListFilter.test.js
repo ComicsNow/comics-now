@@ -72,6 +72,12 @@ describe('Publisher View Reading List Filter', () => {
     expect(matchesPublisher({ name: 'Spawn Origins', publishers: ['Image'] }, 'Image Comics')).toBe(true);
     expect(matchesPublisher({ name: 'Dark Horse Star Wars', publishers: [] }, 'Dark Horse')).toBe(true);
     expect(matchesPublisher({ name: 'Spider-Man Collection', publishers: [] }, 'DC Comics')).toBe(false);
+    // Regression: "New England Comics" must NOT match "DC" reading lists due to accidental "dc" substring
+    expect(matchesPublisher({ name: 'DC: The Flash - Creator Runs and Chronicles', publishers: ['DC Comics'] }, 'New England Comics')).toBe(false);
+    expect(matchesPublisher({ name: 'DC: Harley Quinn and Poison Ivy', publishers: ['DC Comics'] }, 'New England Comics')).toBe(false);
+    expect(matchesPublisher({ name: 'New England Comics: The Tick - Complete Chronology', publishers: ['New England Comics'] }, 'New England Comics')).toBe(true);
+    expect(matchesPublisher({ name: 'The Tick: The Eli Stone Saga', publishers: ['New England Comics'] }, 'New England Comics')).toBe(true);
+    expect(matchesPublisher({ name: 'DC Event: Crisis on Infinite Earths', publishers: ['DC Comics'] }, 'DC Comics')).toBe(true);
   });
 
   test('updateReadingListFilterButtonCount on publisher view counts matching publishers and reveals button', () => {

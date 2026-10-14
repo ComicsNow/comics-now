@@ -610,6 +610,73 @@ def reorder_reading_list_comics(list_id: str, comic_ids: list[str]) -> str:
 
 
 @mcp.tool()
+def curate_reading_order_event(
+    event_name: str, apply_changes: bool = False
+) -> str:
+    """Curate a specific comic event or storyline reading order (e.g., 'Civil War', 'Knightfall', 'Absolute DC').
+    Scrapes canonical orders from DC Universe Infinite, Comic Book Reading Orders, Comic Book Herald, and Wikipedia,
+    matches them against library single issues and omnibuses, and enforces multi-series constraints.
+
+    Args:
+        event_name: Name of the comic crossover or storyline.
+        apply_changes: If False (default), returns a dry-run preview. If True, creates the list in DB and syncs across all users.
+    """
+    from comics_mcp import reading_curator
+    result = reading_curator.curate_event_reading_order(event_name, apply_changes=apply_changes)
+    return _dump(result)
+
+
+@mcp.tool()
+def curate_recent_comics_reading_lists(
+    months: int = 3, apply_changes: bool = False
+) -> str:
+    """Analyze comics added in the last X months to check if they complete existing reading lists or form new ones.
+
+    Args:
+        months: Number of months of recent additions to analyze (default 3).
+        apply_changes: If False (default), returns a dry-run preview. If True, commits changes to DB.
+    """
+    from comics_mcp import reading_curator
+    result = reading_curator.curate_recent_comics(months=months, apply_changes=apply_changes)
+    return _dump(result)
+
+
+@mcp.tool()
+def curate_full_library_reading_lists(
+    unassigned_only: bool = True, apply_changes: bool = False
+) -> str:
+    """Audit the comic collection against major reading orders from DCUI, CBRO, and Comic Book Herald.
+
+    Args:
+        unassigned_only: If True (default), focuses on comics not yet in any reading list.
+        apply_changes: If False (default), returns a dry-run preview. If True, commits changes to DB.
+    """
+    from comics_mcp import reading_curator
+    library = reading_curator.get_all_library_comics(unassigned_only=unassigned_only)
+    cached_orders = reading_curator.reading_orders_cache.list_cached_orders()
+    valid_matches = []
+    for o in cached_orders:
+        full_order = reading_curator.reading_orders_cache.get_cached_order(o["slug"])
+        if full_order:
+            match = reading_curator.match_order_against_library(full_order, library)
+            if match["is_valid"]:
+                if apply_changes:
+                    reading_curator.commit_reading_list(
+                        name=match["title"],
+                        description=match["description"],
+                        comic_ids=[c["comicId"] for c in match["matched_comics"]]
+                    )
+                    match["applied"] = True
+                valid_matches.append(match)
+
+    return _dump({
+        "audited_comics_count": len(library),
+        "valid_proposals_count": len(valid_matches),
+        "proposals": valid_matches
+    })
+
+
+@mcp.tool()
 def reorder_reading_lists(list_ids: list[str]) -> str:
     """Set the display order of reading lists.
 
@@ -1154,12 +1221,72 @@ def main() -> None:
     disable_dns_rebinding = os.environ.get("MCP_DISABLE_DNS_REBINDING", "0") == "1"
 
     if transport in ("sse", "streamable-http") and port_str:
+        import uvicorn
+        from starlette.applications import Starlette
+        from starlette.middleware.cors import CORSMiddleware
+        from starlette.routing import Mount
+
         mcp.settings.host = host
         mcp.settings.port = int(port_str)
         mcp.settings.transport_security = TransportSecuritySettings(
             enable_dns_rebinding_protection=not disable_dns_rebinding
         )
-        mcp.run(transport=transport)
+        mcp.settings.streamable_http_path = "/"
+        base_app = mcp.streamable_http_app()
+        starlette_app = Starlette(
+            routes=[
+                Mount("/comics-mcp", app=base_app),
+                Mount("", app=base_app),
+            ],
+            lifespan=base_app.router.lifespan_context,
+        )
+        starlette_app.add_middleware(
+            CORSMiddleware,
+            allow_origins=["*"],
+            allow_credentials=True,
+            allow_methods=["*"],
+            allow_headers=["*"],
+        )
+
+        OIDC_ISSUER = "https://ahmadfamily.cloudflareaccess.com/cdn-cgi/access/sso/oidc/87012d0e002beb8f164c44624c9a902806dc7b677d5e1cf12f615949e0956b8e"
+
+        OAUTH_PROTECTED_RESOURCE = json.dumps({
+            "resource": "https://mcp.razaahmad.co.uk/comics-mcp",
+            "authorization_servers": ["https://mcp.razaahmad.co.uk/comics-mcp"],
+            "scopes_supported": ["openid", "email", "profile"],
+        }).encode("utf-8")
+
+        OAUTH_AUTH_SERVER = json.dumps({
+            "issuer": OIDC_ISSUER,
+            "authorization_endpoint": f"{OIDC_ISSUER}/authorization",
+            "token_endpoint": f"{OIDC_ISSUER}/token",
+            "jwks_uri": f"{OIDC_ISSUER}/jwks",
+            "userinfo_endpoint": f"{OIDC_ISSUER}/userinfo",
+            "scopes_supported": ["openid", "email", "profile"],
+            "response_types_supported": ["code"],
+            "grant_types_supported": ["authorization_code"],
+            "token_endpoint_auth_methods": ["client_secret_basic", "client_secret_post"],
+        }).encode("utf-8")
+
+        async def app(scope, receive, send):
+            if scope["type"] == "http":
+                path = scope.get("path", "")
+                if "/.well-known/oauth-protected-resource" in path:
+                    from starlette.responses import Response
+                    res = Response(OAUTH_PROTECTED_RESOURCE, media_type="application/json", headers={"Access-Control-Allow-Origin": "*"})
+                    await res(scope, receive, send)
+                    return
+                if "/.well-known/oauth-authorization-server" in path or "/.well-known/openid-configuration" in path:
+                    from starlette.responses import Response
+                    res = Response(OAUTH_AUTH_SERVER, media_type="application/json", headers={"Access-Control-Allow-Origin": "*"})
+                    await res(scope, receive, send)
+                    return
+                if path == "/comics-mcp":
+                    scope["path"] = "/comics-mcp/"
+
+            await starlette_app(scope, receive, send)
+
+        uvicorn.run(app, host=host, port=int(port_str))
     else:
         mcp.run()
 
