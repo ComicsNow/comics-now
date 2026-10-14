@@ -68,16 +68,16 @@ async function startTaggerWorker() {
     });
 
     taggerChild.stdout.on('data', (d) => {
-      const msg = d.toString().trim();
-      if (msg) {
-        log('DEBUG', 'TAGGER', msg);
+      if (process.env.DEBUG_TAGGER) {
+        const msg = d.toString().trim();
+        if (msg) log('DEBUG', 'TAGGER', msg);
       }
     });
 
     taggerChild.stderr.on('data', (d) => {
-      const msg = d.toString().trim();
-      if (msg) {
-        log('DEBUG', 'TAGGER', msg);
+      if (process.env.DEBUG_TAGGER) {
+        const msg = d.toString().trim();
+        if (msg) log('DEBUG', 'TAGGER', msg);
       }
     });
 

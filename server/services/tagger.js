@@ -520,9 +520,10 @@ async function runComicTagger(options = {}) {
         
         const formattedMatches = (res.candidates || []).map((c, index) => {
           const meta = c.metadata || {};
+          const candidateTitle = meta.title || (meta.series ? `${meta.series} #${meta.number || meta.issue || '?'}` : 'Unknown Title');
           return {
             choice: String(index + 1),
-            title: meta.title || 'Unknown Title',
+            title: candidateTitle,
             year: meta.publish_date ? new Date(meta.publish_date).getFullYear().toString() : (meta.year || 'Unknown Year'),
             issue: meta.issue || meta.number || '?',
             publisher: meta.publisher || 'Unknown Publisher',
@@ -533,6 +534,25 @@ async function runComicTagger(options = {}) {
             source: c.source
           };
         });
+
+        // Enrich covers: if a candidate (e.g. from GCD) lacks a cover or has a Cloudflare-blocked cover,
+        // check if another candidate from the same search (e.g. ComicVine, Metron) has an accessible cover for this series
+        for (const m of formattedMatches) {
+          const isBlockedCover = !m.coverUrl || m.coverUrl.includes('comics.org');
+          if (isBlockedCover) {
+            const partner = formattedMatches.find(other =>
+              other !== m &&
+              other.coverUrl &&
+              !other.coverUrl.includes('comics.org') &&
+              other.fullMetadata?.series &&
+              m.fullMetadata?.series &&
+              other.fullMetadata.series.toLowerCase().trim() === m.fullMetadata.series.toLowerCase().trim()
+            );
+            if (partner) {
+              m.coverUrl = partner.coverUrl;
+            }
+          }
+        }
 
         pendingMatchState = {
           fileName: entry.name,

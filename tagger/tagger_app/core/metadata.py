@@ -617,6 +617,7 @@ def normalize_metadata(meta, codex=None):
     """
     if not meta:
         return meta
+    meta = dict(meta)
 
     # 1. Normalize series / title / issue_title & check for volume patterns
     original_series = meta.get("series")
@@ -793,14 +794,40 @@ def score_candidate(filename: str, raw_item: dict, cover_path: str = None, defau
     Penalizes foreign reprint publishers and non-English descriptions.
     """
     norm = normalize_metadata(raw_item)
-    title_score = calculate_similarity(filename, raw_item.get("title", "") or norm.get("title", ""))
+    
+    # 1. Determine the best candidate title string for similarity comparison:
+    # Use raw_item title if present and non-empty, otherwise norm title.
+    # If title is blank (because issue title matches series name), reconstruct "Series #Number".
+    candidate_title = raw_item.get("title") or norm.get("title")
+    if not candidate_title or not str(candidate_title).strip():
+        ser = norm.get("series") or raw_item.get("series") or ""
+        num = norm.get("number") or norm.get("issue_number") or raw_item.get("number") or ""
+        if ser and num:
+            candidate_title = f"{ser} #{num}"
+        elif ser:
+            candidate_title = ser
+
+    title_score = calculate_similarity(filename, candidate_title or "")
+
+    # Also evaluate series alone similarity:
+    series_name = norm.get("series") or raw_item.get("series") or ""
+    if series_name:
+        series_score = calculate_similarity(filename, series_name)
+        if series_score > title_score:
+            title_score = series_score
+
     cover_url = raw_item.get("cover_image_url") or raw_item.get("cover_url")
     if cover_url and cover_path and title_score >= 0.60:
         from tagger_app.core.covers import compare_covers_python
         img_score = compare_covers_python(cover_path, cover_url)
-        score = (img_score * 0.6) + (title_score * 0.4)
+        if img_score > 0:
+            score = (img_score * 0.6) + (title_score * 0.4)
+        else:
+            # If cover comparison failed or could not be downloaded (e.g. 403 on GCD/Cloudflare),
+            # fall back to title similarity instead of crashing score to 0.4 * title_score
+            score = title_score
     else:
-        score = title_score * 0.4
+        score = title_score
 
     # Deprioritize foreign reprint publishers
     if is_foreign_publisher(norm.get("publisher")) or is_foreign_publisher(raw_item.get("publisher")):
