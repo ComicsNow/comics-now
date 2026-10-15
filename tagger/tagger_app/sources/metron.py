@@ -108,7 +108,7 @@ def search_metron_multi(query, user, pwd, year=None):
                 "locations": ", ".join(loc_list) if loc_list else None,
                 "story_arc": ", ".join(arc_names) if arc_names else None,
                 "story_arc_number": arc_number if arc_number else None,
-                "genres": genre_list if genre_list else ["Comics"],
+                "genres": [g for g in (genre_list or []) if g and g.strip().lower() not in ["comic", "comics"]],
                 "age_rating": age_rating,
                 "pages": str(page_count) if page_count else None
             }

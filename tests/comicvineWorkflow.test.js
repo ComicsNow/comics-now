@@ -319,6 +319,36 @@ describe('ComicVine Rework & Unsaved Changes Warning Integration', () => {
 
     expect(sandbox.state.renderMetadataDisplay).toHaveBeenCalled();
   });
+
+  test('Metadata Search Sanitization: Strips edition/issue from Series and clears redundant Title in frontend', () => {
+    // Load metadata.js in sandbox
+    loadClientScript(path.resolve(__dirname, '../public/js/metadata.js'), sandbox);
+
+    // Test sanitizeMetadata directly in sandbox
+    expect(typeof sandbox.sanitizeMetadata).toBe('function');
+    const meta = {
+      Series: 'Do a Powerbomb [HC]',
+      Title: 'Do a Powerbomb #1',
+      Number: ''
+    };
+    sandbox.sanitizeMetadata(meta);
+    expect(meta.Series).toBe('Do a Powerbomb');
+    expect(meta.Title).toBe('');
+    expect(meta.Number).toBe('1');
+
+    // Test renderMetadataDisplay sanitizes before rendering
+    sandbox.state.metadataForm = document.getElementById('metadata-form');
+    sandbox.window.metadataForm = document.getElementById('metadata-form');
+    const rawMeta = {
+      Series: 'Batman #01 - TPB',
+      Title: 'Batman #01',
+      Number: ''
+    };
+    sandbox.renderMetadataDisplay(rawMeta, true);
+    expect(rawMeta.Series).toBe('Batman');
+    expect(rawMeta.Title).toBe('');
+    expect(rawMeta.Number).toBe('1');
+  });
 });
 
 // ==========================================

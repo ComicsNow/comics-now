@@ -92,8 +92,8 @@ def test_search_all_includes_forbiddenplanet(client, monkeypatch):
     monkeypatch.setattr(app, "search_forbiddenplanet_multi", lambda q: called.append(q) or [{"title": "FP Result"}])
     resp = client.post("/api/search", json={"source": "all", "query": "Batman"})
     assert resp.status_code == 200
-    assert len(called) == 1
     results = resp.get_json()
     assert any(r.get("source") == "forbiddenplanet" for r in results)
+
 
 

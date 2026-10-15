@@ -165,7 +165,11 @@ ${JSON.stringify((allCandidates || []).slice(0, 4).map(c => ({
      invent, infer, or hallucinate values.
    - Preserve comma-separated lists exactly as provided by the source.
 
+7. GENRE & TAGS:
+   - NEVER include "Comic" or "Comics" in Genre (it is redundant and pointless). If any source lists "Comics" or "Comic" as genre, strip it completely. Only include actual descriptive genres (e.g. "Superhero", "Sci-Fi", "Horror", "Crime", "Fantasy").
+
 Return a JSON object adhering exactly to the requested schema.
+
 `;
 
   return {
@@ -298,11 +302,14 @@ async function synthesizeMetadataWithGemini({
       normalizePublisher,
       isTitleSameAsSeries,
       cleanDescription,
-      resolveCreatorRoles
+      resolveCreatorRoles,
+      cleanGenreAndTags
     } = require('../services/metadata');
 
     cleanSeries = cleanFormatAndEdition(cleanSeries);
     cleanTitle = cleanFormatAndEdition(cleanTitle);
+    parsed.Genre = cleanGenreAndTags(parsed.Genre || '');
+    if (parsed.Tags) parsed.Tags = cleanGenreAndTags(parsed.Tags);
 
     // Apply volume/subtitle splitting rules (e.g. "Batman: Vol 1, The Shining")
     const volSplit = splitVolumeSeriesAndTitle(cleanSeries, cleanTitle);

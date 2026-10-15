@@ -147,7 +147,7 @@ def parse_lcg_product_page(html, url):
         "cover_artist": ", ".join(cover_artists) if cover_artists else None,
         "authors": authors or writers,
         "description": desc,
-        "genres": ["Comics"],
+        "genres": [],
         "source_url": canonical,
         "cover_image_url": cover,
     }

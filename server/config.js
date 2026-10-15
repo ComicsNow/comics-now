@@ -448,6 +448,24 @@ function setMetronPassword(val, skipSave = false) {
   if (!skipSave) saveConfigToDisk();
 }
 
+function getGcdUser() {
+  return config.gcdUser || '';
+}
+
+function setGcdUser(val, skipSave = false) {
+  config.gcdUser = typeof val === 'string' ? val.trim() : '';
+  if (!skipSave) saveConfigToDisk();
+}
+
+function getGcdPassword() {
+  return config.gcdPassword || '';
+}
+
+function setGcdPassword(val, skipSave = false) {
+  config.gcdPassword = typeof val === 'string' ? val.trim() : '';
+  if (!skipSave) saveConfigToDisk();
+}
+
 function getGoogleBooksApiKey() {
   return config.googleBooksApiKey || '';
 }
@@ -579,6 +597,10 @@ module.exports = {
   setMetronUser,
   getMetronPassword,
   setMetronPassword,
+  getGcdUser,
+  setGcdUser,
+  getGcdPassword,
+  setGcdPassword,
   getTaggerForceReprocess,
   setTaggerForceReprocess,
   getNamingRules,
