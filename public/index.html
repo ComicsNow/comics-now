@@ -1144,15 +1144,39 @@
           →
         </button>
 
-        <!-- Page Preview Grid button -->
+        <!-- Page Preview Grid button (Preserved!) -->
         <button
           id="fullscreen-page-grid-btn"
           type="button"
           class="fullscreen-nav-button"
           aria-label="View all pages in a grid"
-          title="Page preview grid"
+          title="Page preview grid (⊞)"
         >
           <span aria-hidden="true">⊞</span>
+        </button>
+
+        <!-- Thumbnail Filmstrip button -->
+        <button
+          id="fullscreen-filmstrip-btn"
+          type="button"
+          class="fullscreen-nav-button"
+          aria-label="Toggle thumbnail filmstrip"
+          title="Thumbnail filmstrip"
+          aria-pressed="false"
+        >
+          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <rect x="2" y="4" width="20" height="16" rx="2"/>
+            <path d="M2 8h20"/>
+            <path d="M2 16h20"/>
+            <path d="M6 4v4"/>
+            <path d="M6 16v4"/>
+            <path d="M10 4v4"/>
+            <path d="M10 16v4"/>
+            <path d="M14 4v4"/>
+            <path d="M14 16v4"/>
+            <path d="M18 4v4"/>
+            <path d="M18 16v4"/>
+          </svg>
         </button>
 
         <!-- Close button -->
@@ -1165,6 +1189,73 @@
         >
           <span aria-hidden="true">&times;</span>
         </button>
+      </div>
+
+      <!-- Reader Page Scrubber Bar -->
+      <div id="fullscreen-scrubber-container" class="fullscreen-scrubber-container hidden" role="region" aria-label="Page Scrubber">
+        <span id="fullscreen-scrubber-current-page" class="scrubber-page-num" aria-hidden="true">1</span>
+        <div class="scrubber-slider-wrapper">
+          <div id="fullscreen-scrubber-track-fill" class="scrubber-track-fill" style="width: 0%;"></div>
+          <input
+            type="range"
+            id="fullscreen-scrubber-slider"
+            class="reader-scrubber-slider"
+            min="1"
+            max="1"
+            value="1"
+            step="1"
+            aria-label="Reader Page Scrubber"
+          />
+        </div>
+        <span id="fullscreen-scrubber-total-pages" class="scrubber-page-num" aria-hidden="true">1</span>
+      </div>
+
+      <!-- Floating Scrubber Thumbnail Preview Popover -->
+      <div id="reader-scrubber-preview" class="reader-scrubber-preview hidden" aria-hidden="true">
+        <div class="reader-scrubber-preview-thumb-wrap">
+          <img id="reader-scrubber-preview-img" src="" alt="Page Preview" class="reader-scrubber-preview-img" loading="eager" />
+        </div>
+        <div class="reader-scrubber-preview-label">
+          <span id="reader-scrubber-preview-page-text">Page 1</span>
+          <span id="reader-scrubber-preview-spread" class="hidden px-1.5 py-0.5 rounded bg-amber-600/90 text-white text-[9px] font-bold">🎬 Spread</span>
+        </div>
+      </div>
+
+      <!-- Reader Thumbnail Filmstrip Drawer (Horizontal skimmable thumbnails) -->
+      <div id="reader-thumbnail-filmstrip" class="reader-thumbnail-filmstrip hidden" role="dialog" aria-label="Thumbnail Filmstrip">
+        <div class="reader-filmstrip-header">
+          <div class="flex items-center gap-2">
+            <span class="text-xs font-bold uppercase tracking-wider text-gray-300 flex items-center gap-1.5">
+              <svg class="w-3.5 h-3.5 text-gray-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <rect x="2" y="4" width="20" height="16" rx="2"/>
+                <path d="M2 8h20"/>
+                <path d="M2 16h20"/>
+                <path d="M6 4v4"/>
+                <path d="M6 16v4"/>
+                <path d="M10 4v4"/>
+                <path d="M10 16v4"/>
+                <path d="M14 4v4"/>
+                <path d="M14 16v4"/>
+                <path d="M18 4v4"/>
+                <path d="M18 16v4"/>
+              </svg>
+              <span>Filmstrip</span>
+            </span>
+            <span class="w-1 h-1 rounded-full bg-gray-600"></span>
+            <span id="reader-filmstrip-page-indicator" class="text-xs text-gray-300 font-medium">Page 1 of 1</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <!-- Jump to Full Grid View (preserving grid view!) -->
+            <button id="reader-filmstrip-grid-btn" type="button" class="filmstrip-action-btn" title="View all pages in full grid (⊞)">
+              <span class="font-bold">⊞</span>
+              <span class="text-xs font-semibold">Grid View</span>
+            </button>
+            <button id="reader-filmstrip-close-btn" type="button" class="filmstrip-close-btn" title="Close Filmstrip" aria-label="Close Filmstrip">&times;</button>
+          </div>
+        </div>
+        <div id="reader-filmstrip-scroll" class="reader-filmstrip-scroll">
+          <div id="reader-filmstrip-items" class="reader-filmstrip-items"></div>
+        </div>
       </div>
 
       <!-- Portrait toggle and Manga Mode - shows on tap only -->
