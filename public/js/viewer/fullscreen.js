@@ -159,10 +159,13 @@ const global = new Proxy(typeof window !== 'undefined' ? window : globalThis, {
       syncFullscreenTitle();
       title.classList.remove('hidden');
     }
+    const scrubber = document.getElementById('fullscreen-scrubber-container');
+    if (scrubber) scrubber.classList.remove('hidden');
 
     if (autoHide) {
       clearTimeout(fullscreenControlsTimeoutId);
       fullscreenControlsTimeoutId = setTimeout(() => {
+        if (global.isFilmstripOpen?.()) return;
         if (global.fullscreenControls) {
           global.fullscreenControls.classList.add('hidden');
         }
@@ -175,6 +178,8 @@ const global = new Proxy(typeof window !== 'undefined' ? window : globalThis, {
         if (global.fullscreenTitle) {
           global.fullscreenTitle.classList.add('hidden');
         }
+        const sc = document.getElementById('fullscreen-scrubber-container');
+        if (sc) sc.classList.add('hidden');
         fullscreenControlsTimeoutId = null;
       }, FULLSCREEN_CONTROLS_AUTOHIDE_DELAY);
     }
@@ -194,6 +199,8 @@ const global = new Proxy(typeof window !== 'undefined' ? window : globalThis, {
     }
     if (closeBtn) closeBtn.classList.add('hidden');
     if (title) title.classList.add('hidden');
+    const scrubber = document.getElementById('fullscreen-scrubber-container');
+    if (scrubber && !global.isFilmstripOpen?.()) scrubber.classList.add('hidden');
     clearTimeout(fullscreenControlsTimeoutId);
     fullscreenControlsTimeoutId = null;
   }
@@ -280,6 +287,9 @@ const global = new Proxy(typeof window !== 'undefined' ? window : globalThis, {
     
     hideFullscreenControls();
     stopCinemaPan();
+    try {
+      global.closeFilmstrip?.();
+    } catch (e) {}
 
     // 2. CLEANUP IN BACKGROUND
     try {
@@ -541,7 +551,7 @@ const global = new Proxy(typeof window !== 'undefined' ? window : globalThis, {
     }
     // Skip taps on UI controls and the close button.
     if (event.target && typeof event.target.closest === 'function'
-        && event.target.closest('button, input, a, select, #fullscreen-controls, #comic-page-grid-overlay')) {
+        && event.target.closest('button, input, a, select, #fullscreen-controls, #comic-page-grid-overlay, #fullscreen-scrubber-container, #reader-scrubber-preview, #reader-thumbnail-filmstrip')) {
       fsLastTapAt = 0;
       return;
     }
@@ -841,11 +851,11 @@ const global = new Proxy(typeof window !== 'undefined' ? window : globalThis, {
     const image = global.fullscreenImage;
     if (!viewer || !image) return;
 
-    // The page-preview grid is a modal inside the viewer: its own scroll and
-    // click handling must win. Skip pan/pinch/zoom bookkeeping for its events
-    // (this also keeps viewer.setPointerCapture off grid gestures).
+    // The page-preview grid, filmstrip, and scrubber are interactive reader overlays:
+    // their own scroll and click handling must win. Skip pan/pinch/zoom bookkeeping for their events
+    // (this also keeps viewer.setPointerCapture off grid/filmstrip gestures).
     if (event.target && typeof event.target.closest === 'function'
-        && event.target.closest('#comic-page-grid-overlay')) return;
+        && event.target.closest('#comic-page-grid-overlay, #reader-thumbnail-filmstrip, #fullscreen-scrubber-container, #reader-scrubber-preview')) return;
 
     fsStartX = event.clientX;
     fsStartY = event.clientY;
@@ -916,10 +926,10 @@ const global = new Proxy(typeof window !== 'undefined' ? window : globalThis, {
     const image = global.fullscreenImage;
     if (!viewer || !image) return;
 
-    // Ignore moves whose target is the page-preview grid (its own scrolling
-    // must not promote a pending viewer pan or pinch).
+    // Ignore moves whose target is the page-preview grid, filmstrip, or scrubber (their own scrolling
+    // must not promote a pending viewer pan or pinch, and must not preventDefault).
     if (event.target && typeof event.target.closest === 'function'
-        && event.target.closest('#comic-page-grid-overlay')) return;
+        && event.target.closest('#comic-page-grid-overlay, #reader-thumbnail-filmstrip, #fullscreen-scrubber-container, #reader-scrubber-preview')) return;
 
     if (!hasDragged) {
       const dx = event.clientX - fsStartX;
@@ -1001,11 +1011,11 @@ const global = new Proxy(typeof window !== 'undefined' ? window : globalThis, {
   function handleFullscreenPointerUp(event) {
     const image = global.fullscreenImage;
 
-    // Events targeting the page-preview grid: run cleanup for this pointer (a
+    // Events targeting the page-preview grid, filmstrip, or scrubber: run cleanup for this pointer (a
     // pending pan armed on the image must not stay stale) but never start a
-    // fresh pan from a finger that is over the grid.
+    // fresh pan from a finger that is over them.
     if (event.target && typeof event.target.closest === 'function'
-        && event.target.closest('#comic-page-grid-overlay')) {
+        && event.target.closest('#comic-page-grid-overlay, #reader-thumbnail-filmstrip, #fullscreen-scrubber-container, #reader-scrubber-preview')) {
       fullscreenTouchPointers.delete(event.pointerId);
       if (event.pointerId === fullscreenPanPointerId) endFullscreenPan(event.pointerId);
       if (event.pointerId === landscapePanPointerId) endLandscapePan();
@@ -1105,6 +1115,10 @@ const global = new Proxy(typeof window !== 'undefined' ? window : globalThis, {
     progressIndicator.textContent = `${progressPercent}% read`;
     pageCounter.textContent = pageText;
     checkSpreadCinemaStatus({ autoPan: true });
+
+    try {
+      global.updateReaderScrubberStatus?.(currentPage, totalPages);
+    } catch (e) {}
   }
 
   let isCinemaPanning = false;
