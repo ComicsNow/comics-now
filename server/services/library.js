@@ -153,16 +153,18 @@ async function buildLibrary(userId = 'default-user') {
     for (const publisherName in lib[rootDir].publishers) {
       const folderName = safeDirName(publisherName);
       const pubLogoDir = path.join(LOGOS_DIRECTORY, folderName);
-      const { logoFile, needsBackground } = await resolveLogo(pubLogoDir);
+      const { logoFile, needsBackground, needsDarkBackground } = await resolveLogo(pubLogoDir);
 
       if (logoFile) {
         lib[rootDir].publishers[publisherName].logoUrl =
           `logos/${encodeURIComponent(folderName)}/${encodeURIComponent(logoFile)}`;
         lib[rootDir].publishers[publisherName].logoNeedsBackground = needsBackground;
+        lib[rootDir].publishers[publisherName].logoNeedsDarkBackground = Boolean(needsDarkBackground);
       } else {
         // Use default blank logo when no publisher logo exists
         lib[rootDir].publishers[publisherName].logoUrl = 'logos/6373148-blank.png';
         lib[rootDir].publishers[publisherName].logoNeedsBackground = false;
+        lib[rootDir].publishers[publisherName].logoNeedsDarkBackground = false;
       }
     }
   }

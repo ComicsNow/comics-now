@@ -198,7 +198,7 @@ export async function enableContinuousMode() {
   
   const refreshGuidedToggle = state.refreshGuidedToggle || window.refreshGuidedToggle;
   if (typeof refreshGuidedToggle === 'function') {
-    try { await refreshGuidedToggle(); } catch (_) {}
+    try { refreshGuidedToggle().catch?.(() => {}); } catch (_) {}
   }
 
   // Continuous mode only works in fullscreen
@@ -208,6 +208,8 @@ export async function enableContinuousMode() {
   if (!isFullscreen) {
     return;
   }
+
+  fullscreenViewer.classList.add('continuous-active');
 
   // Hide fullscreen single image
   const fullscreenImage = document.getElementById('fullscreen-image');
@@ -316,7 +318,7 @@ export async function disableContinuousMode() {
   
   const refreshGuidedToggle = state.refreshGuidedToggle || window.refreshGuidedToggle;
   if (typeof refreshGuidedToggle === 'function') {
-    try { await refreshGuidedToggle(); } catch (_) {}
+    try { refreshGuidedToggle().catch?.(() => {}); } catch (_) {}
   }
 
   // Check if in fullscreen mode
@@ -324,6 +326,9 @@ export async function disableContinuousMode() {
   const isFullscreen = fullscreenViewer && !fullscreenViewer.classList.contains('hidden');
 
   if (isFullscreen) {
+    if (fullscreenViewer) {
+      fullscreenViewer.classList.remove('continuous-active');
+    }
     // Show fullscreen single image
     const fullscreenImage = document.getElementById('fullscreen-image');
     if (fullscreenImage) {
@@ -739,34 +744,34 @@ function setupContinuousModeButtonHandler(button) {
 
       currentComic.continuousMode = newMode;
 
-      const updateComicInLibrary = state.updateComicInLibrary || window.updateComicInLibrary;
-      // Update library object
-      if (typeof updateComicInLibrary === 'function') {
-        updateComicInLibrary(currentComic.id, { continuousMode: newMode });
-      }
+      // 1. Instant UI feedback: update button icon / active state immediately
+      updateContinuousModeUI(newMode);
 
-      // Update cache
-      await updateContinuousModeInCache(currentComic.id, newMode);
-
-      const downloadedComicIds = state.downloadedComicIds || window.downloadedComicIds;
-      const updateDownloadedComicInfo = state.updateDownloadedComicInfo || window.updateDownloadedComicInfo;
-      // Update downloaded comic if applicable
-      const isDownloaded = downloadedComicIds?.has(currentComic.id);
-      if (isDownloaded && typeof updateDownloadedComicInfo === 'function') {
-        await updateDownloadedComicInfo(currentComic.id, { continuousMode: newMode });
-      }
-
-      const updateDownloadedSmartListComic = state.updateDownloadedSmartListComic || window.updateDownloadedSmartListComic;
-      // Update downloaded smart list
-      if (typeof updateDownloadedSmartListComic === 'function') {
-        updateDownloadedSmartListComic(currentComic.id, { continuousMode: newMode });
-      }
-
-      // Switch mode
+      // 2. Perform mode switch immediately without blocking on cache/disk writes
       if (newMode) {
         await enableContinuousMode();
       } else {
         await disableContinuousMode();
+      }
+
+      // 3. Persist state asynchronously in background
+      const updateComicInLibrary = state.updateComicInLibrary || window.updateComicInLibrary;
+      if (typeof updateComicInLibrary === 'function') {
+        updateComicInLibrary(currentComic.id, { continuousMode: newMode });
+      }
+
+      updateContinuousModeInCache(currentComic.id, newMode).catch(() => {});
+
+      const downloadedComicIds = state.downloadedComicIds || window.downloadedComicIds;
+      const updateDownloadedComicInfo = state.updateDownloadedComicInfo || window.updateDownloadedComicInfo;
+      const isDownloaded = downloadedComicIds?.has(currentComic.id);
+      if (isDownloaded && typeof updateDownloadedComicInfo === 'function') {
+        updateDownloadedComicInfo(currentComic.id, { continuousMode: newMode }).catch(() => {});
+      }
+
+      const updateDownloadedSmartListComic = state.updateDownloadedSmartListComic || window.updateDownloadedSmartListComic;
+      if (typeof updateDownloadedSmartListComic === 'function') {
+        updateDownloadedSmartListComic(currentComic.id, { continuousMode: newMode });
       }
 
     } catch (error) {
