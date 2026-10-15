@@ -1784,6 +1784,11 @@ body.eink-color-mode * {
     animation: none !important;
 }
 
+/* Guided View / Bubble Magnifier Overlay - sits on top of comic title and close button */
+#bubble-magnifier-overlay {
+    z-index: 100 !important;
+}
+
 /* Grayscale + Contrast optimization for monochrome E-Ink screens */
 body.eink-mode #fullscreen-image,
 body.eink-mode #bubble-magnifier-img {

@@ -119,7 +119,7 @@ export function applyBubbleOverlay(targetBox, isPanelZoom) {
     overlay.style.pointerEvents = 'auto';
     overlay.style.touchAction = 'none';
     overlay.style.userSelect = 'none';
-    overlay.style.zIndex = '10';
+    overlay.style.zIndex = '100';
     overlay.style.borderRadius = '16px';
     overlay.style.boxShadow = '0 15px 50px rgba(0,0,0,0.9), 0 0 0 2px rgba(255,255,255,0.1)';
     overlay.style.overflow = 'hidden';
@@ -146,6 +146,7 @@ export function applyBubbleOverlay(targetBox, isPanelZoom) {
   clearTimeout(overlay._hideTimer);
   overlay.style.display = 'block';
   overlay.style.opacity = '1';
+  overlay.style.zIndex = '100';
 
   const innerImg = document.getElementById('bubble-magnifier-img');
   innerImg.src = img.src;
