@@ -172,12 +172,7 @@ const global = new Proxy(typeof window !== 'undefined' ? window : globalThis, {
         if (global.fullscreenViewer) {
           global.fullscreenViewer.classList.remove('has-controls-open');
         }
-        if (global.fullscreenCloseBtn) {
-          global.fullscreenCloseBtn.classList.add('hidden');
-        }
-        if (global.fullscreenTitle) {
-          global.fullscreenTitle.classList.add('hidden');
-        }
+        // Title and top-right close button remain permanently visible in fullscreen mode
         const sc = document.getElementById('fullscreen-scrubber-container');
         if (sc) sc.classList.add('hidden');
         fullscreenControlsTimeoutId = null;
@@ -189,16 +184,13 @@ const global = new Proxy(typeof window !== 'undefined' ? window : globalThis, {
     const isMangaPanelZoom = global.GuidedView?.getActiveModeName?.() === 'manga-panel-zoom';
     if (global.isFullImageMode || isMangaPanelZoom) return;
     const controls = global.fullscreenControls;
-    const closeBtn = global.fullscreenCloseBtn;
-    const title = global.fullscreenTitle;
     if (!controls) return;
 
     controls.classList.add('hidden');
     if (global.fullscreenViewer) {
       global.fullscreenViewer.classList.remove('has-controls-open');
     }
-    if (closeBtn) closeBtn.classList.add('hidden');
-    if (title) title.classList.add('hidden');
+    // Title and top-right close button remain permanently visible in fullscreen mode
     const scrubber = document.getElementById('fullscreen-scrubber-container');
     if (scrubber && !global.isFilmstripOpen?.()) scrubber.classList.add('hidden');
     clearTimeout(fullscreenControlsTimeoutId);
@@ -222,6 +214,15 @@ const global = new Proxy(typeof window !== 'undefined' ? window : globalThis, {
     viewer.style.display = '';
     const totalPages = typeof getPageCounterTotal === 'function' ? getPageCounterTotal() : 0;
     updateFullscreenPageStatus(global.currentPageIndex + 1, totalPages);
+
+    // Ensure title and close button are visible and up to date in fullscreen mode
+    syncFullscreenTitle();
+    if (global.fullscreenTitle) {
+      global.fullscreenTitle.classList.remove('hidden');
+    }
+    if (global.fullscreenCloseBtn) {
+      global.fullscreenCloseBtn.classList.remove('hidden');
+    }
 
     // Check if continuous mode should be enabled
     if (global.currentComic?.continuousMode && typeof global.enableContinuousMode === 'function') {
