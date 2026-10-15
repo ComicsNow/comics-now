@@ -508,15 +508,19 @@ export function renderPublisherCards(publishersToShow) {
     card.className = 'series-card bg-gray-800 rounded-lg shadow-lg cursor-pointer p-4 border border-gray-700/50 hover:border-purple-500/50 transition-all duration-300 group';
     const hasLogo = Boolean(publisherData.logoUrl);
     const needsLightBackground = Boolean(publisherData.logoNeedsBackground);
+    const needsDarkBackground = Boolean(publisherData.logoNeedsDarkBackground);
     const logoWrapperClasses = ['flex', 'items-center', 'justify-center', 'h-full', 'w-full'];
     if (needsLightBackground) {
       logoWrapperClasses.push('bg-white/95', 'rounded-lg', 'p-4', 'shadow-inner');
+    } else if (needsDarkBackground) {
+      logoWrapperClasses.push('bg-gray-900', 'rounded-lg', 'p-4', 'shadow-inner');
     }
     const logoContent = hasLogo
       ? `<div class="${logoWrapperClasses.join(' ')}"><img src="${API_BASE_URL}/${publisherData.logoUrl}" alt="${escapeHtml(publisher)}" class="h-full w-full object-contain" loading="lazy"></div>`
       : `<svg class="w-16 h-16" fill="currentColor" viewBox="0 0 20 20"><path d="M2 6a2 2 0 012-2h12a2 2 0 012 2v1H4V6zm14 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V8h16zm-2 2H4v4h12v-4z"></path></svg>`;
+    const panelBgClass = needsDarkBackground ? 'panel-dark bg-gray-900' : 'bg-gray-700';
     card.innerHTML = `
-      <div class="relative h-48 w-full bg-gray-700 rounded-lg flex items-center justify-center text-gray-400">
+      <div class="relative h-48 w-full ${panelBgClass} rounded-lg flex items-center justify-center text-gray-400">
         ${publisherStatusBannerHtml}
         ${mangaBannerHtml}
         ${downloadButtonHtml}

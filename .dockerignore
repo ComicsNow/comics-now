@@ -23,6 +23,11 @@ metadata
 .claude
 .remember
 .antigravitycli
+.agents
+AGENTS.md
+CLAUDE.md
+GEMINI.md
+backups
 tagger/scan_logs
 tagger/uploads
 tagger/__pycache__

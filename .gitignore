@@ -21,9 +21,14 @@ verify_migration.js
 plans/
 .antigravitycli/
 .claude/
+.agents/
+AGENTS.md
+CLAUDE.md
+GEMINI.md
 .deploy-backups/
 
 # Database files and backups
+backups/
 *.db
 *.db-*
 *.db.bak*

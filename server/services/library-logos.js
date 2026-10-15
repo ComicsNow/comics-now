@@ -25,19 +25,19 @@ async function findLogoFileIn(dir) {
   }
 }
 
-async function logoNeedsBackground(fullPath) {
+async function inspectLogoContrast(fullPath) {
   try {
     const image = sharp(fullPath);
     const metadata = await image.metadata();
     if (!metadata) {
-      return false;
+      return { needsLightBackground: false, needsDarkBackground: false };
     }
     const format = (metadata.format || '').toLowerCase();
     if (format !== 'png' && format !== 'svg' && format !== 'webp') {
-      return false;
+      return { needsLightBackground: false, needsDarkBackground: false };
     }
-    if (!metadata.hasAlpha) {
-      return false;
+    if (!metadata.hasAlpha && format !== 'svg') {
+      return { needsLightBackground: false, needsDarkBackground: false };
     }
     
     // Get raw pixel data
@@ -62,16 +62,21 @@ async function logoNeedsBackground(fullPath) {
     }
     
     if (visiblePixelCount === 0) {
-      return false;
+      return { needsLightBackground: false, needsDarkBackground: false };
     }
     
     const avgBrightness = totalBrightness / visiblePixelCount;
-    // If the average brightness of the visible pixels is dark (less than 120 out of 255),
-    // it needs a light background to be visible on our dark theme.
-    return avgBrightness < 120;
+    // If the average brightness of visible pixels is dark (< 120 out of 255),
+    // it needs a light background.
+    // If the average brightness of visible pixels is light (> 160 out of 255),
+    // it needs a dark background to be visible against white publisher card panels.
+    return {
+      needsLightBackground: avgBrightness < 120,
+      needsDarkBackground: avgBrightness > 160
+    };
   } catch (err) {
     log('ERROR', 'LOGOS', `Failed to inspect logo ${fullPath}: ${err.message}`);
-    return false;
+    return { needsLightBackground: false, needsDarkBackground: false };
   }
 }
 
@@ -79,15 +84,22 @@ async function resolveLogo(pubLogoDir) {
   const now = Date.now();
   const cached = logoCache.get(pubLogoDir);
   if (cached && cached.expiresAt > now) {
-    return { logoFile: cached.logoFile, needsBackground: cached.needsBackground };
+    return {
+      logoFile: cached.logoFile,
+      needsBackground: cached.needsBackground,
+      needsDarkBackground: cached.needsDarkBackground
+    };
   }
   const logoFile = await findLogoFileIn(pubLogoDir);
   let needsBackground = false;
+  let needsDarkBackground = false;
   if (logoFile) {
-    needsBackground = await logoNeedsBackground(path.join(pubLogoDir, logoFile));
+    const contrast = await inspectLogoContrast(path.join(pubLogoDir, logoFile));
+    needsBackground = contrast.needsLightBackground;
+    needsDarkBackground = contrast.needsDarkBackground;
   }
-  logoCache.set(pubLogoDir, { logoFile, needsBackground, expiresAt: now + LOGO_CACHE_TTL_MS });
-  return { logoFile, needsBackground };
+  logoCache.set(pubLogoDir, { logoFile, needsBackground, needsDarkBackground, expiresAt: now + LOGO_CACHE_TTL_MS });
+  return { logoFile, needsBackground, needsDarkBackground };
 }
 
 module.exports = {
