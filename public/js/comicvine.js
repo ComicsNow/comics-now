@@ -34,6 +34,16 @@ function renderMetadataDisplay(metadata, clearForm = true) {
   }
 }
 
+// Helper to sanitize metadata before rendering or saving
+function sanitizeMetadata(metadata) {
+  if (typeof state.sanitizeMetadata === 'function') {
+    return state.sanitizeMetadata(metadata);
+  } else if (typeof window.sanitizeMetadata === 'function') {
+    return window.sanitizeMetadata(metadata);
+  }
+  return metadata;
+}
+
 // Opens a beautiful, premium modal previewing the full cover image with scale and fade animations
 function openCoverPreviewModal(imageUrl, title) {
   const backdrop = document.createElement('div');
@@ -47,6 +57,11 @@ function openCoverPreviewModal(imageUrl, title) {
   const img = document.createElement('img');
   img.src = imageUrl;
   img.alt = 'Cover Preview';
+  img.referrerPolicy = 'no-referrer';
+  img.onerror = () => {
+    img.onerror = null;
+    img.src = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="300" height="450" viewBox="0 0 300 450"><rect width="100%" height="100%" fill="%231f2937"/><rect x="4" y="4" width="292" height="442" fill="none" stroke="%23374151" stroke-width="2" rx="8"/><text x="50%" y="45%" fill="%239ca3af" font-size="18" font-family="sans-serif" text-anchor="middle" dominant-baseline="middle">GCD Cover</text><text x="50%" y="55%" fill="%236b7280" font-size="12" font-family="sans-serif" text-anchor="middle" dominant-baseline="middle">Cover Image Unavailable Online</text></svg>';
+  };
   img.className = 'max-w-full max-h-[75vh] object-contain rounded-xl shadow-inner border border-gray-800';
   
   const closeBtn = document.createElement('button');
@@ -226,7 +241,7 @@ function renderResultsList() {
     const baseRow = document.createElement('div');
     baseRow.className = 'flex items-center space-x-3 cursor-pointer';
     baseRow.innerHTML = `
-      ${coverUrl ? `<img src="${escapeHtml(coverUrl)}" alt="cover" class="w-10 h-14 object-cover rounded shrink-0 hover:brightness-110 transition-all shadow hover:shadow-lg"/>` : ''}
+      ${coverUrl ? `<img src="${escapeHtml(coverUrl)}" alt="cover" class="w-10 h-14 object-cover rounded shrink-0 hover:brightness-110 transition-all shadow hover:shadow-lg" loading="lazy" referrerpolicy="no-referrer" onerror="this.onerror=null; this.src='data:image/svg+xml;utf8,<svg xmlns=\\'http://www.w3.org/2000/svg\\' width=\\'40\\' height=\\'56\\' viewBox=\\'0 0 40 56\\'><rect width=\\'100%\\' height=\\'100%\\' fill=\\'%23374151\\'/><rect x=\\'2\\' y=\\'2\\' width=\\'36\\' height=\\'52\\' fill=\\'none\\' stroke=\\'%234b5563\\' rx=\\'2\\'/><text x=\\'50%\\' y=\\'50%\\' fill=\\'%239ca3af\\' font-size=\\'7\\' font-family=\\'sans-serif\\' text-anchor=\\'middle\\' dominant-baseline=\\'middle\\'>NO COVER</text></svg>';"/>` : `<div class="w-10 h-14 bg-gray-800 rounded shrink-0 flex items-center justify-center border border-gray-700 shadow"><span class="text-[9px] text-gray-400 font-bold">NO COVER</span></div>`}
       <div class="flex-1 min-w-0">
         <span class="font-bold block truncate">${escapeHtml(displayName)}${badgeHtml}</span>
         <span class="text-sm text-gray-400 block truncate">${escapeHtml(subtitle)}</span>
@@ -245,6 +260,7 @@ function renderResultsList() {
 
     baseRow.addEventListener('click', () => {
       if (result.fullMetadata) {
+        sanitizeMetadata(result.fullMetadata);
         renderMetadataDisplay(result.fullMetadata, true);
         state.metadataHasUnsavedChanges = true;
         const metaForm = document.getElementById('metadata-form-container') || document.getElementById('metadata-form');
@@ -302,7 +318,7 @@ function renderResultsList() {
                   const issueDisplayName = `${issue.name || 'Unknown'}${issue.issueNumber ? ` #${issue.issueNumber}` : ''}`;
 
                   issueLi.innerHTML = `
-                    ${issueCoverUrl ? `<img src="${escapeHtml(issueCoverUrl)}" class="w-8 h-12 object-cover rounded shrink-0 hover:brightness-110 transition-all shadow"/>` : ''}
+                    ${issueCoverUrl ? `<img src="${escapeHtml(issueCoverUrl)}" class="w-8 h-12 object-cover rounded shrink-0 hover:brightness-110 transition-all shadow" loading="lazy" referrerpolicy="no-referrer" onerror="this.onerror=null; this.src='data:image/svg+xml;utf8,<svg xmlns=\\'http://www.w3.org/2000/svg\\' width=\\'32\\' height=\\'48\\' viewBox=\\'0 0 32 48\\'><rect width=\\'100%\\' height=\\'100%\\' fill=\\'%23374151\\'/><rect x=\\'2\\' y=\\'2\\' width=\\'28\\' height=\\'44\\' fill=\\'none\\' stroke=\\'%234b5563\\' rx=\\'2\\'/><text x=\\'50%\\' y=\\'50%\\' fill=\\'%239ca3af\\' font-size=\\'6\\' font-family=\\'sans-serif\\' text-anchor=\\'middle\\' dominant-baseline=\\'middle\\'>NO COVER</text></svg>';"/>` : `<div class="w-8 h-12 bg-gray-700 rounded shrink-0 flex items-center justify-center border border-gray-600 shadow"><span class="text-[9px] text-gray-400 font-bold">NO COVER</span></div>`}
                     <div class="flex-1 min-w-0">
                       <span class="font-bold block truncate">${escapeHtml(issueDisplayName)}</span>
                       <span class="text-sm text-gray-400 block truncate">${escapeHtml(issueSubtitle)}</span>
@@ -413,7 +429,18 @@ export async function performCvSearch() {
 
     // normalize response shape
     const raw     = Array.isArray(payload) ? payload : payload?.results;
-    const results = Array.isArray(raw) ? raw : [];
+    let results   = Array.isArray(raw) ? raw : [];
+    results = results.filter(item => {
+      const src = String(item?.source || source).toLowerCase();
+      if (src === 'gcd') {
+        const num = String(item?.issueNumber || item?.number || '');
+        const name = String(item?.name || item?.title || '');
+        if (/#?\[\s*nn\s*\]/i.test(num) || /#?\[\s*nn\s*\]/i.test(name)) {
+          return false;
+        }
+      }
+      return true;
+    });
     const total   = Number.isFinite(payload?.total) ? payload.total : results.length;
     cvState.total = total;
     cvState.allResults = results;
@@ -584,6 +611,7 @@ export async function applyMetadataFromSearch(volumeId) {
     const response = await fetch(`${state.API_BASE_URL || ''}/api/v1/comicvine/volume/${volumeId}`);
     if (!response.ok) throw new Error('Could not fetch details.');
     const detailedMetadata = await response.json();
+    sanitizeMetadata(detailedMetadata);
     renderMetadataDisplay(detailedMetadata, true);
     state.metadataHasUnsavedChanges = true; // Mark as having unsaved changes
     if (searchStatusDiv) searchStatusDiv.textContent = prevStatus;
@@ -604,6 +632,7 @@ export async function applyIssueMetadataFromSearch(issueId) {
     const response = await fetch(`${state.API_BASE_URL || ''}/api/v1/comicvine/issue/${issueId}`);
     if (!response.ok) throw new Error('Could not fetch issue details.');
     const detailedMetadata = await response.json();
+    sanitizeMetadata(detailedMetadata);
     renderMetadataDisplay(detailedMetadata, true);
     state.metadataHasUnsavedChanges = true; // Mark as having unsaved changes
     if (searchStatusDiv) searchStatusDiv.textContent = prevStatus;

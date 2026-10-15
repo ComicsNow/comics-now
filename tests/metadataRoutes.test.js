@@ -123,5 +123,246 @@ describe('User Metadata Routes - External Search', () => {
       })
     );
   });
+
+  it('should return GCD cover directly in external search without blocking ComicVine calls', async () => {
+    attachMetadataRoutes(router, deps);
+
+    const mockFetch = jest.fn().mockResolvedValue({
+      ok: true,
+      json: jest.fn().mockResolvedValue([
+        {
+          title: 'Spawn #1',
+          series: 'Spawn',
+          number: '1',
+          publisher: 'Image Comics',
+          cover_image_url: 'https://files1.comics.org/img/gcd/covers_by_id/1/w400/123.jpg',
+          source: 'gcd'
+        }
+      ])
+    });
+    global.fetch = mockFetch;
+
+    const req = {
+      query: {
+        source: 'gcd',
+        query: 'Spawn #1'
+      }
+    };
+    const res = {
+      json: jest.fn(),
+      status: jest.fn().mockReturnThis()
+    };
+
+    await externalSearchHandler(req, res);
+
+    expect(res.json).toHaveBeenCalled();
+    const responseData = res.json.mock.calls[0][0];
+    expect(responseData.results[0].image.medium_url).toBe('https://files1.comics.org/img/gcd/covers_by_id/1/w400/123.jpg');
+    expect(deps.cvFetchJson).not.toHaveBeenCalled();
+  });
+
+  it('should dynamically proxy ComicVine cover when proxy/cover targets comics.org', async () => {
+    let proxyCoverHandler;
+    router.get.mockImplementation((path, ...args) => {
+      if (path === '/api/v1/proxy/cover') {
+        proxyCoverHandler = args[args.length - 1];
+      }
+    });
+
+    attachMetadataRoutes(router, deps);
+
+    deps.cvFetchJson.mockResolvedValue({
+      results: [
+        {
+          volume: { name: 'Spawn' },
+          issue_number: '1',
+          image: {
+            medium_url: 'https://comicvine.gamespot.com/spawn1_medium.jpg'
+          }
+        }
+      ]
+    });
+
+    const mockImageBuffer = Buffer.from('fake-jpeg-image-bytes-data-more-than-100-bytes-12345678901234567890123456789012345678901234567890123456789012345678901234567890');
+    const mockFetch = jest.fn().mockImplementation((url) => {
+      if (url.includes('comicvine.gamespot.com')) {
+        return Promise.resolve({
+          ok: true,
+          headers: { get: () => 'image/jpeg' },
+          arrayBuffer: () => Promise.resolve(mockImageBuffer.buffer)
+        });
+      }
+      return Promise.resolve({ ok: false });
+    });
+    global.fetch = mockFetch;
+
+    const req = {
+      query: {
+        url: 'https://files1.comics.org/img/gcd/covers_by_id/1/w400/123.jpg',
+        series: 'Spawn',
+        issue: '1'
+      }
+    };
+    const res = {
+      setHeader: jest.fn(),
+      send: jest.fn(),
+      status: jest.fn().mockReturnThis(),
+      end: jest.fn()
+    };
+
+    await proxyCoverHandler(req, res);
+
+    expect(res.setHeader).toHaveBeenCalledWith('Content-Type', 'image/jpeg');
+    expect(res.send).toHaveBeenCalledWith(expect.any(Buffer));
+  });
+
+  it('should sanitize metadata in /api/v1/search/external', async () => {
+    attachMetadataRoutes(router, deps);
+
+    const mockFetch = jest.fn().mockResolvedValue({
+      ok: true,
+      json: jest.fn().mockResolvedValue([
+        {
+          title: 'Batman #1',
+          series: 'Batman #1 - TPB',
+          number: '',
+          publisher: 'DC Comics',
+          cover_image_url: 'http://image.jpg'
+        }
+      ])
+    });
+    global.fetch = mockFetch;
+
+    const req = {
+      query: { source: 'all', query: 'Batman' }
+    };
+    const res = {
+      json: jest.fn(),
+      status: jest.fn().mockReturnThis()
+    };
+
+    await externalSearchHandler(req, res);
+
+    expect(res.json).toHaveBeenCalled();
+    const body = res.json.mock.calls[0][0];
+    const results = body.results;
+    expect(results[0].fullMetadata.Series).toBe('Batman');
+    expect(results[0].fullMetadata.Title).toBe('');
+    expect(results[0].fullMetadata.Number).toBe('1');
+    expect(results[0].volumeName).toBe('Batman');
+    expect(results[0].issueNumber).toBe('1');
+  });
+
+  it('should sanitize metadata in /api/v1/comicvine/issue/:id', async () => {
+    let issueHandler;
+    router.get.mockImplementation((path, ...args) => {
+      if (path === '/api/v1/comicvine/issue/:id') {
+        issueHandler = args[args.length - 1];
+      }
+    });
+
+    attachMetadataRoutes(router, deps);
+
+    deps.cvFetchJson.mockResolvedValueOnce({
+      results: {
+        name: 'Batman #1',
+        issue_number: '1',
+        description: 'First issue',
+        volume: { name: 'Batman (TPB)' },
+        publisher: { name: 'DC Comics' }
+      }
+    });
+
+    const req = { params: { id: '12345' } };
+    const res = {
+      json: jest.fn(),
+      status: jest.fn().mockReturnThis()
+    };
+
+    await issueHandler(req, res);
+
+    expect(res.json).toHaveBeenCalled();
+    const data = res.json.mock.calls[0][0];
+    expect(data.Series).toBe('Batman');
+    expect(data.Title).toBe('');
+    expect(data.Number).toBe('1');
+  });
+
+  it('should sanitize metadata in /api/v1/comicvine/volume/:id', async () => {
+    let volumeHandler;
+    router.get.mockImplementation((path, ...args) => {
+      if (path === '/api/v1/comicvine/volume/:id') {
+        volumeHandler = args[args.length - 1];
+      }
+    });
+
+    attachMetadataRoutes(router, deps);
+
+    deps.cvFetchJson.mockResolvedValueOnce({
+      results: {
+        name: 'Batman: The Court of Owls - TPB',
+        description: 'A great collection',
+        publisher: { name: 'DC Comics' },
+        start_year: '2012',
+        count_of_issues: 7
+      }
+    });
+
+    const req = { params: { id: '67890' } };
+    const res = {
+      json: jest.fn(),
+      status: jest.fn().mockReturnThis()
+    };
+
+    await volumeHandler(req, res);
+
+    expect(res.json).toHaveBeenCalled();
+    const data = res.json.mock.calls[0][0];
+    expect(data.Series).toBe('Batman: The Court of Owls');
+    expect(data.Title).toBe('');
+  });
+
+  it('should filter out GCD results that contain [nn] or #[nn] text in number or title in /api/v1/search/external', async () => {
+    attachMetadataRoutes(router, deps);
+
+    const mockFetch = jest.fn().mockResolvedValue({
+      ok: true,
+      json: jest.fn().mockResolvedValue([
+        {
+          source: 'gcd',
+          title: '3-D Batman (1953 series) #[nn]',
+          series: '3-D Batman (1953 series)',
+          number: '[nn]'
+        },
+        {
+          source: 'gcd',
+          title: '3-D Batman (1966 series) #[nn]',
+          series: '3-D Batman (1966 series)',
+          number: '#[nn] #[nn]'
+        },
+        {
+          source: 'gcd',
+          title: 'Batman #1',
+          series: 'Batman',
+          number: '1'
+        }
+      ])
+    });
+    global.fetch = mockFetch;
+
+    const req = { query: { source: 'gcd', query: 'Batman' } };
+    const res = { json: jest.fn(), status: jest.fn().mockReturnThis() };
+
+    await externalSearchHandler(req, res);
+
+    expect(res.json).toHaveBeenCalled();
+    const data = res.json.mock.calls[0][0];
+    const results = data.results;
+    expect(results.length).toBe(1);
+    expect(results[0].issueNumber).toBe('1');
+    expect(results[0].name).not.toContain('[nn]');
+  });
 });
+
+
 

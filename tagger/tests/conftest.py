@@ -22,7 +22,7 @@ def _preserve_scheduler_config():
     if existed:
         shutil.copy2(CONFIG_PATH, backup)
     yield
-    if existed:
+    if existed and os.path.exists(backup):
         shutil.move(backup, CONFIG_PATH)
 
 

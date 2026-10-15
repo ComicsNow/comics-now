@@ -92,7 +92,7 @@ def _extract_volume_metadata(item):
         "publisher": publisher,
         "publish_date": published_date,
         "description": desc,
-        "genres": categories if categories else ["Comics"],
+        "genres": [c for c in (categories or []) if c and c.strip().lower() not in ["comic", "comics"]],
         "source_url": source_url,
         "cover_image_url": cover_image_url,
         "pages": page_count

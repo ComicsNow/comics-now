@@ -22,6 +22,8 @@ scheduler_config = {
     "google_books_api_key": "",
     "metron_user": "",
     "metron_pass": "",
+    "gcd_user": "",
+    "gcd_pass": "",
     "confidence_threshold": 0.9,
     "lower_threshold": 0.80,
     "upper_threshold": 0.90,

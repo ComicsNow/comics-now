@@ -1021,6 +1021,19 @@
                         </p>
                     </div>
 
+                    <!-- GCD API block -->
+                    <div class="setting-group" style="margin-top: 1rem;">
+                        <label for="gcd-user">GCD Username / Email (Optional)</label>
+                        <input type="text" id="gcd-user" placeholder="Enter your Grand Comics Database username" value="">
+                    </div>
+                    <div class="setting-group" style="margin-top: 1rem;">
+                        <label for="gcd-pass">GCD Password (Optional)</label>
+                        <input type="password" id="gcd-pass" placeholder="Enter your Grand Comics Database password" value="">
+                        <p style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.4rem;">
+                            Authenticated requests unlock higher rate limits on the Grand Comics Database API.
+                        </p>
+                    </div>
+
                     <!-- Active Search Sources block -->
                     <div class="setting-group" style="margin-top: 1rem;">
                         <label style="margin-bottom: 0.5rem; display: block;">Active Search Sources</label>
@@ -1734,6 +1747,8 @@
         const cvApiKeyInput = document.getElementById('cv-api-key');
         const metronUserInput = document.getElementById('metron-user');
         const metronPassInput = document.getElementById('metron-pass');
+        const gcdUserInput = document.getElementById('gcd-user');
+        const gcdPassInput = document.getElementById('gcd-pass');
         const batchConcurrencySelect = document.getElementById('batch-concurrency');
         const srcComicvine = document.getElementById('src-comicvine');
         const srcMetron = document.getElementById('src-metron');
@@ -3061,6 +3076,12 @@
                         if (cfg.metron_pass && !metronPassInput.value) {
                             metronPassInput.value = cfg.metron_pass;
                         }
+                        if (cfg.gcd_user && !gcdUserInput.value) {
+                            gcdUserInput.value = cfg.gcd_user;
+                        }
+                        if (cfg.gcd_pass && !gcdPassInput.value) {
+                            gcdPassInput.value = cfg.gcd_pass;
+                        }
                         
                         if (cfg.lower_threshold !== undefined) {
                             const slider = document.getElementById('lower-threshold');
@@ -3210,6 +3231,8 @@
             const comicvineVal = cvApiKeyInput.value.trim();
             const metronUser = metronUserInput.value.trim();
             const metronPass = metronPassInput.value.trim();
+            const gcdUser = gcdUserInput ? gcdUserInput.value.trim() : '';
+            const gcdPass = gcdPassInput ? gcdPassInput.value.trim() : '';
             const lowerThreshold = parseFloat(document.getElementById('lower-threshold').value);
             const upperThreshold = parseFloat(document.getElementById('upper-threshold').value);
 
@@ -3241,6 +3264,8 @@
                     comicvine_api_key: comicvineVal,
                     metron_user: metronUser,
                     metron_pass: metronPass,
+                    gcd_user: gcdUser,
+                    gcd_pass: gcdPass,
                     lower_threshold: lowerThreshold,
                     upper_threshold: upperThreshold,
                     confidence_threshold: upperThreshold,

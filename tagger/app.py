@@ -238,6 +238,7 @@ def _has_core_metadata_fields(meta):
 def query_all_sources_sequentially(filename, cover_path=None, comicvine_api_key=None,
                                    google_books_api_key=None,
                                    metron_user=None, metron_pass=None,
+                                   gcd_user=None, gcd_pass=None,
                                    enabled_sources=None, on_progress=None,
                                    existing_meta=None, publisher_codex=None):
     """
@@ -256,6 +257,8 @@ def query_all_sources_sequentially(filename, cover_path=None, comicvine_api_key=
         google_books_api_key=google_books_api_key,
         metron_user=metron_user,
         metron_pass=metron_pass,
+        gcd_user=gcd_user,
+        gcd_pass=gcd_pass,
         cover_path=cover_path,
         existing_meta=existing_meta,
     )
@@ -1929,8 +1932,23 @@ def api_search_external():
     try:
         results = []
         if source == "all":
+            cv_key = data.get("comicvine_api_key") or scheduler_config.get("comicvine_api_key")
+            metron_user = data.get("metron_user") or scheduler_config.get("metron_user")
+            metron_pass = data.get("metron_pass") or scheduler_config.get("metron_pass")
+            gcd_user = data.get("gcd_user") or scheduler_config.get("gcd_user")
+            gcd_pass = data.get("gcd_pass") or scheduler_config.get("gcd_pass")
+
+            def _run_gcd():
+                try:
+                    return search_gcd_multi(query, gcd_user=gcd_user, gcd_pass=gcd_pass, comicvine_api_key=cv_key, metron_user=metron_user, metron_pass=metron_pass)
+                except TypeError:
+                    try:
+                        return search_gcd_multi(query, comicvine_api_key=cv_key, metron_user=metron_user, metron_pass=metron_pass)
+                    except TypeError:
+                        return search_gcd_multi(query)
+
             sources_to_run = [
-                ("gcd", lambda: search_gcd_multi(query)),
+                ("gcd", _run_gcd),
                 ("lcg", lambda: search_lcg_multi(query)),
                 ("forbiddenplanet", lambda: search_forbiddenplanet_multi(query)),
                 ("googlebooks", lambda: search_googlebooks_multi(query, api_key=data.get("google_books_api_key") or scheduler_config.get("google_books_api_key"))),
@@ -1940,13 +1958,9 @@ def api_search_external():
                 ("amazon", lambda: search_amazon_multi(query)),
             ]
 
-
-            cv_key = data.get("comicvine_api_key") or scheduler_config.get("comicvine_api_key")
             if cv_key:
                 sources_to_run.append(("comicvine", lambda: search_comicvine_multi(query, cv_key)))
 
-            metron_user = data.get("metron_user") or scheduler_config.get("metron_user")
-            metron_pass = data.get("metron_pass") or scheduler_config.get("metron_pass")
             if metron_user and metron_pass:
                 sources_to_run.append(("metron", lambda: search_metron_multi(query, metron_user, metron_pass)))
 
@@ -1976,7 +1990,18 @@ def api_search_external():
                     results.append(item)
 
         elif source == "gcd":
-            res = search_gcd_multi(query)
+            cv_key = data.get("comicvine_api_key") or scheduler_config.get("comicvine_api_key")
+            metron_user = data.get("metron_user") or scheduler_config.get("metron_user")
+            metron_pass = data.get("metron_pass") or scheduler_config.get("metron_pass")
+            gcd_user = data.get("gcd_user") or scheduler_config.get("gcd_user")
+            gcd_pass = data.get("gcd_pass") or scheduler_config.get("gcd_pass")
+            try:
+                res = search_gcd_multi(query, gcd_user=gcd_user, gcd_pass=gcd_pass, comicvine_api_key=cv_key, metron_user=metron_user, metron_pass=metron_pass)
+            except TypeError:
+                try:
+                    res = search_gcd_multi(query, comicvine_api_key=cv_key, metron_user=metron_user, metron_pass=metron_pass)
+                except TypeError:
+                    res = search_gcd_multi(query)
             for item in (res or []):
                 if isinstance(item, dict):
                     item["source"] = "gcd"
