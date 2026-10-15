@@ -116,4 +116,24 @@ describe('Fullscreen persistent header controls', () => {
     expect(closeBtn.classList.contains('hidden')).toBe(false);
     expect(titleEl.textContent).toBe('Batman (2016) #1');
   });
+
+  test('zoom overlay has higher z-index in style.css than fullscreen title and close button', () => {
+    const cssPath = path.join(__dirname, '../public/style.css');
+    const css = fs.readFileSync(cssPath, 'utf-8');
+
+    const titleMatch = css.match(/\.fullscreen-title\s*\{[^}]*z-index:\s*(\d+)/);
+    const closeBtnMatch = css.match(/\.fullscreen-close-button\s*\{[^}]*z-index:\s*(\d+)/);
+    const overlayMatch = css.match(/#bubble-magnifier-overlay\s*\{[^}]*z-index:\s*(\d+)/);
+
+    expect(titleMatch).toBeTruthy();
+    expect(closeBtnMatch).toBeTruthy();
+    expect(overlayMatch).toBeTruthy();
+
+    const titleZ = parseInt(titleMatch[1], 10);
+    const closeBtnZ = parseInt(closeBtnMatch[1], 10);
+    const overlayZ = parseInt(overlayMatch[1], 10);
+
+    expect(overlayZ).toBeGreaterThan(titleZ);
+    expect(overlayZ).toBeGreaterThan(closeBtnZ);
+  });
 });

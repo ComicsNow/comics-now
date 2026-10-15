@@ -206,5 +206,15 @@ describe('Guided View Zoom & Overlay Scaling', () => {
     expect(overlayW).toBeGreaterThanOrEqual(350);
     expect(overlayW).toBeLessThanOrEqual(400);
   });
+
+  test('F) Zoom overlay sits on top of comic title and x button (z-index >= 100)', () => {
+    const targetBox = [100, 100, 200, 100];
+    state.GuidedView.applyBubbleOverlay(targetBox, false);
+
+    const overlay = document.getElementById('bubble-magnifier-overlay');
+    expect(overlay).toBeTruthy();
+    const zIndex = parseInt(overlay.style.zIndex, 10);
+    expect(zIndex).toBeGreaterThanOrEqual(100);
+  });
 });
 
