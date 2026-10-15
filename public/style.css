@@ -530,10 +530,13 @@ body.is-offline .comic-context-menu-item.hide-offline {
 .fullscreen-nav.left { left: 0; }
 .fullscreen-nav.right { right: 0; }
 
-/* When zoomed, let pan/drag events reach the viewer underneath
+/* When zoomed or in continuous mode, let touch/pan/scroll events reach the viewer underneath
    instead of being captured by the side-nav hotspots */
-.fullscreen-viewer:not(.fullscreen-fit-mode) .fullscreen-nav {
-    pointer-events: none;
+.fullscreen-viewer:not(.fullscreen-fit-mode) .fullscreen-nav,
+.fullscreen-viewer:has(#fullscreen-pages-continuous:not(.hidden)) .fullscreen-nav,
+.fullscreen-viewer.continuous-active .fullscreen-nav {
+    display: none !important;
+    pointer-events: none !important;
 }
 
 /* Extra scroll headroom past the bottom of a zoomed page,
@@ -1531,17 +1534,21 @@ body.is-offline .comic-context-menu-item.hide-offline {
     left: 0;
     width: 100%;
     height: 100%;
-    overflow-y: auto;
+    overflow-y: scroll;
     overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
+    touch-action: pan-y;
+    overscroll-behavior-y: contain;
     padding: 1rem 0;
     background-color: #000000;
-    z-index: 1;
+    z-index: 20;
 }
 
 #fullscreen-pages-continuous .page-container {
     width: 100%;
     min-height: 200px;
     overflow: hidden;
+    touch-action: pan-y;
 }
 
 #fullscreen-pages-continuous img {
@@ -1552,6 +1559,9 @@ body.is-offline .comic-context-menu-item.hide-offline {
     display: block;
     margin: 0 auto;
     position: relative;
+    pointer-events: none;
+    -webkit-user-drag: none;
+    user-select: none;
 }
 
 /* Context Menu Active States */
@@ -2058,7 +2068,12 @@ body.eink-color-mode #bubble-magnifier-img {
 
 /* Publisher panels: white background by default to match logos */
 #publisher-list-container .series-card > div:first-child {
-    background-color: #ffffff !important;
+    background-color: #ffffff;
+}
+
+/* When a publisher has a white/light logo on transparency, use dark panel for high contrast */
+#publisher-list-container .series-card > div:first-child.panel-dark {
+    background-color: #111827 !important;
 }
 
 /* Comic cover images inside panels */
@@ -2639,6 +2654,34 @@ body.eink-color-mode #bubble-magnifier-img {
 /* Yellow exclamation mark color for logo wordmark */
 .logo-exclamation {
     color: var(--yellow) !important;
+}
+
+/* ─── MODAL BACKGROUND SCROLL LOCK ───────────────────────── */
+/* Freeze document.body scroll while any modal overlay is visible */
+body:has(#settings-modal:not(.hidden)),
+body:has(#reading-list-modal:not(.hidden)),
+body:has(#add-to-list-modal:not(.hidden)),
+body:has(#directory-selection-modal:not(.hidden)),
+body:has(#ct-modal:not(.hidden)),
+body.modal-open {
+    overflow: hidden !important;
+}
+
+/* Contain overscroll inside modal backdrops and dialog boxes */
+#settings-modal,
+#reading-list-modal,
+#add-to-list-modal,
+#directory-selection-modal,
+#ct-modal {
+    overscroll-behavior: contain !important;
+}
+
+#settings-modal > div,
+#reading-list-modal > div,
+#add-to-list-modal > div,
+#directory-selection-modal > div,
+#ct-modal > div {
+    overscroll-behavior: contain !important;
 }
 
 /* ─── MODALS BRUTALIST/RISO OVERRIDES ───────── */
