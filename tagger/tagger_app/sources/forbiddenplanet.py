@@ -146,7 +146,7 @@ def parse_forbiddenplanet_product_soup(soup, url):
         "publisher": publisher,
         "publish_date": publish_date,
         "description": description,
-        "genres": ["Comics"],
+        "genres": [],
         "source_url": url,
         "cover_image_url": cover_image_url,
     }

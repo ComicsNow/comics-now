@@ -20,6 +20,8 @@ class SourceContext:
     google_books_api_key: Optional[str] = None
     metron_user: Optional[str] = None
     metron_pass: Optional[str] = None
+    gcd_user: Optional[str] = None
+    gcd_pass: Optional[str] = None
     cover_path: Optional[str] = None
     existing_meta: Optional[dict] = None
 
@@ -66,7 +68,9 @@ SOURCES = [
         frozenset({"src-gcd", "gcd", "src-metron-gcd", "metron-gcd"}),
         "Searching Grand Comics Database (GCD)...",
         lambda f, ctx, prog: gcd.resolve_gcd(
-            f, cover_path=ctx.cover_path, on_progress=prog, existing_meta=ctx.existing_meta),
+            f, cover_path=ctx.cover_path, on_progress=prog, existing_meta=ctx.existing_meta,
+            gcd_user=ctx.gcd_user, gcd_pass=ctx.gcd_pass,
+            comicvine_api_key=ctx.comicvine_api_key, metron_user=ctx.metron_user, metron_pass=ctx.metron_pass),
         tier=1,
     ),
     Source(

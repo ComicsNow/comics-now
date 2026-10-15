@@ -607,6 +607,12 @@ async function fetchCtSettings() {
     const metronPassInput = document.getElementById('ct-metron-pass-input');
     if (metronPassInput && data.hasMetronPass) metronPassInput.placeholder = '•••••••• (saved)';
 
+    const gcdUserInput = document.getElementById('ct-gcd-user-input');
+    if (gcdUserInput) gcdUserInput.value = data.gcdUser || '';
+
+    const gcdPassInput = document.getElementById('ct-gcd-pass-input');
+    if (gcdPassInput && data.hasGcdPass) gcdPassInput.placeholder = '•••••••• (saved)';
+
     const portInput = document.getElementById('ct-tagger-port-input');
     if (portInput) {
       let port = 5000;
@@ -836,6 +842,12 @@ async function saveCtSettings() {
   const metronPassInput = document.getElementById('ct-metron-pass-input');
   const metronPassword = metronPassInput ? metronPassInput.value.trim() : '';
 
+  const gcdUserInput = document.getElementById('ct-gcd-user-input');
+  const gcdUser = gcdUserInput ? gcdUserInput.value.trim() : '';
+
+  const gcdPassInput = document.getElementById('ct-gcd-pass-input');
+  const gcdPassword = gcdPassInput ? gcdPassInput.value.trim() : '';
+
   const portInput = document.getElementById('ct-tagger-port-input');
   const taggerServicePort = portInput ? parseInt(portInput.value, 10) : NaN;
 
@@ -882,6 +894,8 @@ async function saveCtSettings() {
         googleBooksApiKey,
         metronUser,
         metronPassword,
+        gcdUser,
+        gcdPassword,
         enabledSources,
         forceReprocess,
         ...(Number.isInteger(taggerServicePort) && taggerServicePort >= 1 && taggerServicePort <= 65535

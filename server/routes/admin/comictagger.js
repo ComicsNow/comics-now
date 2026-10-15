@@ -46,6 +46,10 @@ module.exports = function attach(router, deps) {
     setMetronUser,
     getMetronPassword,
     setMetronPassword,
+    getGcdUser,
+    setGcdUser,
+    getGcdPassword,
+    setGcdPassword,
     getTaggerForceReprocess,
     setTaggerForceReprocess,
     searchExternal,
@@ -101,6 +105,8 @@ module.exports = function attach(router, deps) {
       forceReprocess: getTaggerForceReprocess ? getTaggerForceReprocess() : false,
       metronUser: getMetronUser ? getMetronUser() : '',
       hasMetronPass: !!(getMetronPassword && getMetronPassword()),
+      gcdUser: getGcdUser ? getGcdUser() : '',
+      hasGcdPass: !!(getGcdPassword && getGcdPassword()),
       comicVineApiKey: getComicVineApiKey ? getComicVineApiKey() : '',
       googleBooksApiKey: getGoogleBooksApiKey ? getGoogleBooksApiKey() : ''
     });
@@ -118,6 +124,8 @@ module.exports = function attach(router, deps) {
         forceReprocess,
         metronUser,
         metronPassword,
+        gcdUser,
+        gcdPassword,
         comicVineApiKey,
         googleBooksApiKey,
         taggerServicePort
@@ -175,6 +183,16 @@ module.exports = function attach(router, deps) {
       if (metronPassword !== undefined && setMetronPassword && metronPassword.trim()) {
         setMetronPassword(metronPassword);
         await saveSetting('metronPassword', metronPassword);
+      }
+
+      if (gcdUser !== undefined && setGcdUser) {
+        setGcdUser(gcdUser);
+        await saveSetting('gcdUser', gcdUser);
+      }
+
+      if (gcdPassword !== undefined && setGcdPassword && gcdPassword.trim()) {
+        setGcdPassword(gcdPassword);
+        await saveSetting('gcdPassword', gcdPassword);
       }
 
       if (comicVineApiKey !== undefined && setComicVineApiKey) {

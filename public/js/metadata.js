@@ -52,6 +52,14 @@ async function loadMetadata() {
   }
 }
 
+// Helper to safely escape CSS selectors across browser and test environments
+function escapeSelector(val) {
+  if (typeof CSS !== 'undefined' && typeof CSS.escape === 'function') {
+    return CSS.escape(val);
+  }
+  return String(val).replace(/["\\]/g, '\\$&');
+}
+
 // ====== Editable metadata UI with tag-style chips ======
 
 /** Create a basic text/textarea row */
@@ -182,23 +190,196 @@ function createChipInputRow(name, initialCSV = '') {
   return wrap;
 }
 
+function cleanFormatAndEdition(text) {
+  if (!text) return '';
+  let s = String(text);
+
+  // 1. Bracketed format/edition tags: (TPB), [HC], (Paperback), (digital), {HB}, etc.
+  s = s.replace(/[\(\[\{]\s*(?:(?:the|a|an)\s+)?(?:trade\s+paperback|digital(?:\s+edition)?|paperback(?:\s*\/\s*softback)?|hardcover|hardback(?:\s*\/\s*hardcover)?|softcover|graphic\s+novel|tpb|tp|hb|hc|sc|gn)(?:\s+edition)?\s*[\)\]\}]/gi, ' ');
+
+  // 2. Delimited format tokens: " - TPB", " TPB", " HC", " - Hardcover", ": A Graphic Novel", etc.
+  s = s.replace(/(?:^|[\s,:;/|\-\u2010-\u2015]+)(?:(?:the|a|an)\s+)?(?:trade\s+paperback|digital|paperback(?:\s*\/\s*softback)?|hardcover|hardback(?:\s*\/\s*hardcover)?|softcover|graphic\s+novel|tpb|tp|hb|hc|sc|gn)(?:\s+edition)?(?=$|[\s,:;/|\-\u2010-\u2015]+$|[\s,:;/|\-\u2010-\u2015]*[\(\[\{]|[\s,:;/|\-\u2010-\u2015]+(?:v(?:ol)?\.?\s*\d+|#\d+|\bpart\b|\bbook\b|\bvolume\b)|[\s,:;/|\-\u2010-\u2015]+(?=[\-_/|:,;]))/gi, ' ');
+
+  // 3. Trailing digital indicator: " - digital" or ", digital" at end of string or before brackets
+  s = s.replace(/[\s,:;/|\-\u2010-\u2015]+digital(?=$|[\s,:;/|\-\u2010-\u2015]+$|[\s,:;/|\-\u2010-\u2015]*[\(\[\{])/gi, ' ');
+
+  // 4. Remove empty brackets () [] {}
+  s = s.replace(/[\(\[\{]\s*[\)\]\}]/g, ' ');
+
+  // 5. Clean whitespace & trailing/leading/repeated delimiters
+  s = s.replace(/\s*[:;\-–—|/,]+\s*[:;\-–—|/,]+/g, ' - ');
+  s = s.replace(/\s+/g, ' ').trim();
+  s = s.replace(/[\s,:;/|\-\u2010-\u2015]+$/g, '').trim();
+  s = s.replace(/^[\s,:;/|\-\u2010-\u2015]+/g, '').trim();
+  return s;
+}
+
+const VOL_SPLIT_PATTERN = /^(?<series>.+?)[\s,:;\-–—]+\b(?<vol_token>(?<vol_prefix>Vol(?:ume|\.)?|Book|Bk\.?|v)\s*0*(?<vol_num>\d+)(?:(?<sub_sep>\s*[:\-–—,;]\s*|\s+)(?<subtitle>.+))?)$/i;
+const STANDALONE_VOL_PATTERN = /^(?<vol_token>(?<vol_prefix>Vol(?:ume|\.)?|Book|Bk\.?|v)\s*0*(?<vol_num>\d+)(?:(?<sub_sep>\s*[:\-–—,;]\s*|\s+)(?<subtitle>.+))?)$/i;
+const SERIES_ISSUE_PATTERN = /^(?<series>.+?)(?:[\s,:;\-–—]+|\s*)(?:(?:#|(?:issue|no\.?)\s*#?)\s*0*(?<issue_num>\d+)|[\s,:;\-–—]+0+(?<leading_zero_num>[1-9]\d*))$/i;
+
+function splitVolumeSeriesAndTitle(series, title) {
+  let s = (series || '').trim();
+  let t = (title || '').trim();
+
+  let m = s.match(VOL_SPLIT_PATTERN);
+  if (!m && t) {
+    m = t.match(VOL_SPLIT_PATTERN);
+  }
+
+  if (m && m.groups) {
+    const extSeries = m.groups.series.replace(/[\s,:;\-–—]+$/, '').trim();
+    const prefix = m.groups.vol_prefix;
+    const num = String(parseInt(m.groups.vol_num, 10));
+    const sub = (m.groups.subtitle || '').trim();
+    let formattedTitle = m.groups.vol_token.trim();
+    if (prefix.toLowerCase() === 'v') {
+      formattedTitle = sub ? `Vol. ${num}: ${sub}` : `Volume ${num}`;
+    }
+    return {
+      series: extSeries,
+      title: formattedTitle,
+      number: num,
+      volume: num
+    };
+  }
+
+  const standMatch = t.match(STANDALONE_VOL_PATTERN);
+  if (standMatch && standMatch.groups) {
+    const prefix = standMatch.groups.vol_prefix;
+    const num = String(parseInt(standMatch.groups.vol_num, 10));
+    const sub = (standMatch.groups.subtitle || '').trim();
+    let formattedTitle = standMatch.groups.vol_token.trim();
+    if (prefix.toLowerCase() === 'v') {
+      formattedTitle = sub ? `Vol. ${num}: ${sub}` : `Volume ${num}`;
+    }
+    return {
+      series: s,
+      title: formattedTitle,
+      number: num,
+      volume: num
+    };
+  }
+
+  // Check if series ends with an issue number (e.g. "Batman #1", "Batman #01", "Batman 01", "Batman Issue 1")
+  const issueMatch = s.match(SERIES_ISSUE_PATTERN);
+  if (issueMatch && issueMatch.groups) {
+    const extSeries = issueMatch.groups.series.replace(/[\s,:;\-–—]+$/, '').trim();
+    const num = String(parseInt(issueMatch.groups.issue_num || issueMatch.groups.leading_zero_num, 10));
+    return {
+      series: extSeries,
+      title: t,
+      number: num,
+      volume: null
+    };
+  }
+
+  return { series: s, title: t, number: null, volume: null };
+}
+
+/**
+ * Sanitizes metadata fields (Series, Title, Number, Volume) according to standard rules:
+ * 1. Strips format/edition tags (TPB, HC, Softcover, Hardcover, Graphic Novel, etc.) from Series and Title.
+ * 2. Strips volume/issue numbers from Series (e.g. "#1", "01", "Vol. 1") and extracts number/volume.
+ * 3. Clears Title if it is redundant with Series, just Series + issue number, or a generic issue label.
+ */
+function cleanGenreAndTags(val) {
+  if (!val) return '';
+  const items = String(val).split(',').map(s => s.trim()).filter(Boolean);
+  const filtered = items.filter(s => {
+    const lower = s.toLowerCase();
+    return lower !== 'comic' && lower !== 'comics';
+  });
+  return filtered.join(', ');
+}
+
+/**
+ * Sanitizes metadata fields according to library and cataloging rules:
+ * 1. Strips format and edition tags (e.g. TPB, HC, Softcover) from Series and Title
+ * 2. Splits volume and subtitle from Series if present
+ * 3. Clears Title if identical to Series or redundant issue number
+ * 4. Strips redundant "Comic" / "Comics" tags from Genre and Tags
+ *
+ * @param {Object} metadata
+ * @returns {Object} Sanitized metadata (modified in-place and returned)
+ */
+function sanitizeMetadata(metadata) {
+  if (!metadata || typeof metadata !== 'object') return metadata;
+
+  // 1. Strip format/edition words like TPB, HC, Hardcover, Softcover, Graphic Novel, etc. from Series and Title
+  if (metadata.Series) {
+    metadata.Series = cleanFormatAndEdition(metadata.Series);
+  }
+  if (metadata.Title) {
+    metadata.Title = cleanFormatAndEdition(metadata.Title);
+  }
+
+  // 2. Strip volume/issue numbers from Series (e.g. if Series has "#1" or "01" or "Vol. 1", extract number to Number/Volume and clean Series)
+  const volSplit = splitVolumeSeriesAndTitle(metadata.Series, metadata.Title);
+  if (volSplit.series && (volSplit.number || volSplit.series !== metadata.Series)) {
+    metadata.Series = volSplit.series;
+    if (volSplit.title !== undefined) {
+      metadata.Title = volSplit.title;
+    }
+    if (!metadata.Number || metadata.Number === '1' || metadata.Number === '01') {
+      if (volSplit.number) metadata.Number = volSplit.number;
+    }
+    if (!metadata.Volume && volSplit.volume) {
+      metadata.Volume = volSplit.volume;
+    }
+  }
+  if (!metadata.Number && metadata.Volume) {
+    metadata.Number = metadata.Volume;
+  }
+
+  // If Number is still empty, check if Title has an issue number before clearing Title
+  if (!metadata.Number && metadata.Title) {
+    const issueMatch = metadata.Title.match(/^(?:.*[\s,:;\-–—]+)?(?:#|(?:issue|no\.?)\s*#?)\s*0*(\d+)/i) ||
+                       metadata.Title.match(/^(?:.*[\s,:;\-–—]+)?0*(\d+)$/);
+    if (issueMatch) {
+      metadata.Number = String(parseInt(issueMatch[1], 10));
+    }
+  }
+
+  // 3. Check isTitleSameAsSeries(Title, Series): if Title is the same as Series (or if Title is just Series + Issue Number, or if Title is empty/generic issue number like "#1" or "Issue 1"), clear Title (Title = '')
+  if (metadata.Title && (isTitleSameAsSeries(metadata.Title, metadata.Series) || (!metadata.Series && isTitleSameAsSeries(metadata.Title, '')))) {
+    metadata.Title = '';
+  }
+
+  // 4. Strip redundant "Comic" and "Comics" from Genre and Tags
+  if (metadata.Genre) {
+    metadata.Genre = cleanGenreAndTags(metadata.Genre);
+  }
+  if (metadata.Tags) {
+    metadata.Tags = cleanGenreAndTags(metadata.Tags);
+  }
+  if (metadata.genre) {
+    metadata.genre = cleanGenreAndTags(metadata.genre);
+  }
+  if (metadata.tags) {
+    metadata.tags = cleanGenreAndTags(metadata.tags);
+  }
+  if (Array.isArray(metadata.genres)) {
+    metadata.genres = metadata.genres.filter(s => {
+      const lower = String(s || '').trim().toLowerCase();
+      return lower && lower !== 'comic' && lower !== 'comics';
+    });
+  }
+
+  return metadata;
+}
+
 function isTitleSameAsSeries(title, series) {
   if (!title) return false;
-  let tRaw = String(title).trim();
-  tRaw = tRaw.replace(/[\(\[\{]\s*(?:(?:the|a|an)\s+)?(?:trade\s+paperback|digital(?:\s+edition)?|paperback(?:\s*\/\s*softback)?|hardcover|hardback(?:\s*\/\s*hardcover)?|softcover|graphic\s+novel|tpb|tp|hb|hc|sc|gn)\s*[\)\]\}]/gi, ' ');
-  tRaw = tRaw.replace(/(?:^|[\s,:;/|\-\u2010-\u2015]+)(?:(?:the|a|an)\s+)?(?:trade\s+paperback|digital\s+edition|paperback(?:\s*\/\s*softback)?|hardcover|hardback(?:\s*\/\s*hardcover)?|softcover|graphic\s+novel|tpb|tp|hb|hc|sc|gn)(?=$|[\s,:;/|\-\u2010-\u2015]+)/gi, ' ');
-  tRaw = tRaw.replace(/\s+/g, ' ').trim();
+  const tRaw = cleanFormatAndEdition(String(title)).trim();
   if (!tRaw) return true;
 
-  if (/^(?:#|(?:issue|no\.?|vol(?:ume)?\.?|pt\.?|part|book|bk\.?)\s*#?)\s*\d*\s*$/i.test(tRaw)) {
+  if (/^(?:(?:#|(?:issue|no\.?|vol(?:ume)?\.?|pt\.?|part|book|bk\.?)\s*#?)\s*\d*|\d+)\s*$/i.test(tRaw)) {
     return true;
   }
 
   if (!series) return false;
-  let sRaw = String(series).trim();
-  sRaw = sRaw.replace(/[\(\[\{]\s*(?:(?:the|a|an)\s+)?(?:trade\s+paperback|digital(?:\s+edition)?|paperback(?:\s*\/\s*softback)?|hardcover|hardback(?:\s*\/\s*hardcover)?|softcover|graphic\s+novel|tpb|tp|hb|hc|sc|gn)\s*[\)\]\}]/gi, ' ');
-  sRaw = sRaw.replace(/(?:^|[\s,:;/|\-\u2010-\u2015]+)(?:(?:the|a|an)\s+)?(?:trade\s+paperback|digital\s+edition|paperback(?:\s*\/\s*softback)?|hardcover|hardback(?:\s*\/\s*hardcover)?|softcover|graphic\s+novel|tpb|tp|hb|hc|sc|gn)(?=$|[\s,:;/|\-\u2010-\u2015]+)/gi, ' ');
-  sRaw = sRaw.replace(/\s+/g, ' ').trim();
+  const sRaw = cleanFormatAndEdition(String(series)).trim();
   if (!sRaw) return false;
 
   if (tRaw.toLowerCase() === sRaw.toLowerCase()) return true;
@@ -233,6 +414,13 @@ function isTitleSameAsSeries(title, series) {
 }
 
 function renderMetadataDisplay(metadata, clearForm = true) {
+  if (metadata && typeof metadata === 'object') {
+    sanitizeMetadata(metadata);
+  }
+  if (global.currentMetadata && typeof global.currentMetadata === 'object' && global.currentMetadata !== metadata) {
+    sanitizeMetadata(global.currentMetadata);
+  }
+
   if (clearForm) {
     global.metadataForm.innerHTML = '';
     const statusDiv = document.createElement('div');
@@ -266,7 +454,7 @@ function renderMetadataDisplay(metadata, clearForm = true) {
     // For non-admins: skip empty fields
     if (!isAdmin && (!val || val === '')) continue;
     // If an element already exists (e.g., re-render), update it
-    const existing = global.metadataForm.querySelector(`[name="${CSS.escape(key)}"]`);
+    const existing = global.metadataForm.querySelector(`[name="${escapeSelector(key)}"]`);
     if (existing) {
       if (chipFields.has(key) && isAdmin) {
         // replace existing chip row if needed to reflect fresh values
@@ -312,7 +500,7 @@ function renderMetadataDisplay(metadata, clearForm = true) {
     const submitButton = global.metadataForm.querySelector('button[type="submit"]');
 
     function addFieldToForm(key) {
-      if (global.metadataForm.querySelector(`[name="${CSS.escape(key)}"]`)) return;
+      if (global.metadataForm.querySelector(`[name="${escapeSelector(key)}"]`)) return;
       if (chipFields.has(key)) {
         global.metadataForm.insertBefore(createChipInputRow(key, ''), submitButton);
       } else {
@@ -320,7 +508,7 @@ function renderMetadataDisplay(metadata, clearForm = true) {
         global.metadataForm.insertBefore(createFormRow(key, ''), submitButton);
       }
       // Focus the new input
-      const el = global.metadataForm.querySelector(`[name="${CSS.escape(key)}"]`);
+      const el = global.metadataForm.querySelector(`[name="${escapeSelector(key)}"]`);
       if (el) setTimeout(() => el.focus(), 50);
     }
 
@@ -329,7 +517,7 @@ function renderMetadataDisplay(metadata, clearForm = true) {
       if (section) section.remove();
 
       const missingKeys = KNOWN_FIELDS.filter(k =>
-        !global.metadataForm.querySelector(`[name="${CSS.escape(k)}"]`) &&
+        !global.metadataForm.querySelector(`[name="${escapeSelector(k)}"]`) &&
         !String(merged[k] || '').trim()
       );
 
@@ -373,7 +561,7 @@ function renderMetadataDisplay(metadata, clearForm = true) {
       customBtn.addEventListener('click', () => {
         const key = prompt('Enter field name (e.g., Translator, CoverArtist):');
         if (!key?.trim()) return;
-        if (global.metadataForm.querySelector(`[name="${CSS.escape(key.trim())}"]`)) {
+        if (global.metadataForm.querySelector(`[name="${escapeSelector(key.trim())}"]`)) {
           return alert('That field already exists.');
         }
         addFieldToForm(key.trim());
@@ -404,7 +592,11 @@ export {
   createFormRow,
   createChipInputRow,
   renderMetadataDisplay,
-  isTitleSameAsSeries
+  isTitleSameAsSeries,
+  cleanFormatAndEdition,
+  splitVolumeSeriesAndTitle,
+  sanitizeMetadata,
+  cleanGenreAndTags
 };
 
 state.loadMetadata = loadMetadata;
@@ -412,6 +604,10 @@ state.createFormRow = createFormRow;
 state.createChipInputRow = createChipInputRow;
 state.renderMetadataDisplay = renderMetadataDisplay;
 state.isTitleSameAsSeries = isTitleSameAsSeries;
+state.cleanFormatAndEdition = cleanFormatAndEdition;
+state.splitVolumeSeriesAndTitle = splitVolumeSeriesAndTitle;
+state.sanitizeMetadata = sanitizeMetadata;
+state.cleanGenreAndTags = cleanGenreAndTags;
 
 if (typeof window !== 'undefined') {
   window.loadMetadata = loadMetadata;
@@ -419,5 +615,9 @@ if (typeof window !== 'undefined') {
   window.createChipInputRow = createChipInputRow;
   window.renderMetadataDisplay = renderMetadataDisplay;
   window.isTitleSameAsSeries = isTitleSameAsSeries;
+  window.cleanFormatAndEdition = cleanFormatAndEdition;
+  window.splitVolumeSeriesAndTitle = splitVolumeSeriesAndTitle;
+  window.sanitizeMetadata = sanitizeMetadata;
+  window.cleanGenreAndTags = cleanGenreAndTags;
 }
 

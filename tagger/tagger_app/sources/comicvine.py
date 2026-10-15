@@ -63,7 +63,7 @@ def _parse_search_issue_match(match, api_key=None):
         "publisher": publisher,
         "publish_date": match.get("cover_date") or match.get("store_date"),
         "description": desc,
-        "genres": ["Comics"],
+        "genres": [],
         "source_url": site_url,
         "cover_image_url": cover_image_url,
         "volume_id": vol_id,
@@ -182,7 +182,7 @@ def search_comicvine_volumes(query, api_key, limit=5):
                     "publisher": pub_name,
                     "publish_date": match.get("start_year"),
                     "description": desc,
-                    "genres": ["Comics"],
+                    "genres": [],
                     "source_url": site_url or f"https://comicvine.gamespot.com/volume/4050-{match.get('id')}/",
                     "cover_image_url": cover_image_url
                 }
@@ -384,7 +384,7 @@ def fetch_comicvine_metadata(comicvine_url, api_key):
             "publisher": publisher,
             "publish_date": results.get("cover_date") or results.get("store_date"),
             "description": results.get("description"),
-            "genres": ["Comics"],
+            "genres": [],
             "source_url": comicvine_url,
             "cover_image_url": cover_image_url,
             "writer": ", ".join(writers) if writers else ", ".join(authors),
@@ -450,7 +450,7 @@ def fetch_comicvine_metadata(comicvine_url, api_key):
             "publisher": pub_name,
             "publish_date": results.get("start_year"),
             "description": results.get("description"),
-            "genres": ["Comics"],
+            "genres": [],
             "source_url": comicvine_url,
             "cover_image_url": cover_image_url
         }

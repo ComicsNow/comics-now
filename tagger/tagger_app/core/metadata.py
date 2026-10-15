@@ -807,6 +807,15 @@ def score_candidate(filename: str, raw_item: dict, cover_path: str = None, defau
         elif ser:
             candidate_title = ser
 
+    # Discard unnumbered GCD issues with [nn]
+    import re
+    cand_num = str(norm.get("number") or raw_item.get("number") or "")
+    cand_title_str = str(candidate_title or "")
+    if re.search(r'\[\s*nn\s*\]', cand_num, re.IGNORECASE) or re.search(r'\[\s*nn\s*\]', cand_title_str, re.IGNORECASE):
+        src_label = str(default_source or raw_item.get("source") or "").lower()
+        if "gcd" in src_label:
+            return (norm, 0.0, raw_item.get("source_url") or "")
+
     title_score = calculate_similarity(filename, candidate_title or "")
 
     # Also evaluate series alone similarity:
@@ -1136,12 +1145,12 @@ def merge_best_metadata_fields(candidates_data: list, existing_meta: dict = None
                     _add_source(c["source"])
         result[lore_field] = ", ".join(lore_items) if lore_items else ""
 
-    # 9. Genres (Union of sets)
-    genres = _split_items(result.get("genres") or result.get("genre"))
+    # 9. Genres (Union of sets, filtering out redundant 'comic' / 'comics')
+    genres = [g for g in _split_items(result.get("genres") or result.get("genre")) if g.lower() not in ["comic", "comics"]]
     for c in norm_candidates:
         c_genres = _split_items(c["meta"].get("genres") or c["meta"].get("genre"))
         for g in c_genres:
-            if not any(g.lower() == eg.lower() for eg in genres):
+            if g.lower() not in ["comic", "comics"] and not any(g.lower() == eg.lower() for eg in genres):
                 genres.append(g)
                 _add_source(c["source"])
     result["genres"] = genres

@@ -226,9 +226,35 @@ def generate_comic_info_xml(metadata, enabled_fields=None):
             
     # 8. Genre
     if enabled_fields is None or "Genre" in enabled_fields:
-        genre_val = _clean_str(metadata.get("genres") or metadata.get("Genre") or metadata.get("genre"))
+        raw_genre = metadata.get("genres") or metadata.get("Genre") or metadata.get("genre")
+        if isinstance(raw_genre, list):
+            clean_genres = [g.strip() for g in raw_genre if g and g.strip().lower() not in ['comic', 'comics']]
+            genre_val = ", ".join(clean_genres) if clean_genres else None
+        else:
+            raw_str = _clean_str(raw_genre)
+            if raw_str:
+                clean_genres = [g.strip() for g in raw_str.split(',') if g.strip() and g.strip().lower() not in ['comic', 'comics']]
+                genre_val = ", ".join(clean_genres) if clean_genres else None
+            else:
+                genre_val = None
         if genre_val:
             ET.SubElement(root, "Genre").text = genre_val
+
+    # Tags
+    if enabled_fields is None or "Tags" in enabled_fields:
+        raw_tags = metadata.get("tags") or metadata.get("Tags")
+        if isinstance(raw_tags, list):
+            clean_tags = [t.strip() for t in raw_tags if t and t.strip().lower() not in ['comic', 'comics']]
+            tags_val = ", ".join(clean_tags) if clean_tags else None
+        else:
+            raw_str = _clean_str(raw_tags)
+            if raw_str:
+                clean_tags = [t.strip() for t in raw_str.split(',') if t.strip() and t.strip().lower() not in ['comic', 'comics']]
+                tags_val = ", ".join(clean_tags) if clean_tags else None
+            else:
+                tags_val = None
+        if tags_val:
+            ET.SubElement(root, "Tags").text = tags_val
             
     # 9. PageCount
     if enabled_fields is None or "PageCount" in enabled_fields:

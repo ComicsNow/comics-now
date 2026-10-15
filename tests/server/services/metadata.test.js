@@ -15,7 +15,11 @@ const {
   saveMetadataToComic,
   normalizePublisher,
   cleanDescription,
-  resolveCreatorRoles
+  resolveCreatorRoles,
+  cleanFormatAndEdition,
+  splitVolumeSeriesAndTitle,
+  isTitleSameAsSeries,
+  sanitizeMetadata
 } = require('../../../server/services/metadata');
 
 // Utility helper to create a real ZIP archive with internal ComicInfo.xml
@@ -350,6 +354,101 @@ describe('Metadata Service - Real Integration Tests (No Mock filesystem)', () =>
       resolveCreatorRoles(meta, ['Martin Simmonds']);
       expect(meta.Writer).toBe('James Tynion IV');
       expect(meta.Penciller).toBe('Martin Simmonds');
+    });
+  });
+
+  describe('cleanFormatAndEdition', () => {
+    it('should strip TPB, HC, Hardcover, Softcover, Graphic Novel tags', () => {
+      expect(cleanFormatAndEdition('Batman - TPB')).toBe('Batman');
+      expect(cleanFormatAndEdition('Do a Powerbomb [HC]')).toBe('Do a Powerbomb');
+      expect(cleanFormatAndEdition('Saga Vol. 1 Graphic Novel')).toBe('Saga Vol. 1');
+      expect(cleanFormatAndEdition('Powers (Hardcover)')).toBe('Powers');
+      expect(cleanFormatAndEdition('Batman: Softcover Edition')).toBe('Batman');
+      expect(cleanFormatAndEdition('Thorgal (Trade Paperback)')).toBe('Thorgal');
+    });
+  });
+
+  describe('splitVolumeSeriesAndTitle', () => {
+    it('should extract volume numbers and series name', () => {
+      const res = splitVolumeSeriesAndTitle('Batman Vol. 1', '');
+      expect(res.series).toBe('Batman');
+      expect(res.volume).toBe('1');
+      expect(res.number).toBe('1');
+    });
+
+    it('should strip issue numbers like #1 or 01 from series', () => {
+      const res1 = splitVolumeSeriesAndTitle('Batman #1', '');
+      expect(res1.series).toBe('Batman');
+      expect(res1.number).toBe('1');
+
+      const res2 = splitVolumeSeriesAndTitle('Do a Powerbomb 01', '');
+      expect(res2.series).toBe('Do a Powerbomb');
+      expect(res2.number).toBe('1');
+
+      const res3 = splitVolumeSeriesAndTitle('Spider-Man #03', '');
+      expect(res3.series).toBe('Spider-Man');
+      expect(res3.number).toBe('3');
+    });
+  });
+
+  describe('isTitleSameAsSeries', () => {
+    it('should return true for identical series and title', () => {
+      expect(isTitleSameAsSeries('Batman', 'Batman')).toBe(true);
+    });
+
+    it('should return true for series + issue number in title', () => {
+      expect(isTitleSameAsSeries('Batman #1', 'Batman')).toBe(true);
+      expect(isTitleSameAsSeries('Batman 01', 'Batman')).toBe(true);
+    });
+
+    it('should return true for generic issue or volume titles like #1 or 01', () => {
+      expect(isTitleSameAsSeries('#1', 'Batman')).toBe(true);
+      expect(isTitleSameAsSeries('Issue 1', 'Batman')).toBe(true);
+      expect(isTitleSameAsSeries('01', 'Batman')).toBe(true);
+      expect(isTitleSameAsSeries('1', 'Batman')).toBe(true);
+    });
+
+    it('should return false for distinct issue titles', () => {
+      expect(isTitleSameAsSeries('The Court of Owls', 'Batman')).toBe(false);
+      expect(isTitleSameAsSeries('Vol. 1: The Court of Owls', 'Batman')).toBe(false);
+    });
+  });
+
+  describe('sanitizeMetadata', () => {
+    it('should clean format tags, strip series numbers, and blank redundant title', () => {
+      const meta = {
+        Series: 'Batman #1 - TPB',
+        Title: 'Batman #1',
+        Number: ''
+      };
+      sanitizeMetadata(meta);
+      expect(meta.Series).toBe('Batman');
+      expect(meta.Title).toBe('');
+      expect(meta.Number).toBe('1');
+    });
+
+    it('should extract issue number from Title if number is missing and clear redundant title', () => {
+      const meta = {
+        Series: 'Batman',
+        Title: '01',
+        Number: ''
+      };
+      sanitizeMetadata(meta);
+      expect(meta.Series).toBe('Batman');
+      expect(meta.Title).toBe('');
+      expect(meta.Number).toBe('1');
+    });
+
+    it('should retain non-redundant title', () => {
+      const meta = {
+        Series: 'Batman #1 [HC]',
+        Title: 'The Court of Owls',
+        Number: ''
+      };
+      sanitizeMetadata(meta);
+      expect(meta.Series).toBe('Batman');
+      expect(meta.Title).toBe('The Court of Owls');
+      expect(meta.Number).toBe('1');
     });
   });
 });

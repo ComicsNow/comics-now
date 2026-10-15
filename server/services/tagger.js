@@ -10,6 +10,8 @@ const {
   getTaggerEnabledSources,
   getMetronUser,
   getMetronPassword,
+  getGcdUser,
+  getGcdPassword,
   getComicVineApiKey,
   getGoogleBooksApiKey,
   getTaggerForceReprocess
@@ -33,7 +35,7 @@ function getScanLibrary() {
  * Empty fields are dropped so `metadata LIKE '%"StoryArc"%'` style queries stay accurate.
  */
 function buildTaggedDbMeta({ title, series, number, volume, publisher, info }) {
-  const { cleanDescription } = require('./metadata');
+  const { cleanDescription, cleanGenreAndTags } = require('./metadata');
   const m = {
     Title: title,
     Series: series,
@@ -49,7 +51,8 @@ function buildTaggedDbMeta({ title, series, number, volume, publisher, info }) {
     CoverArtist: info.CoverArtist || '',
     Editor: info.Editor || '',
     Summary: cleanDescription(info.Summary || ''),
-    Genre: info.Genre || '',
+    Genre: cleanGenreAndTags(info.Genre || ''),
+    Tags: cleanGenreAndTags(info.Tags || ''),
     Characters: info.Characters || '',
     Teams: info.Teams || '',
     Locations: info.Locations || '',
@@ -276,6 +279,8 @@ async function runComicTagger(options = {}) {
     const googleBooksApiKey = getGoogleBooksApiKey();
     const metronUser = getMetronUser();
     const metronPass = getMetronPassword();
+    const gcdUser = typeof getGcdUser === 'function' ? getGcdUser() : '';
+    const gcdPass = typeof getGcdPassword === 'function' ? getGcdPassword() : '';
 
     let publisherCodex = [];
     try {
@@ -417,6 +422,8 @@ async function runComicTagger(options = {}) {
             google_books_api_key: googleBooksApiKey,
             metron_user: metronUser,
             metron_pass: metronPass,
+            gcd_user: gcdUser,
+            gcd_pass: gcdPass,
             lower_threshold: lowerThreshold,
             upper_threshold: upperThreshold,
             enabled_sources: enabledSources,
@@ -816,6 +823,8 @@ async function searchExternal(source, query) {
   const googleBooksApiKey = getGoogleBooksApiKey();
   const metronUser = getMetronUser();
   const metronPass = getMetronPassword();
+  const gcdUser = typeof getGcdUser === 'function' ? getGcdUser() : '';
+  const gcdPass = typeof getGcdPassword === 'function' ? getGcdPassword() : '';
 
   const fetchRes = await fetch(`${serviceUrl}/api/search`, {
     method: 'POST',
@@ -826,7 +835,9 @@ async function searchExternal(source, query) {
       comicvine_api_key: comicvineApiKey,
       google_books_api_key: googleBooksApiKey,
       metron_user: metronUser,
-      metron_pass: metronPass
+      metron_pass: metronPass,
+      gcd_user: gcdUser,
+      gcd_pass: gcdPass
     })
   });
   if (!fetchRes.ok) {
