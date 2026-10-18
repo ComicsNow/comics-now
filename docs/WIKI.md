@@ -33,16 +33,21 @@ For the complete REST endpoint reference — every route under `/api/v1` with pa
    - [The 3 Metadata Storage Options](#the-3-metadata-storage-options)
 7. [The Tagging Engine & File Organization](#7-the-tagging-engine--file-organization)
    - [Multi-Source Metadata APIs](#multi-source-metadata-apis)
+   - [Grand Comics Database (GCD) & Cover Cascade](#grand-comics-database-gcd--cover-cascade)
    - [The Tag Comics Now! UI & Matching Workflow](#the-tag-comics-now-ui--matching-workflow)
    - [Automatic Renaming & Moving](#automatic-renaming--moving)
 8. [Smart Guided View & Reading Modes](#8-smart-guided-view--reading-modes)
    - [How Guided View Works (Deep Learning / ONNX)](#how-guided-view-works-deep-learning--onnx)
+   - [Modal Serverless GPU Acceleration (Cloud GPU Speedup)](#modal-serverless-gpu-acceleration-cloud-gpu-speedup)
    - [Admin-Generated, Community Shared](#admin-generated-community-shared)
    - [Reading Modes](#reading-modes)
    - [Display & Viewport Controls](#display--viewport-controls)
+   - [Fullscreen Thumbnail Filmstrip & Scrubber](#fullscreen-thumbnail-filmstrip--scrubber)
    - [Authoring & Editing Guided View with GVE Now!](#authoring--editing-guided-view-with-gve-now)
 9. [Reading Lists](#9-reading-lists)
    - [Creating & Managing Lists](#creating--managing-lists)
+   - [Interactive Continuity DAG View (Directed Acyclic Graph)](#interactive-continuity-dag-view-directed-acyclic-graph)
+   - [View Modes: Grid, List & DAG](#view-modes-grid-list--dag)
    - [Reordering Comics & Lists](#reordering-comics--lists)
    - [Syncing Lists to All Users (`syncToAll`)](#syncing-lists-to-all-users-synctoall)
    - [Bulk Operations & Import](#bulk-operations--import)
@@ -51,6 +56,7 @@ For the complete REST endpoint reference — every route under `/api/v1` with pa
     - [Cross-Device Reading Progress](#cross-device-reading-progress)
     - [The Downloads Queue](#the-downloads-queue)
     - [Installing as an Offline PWA](#installing-as-an-offline-pwa)
+    - [Active Connectivity Probing & Doze Self-Healing](#active-connectivity-probing--doze-self-healing)
 11. [UI Navigation, Views & Long-Press Menus](#11-ui-navigation-views--long-press-menus)
     - [Library Card View (Long-Press Actions)](#library-card-view-long-press-actions)
     - [Publisher View (Long-Press Actions)](#publisher-view-long-press-actions)
@@ -300,6 +306,17 @@ The tagger queries the following providers:
 - **Goodreads & Amazon**: Ideal for trade paperbacks, graphic novels, and ISBN lookups.
 - **Google Books, Blackwells, Waterstones, LCG**: Supplemental publisher and store indicia.
 
+### Grand Comics Database (GCD) & Cover Cascade
+Comics Now! includes full native support for querying the **Grand Comics Database (GCD)** — one of the largest non-profit historical comic archives:
+- **Authentication**: Optional GCD login credentials can be supplied under **Tag Comics Now! → Settings & Sources** to unlock member queries and higher rate limits.
+- **Tiered Rate Limiting**: The tagger automatically respects GCD's request throttling rules with automatic backoff and local disk caching to prevent API bans.
+- **3-Step Cover Cascade**: When identifying covers, the engine executes a prioritized multi-tier cascade:
+  1. **Primary**: High-resolution scans from **ComicVine**.
+  2. **Secondary**: Community scans from **Metron**.
+  3. **Fallback Archive**: Historical scans from **GCD**.
+  If a release lacks a cover on ComicVine or Metron, GCD fills the gap automatically.
+- **Metadata Sanitization**: Synopses and issue descriptions scraped from online sources are sanitized automatically, stripping promotional bookstore sales ads, ISBN dump lines, and distributor placeholders before writing to your database or ComicInfo.xml sidecars.
+
 ### Service Port
 The tagger listens on port `5000` by default — configurable via the `APP_PORT` environment variable (`APP_HOST` defaults to `0.0.0.0`). When embedded, Comics Now! spawns the tagger and proxies to it; change the port under **Tag Comics Now! → Settings & Sources → Service Port** and the app will spawn and proxy to the new port. For a standalone or sidecar tagger, set `APP_PORT` and point Comics Now! at the same port, or set `TAGGER_SERVICE_URL` (or `taggerServiceUrl` in `config.json`).
 
@@ -327,6 +344,64 @@ Comics Now! features an AI-driven panel detection pipeline:
   - `manga.onnx`: Optimized for Japanese manga layouts (right-to-left).
 - Analyzes page contrast, borders, and margins to compute exact panel coordinates (`[x, y, width, height]`) and speech bubble regions.
 
+### Modal Serverless GPU Acceleration (Cloud GPU Speedup)
+While local CPU detection runs smoothly on modern desktop processors, analyzing hundreds of pages with deep learning neural networks can take 30–60 seconds per issue on low-power servers, NAS hardware, or a Raspberry Pi.
+
+Comics Now! supports offloading panel and dialogue bubble detection to cloud **NVIDIA T4 GPUs** via [Modal](https://modal.com):
+
+| Feature | Local CPU Inference (ONNX) | Modal Serverless GPU (T4) |
+| :--- | :--- | :--- |
+| **Speed per Comic (24-32 pages)** | ~30 – 60 seconds | **~1 – 3 seconds** |
+| **Local CPU Load (Raspberry Pi)** | 100% (High thermal load) | **≤ 50% (Cool & responsive)** |
+| **Parallel Comic Processing** | 1 at a time (Sequential) | **2 comics simultaneously** |
+| **Failure Handling** | N/A | **Automatic fallback to local CPU** |
+
+#### Modal Free Tier & $30 Monthly Compute Credits
+Every Modal account includes **$30.00 of recurring free compute credits every calendar month**. Because a single comic costs approximately **$0.0005 to $0.001** of GPU compute time, Modal's free allowance enables analyzing **30,000+ comic pages (~1,500+ issues) each month completely free**.
+
+#### How to Add a $30 Budget Cap (Preventing Unexpected Charges)
+To guarantee that you never incur unexpected charges on your credit card beyond Modal's free compute credit:
+
+1. Log into your [Modal Dashboard](https://modal.com).
+2. Navigate to **Settings → Billing / Usage** (or **Workspace Settings → Usage Limits**).
+3. Under **Monthly Spending Limit**, enter:
+   ```text
+   $30.00
+   ```
+4. Set email notification alert thresholds (e.g. at **50%**, **80%**, and **100%**).
+5. Click **Save Changes**.
+
+Once this hard limit is reached, Modal immediately halts cloud function invocations instead of charging your card. Comics Now! detects the spend limit via live telemetry, displays a warning badge in the Admin UI, and automatically reverts to local CPU detection without interruption.
+
+> [!WARNING]
+> **User Responsibility & Billing Safeguards**: It is strictly your responsibility to configure your spending limits in your Modal account dashboard and monitor your usage. Comics Now! provides automated budget monitoring and safe fallbacks to local CPU, but cannot control third-party billing accounts or guarantee that third-party services will not bill you if you choose not to set a spend limit or configure a higher limit.
+
+#### Step-by-Step Setup in Comics Now!
+1. **Generate API Credentials**:
+   - In your Modal dashboard, go to **Settings → API Tokens**.
+   - Click **New Token** to generate a **Token ID** (`ak-...`) and **Token Secret** (`as-...`).
+2. **Configure via Web Admin UI**:
+   - Open Comics Now! and go to **Settings → Guided View**.
+   - Check **Use Modal GPU Acceleration**.
+   - Enter your **Token ID** and **Token Secret** (leave Environment as `main`).
+   - Click **Test Connection** — this validates your API credentials and fetches your real-time Modal credit balance.
+   - Click **⚡ Initialize Modal GPU Environment** — this performs a one-time deployment, creating a persistent Modal Volume (`comics-now-models`) and uploading the neural network models.
+   - Under **Processing Concurrency**, select **2 Comics in parallel (Modal GPU)**.
+   - Click **Save Settings**.
+3. **Alternative: Environment Variables (`.env` or Docker Compose)**:
+   ```bash
+   MODAL_TOKEN_ID="ak-..."
+   MODAL_TOKEN_SECRET="as-..."
+   MODAL_ENVIRONMENT="main"
+   ```
+
+#### Live Telemetry & Balance Monitoring
+In **Settings → Guided View**, Comics Now! displays a real-time status card showing:
+- **Available Credit**: Remaining free monthly allowance.
+- **Total Credits**: Overall account credit allotment ($30.00).
+- **Metered Cost**: Cloud GPU compute incurred during the active billing cycle.
+- **Billed Cost**: Any billed amount (remains $0.00 when the $30 cap is enforced).
+
 ### Admin-Generated, Community Shared
 - Panel detection is computationally intensive. Therefore, **generating Guided View is an Admin privilege** (via the comic card long-press menu or Comic Summary page).
 - Once computed, the panel maps are saved permanently in the database.
@@ -348,6 +423,12 @@ Switch between reading modes instantly in the reader overlay:
 - **Full Page Overview**: Double-tap in Guided View to view the full page before stepping to the next page's panels.
 - **E-Ink Anti-Ghosting Mode**: Toggle in the fullscreen toolbar cycles **Off → Monochrome → Color**, saved per device (Kindle, Kobo, Onyx Boox, and PocketBook are auto-detected on first visit). **Monochrome** applies a grayscale + contrast filter for black-and-white e-readers; **Color** boosts saturation for color e-paper displays. Both modes disable animations and flash the screen black on each page turn to prevent ghosting.
 - **Cinema Pan (Spreads)**: In Fullscreen, wide double-page spreads pan across automatically when they overflow the screen, starting once per displayed page (a re-render never restarts a pan you've stopped; navigating away and back re-arms it). A **Cinema Pan Spread** badge indicates the spread — tap it to toggle panning manually; spreads that already fit the screen don't pan.
+
+### Fullscreen Thumbnail Filmstrip & Scrubber
+When reading in fullscreen mode on touch tablets, phones, or desktop monitors:
+- **Horizontal Thumbnail Filmstrip**: Displays a touch-scrollable visual reel of all page thumbnails across the comic, allowing you to visually scan chapters, splash pages, and covers without leaving the reader.
+- **Precision Page Scrubber**: A bottom slider bar that lets you jump across 100+ pages smoothly with real-time page number feedback.
+- **Persistent Header Controls**: Fullscreen mode keeps the comic title and close/exit buttons permanently accessible at the top edge with calibrated z-index layering so zoom overlays never obscure navigation.
 
 ### Authoring & Editing Guided View with GVE Now!
 While Comics Now! automatically extracts panels and dialogue balloons via deep learning (`manga.onnx` and `western.onnx`), you can inspect, author, and fine-tune panel coordinates using the official companion application: **[GVE Now! (Guided View Editor)](https://github.com/ComicsNow/gve-now-editor)**.
@@ -373,9 +454,27 @@ Reading lists allow you to curate custom story arcs, crossovers, and reading ord
 2. Give your list a title (e.g. *"Civil War - Complete Chronology"*) and optional description.
 3. Add comics from any publisher or series directly using the **Add to List** option on any comic card.
 
+### Interactive Continuity DAG View (Directed Acyclic Graph)
+Reading lists in Comics Now! support a first-of-its-kind interactive **Continuity DAG visualizer**:
+- **Multi-Series Crossover Timelines**: When reading complex multi-title crossovers (e.g., *Crisis on Infinite Earths*, *Absolute Universe*, *Infinity Gauntlet*), the DAG computes reading flow, arranges comics into distinct parallel series lanes, and renders directional Bézier curves between narrative milestones.
+- **Fluid Zoom & Pan Navigation**: Navigate massive 100+ issue story arcs smoothly using mouse wheel zoom/pan on desktop or intuitive **pinch-to-zoom** and two-finger drag on mobile tablets and phones.
+- **Click-to-Read Graph Nodes**: Tap or click any comic node directly within the DAG canvas to inspect issue metadata, check read status, or immediately launch the reader.
+- **Live Search & Filter**: Instantly isolate specific character arcs or sub-series within massive reading lists using the live DAG search bar.
+
+### View Modes: Grid, List & DAG
+Every reading list features an instant 3-way segmented control at the top of the detail modal:
+1. **Grid View (`⊞`)**: Visual poster-forward cover grid showcasing high-resolution cover art with read progress badges.
+2. **List View (`☰`)**: Compact 3-line operational view designed for reading sessions:
+   - **Line 1**: Comic title, series name, and publication date.
+   - **Line 2**: Live reading status badge (completion tick, in-progress indicator, and exact percentage read).
+   - **Line 3**: Dynamic action buttons: **[▶ Read]** or **[▶ Resume]**, Mark as Read/Unread, and an interactive **Download** button with deletion confirmation.
+3. **DAG View (`🔀`)**: Fullscreen continuity map displaying narrative order flow.
+
 ### Reordering Comics & Lists
-- Open the reading list and drag-and-drop issues to set the exact chronological or crossover reading sequence.
-- Save the custom sequence via **Save Order**.
+- Click **Edit** to enter reordering mode.
+- Use the drag handles or up/down buttons on the left of each item to arrange issues into your desired narrative order.
+- To protect against accidental deletions, list deletion and issue removal buttons (`🗑️`) only appear while **Edit** mode is active.
+- Save changes via **Save Order** or discard with **Cancel**.
 
 ### Syncing Lists to All Users (`syncToAll`)
 - When an Administrator creates a curated list, they can toggle **Sync to All Users**.
@@ -412,6 +511,14 @@ Comics Now! is a full Progressive Web App:
 - **On Android**: In Chrome, tap the menu and select **Install App** or **Add to Home screen**.
 - **On Desktop (Chrome/Edge)**: Click the **Install** icon in the URL address bar.
 - Once installed, downloaded comics can be read completely offline with zero internet access.
+
+### Active Connectivity Probing & Doze Self-Healing
+On mobile devices (especially Android PWAs/WebAPKs), the operating system's battery optimization (Doze Mode) suspends network sockets when the screen locks. In standard PWAs, this causes browsers to get stuck reporting `navigator.onLine === false` even after reconnecting to Wi-Fi.
+
+Comics Now! incorporates an intelligent self-healing connectivity loop:
+- **High-Speed Health Probe (`/api/v1/health`)**: An unauthenticated, zero-overhead endpoint designed for sub-millisecond network verification.
+- **Wake-Up & Focus Re-Validation**: Whenever you unlock your phone or switch back to the PWA (`visibilitychange` and `focus` events), Comics Now! immediately probes the health endpoint.
+- **Auto-Recovery**: If the probe succeeds, the app clears any offline indicators, dispatches a live `online` event, and refreshes library and reading list data without requiring you to restart or kill the app.
 
 ---
 
