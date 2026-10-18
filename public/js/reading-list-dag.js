@@ -764,18 +764,32 @@ function hideNodeInspector(container) {
  */
 function launchComicReader(comicId) {
   let comic = typeof getComicById === 'function' ? getComicById(comicId) : null;
+  if (!comic && typeof window !== 'undefined' && typeof window.getComicById === 'function') {
+    comic = window.getComicById(comicId);
+  }
+  if (!comic && state && typeof state.getComicById === 'function') {
+    comic = state.getComicById(comicId);
+  }
+  if (!comic && currentDAGData && currentDAGData.nodes) {
+    const node = currentDAGData.nodes.find(n => n.id === comicId);
+    if (node) {
+      comic = { id: node.id, name: node.name, series: node.series, totalPages: node.totalPages, lastReadPage: node.lastReadPage };
+    }
+  }
+
   const listContext = activeContextList ? { readingListId: activeContextList.id, readingListName: activeContextList.name } : {};
 
-  if (comic && typeof global.openComicViewer === 'function') {
-    global.openComicViewer(comic, listContext);
-    if (typeof global.closeReadingListModal === 'function') {
-      global.closeReadingListModal();
-    }
-  } else if (typeof global.openComicViewer === 'function') {
-    // If not in memory state, pass minimal dummy comic with id
-    global.openComicViewer({ id: comicId }, listContext);
-    if (typeof global.closeReadingListModal === 'function') {
-      global.closeReadingListModal();
+  const openViewer = (typeof window !== 'undefined' && window.openComicViewer) ||
+                     (typeof state !== 'undefined' && state.openComicViewer) ||
+                     (typeof global !== 'undefined' && global.openComicViewer);
+  const closeModal = (typeof window !== 'undefined' && window.closeReadingListModal) ||
+                      (typeof state !== 'undefined' && state.closeReadingListModal) ||
+                      (typeof global !== 'undefined' && global.closeReadingListModal);
+
+  if (typeof openViewer === 'function') {
+    openViewer(comic || { id: comicId }, listContext);
+    if (typeof closeModal === 'function') {
+      closeModal();
     }
   }
 }

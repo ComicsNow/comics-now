@@ -5,7 +5,8 @@ import {
   getRelativePath,
   ICONS,
   rootFolderListContainer,
-  applyDisplayInfoToLibrary
+  applyDisplayInfoToLibrary,
+  getComicById
 } from './js/globals.js';
 
 import { registerRoutes } from './js/routes.js';
@@ -570,6 +571,7 @@ function showUserBadge() {
  * Open the reading list modal and refresh its contents
  */
 function openReadingListModal() {
+  isListEditMode = false;
   if (!global._isNavigatingFromRouter && global.router) {
     if (getRelativePath() !== '/reading-lists') {
       global.router.navigate('/reading-lists', true);
@@ -586,6 +588,7 @@ function openReadingListModal() {
  * Close the reading list modal
  */
 function closeReadingListModal() {
+  isListEditMode = false;
   const modal = document.getElementById('reading-list-modal');
   if (modal) {
     modal.classList.add('hidden');
@@ -624,8 +627,14 @@ async function refreshReadingListModal() {
 
   if (offlineBadge) offlineBadge.classList.toggle('hidden', !isOffline);
   if (editBtn) editBtn.classList.toggle('hidden', isListEditMode || isOffline);
-  if (saveBtn) saveBtn.classList.toggle('hidden', !isListEditMode);
-  if (cancelBtn) cancelBtn.classList.toggle('hidden', !isListEditMode);
+  if (saveBtn) {
+    saveBtn.classList.toggle('hidden', !isListEditMode);
+    saveBtn.hidden = !isListEditMode;
+  }
+  if (cancelBtn) {
+    cancelBtn.classList.toggle('hidden', !isListEditMode);
+    cancelBtn.hidden = !isListEditMode;
+  }
   if (createBtn) createBtn.classList.toggle('hidden', isOffline);
   if (importBtn) importBtn.classList.toggle('hidden', isOffline);
   if (buttonsSection) buttonsSection.classList.toggle('hidden', isListEditMode);
@@ -739,7 +748,7 @@ async function refreshReadingListModal() {
                 ${list.description ? `<p class="text-xs text-gray-400 line-clamp-1 mt-0.5">${escapeHtml(list.description)}</p>` : ''}
               </div>
             </div>
-            <button class="text-gray-600 hover:text-red-400 transition-colors p-1 delete-list-btn ${isListEditMode || isOffline ? 'hidden' : ''}" data-list-id="${escapeHtml(list.id)}" title="Delete List">
+            <button class="text-gray-600 hover:text-red-400 transition-colors p-1 delete-list-btn ${!isListEditMode || isOffline ? 'hidden' : ''}" data-list-id="${escapeHtml(list.id)}" title="Delete List" ${!isListEditMode || isOffline ? 'hidden' : ''}>
               <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
               </svg>
@@ -758,37 +767,37 @@ async function refreshReadingListModal() {
           </div>
 
           <!-- Action Icons -->
-          <div class="flex gap-2 items-center mt-2 ${isListEditMode ? 'opacity-50 pointer-events-none' : ''}">
+          <div class="flex gap-1 sm:gap-1.5 items-stretch mt-2 w-full max-w-full ${isListEditMode ? 'opacity-50 pointer-events-none' : ''}">
             ${isOffline ? '' : `
-              <button class="flex-1 flex items-center justify-center gap-2 bg-gray-700 hover:bg-gray-600 text-white text-xs font-bold py-2 px-3 rounded-lg transition-colors read-toggle-btn"
+              <button class="flex-1 min-w-0 h-[38px] flex items-center justify-center gap-1 bg-gray-700 hover:bg-gray-600 text-white text-xs font-bold px-1 rounded-lg transition-colors read-toggle-btn"
                       data-list-id="${escapeHtml(list.id)}"
                       data-current-status="${allRead}"
                       title="${allRead ? 'Mark as unread' : 'Mark as read'}">
-                <span class="opacity-70">${allRead ? '↩' : ICONS.READ}</span>
+                <span class="opacity-70 inline-flex items-center justify-center w-3.5 h-3.5 shrink-0 [&>svg]:w-3.5 [&>svg]:h-3.5 [&>svg]:shrink-0">${allRead ? '↩' : ICONS.READ}</span>
                 <span>${allRead ? 'Unread' : 'Read'}</span>
               </button>
             `}
 
-            <button class="flex-1 flex items-center justify-center gap-1.5 bg-gray-700 hover:bg-purple-900/60 hover:text-purple-300 text-white text-xs font-bold py-2 px-3 rounded-lg transition-colors dag-list-btn"
+            <button class="flex-1 min-w-0 h-[38px] flex items-center justify-center gap-1 bg-gray-700 hover:bg-purple-900/60 hover:text-purple-300 text-white text-xs font-bold px-1 rounded-lg transition-colors dag-list-btn"
                     data-list-id="${escapeHtml(list.id)}"
                     data-list-name="${escapeHtml(list.name)}"
                     title="View Continuity DAG">
-              <span>🔀</span>
+              <span class="inline-flex items-center justify-center w-3.5 h-3.5 shrink-0 text-xs leading-none">🔀</span>
               <span>DAG</span>
             </button>
 
-            <button class="flex-1 flex items-center justify-center gap-2 bg-gray-700 hover:bg-gray-600 text-white text-xs font-bold py-2 px-3 rounded-lg transition-colors download-list-btn"
+            <button class="flex-1 min-w-0 h-[38px] flex items-center justify-center gap-1 bg-gray-700 hover:bg-gray-600 text-white text-xs font-bold px-1 rounded-lg transition-colors download-list-btn"
                     data-list-id="${escapeHtml(list.id)}"
                     data-list-name="${escapeHtml(list.name)}"
                     title="Download all comics in this list">
-              <span class="opacity-70">${ICONS.DOWNLOAD}</span>
+              <span class="opacity-70 inline-flex items-center justify-center w-3.5 h-3.5 shrink-0 [&>svg]:w-3.5 [&>svg]:h-3.5 [&>svg]:shrink-0">${ICONS.DOWNLOAD}</span>
               <span>Save</span>
             </button>
 
-            <button class="flex-[1.5] flex items-center justify-center gap-2 ${allRead ? 'bg-blue-600 hover:bg-blue-700' : 'bg-purple-600 hover:bg-purple-700'} text-white text-xs font-bold py-2 px-4 rounded-lg transition-all shadow-lg play-list-btn"
+            <button class="flex-1 min-w-0 h-[38px] flex items-center justify-center gap-1 ${allRead ? 'bg-blue-600 hover:bg-blue-700' : 'bg-purple-600 hover:bg-purple-700'} text-white text-xs font-bold px-1 rounded-lg transition-all shadow-lg play-list-btn"
                     data-list-id="${escapeHtml(list.id)}"
                     title="${allRead ? 'Restart' : hasProgress ? 'Continue' : 'Play'}">
-              <span>${allRead ? '🔄' : '▶'}</span>
+              <span class="inline-flex items-center justify-center w-3.5 h-3.5 shrink-0 text-xs leading-none">${allRead ? '🔄' : '▶'}</span>
               <span>${allRead ? 'Restart' : hasProgress ? 'Resume' : 'Start'}</span>
             </button>
           </div>
@@ -1055,38 +1064,38 @@ async function showReadingListDetail(listId, listName, initialViewMode = null) {
   detailView.className = 'flex-1 overflow-y-auto p-4 sm:p-6';
 
   detailView.innerHTML = `
-    <div class="mb-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-      <div class="flex items-center gap-4 min-w-0">
-        <button id="back-to-lists-btn" class="bg-gray-700 hover:bg-gray-600 text-white p-2 rounded-full transition-all hover:scale-110 shadow-lg shrink-0" title="Back to lists">
+    <div class="mb-5 flex flex-col md:flex-row md:items-center justify-between gap-3 pb-3 border-b border-gray-700/60">
+      <div class="flex items-center gap-3 min-w-0">
+        <button id="back-to-lists-btn" class="shrink-0" title="Back to reading lists">
           <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
           </svg>
         </button>
         <div class="min-w-0">
-          <h2 class="text-2xl font-bold text-white flex items-center gap-2 truncate">
+          <h2 class="text-xl sm:text-2xl font-bold text-white flex items-center gap-2 truncate">
             <span class="text-purple-400 shrink-0">📚</span>
             <span class="truncate">${escapeHtml(listName)}</span>
           </h2>
-          <div class="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-gray-500 mt-0.5">
+          <div class="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-gray-400 mt-0.5">
             <span>Reading List Detail</span>
-            <span class="w-1 h-1 rounded-full bg-gray-700"></span>
+            <span class="w-1 h-1 rounded-full bg-gray-600"></span>
             <span id="list-item-count-badge">Loading...</span>
-            ${isOffline ? '<span class="w-1 h-1 rounded-full bg-gray-700"></span><span class="text-amber-400 font-semibold">Offline</span>' : ''}
+            ${isOffline ? '<span class="w-1 h-1 rounded-full bg-gray-600"></span><span class="text-amber-400 font-semibold">Offline</span>' : ''}
           </div>
         </div>
       </div>
-      <div class="flex items-center gap-2 flex-wrap">
+      <div class="flex items-center gap-2 flex-wrap sm:flex-nowrap shrink-0">
         <!-- View Mode Segmented Controls: Grid / List / DAG -->
-        <div class="flex items-center bg-gray-700/80 p-0.5 rounded-lg border border-gray-600/80 text-xs shadow-md">
-          <button id="view-mode-grid-btn" class="px-2.5 py-1.5 rounded-md font-bold transition-all flex items-center gap-1 ${viewMode === 'detailed' ? 'bg-purple-600 text-white shadow' : 'text-gray-300 hover:text-white'}" title="Grid View">
+        <div class="view-mode-segmented-control flex items-center bg-gray-900/80 p-1 rounded-lg border border-gray-700/80 text-xs shadow-inner">
+          <button id="view-mode-grid-btn" class="segmented-btn px-2.5 py-1.5 rounded-md font-bold transition-all flex items-center gap-1 ${viewMode === 'detailed' ? 'active-view-mode bg-purple-600 text-white shadow' : 'text-gray-300 hover:text-white'}" title="Grid View">
             <span>⊞</span>
             <span class="hidden sm:inline">Grid</span>
           </button>
-          <button id="view-mode-compact-btn" class="px-2.5 py-1.5 rounded-md font-bold transition-all flex items-center gap-1 ${viewMode === 'compact' ? 'bg-purple-600 text-white shadow' : 'text-gray-300 hover:text-white'}" title="Compact List View">
+          <button id="view-mode-compact-btn" class="segmented-btn px-2.5 py-1.5 rounded-md font-bold transition-all flex items-center gap-1 ${viewMode === 'compact' ? 'active-view-mode bg-purple-600 text-white shadow' : 'text-gray-300 hover:text-white'}" title="Compact List View">
             <span>☰</span>
             <span class="hidden sm:inline">List</span>
           </button>
-          <button id="view-mode-dag-btn" class="px-2.5 py-1.5 rounded-md font-bold transition-all flex items-center gap-1 ${viewMode === 'dag' ? 'bg-purple-600 text-white shadow' : 'text-gray-300 hover:text-white'}" title="Interactive Continuity DAG">
+          <button id="view-mode-dag-btn" class="segmented-btn px-2.5 py-1.5 rounded-md font-bold transition-all flex items-center gap-1 ${viewMode === 'dag' ? 'active-view-mode bg-purple-600 text-white shadow' : 'text-gray-300 hover:text-white'}" title="Interactive Continuity DAG">
             <span>🔀</span>
             <span class="hidden sm:inline">DAG</span>
           </button>
@@ -1104,14 +1113,24 @@ async function showReadingListDetail(listId, listName, initialViewMode = null) {
           <span>✏️</span>
           <span class="hidden sm:inline">Edit</span>
         </button>
-        <button id="save-order-btn" class="hidden bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-5 rounded-lg transition-all shadow-lg hover:shadow-green-900/40 text-xs">
-          Save Order
-        </button>
-        <button id="cancel-edit-btn" class="hidden bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-3 rounded-lg transition-all border border-gray-500 text-xs">
-          Cancel
-        </button>
       </div>
     </div>
+
+    <!-- Edit mode controls on a dedicated second line -->
+    <div id="reading-list-edit-actions" class="hidden flex items-center justify-between bg-gray-800/80 p-2.5 rounded-xl border border-gray-700/60 mb-4 shadow-md" hidden>
+      <div class="flex items-center gap-2">
+        <button id="save-order-btn" class="hidden bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg transition-all shadow-lg hover:shadow-green-900/40 text-xs flex items-center gap-1.5" hidden>
+          <span>💾</span>
+          <span>Save Order</span>
+        </button>
+        <button id="cancel-edit-btn" class="hidden bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-3 rounded-lg transition-all border border-gray-500 text-xs flex items-center gap-1.5" hidden>
+          <span>✕</span>
+          <span>Cancel</span>
+        </button>
+      </div>
+      <span class="text-[11px] text-gray-400 italic hidden sm:inline">Use ▲/▼ or drag to reorder reading list</span>
+    </div>
+
     <div id="list-detail-comics-container" class="space-y-2">
       <p class="text-sm text-gray-400 text-center py-8 animate-pulse italic">Loading your collection...</p>
     </div>
@@ -1128,10 +1147,13 @@ async function showReadingListDetail(listId, listName, initialViewMode = null) {
     const compactBtn = document.getElementById('view-mode-compact-btn');
     const dagBtn = document.getElementById('view-mode-dag-btn');
     const editBtn = document.getElementById('edit-list-btn');
+    const editActionsBar = document.getElementById('reading-list-edit-actions');
+    const saveBtn = document.getElementById('save-order-btn');
+    const cancelBtn = document.getElementById('cancel-edit-btn');
 
-    if (gridBtn) gridBtn.className = `px-2.5 py-1.5 rounded-md font-bold transition-all flex items-center gap-1 ${viewMode === 'detailed' ? 'bg-purple-600 text-white shadow' : 'text-gray-300 hover:text-white'}`;
-    if (compactBtn) compactBtn.className = `px-2.5 py-1.5 rounded-md font-bold transition-all flex items-center gap-1 ${viewMode === 'compact' ? 'bg-purple-600 text-white shadow' : 'text-gray-300 hover:text-white'}`;
-    if (dagBtn) dagBtn.className = `px-2.5 py-1.5 rounded-md font-bold transition-all flex items-center gap-1 ${viewMode === 'dag' ? 'bg-purple-600 text-white shadow' : 'text-gray-300 hover:text-white'}`;
+    if (gridBtn) gridBtn.className = `segmented-btn px-2.5 py-1.5 rounded-md font-bold transition-all flex items-center gap-1 ${viewMode === 'detailed' ? 'active-view-mode bg-purple-600 text-white shadow' : 'text-gray-300 hover:text-white'}`;
+    if (compactBtn) compactBtn.className = `segmented-btn px-2.5 py-1.5 rounded-md font-bold transition-all flex items-center gap-1 ${viewMode === 'compact' ? 'active-view-mode bg-purple-600 text-white shadow' : 'text-gray-300 hover:text-white'}`;
+    if (dagBtn) dagBtn.className = `segmented-btn px-2.5 py-1.5 rounded-md font-bold transition-all flex items-center gap-1 ${viewMode === 'dag' ? 'active-view-mode bg-purple-600 text-white shadow' : 'text-gray-300 hover:text-white'}`;
 
     if (modalContainer) {
       if (viewMode === 'dag') {
@@ -1144,12 +1166,65 @@ async function showReadingListDetail(listId, listName, initialViewMode = null) {
     }
 
     if (editBtn) {
-      editBtn.classList.toggle('hidden', viewMode === 'dag' || isOffline);
+      if (isEditMode || viewMode === 'dag' || isOffline) {
+        editBtn.classList.add('hidden');
+      } else {
+        editBtn.classList.remove('hidden');
+      }
+    }
+    if (editActionsBar) {
+      if (isEditMode) {
+        editActionsBar.classList.remove('hidden');
+        editActionsBar.hidden = false;
+      } else {
+        editActionsBar.classList.add('hidden');
+        editActionsBar.hidden = true;
+      }
+    }
+    if (saveBtn) {
+      if (isEditMode) {
+        saveBtn.classList.remove('hidden');
+        saveBtn.hidden = false;
+      } else {
+        saveBtn.classList.add('hidden');
+        saveBtn.hidden = true;
+      }
+    }
+    if (cancelBtn) {
+      if (isEditMode) {
+        cancelBtn.classList.remove('hidden');
+        cancelBtn.hidden = false;
+      } else {
+        cancelBtn.classList.add('hidden');
+        cancelBtn.hidden = true;
+      }
+    }
+  };
+
+  const exitEditMode = () => {
+    isEditMode = false;
+    const editBtn = document.getElementById('edit-list-btn');
+    const editActionsBar = document.getElementById('reading-list-edit-actions');
+    const saveBtn = document.getElementById('save-order-btn');
+    const cancelBtn = document.getElementById('cancel-edit-btn');
+    if (editBtn) editBtn.classList.toggle('hidden', viewMode === 'dag' || isOffline);
+    if (editActionsBar) {
+      editActionsBar.classList.add('hidden');
+      editActionsBar.hidden = true;
+    }
+    if (saveBtn) {
+      saveBtn.classList.add('hidden');
+      saveBtn.hidden = true;
+    }
+    if (cancelBtn) {
+      cancelBtn.classList.add('hidden');
+      cancelBtn.hidden = true;
     }
   };
 
   document.getElementById('view-mode-grid-btn')?.addEventListener('click', () => {
     if (viewMode === 'detailed') return;
+    exitEditMode();
     viewMode = 'detailed';
     localStorage.setItem('readingListViewMode', viewMode);
     updateViewModeControls();
@@ -1158,6 +1233,7 @@ async function showReadingListDetail(listId, listName, initialViewMode = null) {
 
   document.getElementById('view-mode-compact-btn')?.addEventListener('click', () => {
     if (viewMode === 'compact') return;
+    exitEditMode();
     viewMode = 'compact';
     localStorage.setItem('readingListViewMode', viewMode);
     updateViewModeControls();
@@ -1166,6 +1242,7 @@ async function showReadingListDetail(listId, listName, initialViewMode = null) {
 
   document.getElementById('view-mode-dag-btn')?.addEventListener('click', () => {
     if (viewMode === 'dag') return;
+    exitEditMode();
     viewMode = 'dag';
     localStorage.setItem('readingListViewMode', viewMode);
     updateViewModeControls();
@@ -1209,7 +1286,10 @@ async function showReadingListDetail(listId, listName, initialViewMode = null) {
 
       for (let index = 0; index < details.items.length; index++) {
         const item = details.items[index];
-        let comic = typeof global.getComicById === 'function' ? global.getComicById(item.comicId) : null;
+        let comic = (typeof getComicById === 'function' ? getComicById(item.comicId) : null) ||
+                    (typeof global.getComicById === 'function' ? global.getComicById(item.comicId) : null) ||
+                    (typeof window !== 'undefined' && typeof window.getComicById === 'function' ? window.getComicById(item.comicId) : null) ||
+                    (typeof state !== 'undefined' && typeof state.getComicById === 'function' ? state.getComicById(item.comicId) : null);
         if (!comic && typeof global.getOfflineComicRecordById === 'function') {
           try {
             const offlineRec = await global.getOfflineComicRecordById(item.comicId);
@@ -1240,42 +1320,80 @@ async function showReadingListDetail(listId, listName, initialViewMode = null) {
           status = 'in-progress';
         }
 
-        const isDownloaded = global.downloadedComicIds?.has(comic.id);
+        const isDownloaded = Boolean(
+          (global.downloadedComicIds && global.downloadedComicIds.has(comic.id)) ||
+          (state.downloadedComicIds && state.downloadedComicIds.has(comic.id)) ||
+          (typeof window !== 'undefined' && window.downloadedComicIds && window.downloadedComicIds.has(comic.id))
+        );
 
         // Render based on view mode
         if (viewMode === 'compact') {
-          // Compact view: minimal height, no progress bar
-          comicDiv.className = 'bg-gray-800/50 p-3 rounded-lg flex items-center gap-3 hover:bg-gray-700 transition-all border border-gray-700/50 hover:border-purple-500/30 group';
+          // Compact list view: 3 lines of structured info
+          comicDiv.className = 'bg-gray-800/60 p-3 sm:p-3.5 rounded-xl flex items-start gap-3 hover:bg-gray-800/90 transition-all border border-gray-700/60 hover:border-purple-500/40 group';
           comicDiv.innerHTML = `
             ${isEditMode ? `
-              <div class="flex flex-col gap-1 mr-1">
-                <button class="reorder-up-btn text-gray-500 hover:text-white p-0.5" title="Move Up">▲</button>
-                <button class="reorder-down-btn text-gray-500 hover:text-white p-0.5" title="Move Down">▼</button>
+              <div class="flex flex-col gap-1 self-center shrink-0 mr-1">
+                <button class="reorder-up-btn text-gray-400 hover:text-white p-1 hover:bg-gray-700 rounded transition-colors" title="Move Up">▲</button>
+                <button class="reorder-down-btn text-gray-400 hover:text-white p-1 hover:bg-gray-700 rounded transition-colors" title="Move Down">▼</button>
               </div>
             ` : ''}
-            <div class="shrink-0 flex items-center justify-center" style="width: 1.5rem; height: 1.5rem;">
-              <span class="${status === 'read' ? 'text-green-500' : status === 'in-progress' ? 'text-purple-400' : 'text-gray-600'} text-lg">
-                ${status === 'read' ? '●' : status === 'in-progress' ? '◐' : '○'}
-              </span>
+
+            <div class="flex-1 min-w-0 flex flex-col gap-1.5">
+              <!-- First line - name of comic -->
+              <div class="comic-title-line flex items-center gap-2">
+                <h4 class="text-sm sm:text-base font-bold text-gray-100 group-hover:text-purple-300 transition-colors truncate">
+                  ${escapeHtml(title)}
+                </h4>
+              </div>
+
+              <!-- Second line - progress icon, completed icon (if book completed), percentage read -->
+              <div class="comic-progress-line flex items-center gap-2 text-xs">
+                <span class="inline-flex items-center text-sm ${status === 'read' ? 'text-green-500' : status === 'in-progress' ? 'text-purple-400' : 'text-gray-500'}" title="${status}">
+                  ${status === 'read' ? '●' : status === 'in-progress' ? '◐' : '○'}
+                </span>
+                ${status === 'read' ? `
+                  <span class="comic-completed-badge inline-flex items-center gap-1 text-green-400 font-bold bg-green-950/70 border border-green-700/60 px-1.5 py-0.5 rounded text-[11px]" title="Book Completed">
+                    <span>✓</span>
+                    <span>Completed</span>
+                  </span>
+                ` : ''}
+                <span class="font-bold text-[11px] uppercase tracking-wide ${status === 'read' ? 'text-green-400' : status === 'in-progress' ? 'text-purple-400' : 'text-gray-400'}">
+                  ${progressPercent}% read
+                </span>
+                ${total > 0 ? `<span class="text-gray-500 text-[11px]">• Page ${last > 0 ? last + 1 : 0} of ${total}</span>` : ''}
+              </div>
+
+              <!-- Third line - resume/read, mark as read/unread, download buttons -->
+              ${!isEditMode ? `
+                <div class="comic-actions-line flex items-center gap-2 mt-1 pt-1.5 border-t border-gray-700/40">
+                  ${status === 'in-progress' ? `
+                    <button class="resume-comic-btn bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold py-1.5 px-3 rounded-lg transition-colors flex items-center gap-1.5 shadow" data-comic-id="${escapeHtml(item.comicId)}" title="Resume from page ${last + 1}">
+                      <span>▶</span>
+                      <span>Resume</span>
+                    </button>
+                  ` : `
+                    <button class="read-comic-btn ${status === 'read' ? 'bg-gray-700 hover:bg-gray-600 text-gray-200' : 'bg-purple-600 hover:bg-purple-500 text-white'} text-xs font-bold py-1.5 px-3 rounded-lg transition-colors flex items-center gap-1.5 shadow" data-comic-id="${escapeHtml(item.comicId)}" title="Read comic">
+                      <span>▶</span>
+                      <span>Read</span>
+                    </button>
+                  `}
+                  <button class="mark-read-btn bg-gray-700/80 hover:bg-gray-600 text-gray-300 hover:text-green-400 text-xs font-bold py-1.5 px-2.5 rounded-lg transition-colors flex items-center gap-1.5 border border-gray-600/60" title="${status === 'read' ? 'Mark as unread' : 'Mark as read'}" data-comic-id="${escapeHtml(item.comicId)}" data-status="${status}">
+                    <span>${status === 'read' ? '↩' : ICONS.READ}</span>
+                    <span class="hidden sm:inline">${status === 'read' ? 'Mark Unread' : 'Mark Read'}</span>
+                  </button>
+                  <button class="download-comic-btn ${isDownloaded ? 'bg-green-950/60 hover:bg-green-900/60 text-green-400 hover:text-green-300 border-green-700/60' : 'bg-gray-700/80 hover:bg-gray-600 text-gray-300 hover:text-blue-400 border-gray-600/60'} text-xs font-bold py-1.5 px-2.5 rounded-lg transition-colors flex items-center gap-1.5 border" title="${isDownloaded ? 'Delete from device' : 'Download comic'}" data-comic-id="${escapeHtml(item.comicId)}" data-is-downloaded="${isDownloaded}">
+                    <span>${isDownloaded ? ICONS.READ : ICONS.DOWNLOAD}</span>
+                    <span class="hidden sm:inline">${isDownloaded ? 'Downloaded' : 'Download'}</span>
+                  </button>
+                </div>
+              ` : ''}
             </div>
-            <div class="flex-1 min-w-0 flex items-center gap-2">
-              <p class="text-sm font-medium text-gray-200 truncate group-hover:text-white transition-colors">${escapeHtml(title)}</p>
-              ${isDownloaded ? `<span class="text-green-400 shrink-0 opacity-70" title="Downloaded">${ICONS.READ}</span>` : ''}
-            </div>
-            <div class="shrink-0 text-[10px] font-bold text-gray-500 bg-black/20 px-2 py-0.5 rounded uppercase tracking-tighter">
-              ${progressPercent}%
-            </div>
-            <div class="flex items-center gap-1 ml-2">
-              <button class="mark-read-btn ${isEditMode ? 'hidden' : ''} shrink-0 text-gray-500 hover:text-green-400 transition-colors p-1.5 hover:bg-green-500/10 rounded" title="${status === 'read' ? 'Mark as unread' : 'Mark as read'}" data-comic-id="${escapeHtml(item.comicId)}" data-status="${status}">
-                <span class="text-lg">${status === 'read' ? '↩' : ICONS.READ}</span>
-              </button>
-              <button class="download-comic-btn ${isEditMode ? 'hidden' : ''} block sm:hidden shrink-0 text-gray-500 hover:text-blue-400 transition-colors p-1.5 hover:bg-blue-500/10 rounded" title="Download comic" data-comic-id="${escapeHtml(item.comicId)}">
-                <span class="text-lg">${ICONS.DOWNLOAD}</span>
-              </button>
-              <button class="delete-comic-btn ${isEditMode || isOffline ? 'hidden' : ''} shrink-0 text-gray-600 hover:text-red-400 transition-colors p-1.5 hover:bg-red-500/10 rounded" title="Remove from list" data-comic-id="${escapeHtml(item.comicId)}">
+
+            ${isEditMode ? `
+              <button class="delete-comic-btn ${isOffline ? 'hidden' : ''} self-center shrink-0 text-red-400 hover:text-red-300 transition-colors p-2 hover:bg-red-500/10 rounded-lg ml-auto" title="Remove from list" data-comic-id="${escapeHtml(item.comicId)}">
                 <span class="text-lg">🗑</span>
               </button>
-            </div>
+            ` : ''}
           `;
         } else {
           // Grid view: comic cards with covers
@@ -1292,22 +1410,29 @@ async function showReadingListDetail(listId, listName, initialViewMode = null) {
             ? '<div class="status-banner status-in-progress">In Progress</div>'
             : '';
 
-          const downloadIndicatorGrid = isDownloaded
-            ? `<div class="absolute bottom-2 right-2 bg-gray-900/80 backdrop-blur p-1 rounded text-green-400 z-10" title="Downloaded">${ICONS.READ}</div>`
-            : '';
-
           comicDiv.innerHTML = `
             <div class="relative">
               ${isEditMode ? `
-                <div class="absolute top-2 left-2 z-20 flex items-center gap-1 bg-gray-900/80 backdrop-blur p-1.5 rounded-lg shadow-xl">
-                  <div class="flex flex-col gap-1">
+                <div class="absolute top-2 left-2 z-20 flex items-center gap-1 bg-gray-900/90 backdrop-blur p-1 rounded-lg shadow-xl">
+                  <div class="flex flex-col gap-0.5">
                     <button class="reorder-up-btn text-gray-400 hover:text-white p-0.5 transition-colors" title="Move Up">▲</button>
                     <button class="reorder-down-btn text-gray-400 hover:text-white p-0.5 transition-colors" title="Move Down">▼</button>
                   </div>
                 </div>
-              ` : ''}
+                <button class="delete-comic-btn absolute top-2 right-2 z-20 bg-gray-900/90 backdrop-blur p-1.5 rounded-lg text-red-500 hover:text-red-400 transition-all shadow-xl ${isOffline ? 'hidden' : ''}" title="Remove from list" data-comic-id="${escapeHtml(item.comicId)}">
+                  🗑
+                </button>
+              ` : `
+                ${!isLocal ? `
+                  <button class="mark-read-btn absolute top-2 left-2 z-10 bg-gray-900/80 backdrop-blur p-1.5 rounded-lg text-gray-300 hover:text-green-400 transition-all shadow-lg" title="${status === 'read' ? 'Mark as unread' : 'Mark as read'}" data-comic-id="${escapeHtml(item.comicId)}" data-status="${status}">
+                    ${status === 'read' ? '↩' : ICONS.READ}
+                  </button>
+                  <button class="download-comic-btn absolute top-2 right-2 z-10 bg-gray-900/80 backdrop-blur p-1.5 rounded-lg ${isDownloaded ? 'text-green-400 hover:text-green-300' : 'text-gray-300 hover:text-blue-400'} transition-all shadow-lg" title="${isDownloaded ? 'Delete from device' : 'Download comic'}" data-comic-id="${escapeHtml(item.comicId)}" data-is-downloaded="${isDownloaded}">
+                    ${isDownloaded ? ICONS.READ : ICONS.DOWNLOAD}
+                  </button>
+                ` : ''}
+              `}
               ${statusBanner}
-              ${!isLocal ? downloadIndicatorGrid : ''}
               <div class="aspect-2/3 w-full bg-gray-700 overflow-hidden flex items-center justify-center">
                 ${comic.thumbnailPath ? 
                   `<img src="${coverUrl}" alt="${escapeHtml(title)}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" loading="lazy">` :
@@ -1324,41 +1449,65 @@ async function showReadingListDetail(listId, listName, initialViewMode = null) {
               <div class="absolute bottom-0 left-0 right-0 h-1.5 bg-gray-900/50">
                 <div class="h-full ${status === 'read' ? 'bg-green-500' : 'bg-purple-600'} transition-all duration-500" style="width: ${progressPercent}%;"></div>
               </div>
+            </div>
+            <div class="p-3 grow flex flex-col justify-between min-w-0 gap-2">
+              <div>
+                <p class="text-sm font-bold text-white truncate leading-tight">${escapeHtml(title)}</p>
+                <div class="flex items-center gap-1.5 mt-1">
+                  <span class="text-[10px] font-bold uppercase tracking-tighter text-gray-500">${progressPercent}% COMPLETE</span>
+                </div>
+              </div>
               ${!isEditMode ? `
-                <div class="absolute top-2 right-2 flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                  ${!isLocal ? `
-                    <button class="mark-read-btn bg-gray-900/80 backdrop-blur p-2 rounded-lg text-gray-400 hover:text-green-400 transition-all shadow-xl" title="${status === 'read' ? 'Mark as unread' : 'Mark as read'}" data-comic-id="${escapeHtml(item.comicId)}" data-status="${status}">
-                      ${status === 'read' ? '↩' : ICONS.READ}
+                <div class="flex items-center gap-1.5 pt-1 mt-auto">
+                  ${status === 'in-progress' ? `
+                    <button class="resume-comic-btn w-full bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold py-1.5 px-2 rounded-md transition-colors flex items-center justify-center gap-1 shadow" data-comic-id="${escapeHtml(item.comicId)}" title="Resume from page ${last + 1}">
+                      <span>▶</span>
+                      <span>Resume</span>
                     </button>
-                  ` : ''}
-                  ${!isLocal ? `
-                    <button class="download-comic-btn block sm:hidden bg-gray-900/80 backdrop-blur p-2 rounded-lg text-gray-400 hover:text-blue-400 transition-all shadow-xl" title="Download comic" data-comic-id="${escapeHtml(item.comicId)}">
-                      ${ICONS.DOWNLOAD}
+                  ` : `
+                    <button class="read-comic-btn w-full ${status === 'read' ? 'bg-gray-700 hover:bg-gray-600 text-gray-200' : 'bg-purple-600 hover:bg-purple-500 text-white'} text-xs font-bold py-1.5 px-3 rounded-md transition-colors flex items-center justify-center gap-1.5 shadow" data-comic-id="${escapeHtml(item.comicId)}" title="Read comic">
+                      <span>▶</span>
+                      <span>Read</span>
                     </button>
-                  ` : ''}
-                  <button class="delete-comic-btn ${isEditMode || isOffline ? 'hidden' : ''} bg-gray-900/80 backdrop-blur p-2 rounded-lg text-red-500 hover:text-red-400 transition-all shadow-xl" title="Remove from list" data-comic-id="${escapeHtml(item.comicId)}">
-                    🗑
-                  </button>
+                  `}
                 </div>
               ` : ''}
             </div>
-            <div class="p-3 grow flex flex-col justify-center min-w-0">
-              <p class="text-sm font-bold text-white truncate leading-tight">${escapeHtml(title)}</p>
-              <div class="flex items-center gap-1.5 mt-1">
-                 <span class="text-[10px] font-bold uppercase tracking-tighter text-gray-500">${progressPercent}% COMPLETE</span>
-              </div>
-            </div>
           `;
+        }
+
+        function openComicReader(comicToOpen, startPage = null) {
+          if (typeof startPage === 'number') {
+            try {
+              sessionStorage.setItem(`progress_${comicToOpen.id}`, String(startPage));
+            } catch (err) {}
+          } else {
+            try {
+              sessionStorage.removeItem(`progress_${comicToOpen.id}`);
+            } catch (err) {}
+          }
+
+          const openViewer = (typeof window !== 'undefined' && window.openComicViewer) ||
+                             (typeof state !== 'undefined' && state.openComicViewer) ||
+                             (typeof global !== 'undefined' && global.openComicViewer);
+          const closeModal = (typeof window !== 'undefined' && window.closeReadingListModal) ||
+                              (typeof state !== 'undefined' && state.closeReadingListModal) ||
+                              (typeof global !== 'undefined' && global.closeReadingListModal);
+
+          if (typeof openViewer === 'function') {
+            openViewer(comicToOpen, { readingListId: listId, readingListName: listName });
+            if (typeof closeModal === 'function') {
+              closeModal();
+            }
+          }
         }
 
         // Click to open comic (only when not in edit mode)
         if (!isEditMode) {
           comicDiv.style.cursor = 'pointer';
-          comicDiv.addEventListener('click', () => {
-            if (typeof global.openComicViewer === 'function') {
-              global.openComicViewer(comic, { readingListId: listId, readingListName: listName });
-              closeReadingListModal();
-            }
+          comicDiv.addEventListener('click', (e) => {
+            if (e.target.closest('button')) return;
+            openComicReader(comic);
           });
         }
 
@@ -1387,6 +1536,24 @@ async function showReadingListDetail(listId, listName, initialViewMode = null) {
             });
           }
         }
+
+        // Read button handler
+        const readBtns = comicDiv.querySelectorAll('.read-comic-btn');
+        readBtns.forEach(btn => {
+          btn.addEventListener('click', (e) => {
+            e.stopPropagation(); // Prevent opening comic from card click
+            openComicReader(comic, 0);
+          });
+        });
+
+        // Resume button handler
+        const resumeBtns = comicDiv.querySelectorAll('.resume-comic-btn');
+        resumeBtns.forEach(btn => {
+          btn.addEventListener('click', (e) => {
+            e.stopPropagation(); // Prevent opening comic from card click
+            openComicReader(comic, null); // Resume from saved lastReadPage
+          });
+        });
 
         // Mark as read/unread button handler
         const markReadBtn = comicDiv.querySelector('.mark-read-btn');
@@ -1436,11 +1603,38 @@ async function showReadingListDetail(listId, listName, initialViewMode = null) {
           downloadBtn.addEventListener('click', async (e) => {
             e.stopPropagation(); // Prevent opening comic
 
-            if (typeof global.downloadComic === 'function') {
-              await global.downloadComic(comic, downloadBtn);
+            const isCurrentlyDownloaded = downloadBtn.dataset.isDownloaded === 'true' ||
+              Boolean(
+                (global.downloadedComicIds && global.downloadedComicIds.has(comic.id)) ||
+                (state.downloadedComicIds && state.downloadedComicIds.has(comic.id)) ||
+                (typeof window !== 'undefined' && window.downloadedComicIds && window.downloadedComicIds.has(comic.id))
+              );
+
+            if (isCurrentlyDownloaded) {
+              if (confirm(`Delete "${title}" from your device?`)) {
+                downloadBtn.disabled = true;
+                const deleteFn = global.deleteOfflineComic || window.deleteOfflineComic || state.deleteOfflineComic;
+                if (typeof deleteFn === 'function') {
+                  await deleteFn(comic.id);
+                } else {
+                  console.warn('deleteOfflineComic function not available');
+                }
+                global.downloadedComicIds?.delete(comic.id);
+                state.downloadedComicIds?.delete(comic.id);
+                if (typeof window !== 'undefined' && window.downloadedComicIds) {
+                  window.downloadedComicIds.delete(comic.id);
+                }
+                await renderComics();
+              }
             } else {
-              console.error('downloadComic function not available');
-              alert('Download functionality is not available. Please refresh the page.');
+              if (typeof global.downloadComic === 'function') {
+                await global.downloadComic(comic, downloadBtn);
+              } else if (typeof window.downloadSeries === 'function') {
+                window.downloadSeries([comic], downloadBtn);
+              } else {
+                console.error('downloadComic function not available');
+                alert('Download functionality is not available. Please refresh the page.');
+              }
             }
           });
         }
@@ -1525,8 +1719,21 @@ async function showReadingListDetail(listId, listName, initialViewMode = null) {
     }
     isEditMode = true;
     document.getElementById('edit-list-btn').classList.add('hidden');
-    document.getElementById('save-order-btn').classList.remove('hidden');
-    document.getElementById('cancel-edit-btn').classList.remove('hidden');
+    const editActionsBar = document.getElementById('reading-list-edit-actions');
+    const saveBtn = document.getElementById('save-order-btn');
+    const cancelBtn = document.getElementById('cancel-edit-btn');
+    if (editActionsBar) {
+      editActionsBar.classList.remove('hidden');
+      editActionsBar.hidden = false;
+    }
+    if (saveBtn) {
+      saveBtn.classList.remove('hidden');
+      saveBtn.hidden = false;
+    }
+    if (cancelBtn) {
+      cancelBtn.classList.remove('hidden');
+      cancelBtn.hidden = false;
+    }
     renderComics();
   });
 
@@ -1543,10 +1750,7 @@ async function showReadingListDetail(listId, listName, initialViewMode = null) {
 
       const result = await global.ReadingLists.reorderComics(listId, newOrder);
       if (result.ok) {
-        isEditMode = false;
-        document.getElementById('edit-list-btn').classList.remove('hidden');
-        document.getElementById('save-order-btn').classList.add('hidden');
-        document.getElementById('cancel-edit-btn').classList.add('hidden');
+        exitEditMode();
         renderComics();
       } else {
         alert('Failed to save new order. Please try again.');
@@ -1559,15 +1763,12 @@ async function showReadingListDetail(listId, listName, initialViewMode = null) {
 
   // Cancel button handler
   document.getElementById('cancel-edit-btn').addEventListener('click', () => {
-    isEditMode = false;
-    document.getElementById('edit-list-btn').classList.remove('hidden');
-    document.getElementById('save-order-btn').classList.add('hidden');
-    document.getElementById('cancel-edit-btn').classList.add('hidden');
+    exitEditMode();
     renderComics();
   });
 
   // Initial render
-  renderComics();
+  await renderComics();
 }
 
 /**
