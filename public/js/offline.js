@@ -55,12 +55,37 @@ async function initializeOfflineFeatures() {
 
     global.addEventListener('offline', () => {
       OfflineStatus.updateOfflineIndicator();
+      // On mobile network handover, verify if connectivity is actually lost
+      if (typeof OfflineStatus.checkServerConnectivity === 'function') {
+        OfflineStatus.checkServerConnectivity().catch(() => {});
+      }
+    });
+
+    // Proactively probe and self-heal connectivity when the user unlocks or resumes the PWA
+    if (typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', () => {
+        if (!document.hidden && typeof OfflineStatus.checkServerConnectivity === 'function') {
+          OfflineStatus.checkServerConnectivity().catch(() => {});
+        }
+      });
+    }
+
+    global.addEventListener('focus', () => {
+      if (typeof OfflineStatus.checkServerConnectivity === 'function') {
+        OfflineStatus.checkServerConnectivity().catch(() => {});
+      }
     });
 
     // Note: Since DOMContentLoaded might have already fired, we check document.readyState
     const onDOMReady = () => {
       OfflineStatus.updateOfflineIndicator();
-      setInterval(() => OfflineStatus.updateOfflineIndicator(), 5000);
+      setInterval(() => {
+        OfflineStatus.updateOfflineIndicator();
+        // If the app is flagged as offline, probe server connectivity to break the Android Doze deadlock
+        if (typeof OfflineStatus.isAppOnline === 'function' && !OfflineStatus.isAppOnline()) {
+          OfflineStatus.checkServerConnectivity().catch(() => {});
+        }
+      }, 5000);
     };
 
     if (document.readyState === 'loading') {
@@ -70,7 +95,10 @@ async function initializeOfflineFeatures() {
     }
 
     setInterval(() => {
-      if (navigator.onLine !== false) {
+      const isOnline = typeof OfflineStatus.isAppOnline === 'function'
+        ? OfflineStatus.isAppOnline()
+        : navigator.onLine !== false;
+      if (isOnline) {
         OfflineStatus.enhancedBackgroundSync().catch(error => {
           
         });

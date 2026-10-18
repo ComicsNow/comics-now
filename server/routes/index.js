@@ -100,6 +100,7 @@ function createApiRouter(deps) {
   // Public routes
   const publicRouter = express.Router();
   require('./public/auth')(publicRouter, extendedDeps);
+  require('./public/health')(publicRouter, extendedDeps);
   router.use(publicRouter);
   
   // Extract user routes
