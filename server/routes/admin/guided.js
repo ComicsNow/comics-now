@@ -38,11 +38,126 @@ module.exports = function attach(router, deps) {
       await saveSetting(guidedReader.SETTINGS_KEYS.scheduleEnabled, scheduleEnabled);
       await saveSetting(guidedReader.SETTINGS_KEYS.scheduleInterval, scheduleInterval);
       await saveSetting(guidedReader.SETTINGS_KEYS.scheduleUnit, scheduleUnit);
+
+      if (body.useModal !== undefined) {
+        await saveSetting(guidedReader.SETTINGS_KEYS.useModal, !!body.useModal);
+      }
+      if (body.modalTokenId !== undefined) {
+        await saveSetting(guidedReader.SETTINGS_KEYS.modalTokenId, String(body.modalTokenId).trim());
+      }
+      if (body.modalTokenSecret !== undefined && String(body.modalTokenSecret).trim() !== '') {
+        await saveSetting(guidedReader.SETTINGS_KEYS.modalTokenSecret, String(body.modalTokenSecret).trim());
+      }
+      if (body.modalEnvironment !== undefined) {
+        await saveSetting(guidedReader.SETTINGS_KEYS.modalEnvironment, String(body.modalEnvironment).trim());
+      }
+      if (body.concurrency !== undefined) {
+        const conc = Math.min(Math.max(Number(body.concurrency) || 2, 1), 2);
+        await saveSetting(guidedReader.SETTINGS_KEYS.concurrency, conc);
+      }
+
       await guidedReader.applySettingsChanged();
 
-      res.json({ ok: true, settings: { autoOnAdd, scheduleEnabled, scheduleInterval, scheduleUnit } });
+      const savedSettings = await guidedReader.getSettings();
+      res.json({ ok: true, settings: savedSettings });
     } catch (e) {
       res.status(400).json({ ok: false, message: formatErrorMessage(e, req, 'Failed to save guided settings') });
+    }
+  });
+
+  router.get('/api/v1/guided/modal-credits', async (req, res) => {
+    try {
+      const detector = deps.modalDetector || (guidedReader && guidedReader.modalDetector) || require('../../services/modal-detector');
+      const settings = await guidedReader.getSettings();
+
+      let modalTokenSecret = '';
+      if (deps.dbGet) {
+        const row = await deps.dbGet('SELECT value FROM settings WHERE key = ?', [guidedReader.SETTINGS_KEYS.modalTokenSecret]);
+        try { modalTokenSecret = row ? JSON.parse(row.value) : ''; } catch { modalTokenSecret = row?.value || ''; }
+      }
+
+      const result = await detector.checkCredits({
+        modalTokenId: settings.modalTokenId,
+        modalTokenSecret,
+        modalEnvironment: settings.modalEnvironment
+      });
+      res.json(result);
+    } catch (e) {
+      res.status(500).json({ ok: false, error: formatErrorMessage(e, req, 'Failed to check Modal credits') });
+    }
+  });
+
+  router.get('/api/v1/guided/modal-status', async (req, res) => {
+    try {
+      const detector = deps.modalDetector || (guidedReader && guidedReader.modalDetector) || require('../../services/modal-detector');
+      const settings = await guidedReader.getSettings();
+
+      let modalTokenSecret = '';
+      if (deps.dbGet) {
+        const row = await deps.dbGet('SELECT value FROM settings WHERE key = ?', [guidedReader.SETTINGS_KEYS.modalTokenSecret]);
+        try { modalTokenSecret = row ? JSON.parse(row.value) : ''; } catch { modalTokenSecret = row?.value || ''; }
+      }
+
+      const result = await detector.checkEnvironment({
+        modalTokenId: settings.modalTokenId,
+        modalTokenSecret,
+        modalEnvironment: settings.modalEnvironment
+      });
+      res.json(result);
+    } catch (e) {
+      res.status(500).json({ ok: false, error: formatErrorMessage(e, req, 'Failed to check Modal environment') });
+    }
+  });
+
+  router.post('/api/v1/guided/modal-setup', async (req, res) => {
+    try {
+      const body = req.body || {};
+      const detector = deps.modalDetector || (guidedReader && guidedReader.modalDetector) || require('../../services/modal-detector');
+      const settings = await guidedReader.getSettings();
+
+      const modalTokenId = body.modalTokenId !== undefined ? body.modalTokenId : settings.modalTokenId;
+      const modalEnvironment = body.modalEnvironment !== undefined ? body.modalEnvironment : settings.modalEnvironment;
+
+      let modalTokenSecret = body.modalTokenSecret;
+      if ((modalTokenSecret === undefined || modalTokenSecret === '') && deps.dbGet) {
+        const row = await deps.dbGet('SELECT value FROM settings WHERE key = ?', [guidedReader.SETTINGS_KEYS.modalTokenSecret]);
+        try { modalTokenSecret = row ? JSON.parse(row.value) : ''; } catch { modalTokenSecret = row?.value || ''; }
+      }
+
+      const result = await detector.setupEnvironment({
+        modalTokenId,
+        modalTokenSecret,
+        modalEnvironment
+      });
+      res.json(result);
+    } catch (e) {
+      res.status(500).json({ ok: false, error: formatErrorMessage(e, req, 'Failed to setup Modal environment') });
+    }
+  });
+
+  router.post('/api/v1/guided/modal-test', async (req, res) => {
+    try {
+      const body = req.body || {};
+      const detector = deps.modalDetector || (guidedReader && guidedReader.modalDetector) || require('../../services/modal-detector');
+      const settings = await guidedReader.getSettings();
+
+      const modalTokenId = body.modalTokenId !== undefined ? body.modalTokenId : settings.modalTokenId;
+      const modalEnvironment = body.modalEnvironment !== undefined ? body.modalEnvironment : settings.modalEnvironment;
+
+      let modalTokenSecret = body.modalTokenSecret;
+      if ((modalTokenSecret === undefined || modalTokenSecret === '') && deps.dbGet) {
+        const row = await deps.dbGet('SELECT value FROM settings WHERE key = ?', [guidedReader.SETTINGS_KEYS.modalTokenSecret]);
+        try { modalTokenSecret = row ? JSON.parse(row.value) : ''; } catch { modalTokenSecret = row?.value || ''; }
+      }
+
+      const result = await detector.checkCredits({
+        modalTokenId,
+        modalTokenSecret,
+        modalEnvironment
+      });
+      res.json(result);
+    } catch (e) {
+      res.status(400).json({ ok: false, error: formatErrorMessage(e, req, 'Failed to test Modal connection') });
     }
   });
 
@@ -85,7 +200,8 @@ module.exports = function attach(router, deps) {
   // Skip only the currently-processing comic; the rest of the queue continues.
   router.post('/api/v1/guided/cancel-current', (req, res) => {
     try {
-      const cancelled = guidedReader.cancelCurrent();
+      const comicId = req.body?.id || req.query?.id || null;
+      const cancelled = guidedReader.cancelCurrent(comicId);
       res.json({ ok: true, cancelled });
     } catch (e) {
       res.status(400).json({ ok: false, message: formatErrorMessage(e, req, 'Failed to cancel current job') });

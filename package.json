@@ -29,9 +29,10 @@
     "build:css": "tailwindcss -i ./styles/tailwind.css -o ./public/tailwind.css --minify",
     "prepack": "npm run build:css && npm run build",
     "test": "jest",
+    "test:modal": "node scripts/run-modal-tests.js",
     "test:watch": "jest --watch",
     "test:e2e": "playwright test",
-    "test:all": "npm run test && npm run test:e2e",
+    "test:all": "npm run test && npm run test:modal && npm run test:e2e",
     "postinstall": "node scripts/check-dependencies.js",
     "mcp": "bash mcp/run.sh"
   },
