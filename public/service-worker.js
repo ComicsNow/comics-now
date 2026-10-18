@@ -86,6 +86,11 @@ self.addEventListener('fetch', event => {
     return;
   }
 
+  // HEALTH CHECK BYPASS: Let browser handle connectivity health probes directly
+  if (url.pathname.includes('/api/v1/health')) {
+    return;
+  }
+
   // SPECIAL CACHE: Comic Pages, Thumbnails, and Guided View JSON (DOWNLOADS_CACHE_NAME)
   const isComicPage = url.pathname.includes('/api/v1/comics/pages/image');
   const isThumbnail = url.pathname.includes('/thumbnails/');
