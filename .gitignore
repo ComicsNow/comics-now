@@ -61,7 +61,13 @@ pnpm-lock.yaml
 pnpm-workspace.yaml
 .pnpm-store/
 
-# MCP virtual environment
+# Virtual environments
+.venv/
+venv/
 mcp/.venv
 mcp/.venv/
+
+# Modal test fixtures (binary archives)
+scripts/modal/tests/fixtures/*.cbz
+scripts/modal/tests/fixtures/*.cbr
 

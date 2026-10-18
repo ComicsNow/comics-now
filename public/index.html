@@ -411,6 +411,80 @@
                 </div>
               </div>
 
+              <!-- Modal Cloud GPU Acceleration -->
+              <div class="pt-3 border-t border-gray-700">
+                <h5 class="text-md font-semibold mb-2">Cloud GPU Acceleration (Modal)</h5>
+                <label class="flex items-start gap-2 cursor-pointer mb-3">
+                  <input type="checkbox" id="guided-use-modal" class="w-4 h-4 mt-1">
+                  <span>
+                    <span class="font-medium">Use Modal GPU Acceleration</span>
+                    <span class="block text-xs text-gray-400">Offload panel and speech bubble detection to cloud GPUs (Modal T4) for fast processing (~1-2s per batch). Automatically falls back to local CPU ONNX detection if Modal encounters an error or reaches its spend limit.</span>
+                  </span>
+                </label>
+
+                <!-- Modal Configuration & Credit Status -->
+                <div id="guided-modal-panel" class="ml-6 space-y-3 hidden">
+                  <!-- Credit Display Card -->
+                  <div id="guided-modal-credit-card" class="bg-gray-800/80 border border-gray-600 rounded-lg p-3 text-sm">
+                    <div class="flex items-center justify-between mb-2">
+                      <div class="flex items-center gap-2">
+                        <span class="font-semibold text-gray-200">Modal Balance & Credits</span>
+                        <span id="guided-modal-badge" class="text-xs px-2 py-0.5 rounded-full bg-gray-700 text-gray-300">Checking…</span>
+                      </div>
+                      <button type="button" id="guided-modal-refresh-btn" class="text-xs text-red-400 hover:text-red-300 transition-colors">Refresh</button>
+                    </div>
+                    <div id="guided-modal-credit-details" class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs text-gray-300">
+                      <div>Available Credit: <span id="guided-modal-available" class="font-semibold text-green-400">–</span></div>
+                      <div>Total Credits: <span id="guided-modal-total-credits" class="font-semibold">–</span></div>
+                      <div>Metered Cost: <span id="guided-modal-metered" class="font-semibold text-amber-400">–</span></div>
+                      <div>Billed Cost: <span id="guided-modal-billed" class="font-semibold text-red-400">–</span></div>
+                    </div>
+                    <div id="guided-modal-credit-msg" class="text-xs text-gray-400 mt-2"></div>
+                    <div id="guided-modal-setup-banner" class="hidden mt-2 p-2 bg-amber-950/60 border border-amber-700/50 rounded text-xs text-amber-200 flex items-center justify-between">
+                      <span>First-time setup required: Neural network models need to be uploaded to your Modal storage.</span>
+                      <button type="button" id="guided-modal-banner-setup-btn" class="ml-2 bg-amber-600 hover:bg-amber-500 text-black font-semibold px-2.5 py-1 rounded text-xs transition-colors shrink-0">Setup Now</button>
+                    </div>
+                  </div>
+
+                  <!-- Modal Authentication Credentials -->
+                  <div class="space-y-2">
+                    <div class="text-xs font-semibold text-gray-300 uppercase tracking-wide">Modal Authentication</div>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      <div>
+                        <label for="guided-modal-token-id" class="block text-xs text-gray-400 mb-1">Token ID (optional if ~/.modal.toml exists)</label>
+                        <input type="text" id="guided-modal-token-id" placeholder="ak-..." class="w-full bg-gray-700 text-white p-2 rounded-lg text-xs focus:outline-hidden focus:ring-2 focus:ring-red-500 font-mono">
+                      </div>
+                      <div>
+                        <label for="guided-modal-token-secret" class="block text-xs text-gray-400 mb-1">Token Secret</label>
+                        <input type="password" id="guided-modal-token-secret" placeholder="••••••••" class="w-full bg-gray-700 text-white p-2 rounded-lg text-xs focus:outline-hidden focus:ring-2 focus:ring-red-500 font-mono">
+                      </div>
+                    </div>
+                    <div>
+                      <label for="guided-modal-env" class="block text-xs text-gray-400 mb-1">Environment / Profile (optional)</label>
+                      <input type="text" id="guided-modal-env" placeholder="main" class="w-full sm:w-1/2 bg-gray-700 text-white p-2 rounded-lg text-xs focus:outline-hidden focus:ring-2 focus:ring-red-500">
+                    </div>
+                    <div class="flex items-center gap-2 pt-1 flex-wrap">
+                      <button type="button" id="guided-modal-test-btn" class="bg-gray-700 hover:bg-gray-600 text-white text-xs font-medium py-1.5 px-3 rounded-lg transition-colors">Test Connection</button>
+                      <button type="button" id="guided-modal-setup-btn" class="bg-red-600 hover:bg-red-500 text-white text-xs font-medium py-1.5 px-3 rounded-lg transition-colors hidden">⚡ Initialize Modal GPU Environment</button>
+                      <span id="guided-modal-test-feedback" class="text-xs"></span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Concurrency Setting -->
+              <div class="pt-3 border-t border-gray-700">
+                <h5 class="text-md font-semibold mb-2">Processing Concurrency</h5>
+                <label for="guided-concurrency" class="block text-xs text-gray-400 mb-1">Max parallel comics during detection</label>
+                <div class="flex items-center gap-3">
+                  <select id="guided-concurrency" class="bg-gray-700 text-white p-2 rounded-lg text-sm focus:outline-hidden focus:ring-2 focus:ring-red-500">
+                    <option value="1">1 Comic at a time (Sequential)</option>
+                    <option value="2" selected>2 Comics in parallel (Modal GPU)</option>
+                  </select>
+                  <span class="text-xs text-gray-400">Processes 2 comics simultaneously while capping Raspberry Pi CPU usage &le; 50%. (Clamped to 1 if Modal GPU is disabled).</span>
+                </div>
+              </div>
+
               <div class="flex justify-end pt-2">
                 <button type="submit" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-full transition-colors">Save Settings</button>
               </div>

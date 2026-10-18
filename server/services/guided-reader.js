@@ -2,12 +2,18 @@ const { dbAll, dbGet, dbRun, getReadingPrefMaps, resolveReadingModes } = require
 const { log, guidedLog } = require('../logger');
 const { getComicsDirectories } = require('../config');
 const panelDetector = require('./panel-detector');
+const modalDetector = require('./modal-detector');
 
 const SETTINGS_KEYS = {
   autoOnAdd: 'guided.autoOnAdd',
   scheduleEnabled: 'guided.scheduleEnabled',
   scheduleInterval: 'guided.scheduleInterval',
-  scheduleUnit: 'guided.scheduleUnit'
+  scheduleUnit: 'guided.scheduleUnit',
+  useModal: 'guided.useModal',
+  modalTokenId: 'guided.modalTokenId',
+  modalTokenSecret: 'guided.modalTokenSecret',
+  modalEnvironment: 'guided.modalEnvironment',
+  concurrency: 'guided.concurrency'
 };
 
 const state = {
@@ -15,12 +21,25 @@ const state = {
   isCancelled: false,   // cancel the whole batch: stop worker + clear queue
   cancelCurrent: false, // skip just the in-flight comic, then continue
   current: null,        // { id, name, index, total }
+  activeComics: new Map(), // comicId -> { id, name, path, cancel, workerIndex }
+  activeWorkers: [],
+  spawnWorkers: null,
   queue: [],            // array of comic rows
   startedAt: null,
   lastFinishedAt: null,
   lastError: null,
   scheduleTimer: null
 };
+
+function getEffectiveConcurrency(settings) {
+  if (!settings || !settings.useModal) return 1;
+  const c = Number(settings.concurrency);
+  return (c === 1) ? 1 : 2;
+}
+
+function setQueueForTest(items) {
+  state.queue = Array.isArray(items) ? [...items] : [];
+}
 
 async function getSetting(key, fallback) {
   try {
@@ -33,11 +52,17 @@ async function getSetting(key, fallback) {
 }
 
 async function getSettings() {
+  const modalSecret = await getSetting(SETTINGS_KEYS.modalTokenSecret, '');
   return {
     autoOnAdd: !!(await getSetting(SETTINGS_KEYS.autoOnAdd, false)),
     scheduleEnabled: !!(await getSetting(SETTINGS_KEYS.scheduleEnabled, false)),
     scheduleInterval: Number(await getSetting(SETTINGS_KEYS.scheduleInterval, 24)) || 24,
-    scheduleUnit: await getSetting(SETTINGS_KEYS.scheduleUnit, 'hours')
+    scheduleUnit: await getSetting(SETTINGS_KEYS.scheduleUnit, 'hours'),
+    useModal: !!(await getSetting(SETTINGS_KEYS.useModal, false)),
+    modalTokenId: (await getSetting(SETTINGS_KEYS.modalTokenId, '')) || '',
+    hasModalSecret: !!modalSecret,
+    modalEnvironment: (await getSetting(SETTINGS_KEYS.modalEnvironment, '')) || '',
+    concurrency: Number(await getSetting(SETTINGS_KEYS.concurrency, 2)) || 2
   };
 }
 
@@ -55,9 +80,16 @@ async function getStatusCounts() {
 async function getStatus() {
   const settings = await getSettings();
   const counts = await getStatusCounts();
+  const active = Array.from(state.activeComics.values()).map(c => ({
+    id: c.id,
+    name: c.name,
+    path: c.path,
+    workerIndex: c.workerIndex
+  }));
   return {
     isRunning: state.isRunning,
     current: state.current,
+    active,
     queueLength: state.queue.length,
     startedAt: state.startedAt,
     lastFinishedAt: state.lastFinishedAt,
@@ -130,17 +162,54 @@ async function buildQueue(scope = null) {
   return queue;
 }
 
-async function processComic(comic) {
+async function processComic(comic, options = {}) {
   const type = comic.type || 'western';
   guidedLog('INFO', `   model: ${type}`);
   const startedAt = Date.now();
-  const result = await panelDetector.processComic(comic.id, comic.path, type, {
-    isCancelled: () => state.isCancelled || state.cancelCurrent
-  });
+  const settings = await getSettings();
+  const isCancelledFn = typeof options.isCancelled === 'function'
+    ? options.isCancelled
+    : () => state.isCancelled || state.cancelCurrent;
+
+  let result;
+  let usedModal = false;
+
+  if (settings.useModal) {
+    try {
+      guidedLog('INFO', `   [Modal] Attempting GPU detection via Modal...`);
+      const secret = await getSetting(SETTINGS_KEYS.modalTokenSecret, '');
+      if (typeof modalDetector.ensureEnvironmentReady === 'function') {
+        await modalDetector.ensureEnvironmentReady({
+          modalTokenId: settings.modalTokenId,
+          modalTokenSecret: secret,
+          modalEnvironment: settings.modalEnvironment
+        }, guidedLog);
+      }
+      result = await modalDetector.processComic(comic.id, comic.path, type, {
+        isCancelled: isCancelledFn,
+        modalTokenId: settings.modalTokenId,
+        modalTokenSecret: secret,
+        modalEnvironment: settings.modalEnvironment
+      });
+      usedModal = true;
+      guidedLog('INFO', `   ✓ Modal GPU detection succeeded`);
+    } catch (modalErr) {
+      if (isCancelledFn()) throw modalErr;
+      guidedLog('WARN', `   ⚠ Modal GPU detection unavailable (${modalErr.message}). Falling back to local CPU processing...`);
+      result = await panelDetector.processComic(comic.id, comic.path, type, {
+        isCancelled: isCancelledFn
+      });
+    }
+  } else {
+    result = await panelDetector.processComic(comic.id, comic.path, type, {
+      isCancelled: isCancelledFn
+    });
+  }
+
   const secs = Math.round((Date.now() - startedAt) / 1000);
   guidedLog('INFO', `   pages ${result.pagesProcessed}/${result.pageCount}` +
     (result.pageFailures ? ` (${result.pageFailures} failed)` : '') +
-    ` · ${result.panels} panels · ${secs}s`);
+    ` · ${result.panels} panels · ${secs}s` + (usedModal ? ' (Modal GPU)' : ' (CPU)'));
   return result;
 }
 
@@ -152,56 +221,113 @@ async function runWorker() {
   state.lastError = null;
 
   try {
-    guidedLog('INFO', `Worker started. Initial queue: ${state.queue.length} comics`);
+    const settings = await getSettings();
+    const initialConcurrency = getEffectiveConcurrency(settings);
+    guidedLog('INFO', `Worker started. Initial queue: ${state.queue.length} comics (concurrency: ${initialConcurrency})`);
 
-    while (state.queue.length > 0 && !state.isCancelled) {
-      const comic = state.queue[0]; // Peek at first item
-      const total = state.queue.length;
-      state.cancelCurrent = false;  // fresh per-item skip flag
+    state.activeWorkers = [];
 
-      state.current = {
-        id: comic.id,
-        name: comic.name,
-        path: comic.path,
-        index: 1,
-        total: total
-      };
+    async function workerTask(workerIndex) {
+      while (!state.isCancelled) {
+        const curSettings = await getSettings();
+        const maxConcurrency = getEffectiveConcurrency(curSettings);
+        if (workerIndex >= maxConcurrency) {
+          guidedLog('INFO', `Worker slot ${workerIndex + 1} retired (concurrency adjusted to ${maxConcurrency})`);
+          break;
+        }
 
-      guidedLog('INFO', `Processing: ${comic.name} (${total} remaining in queue)`);
+        if (state.queue.length === 0) {
+          break;
+        }
 
-      try {
-        await dbRun(
-          `UPDATE comics SET guidedViewStatus = 'processing', guidedViewError = NULL WHERE id = ?`,
-          [comic.id]
-        );
-        const result = await processComic(comic);
-        await dbRun(
-          `UPDATE comics SET guidedViewStatus = 'completed', guidedViewError = NULL, guidedViewPath = ? WHERE id = ?`,
-          [result.outputPath || null, comic.id]
-        );
-        guidedLog('INFO', `   ✓ Completed (${result.panels} panels)`);
-      } catch (err) {
-        if (state.isCancelled || state.cancelCurrent) {
-          // Not a real failure — the user skipped this comic. Leave it undone
-          // (pending) so it can be re-run later.
+        const comic = state.queue.shift();
+        if (!comic) break;
+
+        const totalRemaining = state.queue.length;
+        const activeItem = {
+          id: comic.id,
+          name: comic.name,
+          path: comic.path,
+          workerIndex,
+          isCancelled: false
+        };
+        state.activeComics.set(comic.id, activeItem);
+
+        state.current = {
+          id: comic.id,
+          name: comic.name,
+          path: comic.path,
+          index: 1,
+          total: totalRemaining + state.activeComics.size
+        };
+
+        guidedLog('INFO', `Processing: ${comic.name} (${totalRemaining} remaining in queue)`);
+
+        try {
           await dbRun(
-            `UPDATE comics SET guidedViewStatus = 'pending', guidedViewError = NULL WHERE id = ?`,
+            `UPDATE comics SET guidedViewStatus = 'processing', guidedViewError = NULL WHERE id = ?`,
             [comic.id]
-          ).catch(() => {});
-          guidedLog('WARN', `   ⦸ Cancelled: ${comic.name}`);
-        } else {
-          await dbRun(
-            `UPDATE comics SET guidedViewStatus = 'failed', guidedViewError = ? WHERE id = ?`,
-            [String(err.message || err).slice(0, 500), comic.id]
           );
-          guidedLog('ERROR', `   ✗ Failed: ${err.message || err}`);
+          const result = await processComic(comic, {
+            isCancelled: () => state.isCancelled || state.cancelCurrent || activeItem.isCancelled
+          });
+          if (!result || (result.panels === 0 && (result.pageCount > 0 || result.pagesProcessed > 0))) {
+            throw new Error('Detection completed with 0 panels');
+          }
+          await dbRun(
+            `UPDATE comics SET guidedViewStatus = 'completed', guidedViewError = NULL, guidedViewPath = ? WHERE id = ?`,
+            [result.outputPath || null, comic.id]
+          );
+          guidedLog('INFO', `   ✓ Completed (${result.panels} panels)`);
+        } catch (err) {
+          if (state.isCancelled || state.cancelCurrent || activeItem.isCancelled) {
+            await dbRun(
+              `UPDATE comics SET guidedViewStatus = 'pending', guidedViewError = NULL WHERE id = ?`,
+              [comic.id]
+            ).catch(() => {});
+            guidedLog('WARN', `   ⦸ Cancelled: ${comic.name}`);
+          } else {
+            await dbRun(
+              `UPDATE comics SET guidedViewStatus = 'failed', guidedViewError = ? WHERE id = ?`,
+              [String(err.message || err).slice(0, 500), comic.id]
+            );
+            guidedLog('ERROR', `   ✗ Failed: ${err.message || err}`);
+          }
+        } finally {
+          state.activeComics.delete(comic.id);
+          if (state.activeComics.size === 0) {
+            state.current = null;
+          } else {
+            const nextActive = state.activeComics.values().next().value;
+            state.current = {
+              id: nextActive.id,
+              name: nextActive.name,
+              path: nextActive.path,
+              index: 1,
+              total: state.queue.length + state.activeComics.size
+            };
+          }
         }
       }
-
-      state.queue.shift(); // Remove processed item
-      state.cancelCurrent = false; // consumed; keep going to the next item
     }
-    
+
+    state.spawnWorkers = function(targetConcurrency) {
+      while (state.activeWorkers.length < targetConcurrency && state.queue.length > 0 && !state.isCancelled) {
+        const slot = state.activeWorkers.length;
+        const p = workerTask(slot).finally(() => {
+          const idx = state.activeWorkers.indexOf(p);
+          if (idx !== -1) state.activeWorkers.splice(idx, 1);
+        });
+        state.activeWorkers.push(p);
+      }
+    };
+
+    state.spawnWorkers(initialConcurrency);
+
+    while (state.activeWorkers.length > 0) {
+      await Promise.all([...state.activeWorkers]);
+    }
+
     if (state.isCancelled) {
       guidedLog('WARN', `Worker stopped due to cancellation. ${state.queue.length} items remain in queue.`);
     }
@@ -213,6 +339,9 @@ async function runWorker() {
   } finally {
     state.isRunning = false;
     state.current = null;
+    state.activeComics.clear();
+    state.activeWorkers = [];
+    state.spawnWorkers = null;
     state.lastFinishedAt = Date.now();
     await dbRun(
       "UPDATE comics SET guidedViewStatus = 'pending' WHERE guidedViewStatus = 'processing'"
@@ -234,6 +363,9 @@ async function startRun() {
 
   if (!state.isRunning) {
     runWorker().catch(err => log('ERROR', 'GUIDED', `runWorker rejected: ${err.message}`));
+  } else if (typeof state.spawnWorkers === 'function') {
+    const settings = await getSettings();
+    state.spawnWorkers(getEffectiveConcurrency(settings));
   }
   return true;
 }
@@ -269,25 +401,46 @@ async function startRunForScope(type, target, options = {}) {
 
   if (!state.isRunning) {
     runWorker().catch(err => log('ERROR', 'GUIDED', `runWorker(scope) rejected: ${err.message}`));
+  } else if (typeof state.spawnWorkers === 'function') {
+    const settings = await getSettings();
+    state.spawnWorkers(getEffectiveConcurrency(settings));
   }
   return true;
 }
 
 // Skip only the comic currently being processed; the worker then continues with
-// the rest of the queue.
-function cancelCurrent() {
-  if (!state.isRunning || !state.current) return false;
+// the rest of the queue. Can optionally skip a specific comic by id.
+function cancelCurrent(comicId = null) {
+  if (!state.isRunning) return false;
+  if (comicId) {
+    const active = state.activeComics.get(comicId);
+    if (active) {
+      active.isCancelled = true;
+      guidedLog('WARN', `Skipping current job: ${active.name}`);
+      return true;
+    }
+    return false;
+  }
   state.cancelCurrent = true;
-  guidedLog('WARN', `Skipping current job: ${state.current.name}`);
+  for (const active of state.activeComics.values()) {
+    active.isCancelled = true;
+  }
+  const name = state.current ? state.current.name : 'active job(s)';
+  guidedLog('WARN', `Skipping current job: ${name}`);
   return true;
 }
 
 // Cancel the entire batch: drop every queued job and stop the worker after the
-// in-flight comic unwinds.
+// in-flight comics unwind.
 function cancelAll() {
   const cleared = state.queue.length;
   state.queue = [];
-  if (state.isRunning) state.isCancelled = true;
+  if (state.isRunning) {
+    state.isCancelled = true;
+    for (const active of state.activeComics.values()) {
+      active.isCancelled = true;
+    }
+  }
   dbRun("UPDATE comics SET guidedViewStatus = 'pending' WHERE guidedViewStatus = 'processing'").catch(() => {});
   guidedLog('WARN', `Cancel-all requested: cleared ${cleared} queued job(s); stopping current item.`);
   return state.isRunning || cleared > 0;
@@ -352,6 +505,13 @@ async function scheduleNextRun() {
 
 async function applySettingsChanged() {
   await scheduleNextRun();
+  if (state.isRunning && typeof state.spawnWorkers === 'function') {
+    const settings = await getSettings();
+    const targetConcurrency = getEffectiveConcurrency(settings);
+    if (state.activeWorkers.length < targetConcurrency) {
+      state.spawnWorkers(targetConcurrency);
+    }
+  }
 }
 
 async function initialize() {
@@ -381,7 +541,12 @@ module.exports = {
   cancelAll,
   getStatus,
   getSettings,
+  processComic,
   onLibraryScanComplete,
   applySettingsChanged,
-  SETTINGS_KEYS
+  SETTINGS_KEYS,
+  modalDetector,
+  getEffectiveConcurrency,
+  setQueueForTest,
+  runWorker
 };

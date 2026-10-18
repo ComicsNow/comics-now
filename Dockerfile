@@ -24,11 +24,13 @@ RUN npm run build
 # Prune development dependencies to keep the image lightweight
 RUN npm prune --omit=dev
 
-# Install Python dependencies for internal tagger in a virtual environment
+# Install Python dependencies for internal tagger and modal in a virtual environment
 RUN python3 -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
+COPY scripts/requirements-modal.txt ./scripts/
 RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
-    pip install --no-cache-dir -r tagger/requirements.txt
+    pip install --no-cache-dir -r tagger/requirements.txt && \
+    pip install --no-cache-dir -r scripts/requirements-modal.txt
 
 # Runtime stage
 FROM node:20-bookworm-slim

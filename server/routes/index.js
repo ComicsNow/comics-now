@@ -62,7 +62,8 @@ function createApiRouter(deps) {
     getAllReadingPreferences,
     setReadingPreference,
     getReadingPrefMaps,
-    resolveReadingModes
+    resolveReadingModes,
+    modalDetector: require('../services/modal-detector')
   };
 
   // Middleware wrappers to prevent blocking static SPA routes that fall through
