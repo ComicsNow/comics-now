@@ -18,6 +18,10 @@ let selectedListIds = new Set();
  * @returns {boolean}
  */
 export function isOffline() {
+  const status = typeof window !== 'undefined' ? (window.OfflineStatus || window) : null;
+  if (status && typeof status.isAppOnline === 'function') {
+    return !status.isAppOnline();
+  }
   return typeof navigator !== 'undefined' && navigator && navigator.onLine === false;
 }
 

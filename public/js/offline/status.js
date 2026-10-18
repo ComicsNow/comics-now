@@ -183,9 +183,76 @@ export function findComicInLibraryById(targetId) {
   return null;
 }
 
+let lastKnownOnlineState = typeof navigator !== 'undefined' ? navigator.onLine !== false : true;
+let activeProbePromise = null;
+
+export function setLastKnownOnlineState(val) {
+  lastKnownOnlineState = Boolean(val);
+}
+
+export function isAppOnline() {
+  if (lastKnownOnlineState === true) return true;
+  if (typeof navigator !== 'undefined' && navigator.onLine) return true;
+  return false;
+}
+
+export async function checkServerConnectivity({ timeout = 3000, force = false } = {}) {
+  if (activeProbePromise && !force) return activeProbePromise;
+
+  activeProbePromise = (async () => {
+    const apiBaseUrl = state.API_BASE_URL || (typeof window !== 'undefined' ? window.API_BASE_URL : '') || '';
+    const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+    const timeoutId = controller && typeof setTimeout === 'function' ? setTimeout(() => controller.abort(), timeout) : null;
+
+    try {
+      const url = `${apiBaseUrl}/api/v1/health?_t=${Date.now()}`;
+      const res = await fetch(url, {
+        method: 'GET',
+        cache: 'no-store',
+        signal: controller?.signal
+      });
+
+      if (res && (res.ok || res.status === 200)) {
+        const wasOffline = lastKnownOnlineState === false;
+        lastKnownOnlineState = true;
+        updateOfflineIndicator();
+        if (wasOffline && typeof window !== 'undefined' && typeof window.dispatchEvent === 'function') {
+          window.dispatchEvent(new Event('online'));
+        }
+        return true;
+      }
+    } catch (err) {
+      // Network probe failed
+    } finally {
+      if (timeoutId && typeof clearTimeout === 'function') clearTimeout(timeoutId);
+      activeProbePromise = null;
+    }
+
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+      lastKnownOnlineState = false;
+      updateOfflineIndicator();
+    }
+    return false;
+  })();
+
+  return activeProbePromise;
+}
+
 export function updateOfflineIndicator() {
   const offlineIndicator = document.getElementById('offline-indicator');
-  const isOffline = typeof navigator !== 'undefined' && navigator.onLine === false;
+  const navOffline = typeof navigator !== 'undefined' && navigator.onLine === false;
+  
+  // If navigator says offline but last known state was online, don't immediately lock into offline mode:
+  // give a grace period and probe the server in the background
+  let isOffline = navOffline;
+  if (lastKnownOnlineState === true && navOffline) {
+    isOffline = false;
+    checkServerConnectivity();
+  } else if (lastKnownOnlineState === false) {
+    isOffline = true;
+  } else if (lastKnownOnlineState === true && !navOffline) {
+    isOffline = false;
+  }
   
   if (offlineIndicator) {
     if (isOffline) {
@@ -196,7 +263,10 @@ export function updateOfflineIndicator() {
   }
   
   // Toggle class on body for CSS-based hiding of UI elements
-  document.body.classList.toggle('is-offline', isOffline);
+  if (document && document.body && document.body.classList) {
+    document.body.classList.toggle('is-offline', isOffline);
+  }
+  return isOffline;
 }
 
 export async function mergeOfflineStatusesIntoLibrary() {
@@ -531,6 +601,9 @@ export const OfflineStatus = {
   mergeOfflineStatusesIntoLibrary,
   enhancedBackgroundSync,
   saveStatusToDB,
+  setLastKnownOnlineState,
+  isAppOnline,
+  checkServerConnectivity,
 };
 
 // Expose on state & window for transitional compatibility

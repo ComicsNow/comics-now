@@ -12,6 +12,7 @@ import {
 import { registerRoutes } from './js/routes.js';
 import { hideAdminUI } from './js/utils/admin-ui.js';
 import { renderReadingListDAG } from './js/reading-list-dag.js';
+import { isAppOnline, checkServerConnectivity } from './js/offline/status.js';
 
 // Side-effect imports to load and register all other ES Modules in order
 import './js/reading-list-dag.js';
@@ -162,7 +163,7 @@ function resolveAppConfig() {
 }
 
 function showOfflineLibraryUnavailableMessage() {
-  const offline = navigator.onLine === false;
+  const offline = typeof isAppOnline === 'function' ? !isAppOnline() : navigator.onLine === false;
   const message = offline
     ? 'Offline library unavailable. Connect to the server while online at least once to sync your comics for offline use.'
     : 'Unable to load the comics library. Check that the server is running and reachable.';
@@ -423,7 +424,7 @@ async function loadLibraryOfflineFirst() {
       }
     }
 
-    const isOffline = navigator.onLine === false;
+    const isOffline = typeof isAppOnline === 'function' ? !isAppOnline() : navigator.onLine === false;
     let hasLibraryData = Boolean(cachedLibrary);
 
     if (!cachedLibrary && isOffline) {
@@ -440,6 +441,16 @@ async function loadLibraryOfflineFirst() {
         if (!hasLibraryData) {
           showOfflineLibraryUnavailableMessage();
         }
+      }
+    } else {
+      // If we initially loaded in offline mode, probe server in the background
+      // to automatically break out of any stale Android Doze offline lock
+      if (typeof checkServerConnectivity === 'function') {
+        checkServerConnectivity().then(online => {
+          if (online && typeof fetchLibraryFromServer === 'function') {
+            fetchLibraryFromServer().catch(() => {});
+          }
+        }).catch(() => {});
       }
     }
 
@@ -611,7 +622,7 @@ async function refreshReadingListModal() {
   const listsContainer = document.getElementById('reading-lists-container');
   if (!listsContainer) return;
 
-  const isOffline = typeof navigator !== 'undefined' && navigator && navigator.onLine === false;
+  const isOffline = typeof isAppOnline === 'function' ? !isAppOnline() : (typeof navigator !== 'undefined' && navigator && navigator.onLine === false);
   if (isOffline) {
     isListEditMode = false;
   }
@@ -1035,7 +1046,7 @@ async function showReadingListDetail(listId, listName, initialViewMode = null) {
   if (!modalContent) return;
 
   const modalContainer = modal?.querySelector('.bg-gray-800');
-  const isOffline = typeof navigator !== 'undefined' && navigator && navigator.onLine === false;
+  const isOffline = typeof isAppOnline === 'function' ? !isAppOnline() : (typeof navigator !== 'undefined' && navigator && navigator.onLine === false);
 
   // View mode state (detailed, compact, or dag)
   let viewMode = initialViewMode || localStorage.getItem('readingListViewMode') || 'detailed';
