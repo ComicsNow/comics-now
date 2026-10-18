@@ -19,9 +19,11 @@ function getPythonBin() {
       return candidate;
     }
   }
-  const defaultVenv = '/home/raza/projects/guided-backfill/.venv/bin/python3';
-  if (fs.existsSync(defaultVenv)) {
-    return defaultVenv;
+  if (process.env.MODAL_VENV_PATH) {
+    const venvBin = path.join(process.env.MODAL_VENV_PATH, 'bin/python3');
+    if (fs.existsSync(venvBin)) {
+      return venvBin;
+    }
   }
   return 'python3';
 }

@@ -193,5 +193,43 @@ def test_gcd_resolve_skips_nn_candidates(monkeypatch):
     assert meta.get("number") == "1"
 
 
+def test_gcd_search_multi_rejects_ssrf_issue_urls(monkeypatch):
+    from tagger_app.sources import gcd
+    series_resp = {
+        "results": [{
+            "genre": "Superhero",
+            "active_issues": [
+                "http://169.254.169.254/latest/meta-data/",
+                "https://attacker.com/steal-creds",
+                "https://www.comics.org/api/issue/999/",
+                "http://localhost:3000/internal-api"
+            ]
+        }]
+    }
+
+    fetched_urls = []
+    def fake_get(url, *args, **kwargs):
+        fetched_urls.append(url)
+        class Resp:
+            status_code = 200
+            def json(self):
+                if "series/name" in url:
+                    return series_resp
+                if "issue/999" in url:
+                    return {"series_name": "Safe Series", "number": "1"}
+                return {}
+        return Resp()
+
+    monkeypatch.setattr("requests.get", fake_get)
+    results = gcd.search_gcd_multi("Safe Series")
+    # Verify that ONLY the legitimate comics.org URL was requested and SSRF targets were blocked
+    assert "http://169.254.169.254/latest/meta-data/" not in fetched_urls
+    assert "https://attacker.com/steal-creds" not in fetched_urls
+    assert "http://localhost:3000/internal-api" not in fetched_urls
+    assert "https://www.comics.org/api/issue/999/" in fetched_urls
+    assert len(results) == 1
+
+
+
 
 

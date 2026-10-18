@@ -18,8 +18,8 @@ LOCAL_MODAL_DIR = str(pathlib.Path(__file__).parent / "modal")
 if os.path.exists(LOCAL_MODAL_DIR) and LOCAL_MODAL_DIR not in sys.path:
     sys.path.insert(0, LOCAL_MODAL_DIR)
 
-BACKFILL_DIR = os.environ.get("MODAL_BACKFILL_DIR", "/home/raza/projects/guided-backfill")
-if os.path.exists(BACKFILL_DIR) and BACKFILL_DIR not in sys.path:
+BACKFILL_DIR = os.environ.get("MODAL_BACKFILL_DIR")
+if BACKFILL_DIR and os.path.exists(BACKFILL_DIR) and BACKFILL_DIR not in sys.path:
     sys.path.append(BACKFILL_DIR)
 
 
@@ -209,7 +209,8 @@ def process_comic(comic_id: str, comic_path: str, comic_type: str, output_dir: s
 
     out_dir_path = pathlib.Path(output_dir)
     out_dir_path.mkdir(parents=True, exist_ok=True)
-    sidecar_path = out_dir_path / f"{comic_id}.json"
+    safe_comic_id = pathlib.Path(str(comic_id)).name
+    sidecar_path = out_dir_path / f"{safe_comic_id}.json"
 
     result_payload = {
         "comicId": comic_id,

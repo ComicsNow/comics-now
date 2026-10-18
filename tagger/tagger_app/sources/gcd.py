@@ -152,6 +152,14 @@ def search_gcd_multi(query, gcd_user=None, gcd_pass=None, comicvine_api_key=None
             for s in results[:3]:
                 series_genre = s.get('genre') or ''
                 for iss_url in s.get("active_issues", [])[:3]:
+                    if not iss_url:
+                        continue
+                    from urllib.parse import urlparse
+                    parsed = urlparse(str(iss_url))
+                    if parsed.scheme != "https" or parsed.netloc not in ("www.comics.org", "comics.org"):
+                        print(f"[-] GCD security: skipped untrusted issue URL {iss_url}")
+                        continue
+
                     cached_iss = tagger_cache.get_entity("gcd_issue", iss_url)
                     if cached_iss is not None:
                         num = str(cached_iss.get("number") or "")
