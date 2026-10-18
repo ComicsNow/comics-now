@@ -22,10 +22,11 @@
 
 Most digital comic servers were built a decade ago as basic file browsers. **Comics Now!** re-imagines your comic library as a modern, intelligent web application designed for desktops, tablets, and phones:
 
-* 🧠 **Smart Guided View**: Automatically detects panels and dialogue bubbles using deep learning neural networks (`manga.onnx` and speech bubble detectors) for an immersive panel-by-panel reading experience. Features incremental scoping, auto-detection on library scan, and visual authoring/fine-tuning via the companion editor **[GVE Now!](https://github.com/ComicsNow/gve-now-editor)**.
-* 🖼️ **Fullscreen Page Preview Grid & WebP Cache**: Navigate issues visually with a dynamic, lazy-loaded page preview grid. Full-resolution WebP on-the-fly transcoding backed by an LRU disk cache cuts bandwidth and memory while keeping 1:1 pixel coordinates for panel zoom.
+* 🧠 **Smart Guided View & Modal Cloud GPU Acceleration**: Automatically detects panels and dialogue bubbles using deep learning neural networks (`manga.onnx` and speech bubble detectors) for an immersive panel-by-panel reading experience. Features instant cloud GPU acceleration via **Modal** (~1–2s per batch on NVIDIA T4s), incremental scoping, auto-detection on library scan, and visual authoring via **[GVE Now!](https://github.com/ComicsNow/gve-now-editor)**.
+* 🔀 **Interactive Continuity DAG View**: Visualize complex multi-series crossover timelines as interactive Directed Acyclic Graphs with curved Bézier flow lines, fluid pinch-to-zoom/pan navigation, 1-click node reading, and a 3-way view switcher (**Grid `⊞`**, **List `☰`**, and **DAG `🔀`**).
+* 🖼️ **Fullscreen Page Preview Grid, Filmstrip & Scrubber**: Navigate issues visually with a dynamic, lazy-loaded page preview grid, a bottom precision page scrubber, and a horizontal touch-scrollable thumbnail filmstrip. Full-resolution WebP on-the-fly transcoding backed by an LRU disk cache cuts bandwidth while keeping 1:1 pixel coordinates for panel zoom.
 * 🔄 **True Cross-Device Sync**: Pick up right where you left off. Reading progress syncs in real-time between your phone, tablet, and PC.
-* 📱 **Resumable Offline PWA & Background Fetch**: Install Comics Now! to your iOS, iPadOS, Android, or desktop home screen. Queue comics with HTTP `Range` resumable transfers, and enjoy native Android Background Fetch so downloads keep running with the browser closed.
+* 📱 **Resumable Offline PWA & Self-Healing Connectivity**: Install Comics Now! to your iOS, iPadOS, Android, or desktop home screen. Queue comics with HTTP `Range` resumable transfers, native Android Background Fetch, and active health probing that self-heals when waking from mobile sleep mode.
 * 🤖 **Google Gemini AI Vision & Multi-Source Tagging**: Built-in enrichment engine querying ComicVine, Metron, GCD, Goodreads, Amazon, Google Books, and additional sources with perceptual cover hashing. Powered by Google Gemini AI Vision to visually identify issue numbers, series, publishers, and release years directly from cover art when standard scraping fails.
 * 📁 **Configurable File & Folder Organization**: Flexible 4-tab management panel with customizable token naming rules and folder hierarchy templates, with live preview and safe, type-to-confirm batch execution for entire libraries.
 * 🔌 **AI Model Context Protocol (MCP)**: Native Python MCP server exposing 13+ tools allowing Claude, Cursor, and Gemini to curate reading lists, inspect cover art, trigger guided view detection, reorganize directories, and query your collection with natural language.
@@ -127,13 +128,53 @@ Looking for detailed setup guides, configuration tables, or workflow deep dives?
 - [Granular Permissions & User Impersonation](docs/WIKI.md#4-user--administrator-management)
 - [Metadata Mode vs. Folder Mode](docs/WIKI.md#5-libraries-folder-structures--scanning)
 - [Sidecar vs. Database vs. Archive Write-Back](docs/WIKI.md#6-supported-formats-auto-conversion--metadata-storage)
-- [Multi-Source Tagging & Auto-Renaming Engine](docs/WIKI.md#7-the-tagging-engine--file-organization)
+- [Multi-Source Tagging, GCD & Auto-Renaming Engine](docs/WIKI.md#7-the-tagging-engine--file-organization)
+- [Grand Comics Database (GCD) & Cover Cascade](docs/WIKI.md#grand-comics-database-gcd--cover-cascade)
 - [Smart Guided View & Reading Modes (Continuous, Manga, Bubble Zoom, E-Ink)](docs/WIKI.md#8-smart-guided-view--reading-modes)
+- [Modal Serverless GPU Acceleration & $30 Free Tier Cap](docs/WIKI.md#modal-serverless-gpu-acceleration-cloud-gpu-speedup)
+- [Fullscreen Thumbnail Filmstrip & Scrubber](docs/WIKI.md#fullscreen-thumbnail-filmstrip--scrubber)
 - [Authoring & Editing Guided View with GVE Now!](docs/WIKI.md#authoring--editing-guided-view-with-gve-now)
+- [Interactive Reading List DAG & Continuity Views](docs/WIKI.md#interactive-continuity-dag-view-directed-acyclic-graph)
 - [Curating & Syncing Reading Lists to All Users](docs/WIKI.md#9-reading-lists)
-- [Progressive Web App (PWA) Offline Installation](docs/WIKI.md#10-devices-progress-syncing--offline-pwa)
+- [Progressive Web App (PWA) Offline Installation & Doze Recovery](docs/WIKI.md#10-devices-progress-syncing--offline-pwa)
 - [UI Long-Press Context Menus & Actions](docs/WIKI.md#11-ui-navigation-views--long-press-menus)
 - [Model Context Protocol (MCP) Setup for Claude & Cursor](docs/WIKI.md#13-model-context-protocol-mcp-server)
+
+---
+
+## ⚡ Serverless GPU Acceleration (Modal)
+
+Analyzing comic pages with deep learning neural networks can be computationally heavy for low-power home servers or Raspberry Pis. Comics Now! natively integrates with [Modal](https://modal.com) to offload panel and speech bubble detection to cloud **NVIDIA T4 GPUs** in ~1–2 seconds per batch.
+
+### $30/Month Free Tier & Setting a Spending Limit
+Modal provides **$30.00 of free recurring compute credits every calendar month** to every user account (enough to process 30,000+ comic pages for free).
+
+To guarantee you are never billed beyond the free tier:
+1. Go to your [Modal Dashboard](https://modal.com) → **Settings → Billing / Usage** (or **Workspace Settings → Usage Limits**).
+2. Set the **Monthly Spending Limit** to **`$30.00`**.
+3. Enable email alert thresholds (e.g. at 50%, 80%, 100%) and save changes.
+
+> [!WARNING]
+> **User Responsibility & Billing Safeguards**: It is strictly your responsibility to configure your spending limits in your Modal account dashboard and monitor your usage. Comics Now! provides automated budget monitoring and safe fallbacks to local CPU, but cannot control third-party billing accounts or guarantee that third-party services will not bill you if you choose not to set a spend limit or configure a higher limit.
+
+### Quick Setup (30 Seconds)
+1. In your Modal dashboard, generate an API token under **Settings → API Tokens**.
+2. In Comics Now!, open **Settings → Guided View**, check **Use Modal GPU Acceleration**, and paste your **Token ID** and **Token Secret**.
+3. Click **Test Connection**, then click **⚡ Initialize Modal GPU Environment** to deploy models to cloud storage.
+
+*(Read the [Complete Modal Setup & Telemetry Guide](docs/WIKI.md#modal-serverless-gpu-acceleration-cloud-gpu-speedup) in the Wiki.)*
+
+---
+
+## 🔀 Interactive Reading List DAG (Continuity Timelines)
+
+For massive multi-title crossover events (*Crisis on Infinite Earths*, *Absolute Universe*, *Infinity Gauntlet*), Comics Now! features an interactive **Continuity DAG (Directed Acyclic Graph)** view:
+- **Parallel Series Lanes & Bézier Curves**: See chronological issue order flow across publishers and titles.
+- **Pinch-to-Zoom & Pan**: Full touch and mouse navigation with fluid SVG canvas scaling.
+- **Click-to-Read Graph Nodes**: Tap any issue node directly on the graph to view summary or start reading.
+- **Segmented View Switcher**: Toggle seamlessly between **Grid (`⊞`)**, **List (`☰`)** (with live % progress badges and action buttons), and **DAG (`🔀`)** modes.
+
+*(Read the [Reading List DAG Guide](docs/WIKI.md#interactive-continuity-dag-view-directed-acyclic-graph) in the Wiki.)*
 
 ---
 
