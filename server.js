@@ -167,7 +167,8 @@ app.use(helmet({
     directives: {
       "script-src": ["'self'", "'unsafe-inline'"],
       "script-src-attr": ["'unsafe-inline'"],
-      "style-src": ["'self'", "'unsafe-inline'"],
+      "style-src": ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+      "font-src": ["'self'", "https:", "data:", "https://fonts.gstatic.com"],
       "img-src": ["'self'", "data:", "https://placehold.co", "blob:", "https:"],
       "upgrade-insecure-requests": null,
     },

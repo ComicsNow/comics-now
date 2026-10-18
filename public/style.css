@@ -18,10 +18,10 @@
     --cyan:           #2ec6d6;   /* secondary — process cyan */
     --yellow:         #ffce3a;   /* highlight — counts, accents */
 
-    /* Typography */
-    --font-display: 'Anton', sans-serif;
-    --font-body: 'Hanken Grotesk', sans-serif;
-    --font-mono: 'Space Mono', monospace;
+    /* Typography — Material Design 3 Typography System */
+    --font-display: 'Roboto', 'Anton', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    --font-body: 'Roboto', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    --font-mono: 'Roboto Mono', 'Space Mono', monospace;
 
     /* Shape hierarchy */
     --r-sharp:   3px;        /* panels, cards */
@@ -31,10 +31,19 @@
     /* Brutalist shadows */
     --shadow:    4px 4px 0 #000;
     --shadow-lg: 6px 6px 0 #000;
+
+    /* Modern DC Comics Trade Dress Design Tokens ("DC All In" & "Absolute Universe") */
+    --dc-trade-dress:      'DC All In / Absolute';
+    --dc-all-in-blue:      #0055ff;   /* Prime DCU Heroic Electric Blue */
+    --dc-all-in-blue-dim:  #003ec2;
+    --dc-absolute-red:     #e61c24;   /* Absolute Universe Stark Red */
+    --dc-gotham-night:     #0d1117;   /* Deep nocturnal ink field */
+    --dc-bullet-ring:      rgba(255, 255, 255, 0.25); /* Milton Glaser bullet border ring */
+    --dc-trade-hairline:   rgba(255, 255, 255, 0.14); /* Technical editorial rule */
 }
 
 body {
-    font-family: 'Hanken Grotesk', sans-serif;
+    font-family: var(--font-body);
     background-color: var(--ink);
     background-image: url('background.png');
     background-size: cover;
@@ -131,14 +140,19 @@ body::after {
 
 .app-title-riso {
     font-family: var(--font-display);
-    font-size: clamp(40px, 13vw, 58px);
-    line-height: .82;
+    font-size: clamp(24px, 6.5vw, 42px);
+    line-height: 1.1;
     letter-spacing: -1px;
     text-transform: uppercase;
     color: var(--paper);
     transform: skewX(-5deg);
     display: inline-block;
-    text-shadow: 3px 3px 0 var(--red), 6px 6px 0 var(--cyan);
+    white-space: nowrap !important;
+    text-shadow: 3px 3px 0 #000;
+}
+
+.app-title-riso .text-vermilion {
+    color: var(--dc-absolute-red, var(--red)) !important;
 }
 
 .logo-container {
@@ -152,7 +166,7 @@ body::after {
     font-family: var(--font-display);
     text-transform: uppercase;
     letter-spacing: -0.02em;
-    font-size: 2.25rem;
+    font-size: 1.5rem;
     line-height: 1.1;
     margin-left: 0.5rem;
 }
@@ -580,8 +594,8 @@ body.is-offline .comic-context-menu-item.hide-offline {
     height: 44px;
     padding: 0;
     border-radius: 50%;
-    border: 2px solid rgba(255, 255, 255, 0.4);
-    background-color: rgba(0, 0, 0, 0.75);
+    border: 2px solid rgba(255, 255, 255, 0.7);
+    background-color: rgba(13, 17, 23, 0.88);
     color: rgba(255, 255, 255, 0.95);
     font-size: 2rem;
     font-weight: 700;
@@ -590,14 +604,14 @@ body.is-offline .comic-context-menu-item.hide-offline {
     transition: all 0.2s ease;
     backdrop-filter: blur(8px);
     -webkit-backdrop-filter: blur(8px);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+    box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.8), 0 0 0 4px rgba(255, 255, 255, 0.25), 0 6px 18px rgba(0, 0, 0, 0.6);
 }
 
 .fullscreen-close-button:hover {
-    background-color: rgba(239, 68, 68, 0.85);
-    border-color: rgba(255, 255, 255, 0.7);
-    transform: scale(1.05);
-    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.6);
+    background-color: var(--dc-absolute-red);
+    border-color: #ffffff;
+    box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.8), 0 0 0 4px rgba(255, 255, 255, 0.4), 0 8px 24px rgba(230, 28, 36, 0.5);
+    transform: scale(1.06);
 }
 
 .fullscreen-close-button:active {
@@ -2057,7 +2071,7 @@ body.eink-color-mode #bubble-magnifier-img {
 .series-card > div:first-child,
 .folder-card > div:first-child {
     position: relative !important;
-    border: 2px solid #000 !important;
+    border: 1px solid rgba(255, 255, 255, 0.14) !important;
     border-radius: 12px !important;
     overflow: hidden !important;
     aspect-ratio: 3/4 !important;
@@ -2067,8 +2081,8 @@ body.eink-color-mode #bubble-magnifier-img {
     align-items: center !important;
     justify-content: center !important;
     background-color: var(--ink-2) !important; /* raised dark panel default for covers */
-    box-shadow: var(--shadow) !important;
-    transition: transform 0.1s ease, box-shadow 0.1s ease !important;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(0, 0, 0, 0.8) !important;
+    transition: transform 0.22s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.22s ease, border-color 0.22s ease !important;
 }
 
 /* Publisher panels: white background by default to match logos */
@@ -2116,8 +2130,9 @@ body.eink-color-mode #bubble-magnifier-img {
 .comic-card:hover > div:first-child,
 .series-card:hover > div:first-child,
 .folder-card:hover > div:first-child {
-    transform: translate(-2px, -2px) !important;
-    box-shadow: var(--shadow-lg) !important;
+    transform: translateY(-4px) scale(1.02) !important;
+    border-color: var(--dc-all-in-blue) !important;
+    box-shadow: 0 16px 36px rgba(0, 0, 0, 0.75), 0 0 0 1px var(--dc-all-in-blue) !important;
 }
 
 .comic-card:active > div:first-child,
@@ -2153,6 +2168,15 @@ body.eink-color-mode #bubble-magnifier-img {
     margin: -4px 0 4px !important;
     padding: 0 !important;
     line-height: 1.2 !important;
+}
+
+/* Independent styling for series and publisher card titles (sleeker collection card size) */
+.series-card h3 {
+    font-family: var(--font-body) !important;
+    font-weight: 700 !important;
+    font-size: 0.8rem !important;
+    margin-top: 0.5rem !important;
+    margin-bottom: 0.25rem !important;
 }
 
 .comic-card .p-2 {
@@ -2318,8 +2342,9 @@ body.eink-color-mode #bubble-magnifier-img {
     font-size: 1.8rem !important;
     line-height: 1 !important;
     letter-spacing: -0.5px !important;
-    text-shadow: 1.5px 1.5px 0 var(--red), 3px 3px 0 var(--cyan) !important;
+    text-shadow: 1.5px 1.5px 0 #000 !important;
     transform: skewX(-5deg) !important;
+    white-space: nowrap !important;
 }
 
 .logo-compact br {
