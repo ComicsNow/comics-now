@@ -113,7 +113,11 @@ function applyStatusToUI(s) {
 
   const cur = s.current;
   const currentEl = el('guided-current');
-  if (s.isRunning && cur) {
+  if (s.isRunning && Array.isArray(s.active) && s.active.length > 1) {
+    const names = s.active.map(a => a.name).join(' & ');
+    currentEl.textContent = `Running (2 in parallel): ${names}`;
+    currentEl.className = 'text-sm text-blue-400 mt-3';
+  } else if (s.isRunning && cur) {
     currentEl.textContent = `Running: [${cur.index}/${cur.total}] ${cur.name}`;
     currentEl.className = 'text-sm text-blue-400 mt-3';
   } else if (s.isRunning) {
@@ -141,15 +145,191 @@ function applySettingsToUI(settings) {
   el('guided-schedule-interval').value = settings.scheduleInterval ?? 24;
   const unitSel = el('guided-schedule-unit');
   if (unitSel) unitSel.value = settings.scheduleUnit === 'days' ? 'days' : 'hours';
+
+  const useModalCb = el('guided-use-modal');
+  if (useModalCb) {
+    useModalCb.checked = !!settings.useModal;
+    const panel = el('guided-modal-panel');
+    if (panel) panel.classList.toggle('hidden', !settings.useModal);
+  }
+
+  const modalTokenId = el('guided-modal-token-id');
+  if (modalTokenId) modalTokenId.value = settings.modalTokenId || '';
+
+  const modalTokenSecret = el('guided-modal-token-secret');
+  if (modalTokenSecret) {
+    modalTokenSecret.value = '';
+    modalTokenSecret.placeholder = settings.hasModalSecret ? '•••••••• (configured)' : '••••••••';
+  }
+
+  const modalEnv = el('guided-modal-env');
+  if (modalEnv) modalEnv.value = settings.modalEnvironment || '';
+
+  const concurrencySel = el('guided-concurrency');
+  if (concurrencySel) concurrencySel.value = String(settings.concurrency || 2);
+
+  if (settings.useModal) {
+    fetchModalCredits();
+  }
 }
 
-async function fetchStatus() {
+async function fetchModalCredits() {
+  const badge = el('guided-modal-badge');
+  const available = el('guided-modal-available');
+  const total = el('guided-modal-total-credits');
+  const metered = el('guided-modal-metered');
+  const billed = el('guided-modal-billed');
+  const msg = el('guided-modal-credit-msg');
+
+  const setupBanner = el('guided-modal-setup-banner');
+  const setupBtn = el('guided-modal-setup-btn');
+
+  if (badge) {
+    badge.textContent = 'Checking…';
+    badge.className = 'text-xs px-2 py-0.5 rounded-full bg-gray-700 text-gray-300';
+  }
+
+  try {
+    const res = await fetch(api('/api/v1/guided/modal-status'));
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data.ok) {
+      if (badge) {
+        badge.textContent = 'Auth / Error';
+        badge.className = 'text-xs px-2 py-0.5 rounded-full bg-red-900 text-red-200';
+      }
+      if (msg) msg.textContent = data.error || 'Failed to authenticate with Modal';
+      setupBanner?.classList.add('hidden');
+      setupBtn?.classList.add('hidden');
+      return;
+    }
+
+    if (available) available.textContent = `$${Number(data.availableCredits || 0).toFixed(2)}`;
+    if (total) total.textContent = `$${Number(data.totalCredits || 0).toFixed(2)}`;
+    if (metered) metered.textContent = `$${Number(data.meteredCost || 0).toFixed(2)}`;
+    if (billed) billed.textContent = `$${Number(data.billedCost || 0).toFixed(2)}`;
+
+    const needsSetup = !data.modelsUploaded || !data.appDeployed;
+
+    if (needsSetup) {
+      if (badge) {
+        badge.textContent = 'Setup Required';
+        badge.className = 'text-xs px-2 py-0.5 rounded-full bg-amber-900 text-amber-200';
+      }
+      if (msg) {
+        msg.textContent = `Workspace: ${data.workspace || 'default'} · One-time setup required (models or app missing)`;
+      }
+      setupBanner?.classList.remove('hidden');
+      setupBtn?.classList.remove('hidden');
+    } else if (data.spendLimitExceeded) {
+      if (badge) {
+        badge.textContent = 'Spend Limit Reached';
+        badge.className = 'text-xs px-2 py-0.5 rounded-full bg-amber-900 text-amber-200';
+      }
+      if (msg) {
+        msg.textContent = `Workspace: ${data.workspace || 'default'} · Spend limit reached (Jobs will fall back to local CPU)`;
+      }
+      setupBanner?.classList.add('hidden');
+      setupBtn?.classList.add('hidden');
+    } else {
+      if (badge) {
+        badge.textContent = 'Ready (GPU)';
+        badge.className = 'text-xs px-2 py-0.5 rounded-full bg-green-900 text-green-200';
+      }
+      if (msg) {
+        msg.textContent = `Workspace: ${data.workspace || 'default'} · Ready for GPU inference`;
+      }
+      setupBanner?.classList.add('hidden');
+      setupBtn?.classList.add('hidden');
+    }
+  } catch (err) {
+    if (badge) {
+      badge.textContent = 'Offline';
+      badge.className = 'text-xs px-2 py-0.5 rounded-full bg-gray-700 text-gray-400';
+    }
+    if (msg) msg.textContent = `Error connecting to server: ${err.message || err}`;
+    setupBanner?.classList.add('hidden');
+    setupBtn?.classList.add('hidden');
+  }
+}
+
+async function runModalSetup() {
+  const setupBtn = el('guided-modal-setup-btn');
+  const bannerSetupBtn = el('guided-modal-banner-setup-btn');
+  const feedback = el('guided-modal-test-feedback');
+  const badge = el('guided-modal-badge');
+
+  if (setupBtn) {
+    setupBtn.disabled = true;
+    setupBtn.textContent = '⏳ Initializing (Uploading models & deploying)...';
+  }
+  if (bannerSetupBtn) {
+    bannerSetupBtn.disabled = true;
+    bannerSetupBtn.textContent = 'Initializing…';
+  }
+  if (badge) {
+    badge.textContent = 'Setting up…';
+    badge.className = 'text-xs px-2 py-0.5 rounded-full bg-blue-900 text-blue-200 animate-pulse';
+  }
+  if (feedback) {
+    feedback.textContent = 'Uploading ONNX models to Modal storage and deploying persistent GPU worker...';
+    feedback.className = 'text-xs text-blue-300';
+  }
+
+  const payload = {
+    modalTokenId: el('guided-modal-token-id')?.value.trim() || undefined,
+    modalEnvironment: el('guided-modal-env')?.value.trim() || undefined
+  };
+  const secret = el('guided-modal-token-secret')?.value.trim();
+  if (secret) payload.modalTokenSecret = secret;
+
+  try {
+    const res = await fetch(api('/api/v1/guided/modal-setup'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json().catch(() => ({}));
+    if (res.ok && data.ok) {
+      if (feedback) {
+        feedback.textContent = '✓ Modal environment initialized and ready!';
+        feedback.className = 'text-xs text-green-400';
+      }
+      await fetchModalCredits();
+    } else {
+      if (feedback) {
+        feedback.textContent = `✗ Setup failed: ${data.error || data.message || 'Unknown error'}`;
+        feedback.className = 'text-xs text-red-400';
+      }
+    }
+  } catch (err) {
+    if (feedback) {
+      feedback.textContent = `✗ ${err.message || err}`;
+      feedback.className = 'text-xs text-red-400';
+    }
+  } finally {
+    if (setupBtn) {
+      setupBtn.disabled = false;
+      setupBtn.textContent = '⚡ Initialize Modal GPU Environment';
+    }
+    if (bannerSetupBtn) {
+      bannerSetupBtn.disabled = false;
+      bannerSetupBtn.textContent = 'Setup Now';
+    }
+  }
+}
+
+let settingsLoaded = false;
+
+async function fetchStatus(forceSettings = false) {
   try {
     const res = await fetch(api('/api/v1/guided/status'));
     if (!res.ok) return;
     const data = await res.json();
     applyStatusToUI(data);
-    applySettingsToUI(data.settings);
+    if (!settingsLoaded || forceSettings) {
+      applySettingsToUI(data.settings);
+      settingsLoaded = true;
+    }
   } catch (e) {
     // Silent — polling, will retry.
   }
@@ -283,6 +463,64 @@ function bindOnce() {
 
   el('guided-log-level-filter')?.addEventListener('change', rerenderLog);
 
+  el('guided-use-modal')?.addEventListener('change', (e) => {
+    const isChecked = e.target.checked;
+    el('guided-modal-panel')?.classList.toggle('hidden', !isChecked);
+    if (isChecked) {
+      fetchModalCredits();
+    }
+  });
+
+  el('guided-modal-refresh-btn')?.addEventListener('click', () => {
+    fetchModalCredits();
+  });
+
+  el('guided-modal-test-btn')?.addEventListener('click', async () => {
+    const feedback = el('guided-modal-test-feedback');
+    if (feedback) {
+      feedback.textContent = 'Testing…';
+      feedback.className = 'text-xs text-gray-400';
+    }
+
+    const payload = {
+      modalTokenId: el('guided-modal-token-id')?.value.trim() || '',
+      modalEnvironment: el('guided-modal-env')?.value.trim() || ''
+    };
+    const secret = el('guided-modal-token-secret')?.value.trim();
+    if (secret) {
+      payload.modalTokenSecret = secret;
+    }
+
+    try {
+      const res = await fetch(api('/api/v1/guided/modal-test'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.ok) {
+        if (feedback) {
+          feedback.textContent = `✓ Connected (${data.workspace || 'default'})`;
+          feedback.className = 'text-xs text-green-400';
+        }
+        fetchModalCredits();
+      } else {
+        if (feedback) {
+          feedback.textContent = `✗ ${data.error || 'Connection failed'}`;
+          feedback.className = 'text-xs text-red-400';
+        }
+      }
+    } catch (err) {
+      if (feedback) {
+        feedback.textContent = `✗ ${err.message || err}`;
+        feedback.className = 'text-xs text-red-400';
+      }
+    }
+  });
+
+  el('guided-modal-setup-btn')?.addEventListener('click', runModalSetup);
+  el('guided-modal-banner-setup-btn')?.addEventListener('click', runModalSetup);
+
   el('guided-settings-form')?.addEventListener('submit', async (e) => {
     e.preventDefault();
     const status = el('guided-settings-status');
@@ -294,8 +532,17 @@ function bindOnce() {
       autoOnAdd: el('guided-auto-on-add').checked,
       scheduleEnabled: el('guided-schedule-enabled').checked,
       scheduleInterval: parseInt(el('guided-schedule-interval').value, 10) || 24,
-      scheduleUnit: el('guided-schedule-unit').value
+      scheduleUnit: el('guided-schedule-unit').value,
+      useModal: !!el('guided-use-modal')?.checked,
+      modalTokenId: el('guided-modal-token-id')?.value.trim() || '',
+      modalEnvironment: el('guided-modal-env')?.value.trim() || '',
+      concurrency: parseInt(el('guided-concurrency')?.value || '2', 10) || 2
     };
+    const secret = el('guided-modal-token-secret')?.value.trim();
+    if (secret) {
+      payload.modalTokenSecret = secret;
+    }
+
     try {
       const res = await fetch(api('/api/v1/guided/settings'), {
         method: 'POST',
@@ -307,6 +554,9 @@ function bindOnce() {
       if (status) {
         status.textContent = '✓ Saved';
         status.className = 'text-sm text-center text-green-400';
+      }
+      if (payload.useModal) {
+        fetchModalCredits();
       }
       setTimeout(() => { if (status) status.textContent = ''; }, 2500);
     } catch (err) {
@@ -320,8 +570,9 @@ function bindOnce() {
 
 // Called by events.js when the user clicks the Guided Reader tab.
 function openGuidedReaderTab() {
+  settingsLoaded = false;
   bindOnce();
-  fetchStatus();
+  fetchStatus(true);
   startStream();
   startPolling();
   startLogPolling();
@@ -332,6 +583,7 @@ function openGuidedReaderTab() {
 const origClose = global.closeSettingsModal;
 if (typeof origClose === 'function') {
   global.closeSettingsModal = function () {
+    settingsLoaded = false;
     stopStream();
     stopPolling();
     stopLogPolling();
@@ -347,6 +599,7 @@ if (typeof origClose === 'function') {
     set(newVal) {
       if (typeof newVal === 'function') {
         currentClose = function() {
+          settingsLoaded = false;
           stopStream();
           stopPolling();
           stopLogPolling();

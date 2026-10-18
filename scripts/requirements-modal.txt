@@ -1,0 +1,4 @@
+modal>=0.60.0
+Pillow>=10.4.0
+rarfile>=4.1
+pytest>=8.0.0
