@@ -63,6 +63,26 @@ def extract_cover_from_cbz(cbz_path, output_dir="temp_covers"):
         print(f"[+] Cover extracted successfully to: {dest_path}")
         return dest_path
 
+def is_safe_cover_url(url: str) -> bool:
+    """Validate that candidate cover URL does not target loopback or cloud metadata services.
+    Permits public web endpoints and local LAN IP ranges for self-hosted home servers."""
+    if not url or not isinstance(url, str):
+        return False
+    from urllib.parse import urlparse
+    try:
+        parsed = urlparse(url)
+        if parsed.scheme not in ("http", "https"):
+            return False
+        host = (parsed.hostname or "").lower()
+        if host in ("127.0.0.1", "localhost", "::1", "0.0.0.0") or host.endswith(".localhost"):
+            return False
+        if host.startswith("169.254."):
+            return False
+        return True
+    except Exception:
+        return False
+
+
 def compare_covers_python(local_image_path, candidate_image_url, hash_size=16):
     """
     Compares a local cover image against a candidate cover URL using a perceptual hash
@@ -73,6 +93,10 @@ def compare_covers_python(local_image_path, candidate_image_url, hash_size=16):
     1 - (Hamming distance / number of hash bits).
     """
     if not local_image_path or not candidate_image_url:
+        return 0.0
+
+    if not is_safe_cover_url(candidate_image_url):
+        print(f"[-] Security: Rejected unsafe cover URL: {candidate_image_url}")
         return 0.0
 
     try:

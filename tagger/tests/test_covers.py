@@ -230,6 +230,37 @@ def test_gcd_search_multi_rejects_ssrf_issue_urls(monkeypatch):
     assert len(results) == 1
 
 
+def test_compare_covers_python_blocks_metadata_and_loopback_ssrf(monkeypatch, tmp_path):
+    from tagger_app.core import covers
+    dummy_img = tmp_path / "local.jpg"
+    dummy_img.write_bytes(b"dummy")
+
+    network_calls = []
+    def fake_get(url, *args, **kwargs):
+        network_calls.append(url)
+        class Resp:
+            status_code = 404
+            content = b""
+        return Resp()
+
+    monkeypatch.setattr("requests.get", fake_get)
+
+    # 1. Cloud metadata IP must be blocked with 0.0 score and NO network call
+    score_meta = covers.compare_covers_python(str(dummy_img), "http://169.254.169.254/latest/meta-data/")
+    assert score_meta == 0.0
+    assert len(network_calls) == 0
+
+    # 2. Localhost / loopback must be blocked with 0.0 score and NO network call
+    score_loop = covers.compare_covers_python(str(dummy_img), "http://127.0.0.1:3000/secret.jpg")
+    assert score_loop == 0.0
+    assert len(network_calls) == 0
+
+    # 3. LAN URL (e.g. 192.168.0.50) must NOT be blocked by SSRF (safe for local setups)
+    covers.compare_covers_python(str(dummy_img), "http://192.168.0.50/cover.jpg")
+    assert "http://192.168.0.50/cover.jpg" in network_calls
+
+
+
 
 
 

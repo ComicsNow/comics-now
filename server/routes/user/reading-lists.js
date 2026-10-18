@@ -993,11 +993,14 @@ module.exports = function attach(router, deps) {
           // Add comics (skip if comic doesn't exist)
           if (listData.comics && Array.isArray(listData.comics)) {
             for (const comic of listData.comics) {
-              const exists = await dbGet('SELECT id FROM comics WHERE id = ?', [comic.id]);
+              const v = validateComicId(comic?.id);
+              if (!v.valid) continue;
+              const exists = await dbGet('SELECT id FROM comics WHERE id = ?', [v.sanitized]);
               if (exists) {
+                const sortOrder = Math.max(0, parseInt(comic.sortOrder, 10) || 0);
                 await dbRun(
                   'INSERT INTO reading_list_items (listId, comicId, addedAt, sortOrder) VALUES (?, ?, ?, ?)',
-                  [listId, comic.id, now, comic.sortOrder || 0]
+                  [listId, v.sanitized, now, sortOrder]
                 );
               }
             }
