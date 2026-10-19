@@ -196,7 +196,7 @@ function main() {
   console.log('💾 Committing version bump...');
   execSync('git add package.json package-lock.json', { cwd: rootDir });
   execSync(
-    `git commit -m "chore(release): ${nextVersion} [skip ci]" --author="comicsnow <comicsnowdev@gmail.com>"`,
+    `git commit -m "chore(release): ${nextVersion}" --author="comicsnow <comicsnowdev@gmail.com>"`,
     { cwd: rootDir, stdio: 'inherit' }
   );
 
