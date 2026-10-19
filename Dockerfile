@@ -1,5 +1,5 @@
 # Build stage
-FROM node:20-bookworm AS builder
+FROM node:22-bookworm AS builder
 
 # Install system dependencies for building native modules
 RUN apt-get update && apt-get install -y \
@@ -15,11 +15,11 @@ WORKDIR /app
 # Install Node.js dependencies (including devDependencies for Vite)
 COPY package*.json ./
 COPY scripts/check-dependencies.js ./scripts/
-RUN npm ci
+RUN npm ci --ignore-scripts
 
-# Copy the application source code and compile Vite assets
+# Copy the application source code and compile Vite & Tailwind assets
 COPY . .
-RUN npm run build
+RUN npm run build:css && npm run build
 
 # Prune development dependencies to keep the image lightweight
 RUN npm prune --omit=dev
@@ -33,7 +33,7 @@ RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
     pip install --no-cache-dir -r scripts/requirements-modal.txt
 
 # Runtime stage
-FROM node:20-bookworm-slim
+FROM node:22-bookworm-slim
 
 # Install runtime dependencies and security updates without bloated recommendations
 RUN apt-get update && apt-get upgrade -y && apt-get install -y --no-install-recommends \

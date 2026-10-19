@@ -10,7 +10,7 @@ const { execSync } = require('child_process');
 const requiredPackages = [
   { cmd: 'pdftoppm', package: 'poppler-utils', brewPackage: 'poppler', description: 'PDF to CBZ conversion' },
   { cmd: 'zip', package: 'zip', brewPackage: 'zip', description: 'Creating CBZ archives' },
-  { cmd: 'unrar', package: 'unrar', brewPackage: 'unrar', description: 'CBR to CBZ conversion' }
+  { cmd: 'unrar', altCmds: ['unrar-free'], package: 'unrar', brewPackage: 'unrar', description: 'CBR to CBZ conversion' }
 ];
 
 function commandExists(cmd) {
@@ -27,9 +27,11 @@ let missingPackages = [];
 
 console.log('Checking system dependencies...\n');
 
-requiredPackages.forEach(({ cmd, package: pkg, brewPackage, description }) => {
-  if (commandExists(cmd)) {
-    console.log(`✅ ${cmd} - Found`);
+requiredPackages.forEach(({ cmd, altCmds, package: pkg, brewPackage, description }) => {
+  const hasCmd = commandExists(cmd);
+  const altFound = altCmds && altCmds.find(alt => commandExists(alt));
+  if (hasCmd || altFound) {
+    console.log(`✅ ${hasCmd ? cmd : altFound} - Found`);
   } else {
     console.log(`❌ ${cmd} - Not found (${description})`);
     missingPackages.push({ cmd, pkg, brewPackage, description });
