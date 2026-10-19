@@ -1,6 +1,6 @@
 {
   "name": "comics-now",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "description": "Modern self-hosted comic book library server, smart AI guided reader, and cataloging platform.",
   "main": "server.js",
   "bin": {
