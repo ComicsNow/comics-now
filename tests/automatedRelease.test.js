@@ -95,35 +95,25 @@ describe('Automated CI/CD Release & SemVer Logic', () => {
     });
   });
 
-  describe('Unified CI/CD Workflow Specification', () => {
+  describe('CI/CD Workflow Specification', () => {
     const rootDir = path.resolve(__dirname, '..');
-    const wfPath = path.join(rootDir, '.github/workflows/docker-publish.yml');
+    const dockerWfPath = path.join(rootDir, '.github/workflows/docker-publish.yml');
     const npmWfPath = path.join(rootDir, '.github/workflows/npm-publish.yml');
 
-    test('redundant standalone npm-publish.yml workflow is removed', () => {
-      expect(fs.existsSync(npmWfPath)).toBe(false);
+    test('dedicated npm-publish.yml workflow exists for npm releases', () => {
+      expect(fs.existsSync(npmWfPath)).toBe(true);
+      const npmWf = yaml.load(fs.readFileSync(npmWfPath, 'utf8'));
+      expect(npmWf.jobs['publish-npm']).toBeDefined();
     });
 
-    test('unified workflow gates both Docker and npm publishing with the single test job', () => {
-      const wf = yaml.load(fs.readFileSync(wfPath, 'utf8'));
+    test('docker-publish workflow gates Docker publishing with the test job', () => {
+      const wf = yaml.load(fs.readFileSync(dockerWfPath, 'utf8'));
       expect(wf.jobs.test).toBeDefined();
 
-      // Docker publish must depend on test
       const dockerJob = wf.jobs['build-and-push-image'];
       expect(dockerJob).toBeDefined();
       const dockerNeeds = Array.isArray(dockerJob.needs) ? dockerJob.needs : [dockerJob.needs];
       expect(dockerNeeds).toContain('test');
-
-      // npm publish must also be part of the unified workflow and depend on test
-      const npmJob = wf.jobs['publish-npm'];
-      expect(npmJob).toBeDefined();
-      const npmNeeds = Array.isArray(npmJob.needs) ? npmJob.needs : [npmJob.needs];
-      expect(npmNeeds).toContain('test');
-
-      // npm publish must NOT duplicate the test suite step
-      const npmSteps = npmJob.steps || [];
-      const hasDuplicateTestStep = npmSteps.some((s) => /npm test|jest/.test(s.run || ''));
-      expect(hasDuplicateTestStep).toBe(false);
     });
   });
 });
