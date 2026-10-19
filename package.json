@@ -34,6 +34,7 @@
     "test:e2e": "playwright test",
     "test:all": "npm run test && npm run test:modal && npm run test:e2e",
     "postinstall": "node scripts/check-dependencies.js",
+    "release": "node scripts/release.js",
     "mcp": "bash mcp/run.sh"
   },
   "keywords": [
