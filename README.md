@@ -10,7 +10,6 @@
   <a href="https://github.com/ComicsNow/comics-now/pkgs/container/comics-now"><img src="https://img.shields.io/badge/ghcr.io-comics--now-2496ED.svg?logo=github" alt="GHCR Image"></a>
   <a href="https://github.com/ComicsNow/comics-now/actions/workflows/npm-publish.yml"><img src="https://github.com/ComicsNow/comics-now/actions/workflows/npm-publish.yml/badge.svg" alt="npm publish"></a>
   <a href="https://github.com/ComicsNow/comics-now/actions/workflows/docker-publish.yml"><img src="https://github.com/ComicsNow/comics-now/actions/workflows/docker-publish.yml/badge.svg" alt="Build Status"></a>
-  <a href="https://github.com/ComicsNow/comics-now/actions/workflows/codeql.yml"><img src="https://github.com/ComicsNow/comics-now/actions/workflows/codeql.yml/badge.svg" alt="CodeQL Status"></a>
   <a href="https://ko-fi.com/comicsnow"><img src="https://img.shields.io/badge/Ko--fi-Support-FF5E5B?logo=ko-fi&logoColor=white" alt="Support on Ko-fi"></a>
   <a href="docs/WIKI.md"><img src="https://img.shields.io/badge/docs-WIKI%20Manual-green.svg" alt="Documentation"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-AGPL--3.0-orange.svg" alt="License"></a>
