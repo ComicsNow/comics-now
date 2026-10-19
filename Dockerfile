@@ -28,9 +28,10 @@ RUN npm prune --omit=dev
 RUN python3 -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 COPY scripts/requirements-modal.txt ./scripts/
-RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
+RUN pip install --no-cache-dir --upgrade pip "setuptools>=83.0.0" wheel && \
     pip install --no-cache-dir -r tagger/requirements.txt && \
-    pip install --no-cache-dir -r scripts/requirements-modal.txt
+    pip install --no-cache-dir -r scripts/requirements-modal.txt && \
+    pip uninstall -y setuptools pip wheel
 
 # Runtime stage
 FROM node:22-bookworm-slim
@@ -44,8 +45,8 @@ RUN apt-get update && apt-get upgrade -y && apt-get install -y --no-install-reco
     zip \
     unzip \
     poppler-utils \
-    && npm install -g npm@10 \
-    && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/* \
+    && rm -rf /usr/local/lib/node_modules/npm /usr/local/bin/npm /usr/local/bin/npx /usr/local/bin/corepack
 
 WORKDIR /app
 
@@ -67,4 +68,4 @@ RUN mkdir -p /app/data && chown 1000:1000 /app/data && chmod +x /app/docker-entr
 EXPOSE 3000
 
 ENTRYPOINT ["/app/docker-entrypoint.sh"]
-CMD ["npm", "start"]
+CMD ["node", "server.js"]

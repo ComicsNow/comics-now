@@ -87,5 +87,10 @@
     "jest-environment-jsdom": "^30.4.1",
     "tailwindcss": "4.3.3",
     "vite": "^8.2.2"
+  },
+  "overrides": {
+    "ip-address": ">=10.7.4",
+    "brace-expansion": ">=2.1.5",
+    "picomatch": ">=4.0.7"
   }
 }
