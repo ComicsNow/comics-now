@@ -1500,20 +1500,22 @@
         </button>
       </div>
 
-      <!-- Right Group: Reading List, Downloads, Tag Comics Now!, and Settings -->
-      <div class="flex gap-2">
-        <button id="reading-list-button" aria-label="Reading Lists" class="brutalist-btn btn-cream w-10 h-10 transition-colors" onclick="openReadingListModal()">
-          <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2"><use href="#icon-menu"></use></svg>
-        </button>
-        <button id="downloads-button" aria-label="Downloads" class="brutalist-btn btn-cyan w-10 h-10 transition-colors" onclick="openDownloadsPanel()">
+      <!-- Right Group: Primary Downloads action + Secondary Tools Group -->
+      <div class="flex items-center gap-2">
+        <button id="downloads-button" aria-label="Downloads" class="brutalist-btn btn-cyan w-10 h-10 transition-colors shrink-0" onclick="openDownloadsPanel()">
           <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2"><use href="#icon-download-alt"></use></svg>
         </button>
-        <button id="ct-button" aria-label="Tag Comics Now!" class="brutalist-btn btn-yellow w-10 h-10 transition-colors">
-          <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2"><use href="#icon-24"></use></svg>
-        </button>
-        <button id="settings-button" onclick="openSettingsModal()" aria-label="Settings" class="brutalist-btn btn-ink w-10 h-10 transition-colors">
-          <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2"><use href="#icon-25"></use></svg>
-        </button>
+        <div id="secondary-tools-group" class="secondary-tools-group flex items-center gap-1.5 p-1 bg-black/40 rounded-xl border border-white/10" role="toolbar" aria-label="Secondary tools">
+          <button id="reading-list-button" aria-label="Reading Lists" class="brutalist-btn btn-cream w-9 h-9 sm:w-10 sm:h-10 transition-colors" onclick="openReadingListModal()">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2"><use href="#icon-menu"></use></svg>
+          </button>
+          <button id="ct-button" aria-label="Tag Comics Now!" class="brutalist-btn btn-yellow w-9 h-9 sm:w-10 sm:h-10 transition-colors">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2"><use href="#icon-24"></use></svg>
+          </button>
+          <button id="settings-button" onclick="openSettingsModal()" aria-label="Settings" class="brutalist-btn btn-ink w-9 h-9 sm:w-10 sm:h-10 transition-colors">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2"><use href="#icon-25"></use></svg>
+          </button>
+        </div>
       </div>
     </div>
 
@@ -1544,25 +1546,28 @@
       </form>
     </div>
 
-    <div id="filters-container" class="flex flex-col items-center mb-6 gap-2">
-      <!-- Status Filters — narrow within whatever view + smart scope is active.
-           Mobile: All on its own row, then [Unread, In Progress, Read] wrapping next.
-           Desktop (sm+): single row, all four pills inline. -->
-      <div id="filter-buttons" class="flex flex-row flex-wrap items-center justify-center gap-2">
-        <button class="filter-btn pill-button active bg-gray-700 hover:bg-gray-600 text-white transition-colors" data-filter="all">
-          <span class="pill-label">All</span>
-        </button>
-        <button class="filter-btn pill-button bg-gray-700 hover:bg-gray-600 text-white transition-colors" data-filter="unread">
-          <span class="pill-label">Unread</span>
-          <span class="count-badge" id="unread-count">0</span>
-        </button>
-        <button class="filter-btn pill-button bg-gray-700 hover:bg-gray-600 text-white transition-colors" data-filter="in-progress">
-          <span class="pill-label">In Progress</span>
-          <span class="count-badge" id="in-progress-count">0</span>
-        </button>
-        <button class="filter-btn pill-button bg-gray-700 hover:bg-gray-600 text-white transition-colors" data-filter="read">
-          <span class="pill-label">Read</span>
-          <span class="count-badge" id="read-count">0</span>
+    <div id="filters-container" class="flex flex-col items-center mb-6 gap-2" data-expanded="false">
+      <!-- Consolidated filter bar: single row with expand toggle, expands to 2 rows -->
+      <div class="filter-bar-wrapper flex items-center justify-center gap-2 w-full max-w-2xl px-2">
+        <div id="filter-buttons" class="flex flex-row flex-nowrap sm:flex-wrap items-center justify-center gap-2 overflow-x-auto no-scrollbar py-1">
+          <button class="filter-btn pill-button active bg-gray-700 hover:bg-gray-600 text-white transition-colors" data-filter="all">
+            <span class="pill-label">All</span>
+          </button>
+          <button class="filter-btn pill-button bg-gray-700 hover:bg-gray-600 text-white transition-colors" data-filter="unread">
+            <span class="pill-label">Unread</span>
+            <span class="count-badge" id="unread-count">0</span>
+          </button>
+          <button class="filter-btn pill-button bg-gray-700 hover:bg-gray-600 text-white transition-colors" data-filter="in-progress">
+            <span class="pill-label">In Progress</span>
+            <span class="count-badge" id="in-progress-count">0</span>
+          </button>
+          <button class="filter-btn pill-button bg-gray-700 hover:bg-gray-600 text-white transition-colors" data-filter="read">
+            <span class="pill-label">Read</span>
+            <span class="count-badge" id="read-count">0</span>
+          </button>
+        </div>
+        <button id="filter-expand-toggle" type="button" aria-expanded="false" aria-label="Toggle all filters" class="filter-expand-btn p-2 rounded-xl bg-gray-800 hover:bg-gray-700 border border-white/10 text-gray-300 hover:text-white transition-colors shrink-0" title="Expand filters">
+          <svg class="w-4 h-4 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7"></path></svg>
         </button>
       </div>
     </div>
@@ -1674,8 +1679,8 @@
         <h2 id="folder-list-title" class="text-2xl font-bold truncate view-title"></h2>
       </div>
       <div class="smart-filter-mount"></div>
-      <div class="flex justify-center mb-4">
-        <div id="folder-alpha-filter" class="flex flex-wrap gap-2 justify-center"></div>
+      <div class="edge-index-container flex justify-end">
+        <div id="folder-alpha-filter" class="edge-index flex flex-wrap gap-2 justify-center"></div>
       </div>
       <div id="folder-list-container" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6"></div>
     </div>
@@ -1685,8 +1690,8 @@
     <div id="publisher-list" class="hidden">
       <h2 id="publisher-title" class="text-2xl font-bold truncate text-center mb-4 view-title"></h2>
       <div class="smart-filter-mount"></div>
-      <div class="flex justify-center mb-4">
-        <div id="publisher-alpha-filter" class="flex flex-wrap gap-2 justify-center"></div>
+      <div class="edge-index-container flex justify-end">
+        <div id="publisher-alpha-filter" class="edge-index flex flex-wrap gap-2 justify-center"></div>
       </div>
       <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6" id="publisher-list-container"></div>
     </div>
@@ -1695,8 +1700,8 @@
     <div id="series-list" class="hidden">
       <h2 id="series-title" class="text-2xl font-bold truncate text-center mb-4 view-title"></h2>
       <div class="smart-filter-mount"></div>
-      <div class="flex justify-center mb-4">
-        <div id="series-alpha-filter" class="flex flex-wrap gap-2 justify-center"></div>
+      <div class="edge-index-container flex justify-end">
+        <div id="series-alpha-filter" class="edge-index flex flex-wrap gap-2 justify-center"></div>
       </div>
       <div class="flex justify-end items-center mb-4 px-2" id="series-sort-container">
         <label for="series-sort-select" class="text-xs sm:text-sm text-gray-400 font-medium mr-2 flex items-center gap-1.5">
@@ -1716,8 +1721,8 @@
     <div id="comic-list" class="hidden">
       <h2 id="comic-list-title" class="text-2xl font-bold truncate text-center mb-4 view-title"></h2>
       <div class="smart-filter-mount"></div>
-      <div class="flex justify-center mb-4">
-        <div id="comic-alpha-filter" class="flex flex-wrap gap-2 justify-center"></div>
+      <div class="edge-index-container flex justify-end">
+        <div id="comic-alpha-filter" class="edge-index flex flex-wrap gap-2 justify-center"></div>
       </div>
       <div id="comic-list-container" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6"></div>
     </div>

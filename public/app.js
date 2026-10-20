@@ -36,6 +36,7 @@ import './js/library/data.js';
 import './js/library/smartlists.js';
 import './js/library/status.js';
 import './js/library/smart-filters.js';
+import { initFilterConsolidation } from './js/library/filter-bar.js';
 import './js/library/breadcrumb.js';
 import './js/library/alpha-list.js';
 import './js/library/search.js';
@@ -293,6 +294,9 @@ function initUIControls() {
   }
   if (typeof global.initComicsDefaults === 'function') {
     global.initComicsDefaults();
+  }
+  if (typeof initFilterConsolidation === 'function') {
+    initFilterConsolidation();
   }
 }
 
