@@ -1404,7 +1404,13 @@ const global = new Proxy(typeof window !== 'undefined' ? window : globalThis, {
           `.page-container[data-index="${targetIndex}"]`
         );
         if (targetContainer) {
-          targetContainer.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          const isEink = (typeof document !== 'undefined' && document.body && (
+            document.body.classList.contains('eink-mode') || document.body.classList.contains('eink-color-mode')
+          )) || (global.einkMode && global.einkMode !== 'none');
+          targetContainer.scrollIntoView({ behavior: isEink ? 'instant' : 'smooth', block: 'center' });
+          if (isEink && typeof global.triggerEinkFlash === 'function') {
+            global.triggerEinkFlash();
+          }
         }
       }
     } else {

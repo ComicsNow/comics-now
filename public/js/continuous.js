@@ -18,6 +18,17 @@ let scrollTimeout = null;
 let continuousClickHandler = null;
 let isInitializingScroll = false;
 
+/**
+ * Helper to check whether E-Ink/Kindle screen mode is currently active
+ */
+function isEinkActive() {
+  const einkMode = state.einkMode || (typeof window !== 'undefined' ? window.einkMode : 'none');
+  const bodyHasEink = typeof document !== 'undefined' && document.body && (
+    document.body.classList.contains('eink-mode') || document.body.classList.contains('eink-color-mode')
+  );
+  return !!(bodyHasEink || (einkMode && einkMode !== 'none'));
+}
+
 // Store original navigation state for restoration
 let originalNavigationState = {
   prevBtnText: '←',
@@ -79,12 +90,17 @@ async function loadPage(pageName, container) {
 
     const img = document.createElement('img');
     img.alt = `Page ${pageName}`;
-    img.style.opacity = '0';
-    img.style.transition = 'opacity 0.2s';
+    const eink = isEinkActive();
+    if (!eink) {
+      img.style.opacity = '0';
+      img.style.transition = 'opacity 0.2s';
+    }
 
     // Set up load handler
     img.onload = () => {
-      img.style.opacity = '1';
+      if (!eink) {
+        img.style.opacity = '1';
+      }
       applyLandscapeToPage(container, img);
     };
 
@@ -502,6 +518,13 @@ async function updateCurrentPageFromScroll() {
   if (state.currentPageIndex !== closestPage) {
     state.currentPageIndex = closestPage;
 
+    if (isEinkActive()) {
+      const triggerEinkFlash = state.triggerEinkFlash || (typeof window !== 'undefined' ? window.triggerEinkFlash : null);
+      if (typeof triggerEinkFlash === 'function') {
+        triggerEinkFlash();
+      }
+    }
+
     const getViewerPages = state.getViewerPages || window.getViewerPages;
     const updateViewerPageCounter = state.updateViewerPageCounter || window.updateViewerPageCounter;
     // Update page counter
@@ -619,6 +642,9 @@ export function scrollToNextPage() {
     }
   });
 
+  const isEink = isEinkActive();
+  const behavior = isEink ? 'instant' : 'smooth';
+
   // Scroll to next page
   const nextPageIndex = currentPageIndex + 1;
   const nextContainer = continuousContainer.querySelector(
@@ -626,13 +652,20 @@ export function scrollToNextPage() {
   );
 
   if (nextContainer) {
-    nextContainer.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    nextContainer.scrollIntoView({ behavior, block: 'center' });
   } else {
     // At last page, scroll to bottom
     continuousContainer.scrollTo({
       top: continuousContainer.scrollHeight,
-      behavior: 'smooth'
+      behavior
     });
+  }
+
+  if (isEink) {
+    const triggerEinkFlash = state.triggerEinkFlash || (typeof window !== 'undefined' ? window.triggerEinkFlash : null);
+    if (typeof triggerEinkFlash === 'function') {
+      triggerEinkFlash();
+    }
   }
 }
 
@@ -666,6 +699,9 @@ export function scrollToPreviousPage() {
     }
   });
 
+  const isEink = isEinkActive();
+  const behavior = isEink ? 'instant' : 'smooth';
+
   // Scroll to previous page
   const prevPageIndex = currentPageIndex - 1;
   const prevContainer = continuousContainer.querySelector(
@@ -673,13 +709,20 @@ export function scrollToPreviousPage() {
   );
 
   if (prevContainer) {
-    prevContainer.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    prevContainer.scrollIntoView({ behavior, block: 'center' });
   } else {
     // At first page, scroll to top
     continuousContainer.scrollTo({
       top: 0,
-      behavior: 'smooth'
+      behavior
     });
+  }
+
+  if (isEink) {
+    const triggerEinkFlash = state.triggerEinkFlash || (typeof window !== 'undefined' ? window.triggerEinkFlash : null);
+    if (typeof triggerEinkFlash === 'function') {
+      triggerEinkFlash();
+    }
   }
 }
 

@@ -1809,13 +1809,17 @@ body.eink-color-mode * {
 
 /* Grayscale + Contrast optimization for monochrome E-Ink screens */
 body.eink-mode #fullscreen-image,
-body.eink-mode #bubble-magnifier-img {
+body.eink-mode #bubble-magnifier-img,
+body.eink-mode #fullscreen-pages-continuous img,
+body.eink-mode #viewer-pages-continuous img {
     filter: grayscale(100%) contrast(140%) brightness(102%) !important;
 }
 
 /* Saturation + Contrast optimization for Color E-Ink screens */
 body.eink-color-mode #fullscreen-image,
-body.eink-color-mode #bubble-magnifier-img {
+body.eink-color-mode #bubble-magnifier-img,
+body.eink-color-mode #fullscreen-pages-continuous img,
+body.eink-color-mode #viewer-pages-continuous img {
     filter: contrast(125%) saturate(135%) brightness(102%) !important;
 }
 
