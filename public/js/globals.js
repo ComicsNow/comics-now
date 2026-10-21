@@ -306,6 +306,23 @@ export function pickMetadataValue(metadata = {}, keys = []) {
   return '';
 }
 
+export function sanitizeComicTitle(rawTitle) {
+  if (!rawTitle || typeof rawTitle !== 'string') return '';
+  let clean = rawTitle.trim();
+  // Strip common archive and ebook extensions
+  clean = clean.replace(/\.(cbz|cbr|cb7|cbt|zip|rar|tar|pdf)$/i, '');
+  // Strip bracketed release / scanner tags (e.g. [215 INK], [Digital-HD])
+  clean = clean.replace(/\[[^\]]*\]/g, ' ');
+  // Strip leading track / sorting index prefixes like "01 ", "001 - ", "01. "
+  clean = clean.replace(/^\s*\d{1,3}\s*[-._]\s*(?=[a-zA-Z])/i, '');
+  clean = clean.replace(/^\s*\d{1,3}\s+(?=[a-zA-Z])/i, '');
+  // Strip release year parenthesis if preceding an issue marker, e.g. "Future Heroes (2015) #86" -> "Future Heroes #86"
+  clean = clean.replace(/\s*\((?:19|20)\d{2}\b[^\)]*\)\s*(?=#\d+)/i, ' ');
+  // Replace underscores and collapse duplicate whitespace
+  clean = clean.replace(/_/g, ' ').replace(/\s+/g, ' ').trim();
+  return clean || rawTitle.trim();
+}
+
 export function buildComicDisplayInfo(comic = {}) {
   const metadata = comic.metadata || {};
 
@@ -323,19 +340,21 @@ export function buildComicDisplayInfo(comic = {}) {
     ? (issueNumber ? `${seriesName} #${issueNumber}` : seriesName)
     : (issueNumber ? `Issue ${issueNumber}` : '');
 
+  const cleanFallbackName = sanitizeComicTitle(comic.name) || toTrimmedString(comic.name) || 'Untitled Comic';
+
   const displayTitle = hasNoMetadata
-    ? (toTrimmedString(comic.name) || 'Untitled Comic')
+    ? cleanFallbackName
     : ([
         seriesWithIssue,
         titleText,
         toTrimmedString(comic.title),
-        toTrimmedString(comic.name)
+        cleanFallbackName
       ].find(Boolean) || 'Untitled Comic');
 
   const subtitleCandidates = [
     titleText,
     toTrimmedString(comic.title),
-    toTrimmedString(comic.name)
+    cleanFallbackName
   ];
   const seen = new Set([displayTitle]);
   let subtitle = '';
@@ -687,6 +706,7 @@ const globalsObj = {
   getComicById,
   turnToPage,
   pickMetadataValue,
+  sanitizeComicTitle,
   buildComicDisplayInfo,
   applyDisplayInfoToComic,
   applyDisplayInfoToLibrary,

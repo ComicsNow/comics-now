@@ -6,7 +6,7 @@ const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 
-describe('Fullscreen persistent header controls', () => {
+describe('Fullscreen Immersive HUD & Clean Display Title', () => {
   let sandbox;
   let state;
 
@@ -17,6 +17,7 @@ describe('Fullscreen persistent header controls', () => {
         <button id="fullscreen-close-btn" class="fullscreen-close-button hidden" type="button">
           <span aria-hidden="true">&times;</span>
         </button>
+        <div id="fullscreen-info-bar" class="fullscreen-info-bar hidden"></div>
         <div id="fullscreen-controls" class="fullscreen-controls hidden"></div>
         <img id="fullscreen-image" src="test.jpg" />
         <div id="fullscreen-scrubber-container" class="hidden"></div>
@@ -27,9 +28,10 @@ describe('Fullscreen persistent header controls', () => {
       fullscreenViewer: document.getElementById('fullscreen-viewer'),
       fullscreenTitle: document.getElementById('fullscreen-title'),
       fullscreenCloseBtn: document.getElementById('fullscreen-close-btn'),
+      fullscreenInfoBar: document.getElementById('fullscreen-info-bar'),
       fullscreenControls: document.getElementById('fullscreen-controls'),
       fullscreenImage: document.getElementById('fullscreen-image'),
-      currentComic: { name: 'Batman (2016) #1', series: 'Batman' },
+      currentComic: { name: '01 Future Heroes [215 INK] (2015) #86.cbz', series: 'Future Heroes' },
       currentPageIndex: 0,
       resetFullscreenZoom: jest.fn(),
       renderPage: jest.fn().mockResolvedValue(undefined),
@@ -58,9 +60,10 @@ describe('Fullscreen persistent header controls', () => {
     new vm.Script(cleanContent).runInContext(sandbox);
   });
 
-  test('hideFullscreenControls leaves title and top-right close button visible', () => {
+  test('hideFullscreenControls hides all HUD chrome for edge-to-edge immersive reading', () => {
     const titleEl = document.getElementById('fullscreen-title');
     const closeBtn = document.getElementById('fullscreen-close-btn');
+    const infoBar = document.getElementById('fullscreen-info-bar');
     const controls = document.getElementById('fullscreen-controls');
 
     // Show controls first
@@ -68,53 +71,101 @@ describe('Fullscreen persistent header controls', () => {
     expect(controls.classList.contains('hidden')).toBe(false);
     expect(titleEl.classList.contains('hidden')).toBe(false);
     expect(closeBtn.classList.contains('hidden')).toBe(false);
+    expect(infoBar.classList.contains('hidden')).toBe(false);
 
     // Call hideFullscreenControls
     sandbox.hideFullscreenControls();
 
-    // Controls container should be hidden, but title and close button must NOT be hidden
+    // All HUD elements must be hidden for full-screen edge-to-edge reading
     expect(controls.classList.contains('hidden')).toBe(true);
-    expect(titleEl.classList.contains('hidden')).toBe(false);
-    expect(closeBtn.classList.contains('hidden')).toBe(false);
+    expect(titleEl.classList.contains('hidden')).toBe(true);
+    expect(closeBtn.classList.contains('hidden')).toBe(true);
+    expect(infoBar.classList.contains('hidden')).toBe(true);
   });
 
-  test('auto-hide timer keeps title and close button visible after timeout', () => {
+  test('toggleFullscreenHUD toggles between visible and hidden', () => {
+    const titleEl = document.getElementById('fullscreen-title');
+    const controls = document.getElementById('fullscreen-controls');
+
+    // Initially controls are hidden
+    sandbox.hideFullscreenControls();
+    expect(controls.classList.contains('hidden')).toBe(true);
+
+    // First toggle: shows HUD
+    sandbox.toggleFullscreenHUD();
+    expect(controls.classList.contains('hidden')).toBe(false);
+    expect(titleEl.classList.contains('hidden')).toBe(false);
+
+    // Second toggle: hides HUD
+    sandbox.toggleFullscreenHUD();
+    expect(controls.classList.contains('hidden')).toBe(true);
+    expect(titleEl.classList.contains('hidden')).toBe(true);
+  });
+
+  test('auto-hide timer hides all HUD elements after timeout', () => {
     jest.useFakeTimers();
     try {
       const titleEl = document.getElementById('fullscreen-title');
       const closeBtn = document.getElementById('fullscreen-close-btn');
+      const infoBar = document.getElementById('fullscreen-info-bar');
       const controls = document.getElementById('fullscreen-controls');
 
       sandbox.showFullscreenControls(true);
       expect(controls.classList.contains('hidden')).toBe(false);
       expect(titleEl.classList.contains('hidden')).toBe(false);
       expect(closeBtn.classList.contains('hidden')).toBe(false);
+      expect(infoBar.classList.contains('hidden')).toBe(false);
 
       // Fast-forward past the autohide delay (3000ms)
       jest.advanceTimersByTime(3500);
 
-      // Controls container should be hidden, but title and close button must stay visible
+      // All HUD elements must be hidden after timeout
       expect(controls.classList.contains('hidden')).toBe(true);
-      expect(titleEl.classList.contains('hidden')).toBe(false);
-      expect(closeBtn.classList.contains('hidden')).toBe(false);
+      expect(titleEl.classList.contains('hidden')).toBe(true);
+      expect(closeBtn.classList.contains('hidden')).toBe(true);
+      expect(infoBar.classList.contains('hidden')).toBe(true);
     } finally {
       jest.useRealTimers();
     }
   });
 
-  test('openFullscreen displays title and close button and populates title text', () => {
+  test('syncFullscreenTitle cleans raw filenames with archive extensions, tags, and track numbers', () => {
+    const titleEl = document.getElementById('fullscreen-title');
+    state.currentComic = { name: '01 Future Heroes [215 INK] (2015) #86.cbz', series: 'Future Heroes' };
+
+    sandbox.syncFullscreenTitle();
+    expect(titleEl.textContent).toBe('Future Heroes #86');
+  });
+
+  test('syncFullscreenTitle utilizes applyDisplayInfoToComic when available', () => {
+    const titleEl = document.getElementById('fullscreen-title');
+    state.currentComic = {
+      name: '01 Future Heroes [215 INK] (2015) #86.cbz',
+      series: 'Future Heroes',
+      metadata: { Number: '86', Series: 'Future Heroes' }
+    };
+    state.applyDisplayInfoToComic = jest.fn((comic) => ({
+      displayTitle: `${comic.metadata.Series} #${comic.metadata.Number}`
+    }));
+
+    sandbox.syncFullscreenTitle();
+    expect(state.applyDisplayInfoToComic).toHaveBeenCalledWith(state.currentComic);
+    expect(titleEl.textContent).toBe('Future Heroes #86');
+  });
+
+  test('openFullscreen displays sanitized clean title and initial HUD with autohide', () => {
     const titleEl = document.getElementById('fullscreen-title');
     const closeBtn = document.getElementById('fullscreen-close-btn');
 
-    // Initially both have 'hidden' class
     titleEl.classList.add('hidden');
     closeBtn.classList.add('hidden');
 
+    state.currentComic = { name: '01 Future Heroes [215 INK] (2015) #86.cbz', series: 'Future Heroes' };
     sandbox.openFullscreen();
 
     expect(titleEl.classList.contains('hidden')).toBe(false);
     expect(closeBtn.classList.contains('hidden')).toBe(false);
-    expect(titleEl.textContent).toBe('Batman (2016) #1');
+    expect(titleEl.textContent).toBe('Future Heroes #86');
   });
 
   test('zoom overlay has higher z-index in style.css than fullscreen title and close button', () => {

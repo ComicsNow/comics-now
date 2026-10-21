@@ -135,11 +135,59 @@ const global = new Proxy(typeof window !== 'undefined' ? window : globalThis, {
   global.applyLandscapeTransform = applyLandscapeTransform;
   global.resetLandscapePan = resetLandscapePan;
 
+  function sanitizeComicTitleLocal(rawTitle) {
+    if (!rawTitle || typeof rawTitle !== 'string') return '';
+    let clean = rawTitle.trim();
+    clean = clean.replace(/\.(cbz|cbr|cb7|cbt|zip|rar|tar|pdf)$/i, '');
+    clean = clean.replace(/\[[^\]]*\]/g, ' ');
+    clean = clean.replace(/^\s*\d{1,3}\s*[-._]\s*(?=[a-zA-Z])/i, '');
+    clean = clean.replace(/^\s*\d{1,3}\s+(?=[a-zA-Z])/i, '');
+    clean = clean.replace(/\s*\((?:19|20)\d{2}\b[^\)]*\)\s*(?=#\d+)/i, ' ');
+    clean = clean.replace(/_/g, ' ').replace(/\s+/g, ' ').trim();
+    return clean || rawTitle.trim();
+  }
+
+  function getCleanComicTitle(comic) {
+    if (!comic) return '';
+    const applyFn = global.applyDisplayInfoToComic || window.applyDisplayInfoToComic || global.state?.applyDisplayInfoToComic;
+    const displayInfo = typeof applyFn === 'function' ? applyFn(comic) : null;
+    let candidate = displayInfo?.displayTitle || comic.displayName || comic.cleanTitle;
+    if (!candidate) {
+      const series = comic.series ? String(comic.series).trim() : '';
+      const rawName = comic.name ? String(comic.name).trim() : '';
+      candidate = rawName || series || 'Untitled';
+    }
+    const sanitizeFn = global.sanitizeComicTitle || sanitizeComicTitleLocal;
+    return sanitizeFn(candidate);
+  }
+
   function syncFullscreenTitle() {
     const title = global.fullscreenTitle;
     if (!title) return;
     const comic = global.currentComic;
-    title.textContent = comic ? (comic.name || comic.series || 'Untitled') : '';
+    if (!comic) {
+      title.textContent = '';
+      return;
+    }
+    const cleanTitle = getCleanComicTitle(comic);
+    title.textContent = cleanTitle;
+    if (typeof title.setAttribute === 'function') {
+      title.setAttribute('title', cleanTitle);
+      title.setAttribute('aria-label', cleanTitle);
+    }
+  }
+
+  function isFullscreenHUDVisible() {
+    const controls = global.fullscreenControls;
+    const infoBar = global.fullscreenInfoBar || document.getElementById('fullscreen-info-bar');
+    const title = global.fullscreenTitle;
+    const closeBtn = global.fullscreenCloseBtn;
+
+    if (controls && !controls.classList.contains('hidden')) return true;
+    if (infoBar && !infoBar.classList.contains('hidden')) return true;
+    if (title && !title.classList.contains('hidden')) return true;
+    if (closeBtn && !closeBtn.classList.contains('hidden')) return true;
+    return false;
   }
 
   function showFullscreenControls(autoHide = false) {
@@ -148,34 +196,32 @@ const global = new Proxy(typeof window !== 'undefined' ? window : globalThis, {
     const controls = global.fullscreenControls;
     const closeBtn = global.fullscreenCloseBtn;
     const title = global.fullscreenTitle;
-    if (!controls) return;
+    const infoBar = global.fullscreenInfoBar || document.getElementById('fullscreen-info-bar');
+    const scrubber = document.getElementById('fullscreen-scrubber-container');
+    if (!controls && !title && !closeBtn && !infoBar) return;
 
-    controls.classList.remove('hidden');
+    if (controls) controls.classList.remove('hidden');
     if (global.fullscreenViewer) {
       global.fullscreenViewer.classList.add('has-controls-open');
+      global.fullscreenViewer.classList.remove('fullscreen-hud-hidden');
     }
     if (closeBtn) closeBtn.classList.remove('hidden');
     if (title) {
       syncFullscreenTitle();
       title.classList.remove('hidden');
     }
-    const scrubber = document.getElementById('fullscreen-scrubber-container');
+    if (infoBar) infoBar.classList.remove('hidden');
     if (scrubber) scrubber.classList.remove('hidden');
 
+    clearTimeout(fullscreenControlsTimeoutId);
+    fullscreenControlsTimeoutId = null;
+
     if (autoHide) {
-      clearTimeout(fullscreenControlsTimeoutId);
       fullscreenControlsTimeoutId = setTimeout(() => {
-        if (global.isFilmstripOpen?.()) return;
-        if (global.fullscreenControls) {
-          global.fullscreenControls.classList.add('hidden');
+        if (global.isFilmstripOpen?.() || (document.getElementById('comic-page-grid-overlay') && !document.getElementById('comic-page-grid-overlay').classList.contains('hidden'))) {
+          return;
         }
-        if (global.fullscreenViewer) {
-          global.fullscreenViewer.classList.remove('has-controls-open');
-        }
-        // Title and top-right close button remain permanently visible in fullscreen mode
-        const sc = document.getElementById('fullscreen-scrubber-container');
-        if (sc) sc.classList.add('hidden');
-        fullscreenControlsTimeoutId = null;
+        hideFullscreenControls();
       }, FULLSCREEN_CONTROLS_AUTOHIDE_DELAY);
     }
   }
@@ -183,18 +229,35 @@ const global = new Proxy(typeof window !== 'undefined' ? window : globalThis, {
   function hideFullscreenControls() {
     const isMangaPanelZoom = global.GuidedView?.getActiveModeName?.() === 'manga-panel-zoom';
     if (global.isFullImageMode || isMangaPanelZoom) return;
-    const controls = global.fullscreenControls;
-    if (!controls) return;
+    if (global.isFilmstripOpen?.()) return;
 
-    controls.classList.add('hidden');
+    const controls = global.fullscreenControls;
+    const closeBtn = global.fullscreenCloseBtn;
+    const title = global.fullscreenTitle;
+    const infoBar = global.fullscreenInfoBar || document.getElementById('fullscreen-info-bar');
+    const scrubber = document.getElementById('fullscreen-scrubber-container');
+
+    if (controls) controls.classList.add('hidden');
+    if (closeBtn) closeBtn.classList.add('hidden');
+    if (title) title.classList.add('hidden');
+    if (infoBar) infoBar.classList.add('hidden');
+    if (scrubber && !global.isFilmstripOpen?.()) scrubber.classList.add('hidden');
+
     if (global.fullscreenViewer) {
       global.fullscreenViewer.classList.remove('has-controls-open');
+      global.fullscreenViewer.classList.add('fullscreen-hud-hidden');
     }
-    // Title and top-right close button remain permanently visible in fullscreen mode
-    const scrubber = document.getElementById('fullscreen-scrubber-container');
-    if (scrubber && !global.isFilmstripOpen?.()) scrubber.classList.add('hidden');
+
     clearTimeout(fullscreenControlsTimeoutId);
     fullscreenControlsTimeoutId = null;
+  }
+
+  function toggleFullscreenHUD() {
+    if (isFullscreenHUDVisible()) {
+      hideFullscreenControls();
+    } else {
+      showFullscreenControls(true);
+    }
   }
 
   function openFullscreen() {
@@ -215,14 +278,9 @@ const global = new Proxy(typeof window !== 'undefined' ? window : globalThis, {
     const totalPages = typeof getPageCounterTotal === 'function' ? getPageCounterTotal() : 0;
     updateFullscreenPageStatus(global.currentPageIndex + 1, totalPages);
 
-    // Ensure title and close button are visible and up to date in fullscreen mode
+    // Populate clean sanitized title and show HUD with autohide for smooth orientation
     syncFullscreenTitle();
-    if (global.fullscreenTitle) {
-      global.fullscreenTitle.classList.remove('hidden');
-    }
-    if (global.fullscreenCloseBtn) {
-      global.fullscreenCloseBtn.classList.remove('hidden');
-    }
+    showFullscreenControls(true);
 
     // Check if continuous mode should be enabled
     if (global.currentComic?.continuousMode && typeof global.enableContinuousMode === 'function') {
@@ -232,7 +290,6 @@ const global = new Proxy(typeof window !== 'undefined' ? window : globalThis, {
       }, 100);
     }
 
-    hideFullscreenControls();
     if (typeof global.resetFullscreenZoom === 'function') {
       global.resetFullscreenZoom();
     }
@@ -375,15 +432,14 @@ const global = new Proxy(typeof window !== 'undefined' ? window : globalThis, {
     if (now - lastDoubleTapAt < 500) return;
 
     // Only the centre of the page surfaces controls — taps elsewhere on the
-    // image do nothing (side-nav hotspots own the left/right thirds, and
-    // the user wants top/bottom of the page silent too).
+    // image do nothing (side-nav hotspots own the left/right thirds).
     const image = event.currentTarget || global.fullscreenImage;
     if (image && typeof image.getBoundingClientRect === 'function') {
       const rect = image.getBoundingClientRect();
       const cx = rect.left + rect.width / 2;
       const cy = rect.top + rect.height / 2;
-      const halfW = rect.width / 6;  // central 1/3 horizontally
-      const halfH = rect.height / 6; // central 1/3 vertically
+      const halfW = rect.width * 0.28;  // central ~56% horizontally
+      const halfH = rect.height * 0.42; // central ~84% vertically
       if (Math.abs(event.clientX - cx) > halfW) return;
       if (Math.abs(event.clientY - cy) > halfH) return;
     }
@@ -391,7 +447,11 @@ const global = new Proxy(typeof window !== 'undefined' ? window : globalThis, {
     clearTimeout(pendingUIToggleTimer);
     pendingUIToggleTimer = setTimeout(() => {
       pendingUIToggleTimer = null;
-      global.showFullscreenControls?.(true);
+      if (typeof global.toggleFullscreenHUD === 'function') {
+        global.toggleFullscreenHUD();
+      } else {
+        toggleFullscreenHUD();
+      }
     }, FS_DOUBLE_TAP_MS);
   }
 
@@ -1587,6 +1647,10 @@ export {
   FULLSCREEN_MAX_ZOOM_SCALE,
   showFullscreenControls,
   hideFullscreenControls,
+  toggleFullscreenHUD,
+  isFullscreenHUDVisible,
+  syncFullscreenTitle,
+  getCleanComicTitle,
   openFullscreen,
   closeFullscreen,
   handleFullscreenImageClick,
@@ -1619,6 +1683,10 @@ state.FULLSCREEN_MIN_ZOOM_SCALE = FULLSCREEN_MIN_ZOOM_SCALE;
 state.FULLSCREEN_MAX_ZOOM_SCALE = FULLSCREEN_MAX_ZOOM_SCALE;
 state.showFullscreenControls = showFullscreenControls;
 state.hideFullscreenControls = hideFullscreenControls;
+state.toggleFullscreenHUD = toggleFullscreenHUD;
+state.isFullscreenHUDVisible = isFullscreenHUDVisible;
+state.syncFullscreenTitle = syncFullscreenTitle;
+state.getCleanComicTitle = getCleanComicTitle;
 state.openFullscreen = openFullscreen;
 state.closeFullscreen = closeFullscreen;
 state.handleFullscreenImageClick = handleFullscreenImageClick;
@@ -1651,6 +1719,10 @@ if (typeof window !== 'undefined') {
   window.FULLSCREEN_MAX_ZOOM_SCALE = FULLSCREEN_MAX_ZOOM_SCALE;
   window.showFullscreenControls = showFullscreenControls;
   window.hideFullscreenControls = hideFullscreenControls;
+  window.toggleFullscreenHUD = toggleFullscreenHUD;
+  window.isFullscreenHUDVisible = isFullscreenHUDVisible;
+  window.syncFullscreenTitle = syncFullscreenTitle;
+  window.getCleanComicTitle = getCleanComicTitle;
   window.openFullscreen = openFullscreen;
   window.closeFullscreen = closeFullscreen;
   window.handleFullscreenImageClick = handleFullscreenImageClick;

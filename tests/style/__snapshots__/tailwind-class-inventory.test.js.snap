@@ -321,6 +321,7 @@ exports[`Tailwind class inventory (public/**/*.{html,js}) snapshots the sorted u
   "fullscreen-close-small",
   "fullscreen-controls",
   "fullscreen-fit-mode",
+  "fullscreen-hud-hidden",
   "fullscreen-image",
   "fullscreen-info-bar",
   "fullscreen-nav",

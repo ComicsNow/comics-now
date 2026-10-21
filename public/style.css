@@ -559,7 +559,7 @@ body.is-offline .comic-context-menu-item.hide-offline {
     padding-bottom: calc(env(safe-area-inset-bottom) + 20px);
 }
 
-/* Top-right close button - always visible */
+/* Top-right close button and comic title - immersive auto-hide HUD */
 .fullscreen-title {
     position: fixed;
     top: calc(20px + env(safe-area-inset-top));
@@ -580,6 +580,7 @@ body.is-offline .comic-context-menu-item.hide-offline {
     text-overflow: ellipsis;
     white-space: nowrap;
     pointer-events: none;
+    transition: opacity 0.25s ease, transform 0.25s ease;
 }
 
 .fullscreen-close-button {
@@ -639,6 +640,7 @@ body.is-offline .comic-context-menu-item.hide-offline {
     z-index: 70;
     backdrop-filter: blur(8px);
     -webkit-backdrop-filter: blur(8px);
+    transition: opacity 0.25s ease, transform 0.25s ease;
 }
 
 .fullscreen-progress-indicator {
