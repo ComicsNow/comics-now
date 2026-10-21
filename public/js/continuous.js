@@ -190,9 +190,43 @@ export async function renderContinuousMode() {
  */
 export async function enableContinuousMode() {
   // Continuous scrolls a vertical stream of pages and is incompatible with
-  // any of the guided-view overlays.
+  // any of the guided-view overlays. Automatically unselect any guided mode.
   const GuidedView = state.GuidedView || window.GuidedView;
-  GuidedView?.disableAll?.();
+  const registry = GuidedView?.ModeRegistry || state.GuidedView?.ModeRegistry;
+  if (registry && typeof registry.disableAll === 'function') {
+    registry.disableAll({ persist: true });
+  } else if (typeof GuidedView?.disableAll === 'function') {
+    GuidedView.disableAll({ persist: true });
+  }
+
+  const currentComic = state.currentComic || window.currentComic;
+  if (currentComic) {
+    currentComic.guidedMode = false;
+    currentComic.bubbleMode = false;
+    currentComic.hotZoomMode = false;
+    currentComic.mangaBubbleHotMode = false;
+    try {
+      if (typeof localStorage !== 'undefined' && localStorage) {
+        localStorage.setItem(`guided_pref_${currentComic.id}`, 'none');
+        localStorage.setItem('guided_pref_global_active', 'false');
+      }
+    } catch (_) {}
+
+    const updateComicInLibrary = state.updateComicInLibrary || window.updateComicInLibrary;
+    if (typeof updateComicInLibrary === 'function') {
+      updateComicInLibrary(currentComic.id, {
+        guidedMode: false,
+        bubbleMode: false,
+        hotZoomMode: false,
+        mangaBubbleHotMode: false
+      });
+    }
+  }
+
+  if (typeof GuidedView?.updateAllUI === 'function') {
+    GuidedView.updateAllUI();
+  }
+
   isContinuousMode = true;
   state.isContinuousMode = true;
   
@@ -749,6 +783,31 @@ function setupContinuousModeButtonHandler(button) {
 
       // 2. Perform mode switch immediately without blocking on cache/disk writes
       if (newMode) {
+        // Automatically unselect any guided mode as the two cannot work together
+        const GuidedView = state.GuidedView || window.GuidedView;
+        const registry = GuidedView?.ModeRegistry || state.GuidedView?.ModeRegistry;
+        if (registry && typeof registry.disableAll === 'function') {
+          registry.disableAll({ persist: true });
+        } else if (typeof GuidedView?.disableAll === 'function') {
+          GuidedView.disableAll({ persist: true });
+        }
+
+        currentComic.guidedMode = false;
+        currentComic.bubbleMode = false;
+        currentComic.hotZoomMode = false;
+        currentComic.mangaBubbleHotMode = false;
+
+        try {
+          if (typeof localStorage !== 'undefined' && localStorage) {
+            localStorage.setItem(`guided_pref_${currentComic.id}`, 'none');
+            localStorage.setItem('guided_pref_global_active', 'false');
+          }
+        } catch (_) {}
+
+        if (typeof GuidedView?.updateAllUI === 'function') {
+          GuidedView.updateAllUI();
+        }
+
         await enableContinuousMode();
       } else {
         await disableContinuousMode();

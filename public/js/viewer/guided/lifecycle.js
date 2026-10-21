@@ -153,6 +153,11 @@ export async function refreshGuidedToggle() {
     }
   }
 
+  // Continuous reading mode is mutually exclusive with any guided mode
+  if (isContinuous) {
+    preferredMode = null;
+  }
+
   // Sync comic object flags with preferredMode
   comic.guidedMode = preferredMode === 'guided';
   comic.bubbleMode = preferredMode === 'bubble';
@@ -174,7 +179,7 @@ export async function refreshGuidedToggle() {
       registry.disableAll({ persist: false });
     }
   } else if (activeModeName) {
-    registry.disableAll({ persist: false });
+    registry.disableAll({ persist: isContinuous ? true : false });
   }
 
   if (typeof state.GuidedView.updateAllUI === 'function') state.GuidedView.updateAllUI();

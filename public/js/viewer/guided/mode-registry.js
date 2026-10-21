@@ -44,6 +44,21 @@ export const ModeRegistry = {
         this.disable(activeModeName, { persist: false });
       }
 
+      // If continuous mode is currently active, automatically disable it as the two cannot work together
+      const isContinuous = !!(state.isContinuousMode || (typeof window !== 'undefined' && window.isContinuousMode));
+      if (isContinuous) {
+        const disableContinuousMode = state.disableContinuousMode || (typeof window !== 'undefined' && window.disableContinuousMode);
+        if (typeof disableContinuousMode === 'function') {
+          await disableContinuousMode();
+        }
+        const currentComic = state.currentComic || (typeof window !== 'undefined' && window.currentComic);
+        if (currentComic) {
+          currentComic.continuousMode = false;
+          const updateComic = state.updateComicInLibrary || (typeof window !== 'undefined' && window.updateComicInLibrary);
+          updateComic?.(currentComic.id, { continuousMode: false });
+        }
+      }
+
       // Pre-set the active mode name so that any refreshRender() calls 
       // triggered inside mode.enable() correctly identify the new mode.
       activeModeName = name;
