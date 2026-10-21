@@ -2128,13 +2128,22 @@ body.eink-color-mode #bubble-magnifier-img {
     background: none !important;
 }
 
-/* Card hover animation (shifts panel, not the whole card) */
+/* Card hover, focus, and selection state (DC All In Electric Blue halo) */
 .comic-card:hover > div:first-child,
 .series-card:hover > div:first-child,
-.folder-card:hover > div:first-child {
+.folder-card:hover > div:first-child,
+.comic-card:focus-visible > div:first-child,
+.series-card:focus-visible > div:first-child,
+.folder-card:focus-visible > div:first-child,
+.comic-card.selected > div:first-child,
+.series-card.selected > div:first-child,
+.folder-card.selected > div:first-child,
+.comic-card[aria-selected="true"] > div:first-child,
+.series-card[aria-selected="true"] > div:first-child,
+.folder-card[aria-selected="true"] > div:first-child {
     transform: translateY(-4px) scale(1.02) !important;
     border-color: var(--dc-all-in-blue) !important;
-    box-shadow: 0 16px 36px rgba(0, 0, 0, 0.75), 0 0 0 1px var(--dc-all-in-blue) !important;
+    box-shadow: 0 16px 36px rgba(0, 0, 0, 0.75), 0 0 0 2px var(--dc-all-in-blue), 0 0 16px rgba(0, 85, 255, 0.45) !important;
 }
 
 .comic-card:active > div:first-child,
@@ -2143,14 +2152,16 @@ body.eink-color-mode #bubble-magnifier-img {
     transform: scale(0.97) !important;
 }
 
-/* Card titles */
+/* Card titles — Punchier Comic Typography (Anton, uppercase, crisp tracking) */
 .comic-card h3, 
 .series-card h3, 
 .folder-card h3,
 .comic-card p {
-    font-family: var(--font-body) !important;
+    font-family: 'Anton', var(--font-display) !important;
     font-weight: 800 !important;
     font-size: 15px !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.05em !important;
     color: var(--paper) !important;
     text-align: center !important;
     margin: 12px 0 9px !important;
@@ -2158,6 +2169,8 @@ body.eink-color-mode #bubble-magnifier-img {
     white-space: normal !important;
     word-break: break-word !important;
     line-height: 1.2 !important;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.75) !important;
+    transition: color 0.15s ease, text-shadow 0.15s ease !important;
 }
 
 /* Independent styling for library/folder card publisher/count subtext to avoid overlapping */
@@ -2174,11 +2187,29 @@ body.eink-color-mode #bubble-magnifier-img {
 
 /* Independent styling for series and publisher card titles (sleeker collection card size) */
 .series-card h3 {
-    font-family: var(--font-body) !important;
-    font-weight: 700 !important;
+    font-family: 'Anton', var(--font-display) !important;
+    font-weight: 800 !important;
     font-size: 0.8rem !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.06em !important;
     margin-top: 0.5rem !important;
     margin-bottom: 0.25rem !important;
+}
+
+/* Title brightening on hover / selection */
+.comic-card:hover h3,
+.series-card:hover h3,
+.folder-card:hover h3,
+.comic-card:hover p,
+.comic-card.selected h3,
+.series-card.selected h3,
+.folder-card.selected h3,
+.comic-card[aria-selected="true"] h3,
+.series-card[aria-selected="true"] h3,
+.comic-card[aria-selected="true"] p,
+.series-card[aria-selected="true"] p {
+    color: #ffffff !important;
+    text-shadow: 0 0 10px rgba(0, 85, 255, 0.4), 0 1px 3px rgba(0, 0, 0, 0.9) !important;
 }
 
 .comic-card .p-2 {
