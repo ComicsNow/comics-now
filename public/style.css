@@ -518,8 +518,9 @@ body.is-offline .comic-context-menu-item.hide-offline {
 }
 
 /* Override flex display when continuous mode is active */
-.fullscreen-viewer:has(#fullscreen-pages-continuous:not(.hidden)) {
-    display: block;
+.fullscreen-viewer:has(#fullscreen-pages-continuous:not(.hidden)),
+.fullscreen-viewer.continuous-active {
+    display: block !important;
 }
 
 .fullscreen-image {
@@ -1555,7 +1556,7 @@ body.is-offline .comic-context-menu-item.hide-offline {
     overflow-y: scroll;
     overflow-x: hidden;
     -webkit-overflow-scrolling: touch;
-    touch-action: pan-y;
+    touch-action: pan-y !important;
     overscroll-behavior-y: contain;
     padding: 1rem 0;
     background-color: #000000;
@@ -1566,7 +1567,7 @@ body.is-offline .comic-context-menu-item.hide-offline {
     width: 100%;
     min-height: 200px;
     overflow: hidden;
-    touch-action: pan-y;
+    touch-action: pan-y !important;
 }
 
 #fullscreen-pages-continuous img {

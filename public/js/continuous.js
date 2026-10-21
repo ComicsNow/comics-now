@@ -260,6 +260,17 @@ export async function enableContinuousMode() {
   }
 
   fullscreenViewer.classList.add('continuous-active');
+  // Strip any lingering guided layout classes that could block touch/scroll
+  fullscreenViewer.classList.remove('guided-stage');
+  fullscreenViewer.classList.remove('guided-zoom-no-touchmenu');
+
+  // Force-hide any active guided magnifier overlay so it doesn't intercept touch/pointer gestures
+  const bubbleOverlay = document.getElementById('bubble-magnifier-overlay');
+  if (bubbleOverlay) {
+    bubbleOverlay.style.display = 'none';
+    bubbleOverlay.style.opacity = '0';
+    bubbleOverlay.style.pointerEvents = 'none';
+  }
 
   // Hide fullscreen single image
   const fullscreenImage = document.getElementById('fullscreen-image');

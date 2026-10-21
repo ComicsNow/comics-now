@@ -100,16 +100,36 @@ export const ModeRegistry = {
   },
 
   disableAll({ persist = false } = {}) {
-    if (activeModeName) {
-      const mode = modes.get(activeModeName);
-      if (mode) mode.disable();
-      activeModeName = null;
-    }
+    const prevModeName = activeModeName;
+    activeModeName = null;
+    manualOverrideBox = null;
+
     if (persist) {
       const currentComic = state.currentComic || window.currentComic;
       this.persistOnlyMode(currentComic, null);
     }
-    manualOverrideBox = null;
+
+    if (prevModeName) {
+      const mode = modes.get(prevModeName);
+      if (mode) mode.disable();
+    }
+
+    // Force complete cleanup of CSS classes and overlays
+    if (typeof state.GuidedView?.refreshRender === 'function') {
+      state.GuidedView.refreshRender();
+    } else {
+      const stage = document.getElementById('fullscreen-viewer');
+      if (stage) {
+        stage.classList.remove('guided-stage');
+        stage.classList.remove('guided-zoom-no-touchmenu');
+      }
+      const overlay = document.getElementById('bubble-magnifier-overlay');
+      if (overlay) {
+        overlay.style.display = 'none';
+        overlay.style.opacity = '0';
+        overlay.style.pointerEvents = 'none';
+      }
+    }
   },
 
   toggle(name) {

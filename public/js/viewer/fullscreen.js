@@ -263,11 +263,12 @@ const global = new Proxy(typeof window !== 'undefined' ? window : globalThis, {
     }
 
     // Check if continuous mode should be enabled
-    if (global.currentComic?.continuousMode && typeof global.enableContinuousMode === 'function') {
-      // Enable continuous mode after a short delay to ensure fullscreen is ready
-      setTimeout(async () => {
-        await global.enableContinuousMode();
-      }, 100);
+    if (global.currentComic?.continuousMode) {
+      state.isContinuousMode = true;
+      global.isContinuousMode = true;
+      if (typeof global.enableContinuousMode === 'function') {
+        global.enableContinuousMode();
+      }
     }
 
     hideFullscreenControls();

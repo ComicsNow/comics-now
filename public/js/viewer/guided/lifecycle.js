@@ -45,7 +45,7 @@ export async function refreshGuidedToggle() {
 
   const isManga = !!(comic && (comic.mangaMode === true || comic.mangaMode == 1));
   const processed = !!(comic && comic.guidedViewStatus === 'completed');
-  const isContinuous = !!(state.isContinuousMode || window.isContinuousMode);
+  const isContinuous = !!(state.isContinuousMode || window.isContinuousMode || (comic && comic.continuousMode));
   const isFullImage = !!(state.isFullImageMode || window.isFullImageMode);
   const isLandscape = !!(state.isLandscapeOrientation || window.isLandscapeOrientation);
 
@@ -180,6 +180,20 @@ export async function refreshGuidedToggle() {
     }
   } else if (activeModeName) {
     registry.disableAll({ persist: isContinuous ? true : false });
+  }
+
+  if (isContinuous) {
+    const fv = document.getElementById('fullscreen-viewer');
+    if (fv) {
+      fv.classList.remove('guided-stage');
+      fv.classList.remove('guided-zoom-no-touchmenu');
+    }
+    const overlay = document.getElementById('bubble-magnifier-overlay');
+    if (overlay) {
+      overlay.style.display = 'none';
+      overlay.style.opacity = '0';
+      overlay.style.pointerEvents = 'none';
+    }
   }
 
   if (typeof state.GuidedView.updateAllUI === 'function') state.GuidedView.updateAllUI();

@@ -223,4 +223,107 @@ describe('Continuous Reading Mode & Guided Mode Mutual Exclusion', () => {
       bubbleMode: false
     }));
   });
+
+  test('5. ModeRegistry.disableAll clears activeModeName before mode.disable so refreshRender removes guided classes', () => {
+    const fv = document.getElementById('fullscreen-viewer');
+    fv.classList.add('guided-stage', 'guided-zoom-no-touchmenu');
+
+    // Load actual ModeRegistry code
+    const registryPath = path.join(__dirname, '../public/js/viewer/guided/mode-registry.js');
+    const registryCode = fs.readFileSync(registryPath, 'utf-8')
+      .replace(/import\s+[\s\S]*?from\s+['"][^'"]+['"];?/g, '')
+      .replace(/export\s+const\s+ModeRegistry\s*=/g, 'const ModeRegistry =')
+      .replace(/export\s+\{[\s\S]*?\};?/g, '');
+    new vm.Script(registryCode).runInContext(sandbox);
+
+    const registry = sandbox.state.GuidedView.ModeRegistry;
+
+    let activeDuringDisable = 'unknown';
+    const mockMode = {
+      enable: jest.fn().mockResolvedValue(true),
+      disable: jest.fn(() => {
+        activeDuringDisable = registry.getActiveModeName();
+        // Simulate what mode.disable does (calls refreshRender)
+        const activeNow = registry.getActiveModeName();
+        if (!activeNow) {
+          fv.classList.remove('guided-stage', 'guided-zoom-no-touchmenu');
+        }
+      })
+    };
+
+    registry.register('test-guided', mockMode);
+    // Directly set active mode
+    registry.enable('test-guided');
+
+    registry.disableAll();
+
+    // activeModeName must have been null when mode.disable() was called
+    expect(activeDuringDisable).toBeNull();
+    expect(fv.classList.contains('guided-stage')).toBe(false);
+    expect(fv.classList.contains('guided-zoom-no-touchmenu')).toBe(false);
+  });
+
+  test('6. enableContinuousMode forcefully cleanses guided-stage, guided-zoom-no-touchmenu, and hides bubble overlay', async () => {
+    const fv = document.getElementById('fullscreen-viewer');
+    fv.classList.remove('hidden'); // fullscreen is active
+    fv.classList.add('guided-stage', 'guided-zoom-no-touchmenu');
+
+    const overlay = document.createElement('div');
+    overlay.id = 'bubble-magnifier-overlay';
+    overlay.style.display = 'block';
+    overlay.style.opacity = '1';
+    overlay.style.pointerEvents = 'auto';
+    overlay.style.touchAction = 'none';
+    fv.appendChild(overlay);
+
+    await sandbox.enableContinuousMode();
+
+    expect(fv.classList.contains('guided-stage')).toBe(false);
+    expect(fv.classList.contains('guided-zoom-no-touchmenu')).toBe(false);
+    expect(overlay.style.display).toBe('none');
+    expect(overlay.style.pointerEvents).toBe('none');
+  });
+
+  test('7. style.css and __guided_zoom_style exempt continuous-active so touch scrolling is not blocked', () => {
+    const styleCss = fs.readFileSync(path.join(__dirname, '../public/style.css'), 'utf-8');
+    // .fullscreen-viewer.continuous-active must have display: block (not only :has())
+    expect(styleCss).toMatch(/\.fullscreen-viewer\.continuous-active[\s\S]*?display:\s*block/);
+
+    const guidedIndexPath = path.join(__dirname, '../public/js/viewer/guided/index.js');
+    const guidedIndexCode = fs.readFileSync(guidedIndexPath, 'utf-8');
+    // __guided_zoom_style must exempt continuous-active from touch-action: none
+    expect(guidedIndexCode).toMatch(/continuous-active[\s\S]*?touch-action:\s*pan-y/);
+  });
+
+  test('8. refreshGuidedToggle treats comic.continuousMode as continuous and avoids enabling guided mode', async () => {
+    mockComic.continuousMode = true;
+    mockComic.guidedMode = true;
+
+    // Load lifecycle.js
+    const lifecyclePath = path.join(__dirname, '../public/js/viewer/guided/lifecycle.js');
+    const lifecycleCode = fs.readFileSync(lifecyclePath, 'utf-8')
+      .replace(/import\s+[\s\S]*?from\s+['"][^'"]+['"];?/g, '')
+      .replace(/export\s+function\s+/g, 'function ')
+      .replace(/export\s+async\s+function\s+/g, 'async function ')
+      .replace(/export\s+const\s+/g, 'const ')
+      .replace(/export\s+\{[\s\S]*?\};?/g, '');
+    new vm.Script(lifecycleCode).runInContext(sandbox);
+
+    const fv = document.getElementById('fullscreen-viewer');
+    fv.classList.remove('hidden');
+
+    sandbox.state.GuidedView.cache = new Map();
+    sandbox.state.GuidedView.cache.set('comic-42', { pages: { p1: { panels: [[0, 0, 100, 100]] } } });
+    sandbox.state.GuidedView.enable = jest.fn();
+    sandbox.state.GuidedView.ModeRegistry.isTransitioning = jest.fn(() => false);
+    sandbox.state.GuidedView.ModeRegistry.getActiveModeName = jest.fn(() => null);
+
+    await sandbox.refreshGuidedToggle();
+
+    // Mode must NOT be enabled
+    expect(sandbox.state.GuidedView.enable).not.toHaveBeenCalled();
+    expect(mockComic.guidedMode).toBe(false);
+    expect(fv.classList.contains('guided-stage')).toBe(false);
+    expect(fv.classList.contains('guided-zoom-no-touchmenu')).toBe(false);
+  });
 });
