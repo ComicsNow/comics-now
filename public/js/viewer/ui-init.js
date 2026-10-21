@@ -195,11 +195,7 @@ const global = new Proxy(typeof window !== 'undefined' ? window : globalThis, {
       fullscreenViewer._bgClickAttached = true;
       fullscreenViewer.addEventListener('click', (event) => {
         if (event.target !== fullscreenViewer) return;
-        if (typeof global.toggleFullscreenHUD === 'function') {
-          global.toggleFullscreenHUD();
-        } else {
-          global.showFullscreenControls?.(true);
-        }
+        global.showFullscreenControls?.(true);
       });
     }
 

@@ -138,11 +138,14 @@ const global = new Proxy(typeof window !== 'undefined' ? window : globalThis, {
   function sanitizeComicTitleLocal(rawTitle) {
     if (!rawTitle || typeof rawTitle !== 'string') return '';
     let clean = rawTitle.trim();
+    const isDirtyRelease = /\[[^\]]*\]/.test(clean) || /^\s*\d{1,3}\s*[-._]/.test(clean);
     clean = clean.replace(/\.(cbz|cbr|cb7|cbt|zip|rar|tar|pdf)$/i, '');
     clean = clean.replace(/\[[^\]]*\]/g, ' ');
     clean = clean.replace(/^\s*\d{1,3}\s*[-._]\s*(?=[a-zA-Z])/i, '');
     clean = clean.replace(/^\s*\d{1,3}\s+(?=[a-zA-Z])/i, '');
-    clean = clean.replace(/\s*\((?:19|20)\d{2}\b[^\)]*\)\s*(?=#\d+)/i, ' ');
+    if (isDirtyRelease) {
+      clean = clean.replace(/\s*\((?:19|20)\d{2}\b[^\)]*\)\s*(?=#\d+)/i, ' ');
+    }
     clean = clean.replace(/_/g, ' ').replace(/\s+/g, ' ').trim();
     return clean || rawTitle.trim();
   }
@@ -177,51 +180,40 @@ const global = new Proxy(typeof window !== 'undefined' ? window : globalThis, {
     }
   }
 
-  function isFullscreenHUDVisible() {
-    const controls = global.fullscreenControls;
-    const infoBar = global.fullscreenInfoBar || document.getElementById('fullscreen-info-bar');
-    const title = global.fullscreenTitle;
-    const closeBtn = global.fullscreenCloseBtn;
-
-    if (controls && !controls.classList.contains('hidden')) return true;
-    if (infoBar && !infoBar.classList.contains('hidden')) return true;
-    if (title && !title.classList.contains('hidden')) return true;
-    if (closeBtn && !closeBtn.classList.contains('hidden')) return true;
-    return false;
-  }
-
   function showFullscreenControls(autoHide = false) {
     const isMangaPanelZoom = global.GuidedView?.getActiveModeName?.() === 'manga-panel-zoom';
     if (global.isFullImageMode || isMangaPanelZoom) autoHide = false;
     const controls = global.fullscreenControls;
     const closeBtn = global.fullscreenCloseBtn;
     const title = global.fullscreenTitle;
-    const infoBar = global.fullscreenInfoBar || document.getElementById('fullscreen-info-bar');
-    const scrubber = document.getElementById('fullscreen-scrubber-container');
-    if (!controls && !title && !closeBtn && !infoBar) return;
+    if (!controls) return;
 
-    if (controls) controls.classList.remove('hidden');
+    controls.classList.remove('hidden');
     if (global.fullscreenViewer) {
       global.fullscreenViewer.classList.add('has-controls-open');
-      global.fullscreenViewer.classList.remove('fullscreen-hud-hidden');
     }
     if (closeBtn) closeBtn.classList.remove('hidden');
     if (title) {
       syncFullscreenTitle();
       title.classList.remove('hidden');
     }
-    if (infoBar) infoBar.classList.remove('hidden');
+    const scrubber = document.getElementById('fullscreen-scrubber-container');
     if (scrubber) scrubber.classList.remove('hidden');
 
-    clearTimeout(fullscreenControlsTimeoutId);
-    fullscreenControlsTimeoutId = null;
-
     if (autoHide) {
+      clearTimeout(fullscreenControlsTimeoutId);
       fullscreenControlsTimeoutId = setTimeout(() => {
-        if (global.isFilmstripOpen?.() || (document.getElementById('comic-page-grid-overlay') && !document.getElementById('comic-page-grid-overlay').classList.contains('hidden'))) {
-          return;
+        if (global.isFilmstripOpen?.()) return;
+        if (global.fullscreenControls) {
+          global.fullscreenControls.classList.add('hidden');
         }
-        hideFullscreenControls();
+        if (global.fullscreenViewer) {
+          global.fullscreenViewer.classList.remove('has-controls-open');
+        }
+        // Title and top-right close button remain permanently visible in fullscreen mode
+        const sc = document.getElementById('fullscreen-scrubber-container');
+        if (sc) sc.classList.add('hidden');
+        fullscreenControlsTimeoutId = null;
       }, FULLSCREEN_CONTROLS_AUTOHIDE_DELAY);
     }
   }
@@ -229,35 +221,18 @@ const global = new Proxy(typeof window !== 'undefined' ? window : globalThis, {
   function hideFullscreenControls() {
     const isMangaPanelZoom = global.GuidedView?.getActiveModeName?.() === 'manga-panel-zoom';
     if (global.isFullImageMode || isMangaPanelZoom) return;
-    if (global.isFilmstripOpen?.()) return;
-
     const controls = global.fullscreenControls;
-    const closeBtn = global.fullscreenCloseBtn;
-    const title = global.fullscreenTitle;
-    const infoBar = global.fullscreenInfoBar || document.getElementById('fullscreen-info-bar');
-    const scrubber = document.getElementById('fullscreen-scrubber-container');
+    if (!controls) return;
 
-    if (controls) controls.classList.add('hidden');
-    if (closeBtn) closeBtn.classList.add('hidden');
-    if (title) title.classList.add('hidden');
-    if (infoBar) infoBar.classList.add('hidden');
-    if (scrubber && !global.isFilmstripOpen?.()) scrubber.classList.add('hidden');
-
+    controls.classList.add('hidden');
     if (global.fullscreenViewer) {
       global.fullscreenViewer.classList.remove('has-controls-open');
-      global.fullscreenViewer.classList.add('fullscreen-hud-hidden');
     }
-
+    // Title and top-right close button remain permanently visible in fullscreen mode
+    const scrubber = document.getElementById('fullscreen-scrubber-container');
+    if (scrubber && !global.isFilmstripOpen?.()) scrubber.classList.add('hidden');
     clearTimeout(fullscreenControlsTimeoutId);
     fullscreenControlsTimeoutId = null;
-  }
-
-  function toggleFullscreenHUD() {
-    if (isFullscreenHUDVisible()) {
-      hideFullscreenControls();
-    } else {
-      showFullscreenControls(true);
-    }
   }
 
   function openFullscreen() {
@@ -278,9 +253,14 @@ const global = new Proxy(typeof window !== 'undefined' ? window : globalThis, {
     const totalPages = typeof getPageCounterTotal === 'function' ? getPageCounterTotal() : 0;
     updateFullscreenPageStatus(global.currentPageIndex + 1, totalPages);
 
-    // Populate clean sanitized title and show HUD with autohide for smooth orientation
+    // Ensure title and close button are visible and up to date in fullscreen mode
     syncFullscreenTitle();
-    showFullscreenControls(true);
+    if (global.fullscreenTitle) {
+      global.fullscreenTitle.classList.remove('hidden');
+    }
+    if (global.fullscreenCloseBtn) {
+      global.fullscreenCloseBtn.classList.remove('hidden');
+    }
 
     // Check if continuous mode should be enabled
     if (global.currentComic?.continuousMode && typeof global.enableContinuousMode === 'function') {
@@ -290,21 +270,7 @@ const global = new Proxy(typeof window !== 'undefined' ? window : globalThis, {
       }, 100);
     }
 
-    if (typeof global.resetFullscreenZoom === 'function') {
-      global.resetFullscreenZoom();
-    }
-    applyFullscreenFitMode();
-
-    if (viewer.requestFullscreen) {
-      viewer.requestFullscreen().catch((error) => {
-        
-      });
-    }
-
-    const closeBtn = global.fullscreenCloseBtn;
-    if (closeBtn) {
-      closeBtn.focus();
-    }
+    hideFullscreenControls();
 
     // If no image src was copied, trigger renderPage to load it
     if (!image.src || image.src === '') {
@@ -432,14 +398,15 @@ const global = new Proxy(typeof window !== 'undefined' ? window : globalThis, {
     if (now - lastDoubleTapAt < 500) return;
 
     // Only the centre of the page surfaces controls — taps elsewhere on the
-    // image do nothing (side-nav hotspots own the left/right thirds).
+    // image do nothing (side-nav hotspots own the left/right thirds, and
+    // the user wants top/bottom of the page silent too).
     const image = event.currentTarget || global.fullscreenImage;
     if (image && typeof image.getBoundingClientRect === 'function') {
       const rect = image.getBoundingClientRect();
       const cx = rect.left + rect.width / 2;
       const cy = rect.top + rect.height / 2;
-      const halfW = rect.width * 0.28;  // central ~56% horizontally
-      const halfH = rect.height * 0.42; // central ~84% vertically
+      const halfW = rect.width / 6;  // central 1/3 horizontally
+      const halfH = rect.height / 6; // central 1/3 vertically
       if (Math.abs(event.clientX - cx) > halfW) return;
       if (Math.abs(event.clientY - cy) > halfH) return;
     }
@@ -447,11 +414,7 @@ const global = new Proxy(typeof window !== 'undefined' ? window : globalThis, {
     clearTimeout(pendingUIToggleTimer);
     pendingUIToggleTimer = setTimeout(() => {
       pendingUIToggleTimer = null;
-      if (typeof global.toggleFullscreenHUD === 'function') {
-        global.toggleFullscreenHUD();
-      } else {
-        toggleFullscreenHUD();
-      }
+      global.showFullscreenControls?.(true);
     }, FS_DOUBLE_TAP_MS);
   }
 
@@ -1647,8 +1610,6 @@ export {
   FULLSCREEN_MAX_ZOOM_SCALE,
   showFullscreenControls,
   hideFullscreenControls,
-  toggleFullscreenHUD,
-  isFullscreenHUDVisible,
   syncFullscreenTitle,
   getCleanComicTitle,
   openFullscreen,
@@ -1683,8 +1644,6 @@ state.FULLSCREEN_MIN_ZOOM_SCALE = FULLSCREEN_MIN_ZOOM_SCALE;
 state.FULLSCREEN_MAX_ZOOM_SCALE = FULLSCREEN_MAX_ZOOM_SCALE;
 state.showFullscreenControls = showFullscreenControls;
 state.hideFullscreenControls = hideFullscreenControls;
-state.toggleFullscreenHUD = toggleFullscreenHUD;
-state.isFullscreenHUDVisible = isFullscreenHUDVisible;
 state.syncFullscreenTitle = syncFullscreenTitle;
 state.getCleanComicTitle = getCleanComicTitle;
 state.openFullscreen = openFullscreen;
@@ -1719,8 +1678,6 @@ if (typeof window !== 'undefined') {
   window.FULLSCREEN_MAX_ZOOM_SCALE = FULLSCREEN_MAX_ZOOM_SCALE;
   window.showFullscreenControls = showFullscreenControls;
   window.hideFullscreenControls = hideFullscreenControls;
-  window.toggleFullscreenHUD = toggleFullscreenHUD;
-  window.isFullscreenHUDVisible = isFullscreenHUDVisible;
   window.syncFullscreenTitle = syncFullscreenTitle;
   window.getCleanComicTitle = getCleanComicTitle;
   window.openFullscreen = openFullscreen;

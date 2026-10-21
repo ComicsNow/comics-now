@@ -309,6 +309,7 @@ export function pickMetadataValue(metadata = {}, keys = []) {
 export function sanitizeComicTitle(rawTitle) {
   if (!rawTitle || typeof rawTitle !== 'string') return '';
   let clean = rawTitle.trim();
+  const isDirtyRelease = /\[[^\]]*\]/.test(clean) || /^\s*\d{1,3}\s*[-._]/.test(clean);
   // Strip common archive and ebook extensions
   clean = clean.replace(/\.(cbz|cbr|cb7|cbt|zip|rar|tar|pdf)$/i, '');
   // Strip bracketed release / scanner tags (e.g. [215 INK], [Digital-HD])
@@ -316,8 +317,10 @@ export function sanitizeComicTitle(rawTitle) {
   // Strip leading track / sorting index prefixes like "01 ", "001 - ", "01. "
   clean = clean.replace(/^\s*\d{1,3}\s*[-._]\s*(?=[a-zA-Z])/i, '');
   clean = clean.replace(/^\s*\d{1,3}\s+(?=[a-zA-Z])/i, '');
-  // Strip release year parenthesis if preceding an issue marker, e.g. "Future Heroes (2015) #86" -> "Future Heroes #86"
-  clean = clean.replace(/\s*\((?:19|20)\d{2}\b[^\)]*\)\s*(?=#\d+)/i, ' ');
+  // Strip release year parenthesis if dirty release filename and preceding an issue marker, e.g. "Future Heroes (2015) #86" -> "Future Heroes #86"
+  if (isDirtyRelease) {
+    clean = clean.replace(/\s*\((?:19|20)\d{2}\b[^\)]*\)\s*(?=#\d+)/i, ' ');
+  }
   // Replace underscores and collapse duplicate whitespace
   clean = clean.replace(/_/g, ' ').replace(/\s+/g, ' ').trim();
   return clean || rawTitle.trim();

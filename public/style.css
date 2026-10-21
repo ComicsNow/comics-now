@@ -559,7 +559,7 @@ body.is-offline .comic-context-menu-item.hide-offline {
     padding-bottom: calc(env(safe-area-inset-bottom) + 20px);
 }
 
-/* Top-right close button and comic title - immersive auto-hide HUD */
+/* Top-right close button - always visible */
 .fullscreen-title {
     position: fixed;
     top: calc(20px + env(safe-area-inset-top));
