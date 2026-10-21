@@ -3746,88 +3746,8 @@ body.modal-open {
 .dl-batch-btn.cancel:hover { border-color: #ef4444; color: #fca5a5; }
 
 /* ==========================================================================
-   Mobile Layout Modernization: Edge Index, Toolbar Grouping & Consolidated Filter
+   Mobile Layout Modernization: Edge Index & Bleed Styling
    ========================================================================== */
-
-/* Header Secondary Tools Group */
-.secondary-tools-group {
-    display: inline-flex;
-    align-items: center;
-    background: rgba(18, 18, 18, 0.6);
-    backdrop-filter: blur(8px);
-    border: 1px solid rgba(255, 255, 255, 0.12);
-    border-radius: 12px;
-    padding: 3px 5px;
-    gap: 6px;
-}
-
-/* Consolidated Filter Bar with Expand/Collapse */
-#filters-container {
-    width: 100%;
-    transition: all 0.25s ease;
-}
-
-.filter-bar-wrapper {
-    position: relative;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-    width: 100%;
-}
-
-#filters-container[data-expanded="false"] #filter-buttons {
-    flex-wrap: nowrap;
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-    max-width: calc(100vw - 80px);
-    padding: 4px 2px;
-}
-
-#filters-container[data-expanded="true"] #filter-buttons,
-#filters-container.filters-expanded #filter-buttons {
-    flex-wrap: wrap;
-    max-width: 100%;
-    justify-content: center;
-}
-
-#filters-container.filters-expanded #smart-list-buttons,
-#filters-container[data-expanded="true"] #smart-list-buttons {
-    display: flex !important;
-    flex-wrap: wrap !important;
-    justify-content: center !important;
-    margin-top: 6px !important;
-}
-
-.filter-expand-btn {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 36px;
-    height: 36px;
-    border-radius: 10px;
-    background-color: var(--ink-2);
-    border: 1px solid rgba(255, 255, 255, 0.14);
-    color: var(--paper-dim);
-    cursor: pointer;
-    transition: background-color 0.15s ease, color 0.15s ease, transform 0.2s ease;
-    flex-shrink: 0;
-}
-
-.filter-expand-btn:hover {
-    background-color: var(--ink-3);
-    color: var(--paper);
-    border-color: rgba(255, 255, 255, 0.25);
-}
-
-.filter-expand-btn svg {
-    transition: transform 0.2s ease;
-}
-
-#filters-container[data-expanded="true"] .filter-expand-btn svg,
-#filters-container.filters-expanded .filter-expand-btn svg {
-    transform: rotate(180deg);
-}
 
 /* Edge Index (Vertical Alphabet Rail / Scrubber) */
 .edge-index,

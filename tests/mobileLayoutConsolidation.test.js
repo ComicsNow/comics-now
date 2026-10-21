@@ -9,7 +9,6 @@ const vm = require('vm');
 const ROOT = path.resolve(__dirname, '..');
 const HTML_PATH = path.join(ROOT, 'public', 'index.html');
 const CSS_PATH = path.join(ROOT, 'public', 'style.css');
-const FILTER_BAR_PATH = path.join(ROOT, 'public', 'js', 'library', 'filter-bar.js');
 const ALPHA_LIST_PATH = path.join(ROOT, 'public', 'js', 'library', 'alpha-list.js');
 
 function loadModuleInVm(filePath, customSandbox = {}) {
@@ -35,7 +34,7 @@ function loadModuleInVm(filePath, customSandbox = {}) {
   return sandbox;
 }
 
-describe('Mobile Layout Modernization & Consolidation', () => {
+describe('Mobile Layout - Unconsolidated Filter Bar, Plugin-Friendly Header & Edge Index', () => {
   let htmlContent;
   let cssContent;
 
@@ -44,26 +43,45 @@ describe('Mobile Layout Modernization & Consolidation', () => {
     cssContent = fs.readFileSync(CSS_PATH, 'utf8');
   });
 
-  describe('Secondary Tools Grouping in Header Toolbar', () => {
-    it('groups secondary tools (#reading-list-button, #ct-button, #settings-button) into a cohesive container', () => {
+  describe('Header Toolbar & Plugin Insertion Compatibility', () => {
+    it('has standard header action buttons sharing the same parent container', () => {
       document.body.innerHTML = htmlContent;
-      const group = document.getElementById('secondary-tools-group');
-      expect(group).not.toBeNull();
-      expect(group.querySelector('#reading-list-button')).not.toBeNull();
-      expect(group.querySelector('#ct-button')).not.toBeNull();
-      expect(group.querySelector('#settings-button')).not.toBeNull();
+      const readingListBtn = document.getElementById('reading-list-button');
+      const downloadsBtn = document.getElementById('downloads-button');
+      const ctBtn = document.getElementById('ct-button');
+      const settingsBtn = document.getElementById('settings-button');
+
+      expect(readingListBtn).not.toBeNull();
+      expect(downloadsBtn).not.toBeNull();
+      expect(ctBtn).not.toBeNull();
+      expect(settingsBtn).not.toBeNull();
+
+      // All buttons share the same header actions group
+      expect(readingListBtn.parentElement).toBe(settingsBtn.parentElement);
+      expect(downloadsBtn.parentElement).toBe(settingsBtn.parentElement);
+      expect(ctBtn.parentElement).toBe(settingsBtn.parentElement);
     });
 
-    it('preserves #downloads-button standalone alongside secondary tools without modifying its core attributes', () => {
+    it('supports private plugin buttons being inserted before #settings-button seamlessly', () => {
+      document.body.innerHTML = htmlContent;
+      const settingsBtn = document.getElementById('settings-button');
+      const headerGroup = settingsBtn.parentElement;
+      expect(headerGroup).not.toBeNull();
+
+      // Simulate plugin insertion (tracker.js / aria.js)
+      const mockPluginBtn = document.createElement('button');
+      mockPluginBtn.id = 'tracker-button';
+      headerGroup.insertBefore(mockPluginBtn, settingsBtn);
+
+      expect(document.getElementById('tracker-button')).not.toBeNull();
+      expect(mockPluginBtn.nextElementSibling).toBe(settingsBtn);
+    });
+
+    it('preserves the download icon (#downloads-button) with original attributes', () => {
       document.body.innerHTML = htmlContent;
       const dlBtn = document.getElementById('downloads-button');
-      expect(dlBtn).not.toBeNull();
       expect(dlBtn.getAttribute('aria-label')).toBe('Downloads');
       expect(dlBtn.getAttribute('onclick')).toBe('openDownloadsPanel()');
-
-      // Secondary tools group does NOT contain downloads-button
-      const group = document.getElementById('secondary-tools-group');
-      expect(group.querySelector('#downloads-button')).toBeNull();
     });
 
     it('preserves the second download icon (#downloaded-btn in smart filter pills)', () => {
@@ -73,46 +91,19 @@ describe('Mobile Layout Modernization & Consolidation', () => {
     });
   });
 
-  describe('Consolidated Filter Bar with Industry-Standard Expand/Collapse Toggle', () => {
-    it('includes an industry-standard expand toggle button in the filter container', () => {
+  describe('Native Unconsolidated Filter Bar', () => {
+    it('does NOT contain an expand toggle button (consolidated filter undone)', () => {
       document.body.innerHTML = htmlContent;
       const toggle = document.getElementById('filter-expand-toggle');
-      expect(toggle).not.toBeNull();
-      expect(toggle.getAttribute('aria-expanded')).toBe('false');
-      expect(toggle.getAttribute('aria-label')).toMatch(/filter/i);
+      expect(toggle).toBeNull();
     });
 
-    it('consolidates filters into one row by default and expands to two rows when toggled', () => {
+    it('renders all four status filter pills directly inside #filter-buttons', () => {
       document.body.innerHTML = htmlContent;
-      const container = document.getElementById('filters-container');
-      const toggle = document.getElementById('filter-expand-toggle');
-      expect(container).not.toBeNull();
-      expect(toggle).not.toBeNull();
-
-      // Run filter-bar module in VM
-      const sandbox = loadModuleInVm(FILTER_BAR_PATH);
-      sandbox.initFilterConsolidation();
-
-      // Default state: collapsed
-      expect(toggle.getAttribute('aria-expanded')).toBe('false');
-      expect(container.dataset.expanded).toBe('false');
-
-      // Click to expand
-      toggle.click();
-      expect(toggle.getAttribute('aria-expanded')).toBe('true');
-      expect(container.dataset.expanded).toBe('true');
-      expect(container.classList.contains('filters-expanded')).toBe(true);
-
-      // Click again to collapse
-      toggle.click();
-      expect(toggle.getAttribute('aria-expanded')).toBe('false');
-      expect(container.dataset.expanded).toBe('false');
-    });
-
-    it('defines CSS styles for single-row collapsed mode and 2-row expanded mode', () => {
-      expect(cssContent).toMatch(/#filters-container/);
-      expect(cssContent).toMatch(/\.filter-expand-btn|#filter-expand-toggle/);
-      expect(cssContent).toMatch(/filters-expanded/);
+      const buttons = document.querySelectorAll('#filter-buttons .filter-btn');
+      expect(buttons.length).toBe(4);
+      const filters = Array.from(buttons).map(b => b.getAttribute('data-filter'));
+      expect(filters).toEqual(['all', 'unread', 'in-progress', 'read']);
     });
   });
 
@@ -167,7 +158,6 @@ describe('Mobile Layout Modernization & Consolidation', () => {
 
   describe('Heavy Green Banner & Cover Art Bleed', () => {
     it('retains heavy green banner styling for read status', () => {
-      // Must maintain bold/heavy green banner
       expect(cssContent).toMatch(/\.status-banner/);
       expect(cssContent).toMatch(/\.status-read[^{]*\{[^}]*(?:rgba\(16,\s*185,\s*129|#059669|#10b981|#047857)/);
     });
