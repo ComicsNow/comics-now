@@ -1,9 +1,12 @@
 // Standalone Interactive Character & Event Graph Client
+// High-Performance Hybrid Canvas/SVG Architecture
 // Features: Force Network, Dual-Axis Bridge, Semicircle Horizon,
 // Play Publication History Scrubber, Continuity Friction Spotlight, and Interactive Dossier
 
 let simulation;
 let svg, g, linkElements, nodeElements, textElements, extraElementsGroup;
+let canvas, ctx;
+let currentTransform = d3.zoomIdentity;
 let currentGraphData = null;
 let activeSelectedNode = null;
 let zoomBehavior;
@@ -23,6 +26,12 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 function initUI() {
+  canvas = document.getElementById('graph-canvas');
+  if (canvas) {
+    ctx = canvas.getContext('2d');
+    resizeCanvas();
+  }
+
   svg = d3.select('#graph-svg');
   g = svg.append('g').attr('class', 'main-scene');
   extraElementsGroup = g.append('g').attr('class', 'extra-guides');
@@ -34,7 +43,9 @@ function initUI() {
       return !event.ctrlKey && !event.button;
     })
     .on('zoom', (event) => {
+      currentTransform = event.transform;
       g.attr('transform', event.transform);
+      drawCanvas();
     });
 
   svg.call(zoomBehavior);
@@ -55,6 +66,11 @@ function initUI() {
   document.getElementById('entity-type').addEventListener('change', loadGraph);
   document.getElementById('publisher-filter').addEventListener('change', loadGraph);
   document.getElementById('min-appearances').addEventListener('change', loadGraph);
+
+  const densitySelect = document.getElementById('link-density');
+  if (densitySelect) {
+    densitySelect.addEventListener('change', loadGraph);
+  }
 
   // Mode Tabs
   document.querySelectorAll('.mode-tab[data-mode]').forEach(tab => {
@@ -132,10 +148,22 @@ function initUI() {
 
   // Window resize handler
   window.addEventListener('resize', () => {
+    resizeCanvas();
     if (currentGraphData) {
       renderGraph(currentGraphData);
     }
   });
+}
+
+function resizeCanvas() {
+  if (!canvas || !ctx) return;
+  const dpr = window.devicePixelRatio || 1;
+  const rect = canvas.getBoundingClientRect();
+  canvas.width = rect.width * dpr;
+  canvas.height = rect.height * dpr;
+  ctx.resetTransform();
+  ctx.scale(dpr, dpr);
+  drawCanvas();
 }
 
 function setGraphMode(mode) {
@@ -171,6 +199,7 @@ function toggleFrictionSpotlight() {
   }
 
   applyFilters();
+  drawCanvas();
 }
 
 function centerGraph() {
@@ -195,14 +224,15 @@ function focusOnNode(node) {
 }
 
 function isolateNodeArc(node) {
-  if (!currentGraphData || !nodeElements || !linkElements) return;
+  if (!currentGraphData || !nodeElements) return;
 
   const connectedIds = new Set([node.id]);
-  linkElements.each(function(l) {
-    const isConn = (l.source.id === node.id || l.target.id === node.id || l.source === node.id || l.target === node.id);
-    if (isConn) {
-      connectedIds.add(l.source.id || l.source);
-      connectedIds.add(l.target.id || l.target);
+  (currentGraphData.links || []).forEach(l => {
+    const sId = typeof l.source === 'object' ? l.source.id : l.source;
+    const tId = typeof l.target === 'object' ? l.target.id : l.target;
+    if (sId === node.id || tId === node.id) {
+      connectedIds.add(sId);
+      connectedIds.add(tId);
     }
   });
 
@@ -212,11 +242,7 @@ function isolateNodeArc(node) {
     d3.select(this).classed('highlighted', match);
   });
 
-  linkElements.each(function(l) {
-    const isConn = (l.source.id === node.id || l.target.id === node.id || l.source === node.id || l.target === node.id);
-    d3.select(this).style('opacity', isConn ? 1 : 0.03);
-    d3.select(this).classed('highlighted', isConn);
-  });
+  drawCanvas();
 }
 
 // Scrubber functions
@@ -229,6 +255,7 @@ function setScrubberYear(year) {
   document.getElementById('scrubber-era-display').textContent = getEraLabel(year);
 
   applyFilters();
+  drawCanvas();
 }
 
 function stepScrubberYear(delta) {
@@ -247,6 +274,7 @@ function resetScrubber() {
   document.getElementById('scrubber-year-display').textContent = 'ALL';
   document.getElementById('scrubber-era-display').textContent = 'Full Continuity';
   applyFilters();
+  drawCanvas();
 }
 
 function togglePlayHistory() {
@@ -287,7 +315,7 @@ function getEraLabel(year) {
 }
 
 function applyFilters() {
-  if (!nodeElements || !linkElements) return;
+  if (!nodeElements) return;
 
   const hasYearFilter = currentScrubberYear !== null;
 
@@ -317,23 +345,61 @@ function applyFilters() {
     }
   });
 
-  linkElements.each(function(l) {
-    let visible = true;
-    if (hasYearFilter) {
-      visible = !l.firstYear || l.firstYear <= currentScrubberYear;
+  drawCanvas();
+}
+
+// Hardware-Accelerated Canvas Link Drawing
+function drawCanvas() {
+  if (!canvas || !ctx || !currentGraphData) return;
+  const rect = canvas.getBoundingClientRect();
+  const width = rect.width;
+  const height = rect.height;
+
+  ctx.save();
+  ctx.clearRect(0, 0, width, height);
+  ctx.translate(currentTransform.x, currentTransform.y);
+  ctx.scale(currentTransform.k, currentTransform.k);
+
+  const links = currentGraphData.links || [];
+  const nodeMap = currentGraphData.nodeMap;
+  const hasYearFilter = currentScrubberYear !== null;
+
+  for (let i = 0; i < links.length; i++) {
+    const l = links[i];
+    if (hasYearFilter && l.firstYear && l.firstYear > currentScrubberYear) continue;
+
+    const src = typeof l.source === 'object' ? l.source : nodeMap?.get(l.source);
+    const tgt = typeof l.target === 'object' ? l.target : nodeMap?.get(l.target);
+    if (!src || !tgt || src.x == null || tgt.x == null) continue;
+
+    const isConnected = activeSelectedNode && (src.id === activeSelectedNode.id || tgt.id === activeSelectedNode.id);
+    const isFriction = l.friction;
+
+    ctx.beginPath();
+    ctx.lineWidth = isConnected ? 3.5 : Math.max(1, Math.min(4.5, Math.sqrt(l.weight) * 1.1));
+
+    if (currentMode === 'horizon') {
+      const midX = (src.x + tgt.x) / 2;
+      const midY = Math.min(src.y, tgt.y) - Math.abs(src.x - tgt.x) * 0.35;
+      ctx.moveTo(src.x, src.y);
+      ctx.quadraticCurveTo(midX, midY, tgt.x, tgt.y);
+    } else {
+      ctx.moveTo(src.x, src.y);
+      ctx.lineTo(tgt.x, tgt.y);
     }
 
-    const el = d3.select(this);
-    if (!visible) {
-      el.style('opacity', 0.02);
+    if (isConnected) {
+      ctx.strokeStyle = '#ffcc00';
+    } else if (isFrictionSpotlight) {
+      ctx.strokeStyle = isFriction ? 'rgba(239, 68, 68, 0.95)' : 'rgba(148, 163, 184, 0.08)';
     } else {
-      if (isFrictionSpotlight) {
-        el.style('opacity', l.friction ? 0.95 : 0.08);
-      } else {
-        el.style('opacity', 0.6);
-      }
+      ctx.strokeStyle = isFriction ? 'rgba(239, 68, 68, 0.55)' : 'rgba(148, 163, 184, 0.22)';
     }
-  });
+
+    ctx.stroke();
+  }
+
+  ctx.restore();
 }
 
 async function loadPublishers() {
@@ -362,6 +428,8 @@ async function loadGraph() {
   const entityType = document.getElementById('entity-type').value;
   const publisher = document.getElementById('publisher-filter').value;
   const minAppearances = document.getElementById('min-appearances').value;
+  const densitySelect = document.getElementById('link-density');
+  const maxLinks = densitySelect ? densitySelect.value : '400';
 
   const isMobile = window.innerWidth < 768;
   const maxNodes = isMobile ? '80' : '150';
@@ -370,7 +438,8 @@ async function loadGraph() {
     entityType,
     minAppearances,
     minWeight: '1',
-    maxNodes
+    maxNodes,
+    maxLinks
   });
   if (publisher) params.append('publisher', publisher);
 
@@ -378,6 +447,8 @@ async function loadGraph() {
     const res = await fetch(`/api/graph?${params.toString()}`);
     const data = await res.json();
     if (data.ok) {
+      // Map nodes for O(1) link lookup
+      data.nodeMap = new Map(data.nodes.map(n => [n.id, n]));
       currentGraphData = data;
 
       // Update Year Range for Scrubber
@@ -414,6 +485,7 @@ function renderGraph(data) {
   }
 
   applyFilters();
+  drawCanvas();
 }
 
 function renderNetworkLayout(data) {
@@ -425,17 +497,20 @@ function renderNetworkLayout(data) {
     .domain(['DC Comics', 'Marvel', 'Image Comics', 'Dark Horse Comics'])
     .range(['#0078f2', '#e52421', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899']);
 
-  // Links
-  linkElements = g.append('g')
-    .attr('class', 'links')
-    .selectAll('line')
-    .data(data.links)
-    .enter()
-    .append('line')
-    .attr('class', d => `link ${d.friction ? 'friction-link' : ''}`)
-    .attr('stroke-width', d => Math.max(1.2, Math.min(6, Math.sqrt(d.weight) * 1.1)));
+  // Create D3 Force Simulation
+  simulation = d3.forceSimulation(data.nodes)
+    .force('link', d3.forceLink(data.links).id(d => d.id).distance(d => Math.max(70, 110 - d.weight * 2)))
+    .force('charge', d3.forceManyBody().strength(isMobile ? -160 : -240))
+    .force('center', d3.forceCenter(width / 2, height / 2))
+    .force('collision', d3.forceCollide().radius(d => Math.max(16, Math.sqrt(d.appearances) * 3.2) + 8))
+    .on('tick', ticked);
 
-  // Nodes
+  // Simulation Pre-Warming: Pre-compute 80 ticks in memory so initial frame renders stabilized instantly
+  for (let i = 0; i < 80; i++) {
+    simulation.tick();
+  }
+
+  // Nodes (SVG Layer)
   const nodeGroup = g.append('g').attr('class', 'nodes');
 
   const nodes = nodeGroup.selectAll('.node')
@@ -448,6 +523,7 @@ function renderNetworkLayout(data) {
       else if (d.frictionScore >= 40) fClass = 'bridge-node';
       return `node ${fClass}`;
     })
+    .attr('transform', d => `translate(${d.x},${d.y})`)
     .call(d3.drag()
       .on('start', dragstarted)
       .on('drag', dragged)
@@ -480,37 +556,23 @@ function renderNetworkLayout(data) {
     .attr('text-anchor', 'middle')
     .text(d => d.label);
 
-  // Force simulation
-  simulation = d3.forceSimulation(data.nodes)
-    .force('link', d3.forceLink(data.links).id(d => d.id).distance(d => Math.max(70, 110 - d.weight * 2)))
-    .force('charge', d3.forceManyBody().strength(isMobile ? -180 : -260))
-    .force('center', d3.forceCenter(width / 2, height / 2))
-    .force('collision', d3.forceCollide().radius(d => Math.max(16, Math.sqrt(d.appearances) * 3.2) + 8))
-    .on('tick', ticked);
-
   svg.call(
     zoomBehavior.transform,
     d3.zoomIdentity.translate(0, 0).scale(isMobile ? 0.75 : 0.9)
   );
 
   function ticked() {
-    linkElements
-      .attr('x1', d => d.source.x)
-      .attr('y1', d => d.source.y)
-      .attr('x2', d => d.target.x)
-      .attr('y2', d => d.target.y);
-
     nodes.attr('transform', d => `translate(${d.x},${d.y})`);
+    drawCanvas();
   }
 }
 
-// Dual-Axis Bridge Mode: Two parallel columns with bridge links across the chasm
+// Dual-Axis Bridge Mode
 function renderDualAxisLayout(data) {
   const width = window.innerWidth;
   const height = window.innerHeight - 130;
   const isMobile = window.innerWidth < 768;
 
-  // Determine Axis A and Axis B
   const pubCounts = {};
   data.nodes.forEach(n => {
     (n.publishers || []).forEach(p => {
@@ -533,7 +595,6 @@ function renderDualAxisLayout(data) {
     }
   });
 
-  // Sort each column by appearances
   leftAxisNodes.sort((a, b) => b.appearances - a.appearances);
   rightAxisNodes.sort((a, b) => b.appearances - a.appearances);
 
@@ -557,9 +618,7 @@ function renderDualAxisLayout(data) {
     n.axis = 'right';
   });
 
-  const nodeMap = new Map(data.nodes.map(n => [n.id, n]));
-
-  // Draw Axis Guides & Headers
+  // Guides & Headers
   extraElementsGroup.append('line')
     .attr('class', 'axis-divider')
     .attr('x1', width / 2)
@@ -581,30 +640,7 @@ function renderDualAxisLayout(data) {
     .attr('text-anchor', 'middle')
     .text(`AXIS B: ${secondaryPub.toUpperCase()}`);
 
-  // Draw Links
-  const linksG = g.append('g').attr('class', 'links');
-  linkElements = linksG.selectAll('line')
-    .data(data.links)
-    .enter()
-    .append('line')
-    .attr('class', d => {
-      const src = nodeMap.get(typeof d.source === 'object' ? d.source.id : d.source);
-      const tgt = nodeMap.get(typeof d.target === 'object' ? d.target.id : d.target);
-      const isCrossAxis = src && tgt && src.axis !== tgt.axis;
-      return `link ${isCrossAxis ? 'highlighted friction-link' : ''}`;
-    })
-    .attr('x1', d => (nodeMap.get(typeof d.source === 'object' ? d.source.id : d.source)?.x || 0))
-    .attr('y1', d => (nodeMap.get(typeof d.source === 'object' ? d.source.id : d.source)?.y || 0))
-    .attr('x2', d => (nodeMap.get(typeof d.target === 'object' ? d.target.id : d.target)?.x || 0))
-    .attr('y2', d => (nodeMap.get(typeof d.target === 'object' ? d.target.id : d.target)?.y || 0))
-    .attr('stroke-width', d => {
-      const src = nodeMap.get(typeof d.source === 'object' ? d.source.id : d.source);
-      const tgt = nodeMap.get(typeof d.target === 'object' ? d.target.id : d.target);
-      const isCrossAxis = src && tgt && src.axis !== tgt.axis;
-      return isCrossAxis ? Math.max(2.5, Math.sqrt(d.weight) * 1.5) : Math.max(1, Math.sqrt(d.weight));
-    });
-
-  // Draw Nodes
+  // Nodes (SVG Layer)
   const nodesG = g.append('g').attr('class', 'nodes');
   const nodes = nodesG.selectAll('.node')
     .data(data.nodes)
@@ -637,20 +673,20 @@ function renderDualAxisLayout(data) {
     zoomBehavior.transform,
     d3.zoomIdentity.translate(0, 0).scale(0.85)
   );
+
+  drawCanvas();
 }
 
-// Semicircle Horizon Mode: Dramatic panoramic arc with arched Bézier bridges
+// Semicircle Horizon Mode
 function renderHorizonLayout(data) {
   const width = window.innerWidth;
   const height = window.innerHeight - 130;
   const isMobile = window.innerWidth < 768;
 
-  // Center and Radius of Horizon
   const cx = width / 2;
   const cy = height * 0.88;
   const radius = Math.min(width * 0.48, height * 0.72);
 
-  // Sort nodes chronologically
   const sortedNodes = [...data.nodes].sort((a, b) => {
     const ya = a.firstYear || 2000;
     const yb = b.firstYear || 2000;
@@ -666,9 +702,7 @@ function renderHorizonLayout(data) {
     n.angle = angle;
   });
 
-  const nodeMap = new Map(sortedNodes.map(n => [n.id, n]));
-
-  // Draw Horizon Arc Guide & Celestial Star
+  // Horizon Arc Guide & Celestial Star
   extraElementsGroup.append('path')
     .attr('class', 'horizon-arc-guide')
     .attr('d', `M ${cx - radius} ${cy} A ${radius} ${radius} 0 0 1 ${cx + radius} ${cy}`);
@@ -686,26 +720,7 @@ function renderHorizonLayout(data) {
     .attr('text-anchor', 'middle')
     .text('HORIZON CONTINUITY DOME');
 
-  // Draw Bézier Curved Links
-  const linksG = g.append('g').attr('class', 'links');
-  linkElements = linksG.selectAll('path')
-    .data(data.links)
-    .enter()
-    .append('path')
-    .attr('class', d => `curve-link ${d.friction ? 'highlighted friction-link' : ''}`)
-    .attr('d', d => {
-      const src = nodeMap.get(typeof d.source === 'object' ? d.source.id : d.source);
-      const tgt = nodeMap.get(typeof d.target === 'object' ? d.target.id : d.target);
-      if (!src || !tgt) return '';
-
-      // Curved control point pulled toward celestial center
-      const midX = (src.x + tgt.x) / 2;
-      const midY = Math.min(src.y, tgt.y) - Math.abs(src.x - tgt.x) * 0.35;
-      return `M ${src.x} ${src.y} Q ${midX} ${midY} ${tgt.x} ${tgt.y}`;
-    })
-    .attr('stroke-width', d => Math.max(1.2, Math.min(5, Math.sqrt(d.weight) * 1.1)));
-
-  // Draw Nodes
+  // Nodes (SVG Layer)
   const nodesG = g.append('g').attr('class', 'nodes');
   const nodes = nodesG.selectAll('.node')
     .data(sortedNodes)
@@ -743,6 +758,8 @@ function renderHorizonLayout(data) {
     zoomBehavior.transform,
     d3.zoomIdentity.translate(0, 0).scale(isMobile ? 0.75 : 0.88)
   );
+
+  drawCanvas();
 }
 
 function dragstarted(event, d) {
@@ -756,6 +773,7 @@ function dragged(event, d) {
   if (currentMode !== 'network') return;
   d.fx = event.x;
   d.fy = event.y;
+  drawCanvas();
 }
 
 function dragended(event, d) {
@@ -763,38 +781,33 @@ function dragended(event, d) {
   if (!event.active && simulation) simulation.alphaTarget(0);
   d.fx = null;
   d.fy = null;
+  drawCanvas();
 }
 
 async function selectNode(node) {
   activeSelectedNode = node;
 
-  const connectedNodeIds = new Set();
-  connectedNodeIds.add(node.id);
+  const connectedNodeIds = new Set([node.id]);
 
-  linkElements.each(function(l) {
-    const sId = l.source.id || l.source;
-    const tId = l.target.id || l.target;
-    const isConnected = sId === node.id || tId === node.id;
-    d3.select(this).classed('highlighted', isConnected);
-    if (isConnected) {
+  (currentGraphData.links || []).forEach(l => {
+    const sId = typeof l.source === 'object' ? l.source.id : l.source;
+    const tId = typeof l.target === 'object' ? l.target.id : l.target;
+    if (sId === node.id || tId === node.id) {
       connectedNodeIds.add(sId);
       connectedNodeIds.add(tId);
-      d3.select(this).raise();
     }
   });
 
-  nodeElements.each(function(n) {
-    const isConn = connectedNodeIds.has(n.id);
-    d3.select(this).classed('highlighted', isConn);
-    d3.select(this).style('opacity', isConn ? 1 : 0.15);
-    if (isConn) d3.select(this).raise();
-  });
+  if (nodeElements) {
+    nodeElements.each(function(n) {
+      const isConn = connectedNodeIds.has(n.id);
+      d3.select(this).classed('highlighted', isConn);
+      d3.select(this).style('opacity', isConn ? 1 : 0.15);
+      if (isConn) d3.select(this).raise();
+    });
+  }
 
-  linkElements.style('opacity', function(l) {
-    const sId = l.source.id || l.source;
-    const tId = l.target.id || l.target;
-    return (sId === node.id || tId === node.id) ? 1 : 0.05;
-  });
+  drawCanvas();
 
   // Populate Interactive Dossier
   document.getElementById('sb-name').textContent = node.id;
@@ -891,7 +904,5 @@ function clearHighlight() {
   if (nodeElements) {
     nodeElements.classed('highlighted', false);
   }
-  if (linkElements) {
-    linkElements.classed('highlighted', false);
-  }
+  drawCanvas();
 }

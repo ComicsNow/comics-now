@@ -577,13 +577,26 @@
       overflow: hidden;
       z-index: 2;
       touch-action: none; /* Allows D3 zoom/pan gestures without page scroll collision */
+      contain: layout paint;
+    }
+
+    #graph-canvas {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 2;
     }
 
     #graph-svg {
+      position: absolute;
+      inset: 0;
       width: 100%;
       height: 100%;
       cursor: grab;
       touch-action: none;
+      z-index: 3;
     }
 
     #graph-svg:active {
@@ -921,6 +934,13 @@
         <option value="25">Min 25+</option>
       </select>
 
+      <select id="link-density" class="pill-select" title="Adaptive Link Density Control">
+        <option value="250">Links: Curated (250)</option>
+        <option value="400" selected>Links: Balanced (400)</option>
+        <option value="800">Links: Deep (800)</option>
+        <option value="9999">Links: All (Dense)</option>
+      </select>
+
       <input type="text" id="search-input" class="search-input-pill" placeholder="🔍 Search...">
     </div>
   </header>
@@ -954,6 +974,8 @@
       <span id="friction-banner-count">0 Nexus points</span>
     </div>
 
+    <!-- Hardware-Accelerated 60 FPS Canvas Layer for Dense Link Networks -->
+    <canvas id="graph-canvas"></canvas>
     <svg id="graph-svg"></svg>
 
     <!-- Touch Quick-Action FABs -->

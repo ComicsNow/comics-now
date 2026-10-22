@@ -37,6 +37,8 @@ function buildCoOccurrenceGraph(comics, options = {}) {
   const minAppearances = typeof options.minAppearances === 'number' ? options.minAppearances : 1;
   const minWeight = typeof options.minWeight === 'number' ? options.minWeight : 1;
   const maxNodes = typeof options.maxNodes === 'number' ? options.maxNodes : 250;
+  const maxLinks = typeof options.maxLinks === 'number' ? options.maxLinks : null;
+  const includeComicIds = options.includeComicIds !== false;
 
   const nodeMap = new Map(); // entityName -> { appearances, series: Set, publishers: Set, comics: Set }
   const pairMap = new Map(); // key 'A|B' (sorted) -> { weight, comics: Set }
@@ -227,7 +229,7 @@ function buildCoOccurrenceGraph(comics, options = {}) {
   const maxYear = allYears.length > 0 ? Math.max(...allYears) : 2026;
 
   // Build links between valid nodes with friction attributes
-  const links = [];
+  let links = [];
   for (const pair of pairMap.values()) {
     if (validNodeIds.has(pair.source) && validNodeIds.has(pair.target)) {
       if (pair.weight >= minWeight) {
@@ -242,20 +244,35 @@ function buildCoOccurrenceGraph(comics, options = {}) {
         const isCrossSeries = (srcNode && tgtNode && (srcNode.series.size > 1 || tgtNode.series.size > 1));
         const friction = isCrossPublisher || (linkYears.length > 1 && (linkYears[linkYears.length - 1] - linkYears[0] >= 15));
 
-        links.push({
+        const linkObj = {
           source: pair.source,
           target: pair.target,
           weight: pair.weight,
-          comics: Array.from(pair.comics),
+          comicCount: pair.comics.size,
           firstYear: linkYears.length > 0 ? linkYears[0] : null,
           lastYear: linkYears.length > 0 ? linkYears[linkYears.length - 1] : null,
           years: linkYears,
           isCrossPublisher,
           isCrossSeries,
           friction
-        });
+        };
+
+        if (includeComicIds) {
+          linkObj.comics = Array.from(pair.comics);
+        }
+
+        links.push(linkObj);
       }
     }
+  }
+
+  // Adaptive link pruning: prioritize cross-publisher/continuity friction bridges, then heaviest co-occurrences
+  if (maxLinks && links.length > maxLinks) {
+    links.sort((a, b) => {
+      if (a.friction !== b.friction) return b.friction ? 1 : -1;
+      return b.weight - a.weight;
+    });
+    links = links.slice(0, maxLinks);
   }
 
   return {

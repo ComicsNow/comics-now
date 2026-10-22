@@ -129,6 +129,13 @@ describe('graph-engine (TDD)', () => {
       expect(jl.appearances).toBe(2);
     });
 
+    test('prunes dense edges with maxLinks option prioritizing high weight and friction bridges', () => {
+      const graph = buildCoOccurrenceGraph(sampleComics, { entityType: 'characters', maxLinks: 1 });
+      expect(graph.links.length).toBe(1);
+      // Batman & Superman have weight 2, Batman & Joker have weight 1 => highest weight preserved
+      expect(graph.links[0].weight).toBe(2);
+    });
+
     test('extracts publication years and chronology metadata for nodes and links', () => {
       const graph = buildCoOccurrenceGraph(sampleComics, { entityType: 'characters' });
       const batman = graph.nodes.find(n => n.id === 'Batman');

@@ -71,6 +71,8 @@ function createApp(options = {}) {
       const minAppearances = parseInt(req.query.minAppearances, 10) || 2;
       const minWeight = parseInt(req.query.minWeight, 10) || 1;
       const maxNodes = parseInt(req.query.maxNodes, 10) || 120;
+      const maxLinks = req.query.maxLinks ? parseInt(req.query.maxLinks, 10) : 400;
+      const includeComicIds = req.query.includeComicIds === 'true';
 
       const comics = getAllComics();
       const graph = buildCoOccurrenceGraph(comics, {
@@ -79,7 +81,9 @@ function createApp(options = {}) {
         series,
         minAppearances,
         minWeight,
-        maxNodes
+        maxNodes,
+        maxLinks,
+        includeComicIds
       });
 
       res.json({
