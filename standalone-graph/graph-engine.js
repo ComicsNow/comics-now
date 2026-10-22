@@ -83,6 +83,17 @@ function buildCoOccurrenceGraph(comics, options = {}) {
     const entities = parseListField(rawList);
     if (entities.length === 0) continue;
 
+    // Extract publication year
+    let year = null;
+    if (meta.Year) {
+      const y = parseInt(meta.Year, 10);
+      if (!isNaN(y) && y >= 1900 && y <= 2100) year = y;
+    } else if (meta['Cover Date'] || meta.cover_date) {
+      const cd = String(meta['Cover Date'] || meta.cover_date);
+      const match = cd.match(/\b(19\d{2}|20\d{2})\b/);
+      if (match) year = parseInt(match[1], 10);
+    }
+
     const comicId = comic.id;
     const seriesName = comic.series || meta.Series || 'Unknown Series';
     const publisherName = comic.publisher || meta.Publisher || 'Unknown Publisher';
@@ -95,7 +106,9 @@ function buildCoOccurrenceGraph(comics, options = {}) {
           appearances: 0,
           series: new Set(),
           publishers: new Set(),
-          comics: new Set()
+          comics: new Set(),
+          years: new Set(),
+          appearancesByYear: {}
         });
       }
       const node = nodeMap.get(ent);
@@ -103,6 +116,10 @@ function buildCoOccurrenceGraph(comics, options = {}) {
       node.series.add(seriesName);
       node.publishers.add(publisherName);
       node.comics.add(comicId);
+      if (year) {
+        node.years.add(year);
+        node.appearancesByYear[year] = (node.appearancesByYear[year] || 0) + 1;
+      }
     }
 
     // Track pairs (co-occurrences)
@@ -117,12 +134,16 @@ function buildCoOccurrenceGraph(comics, options = {}) {
             source: entA < entB ? entA : entB,
             target: entA < entB ? entB : entA,
             weight: 0,
-            comics: new Set()
+            comics: new Set(),
+            years: new Set(),
+            publishers: new Set()
           });
         }
         const pair = pairMap.get(pairKey);
         pair.weight += 1;
         pair.comics.add(comicId);
+        if (year) pair.years.add(year);
+        if (publisherName) pair.publishers.add(publisherName);
       }
     }
   }
@@ -139,27 +160,99 @@ function buildCoOccurrenceGraph(comics, options = {}) {
 
   const validNodeIds = new Set(validNodes.map(n => n.id));
 
-  // Build formatted node list
-  const nodes = validNodes.map(n => ({
-    id: n.id,
-    label: n.id,
-    appearances: n.appearances,
-    seriesCount: n.series.size,
-    series: Array.from(n.series),
-    publishers: Array.from(n.publishers),
-    comicCount: n.comics.size
-  }));
+  // Build formatted node list with chronology & continuity friction metrics
+  const nodes = validNodes.map(n => {
+    const yearsArr = Array.from(n.years).sort((a, b) => a - b);
+    const firstYear = yearsArr.length > 0 ? yearsArr[0] : null;
+    const lastYear = yearsArr.length > 0 ? yearsArr[yearsArr.length - 1] : null;
+    const publishersArr = Array.from(n.publishers);
+    const seriesArr = Array.from(n.series);
 
-  // Build links between valid nodes
+    // Calculate Continuity Friction
+    let score = 0;
+    const reasons = [];
+
+    if (publishersArr.length > 1) {
+      score += Math.min(50, publishersArr.length * 25);
+      reasons.push(`Crosses ${publishersArr.length} publishers: ${publishersArr.join(', ')}`);
+    }
+
+    if (seriesArr.length >= 3) {
+      const seriesRatio = (seriesArr.length / Math.max(1, n.appearances));
+      const seriesBonus = Math.min(35, Math.round(seriesRatio * 30 + seriesArr.length * 2));
+      score += seriesBonus;
+      reasons.push(`Spans ${seriesArr.length} distinct series`);
+    }
+
+    if (firstYear && lastYear && (lastYear - firstYear >= 10)) {
+      const span = lastYear - firstYear;
+      score += Math.min(25, Math.round(span / 1.5));
+      reasons.push(`Timeline span of ${span} years (${firstYear}–${lastYear})`);
+    }
+
+    const frictionScore = Math.min(100, Math.max(10, Math.round(score)));
+    let frictionLevel = 'Canon Anchor';
+    if (frictionScore >= 70) {
+      frictionLevel = 'Multiverse Nexus';
+    } else if (frictionScore >= 40) {
+      frictionLevel = 'Cross-Series Bridge';
+    }
+
+    return {
+      id: n.id,
+      label: n.id,
+      appearances: n.appearances,
+      seriesCount: n.series.size,
+      series: seriesArr,
+      publishers: publishersArr,
+      comicCount: n.comics.size,
+      firstYear,
+      lastYear,
+      years: yearsArr,
+      appearancesByYear: n.appearancesByYear,
+      frictionScore,
+      frictionLevel,
+      frictionReasons: reasons
+    };
+  });
+
+  // Collect global year bounds
+  const allYears = [];
+  for (const n of nodes) {
+    if (n.years && n.years.length > 0) {
+      allYears.push(...n.years);
+    }
+  }
+  const minYear = allYears.length > 0 ? Math.min(...allYears) : 1970;
+  const maxYear = allYears.length > 0 ? Math.max(...allYears) : 2026;
+
+  // Build links between valid nodes with friction attributes
   const links = [];
   for (const pair of pairMap.values()) {
     if (validNodeIds.has(pair.source) && validNodeIds.has(pair.target)) {
       if (pair.weight >= minWeight) {
+        const linkYears = Array.from(pair.years).sort((a, b) => a - b);
+        const srcNode = nodeMap.get(pair.source);
+        const tgtNode = nodeMap.get(pair.target);
+        const srcPubs = srcNode ? Array.from(srcNode.publishers) : [];
+        const tgtPubs = tgtNode ? Array.from(tgtNode.publishers) : [];
+
+        const hasCommonPub = srcPubs.some(p => tgtPubs.includes(p));
+        const isCrossPublisher = (srcPubs.length > 0 && tgtPubs.length > 0 && (srcPubs[0] !== tgtPubs[0] || !hasCommonPub || srcPubs.length > 1 || tgtPubs.length > 1)) || (pair.publishers.size > 1);
+        const isCrossSeries = (srcNode && tgtNode && (srcNode.series.size > 1 || tgtNode.series.size > 1));
+        const friction = isCrossPublisher || (linkYears.length > 1 && (linkYears[linkYears.length - 1] - linkYears[0] >= 15));
+
         links.push({
           source: pair.source,
           target: pair.target,
           weight: pair.weight,
-          comics: Array.from(pair.comics)
+          comics: Array.from(pair.comics),
+          firstYear: linkYears.length > 0 ? linkYears[0] : null,
+          lastYear: linkYears.length > 0 ? linkYears[linkYears.length - 1] : null,
+          years: linkYears,
+          isCrossPublisher,
+          isCrossSeries,
+          friction
         });
       }
     }
@@ -173,6 +266,10 @@ function buildCoOccurrenceGraph(comics, options = {}) {
       returnedNodes: nodes.length,
       returnedLinks: links.length,
       entityType,
+      yearRange: {
+        min: minYear,
+        max: maxYear
+      },
       filter: {
         publisher: publisherFilter,
         series: seriesFilter,

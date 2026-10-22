@@ -128,5 +128,63 @@ describe('graph-engine (TDD)', () => {
       expect(jl).toBeDefined();
       expect(jl.appearances).toBe(2);
     });
+
+    test('extracts publication years and chronology metadata for nodes and links', () => {
+      const graph = buildCoOccurrenceGraph(sampleComics, { entityType: 'characters' });
+      const batman = graph.nodes.find(n => n.id === 'Batman');
+      expect(batman.firstYear).toBe(2024);
+      expect(batman.lastYear).toBe(2024);
+      expect(batman.years).toContain(2024);
+
+      const spawn = graph.nodes.find(n => n.id === 'Spawn');
+      expect(spawn.firstYear).toBe(1992);
+      expect(spawn.lastYear).toBe(1992);
+
+      expect(graph.meta.yearRange).toBeDefined();
+      expect(graph.meta.yearRange.min).toBe(1992);
+      expect(graph.meta.yearRange.max).toBe(2024);
+
+      const batSupLink = graph.links.find(
+        l => (l.source === 'Batman' && l.target === 'Superman') ||
+             (l.source === 'Superman' && l.target === 'Batman')
+      );
+      expect(batSupLink.firstYear).toBe(2024);
+      expect(batSupLink.lastYear).toBe(2024);
+    });
+
+    test('calculates continuity friction scores, levels, and reasons', () => {
+      // Create a crossover comic with Batman appearing in an Image Comic
+      const crossoverComics = [
+        ...sampleComics,
+        {
+          id: 'c5',
+          name: 'Batman / Spawn #1',
+          series: 'Batman/Spawn Crossover',
+          publisher: 'Image Comics',
+          metadata: JSON.stringify({
+            Characters: 'Batman, Spawn',
+            Year: '1994'
+          })
+        }
+      ];
+
+      const graph = buildCoOccurrenceGraph(crossoverComics, { entityType: 'characters' });
+      const batman = graph.nodes.find(n => n.id === 'Batman');
+      expect(batman.publishers).toContain('DC Comics');
+      expect(batman.publishers).toContain('Image Comics');
+      expect(batman.frictionScore).toBeGreaterThan(40);
+      expect(batman.frictionLevel).toBeDefined();
+      expect(['Multiverse Nexus', 'Cross-Series Bridge']).toContain(batman.frictionLevel);
+      expect(batman.frictionReasons.length).toBeGreaterThan(0);
+
+      // Check cross-publisher link
+      const batSpawnLink = graph.links.find(
+        l => (l.source === 'Batman' && l.target === 'Spawn') ||
+             (l.source === 'Spawn' && l.target === 'Batman')
+      );
+      expect(batSpawnLink).toBeDefined();
+      expect(batSpawnLink.isCrossPublisher).toBe(true);
+      expect(batSpawnLink.friction).toBe(true);
+    });
   });
 });

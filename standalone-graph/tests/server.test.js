@@ -78,7 +78,7 @@ describe('Standalone Character & Event Graph API (TDD)', () => {
     expect(data.port).toBe(3021);
   });
 
-  test('GET /api/graph returns nodes and links', async () => {
+  test('GET /api/graph returns nodes and links with chronology and continuity friction', async () => {
     const { status, data } = await getJson('/api/graph?entityType=characters&minAppearances=1');
     expect(status).toBe(200);
     expect(data.ok).toBe(true);
@@ -86,6 +86,11 @@ describe('Standalone Character & Event Graph API (TDD)', () => {
     expect(Array.isArray(data.links)).toBe(true);
     expect(data.nodes.some(n => n.id === 'Batman')).toBe(true);
     expect(data.nodes.some(n => n.id === 'Superman')).toBe(true);
+    expect(data.meta.yearRange).toBeDefined();
+
+    const batman = data.nodes.find(n => n.id === 'Batman');
+    expect(batman.frictionScore).toBeDefined();
+    expect(batman.frictionLevel).toBeDefined();
   });
 
   test('GET /api/entity/:name/details returns entity relationships and connected targets', async () => {
