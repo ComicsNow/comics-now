@@ -11,11 +11,14 @@ if (!fs.existsSync(dbDir)) {
 
 const db = new Database(DB_FILE);
 
-// Enable performance pragmas (WAL mode, busy timeout, foreign keys)
+// Enable performance pragmas (WAL mode, busy timeout, foreign keys, memory cache, memory-mapped I/O)
 db.pragma('journal_mode = WAL');
 db.pragma('synchronous = NORMAL');
 db.pragma('busy_timeout = 5000');
 db.pragma('foreign_keys = ON');
+db.pragma('cache_size = -64000');
+db.pragma('mmap_size = 268435456');
+db.pragma('temp_store = MEMORY');
 
 const statementCache = new Map();
 const MAX_CACHED_STATEMENTS = 250;
@@ -251,100 +254,114 @@ async function initializeDatabase() {
     await dbRun(`CREATE INDEX IF NOT EXISTS idx_comics_publisher ON comics(publisher)`);
     await dbRun(`CREATE INDEX IF NOT EXISTS idx_comics_series ON comics(series)`);
     await dbRun(`CREATE INDEX IF NOT EXISTS idx_comics_updatedAt ON comics(updatedAt)`);
+    await dbRun(`CREATE INDEX IF NOT EXISTS idx_comics_publisher_series ON comics(publisher, series)`);
     await dbRun(`CREATE INDEX IF NOT EXISTS idx_reading_list_items_comic ON reading_list_items(comicId)`);
+    await dbRun(`CREATE INDEX IF NOT EXISTS idx_reading_list_items_list_sort ON reading_list_items(listId, sortOrder)`);
+    await dbRun(`CREATE INDEX IF NOT EXISTS idx_reading_lists_user_sort ON reading_lists(userId, sortOrder)`);
+    await dbRun(`CREATE INDEX IF NOT EXISTS idx_user_comic_status_comic ON user_comic_status(comicId)`);
 
     await dbRun('COMMIT');
     log('INFO', 'DB', 'Database initialization complete');
 
     // Title vs Series cleanup migration: If Title matches Series (including issue numbers, #3, etc.), set Title to '' in comics.metadata
-    try {
-      const { isTitleSameAsSeries } = require('./services/metadata');
-      const rows = db.prepare("SELECT id, series, metadata FROM comics WHERE metadata LIKE '%\"Title\":%'").all();
-      const updateStmt = db.prepare("UPDATE comics SET metadata = ? WHERE id = ?");
-      let cleanedCount = 0;
-      for (const row of rows) {
-        if (!row.metadata) continue;
-        try {
-          const m = JSON.parse(row.metadata);
-          if (m.Title && (isTitleSameAsSeries(m.Title, m.Series || row.series) || (!m.Series && !row.series && isTitleSameAsSeries(m.Title, '')))) {
-            m.Title = '';
-            updateStmt.run(JSON.stringify(m), row.id);
-            cleanedCount++;
-          }
-        } catch {}
+    // Guarded to run once and skip on subsequent startups
+    const titleMigrationFlag = await dbGet("SELECT value FROM settings WHERE key = 'migration_title_cleanup_v1'");
+    if (!titleMigrationFlag) {
+      try {
+        const { isTitleSameAsSeries } = require('./services/metadata');
+        const rows = db.prepare("SELECT id, series, metadata FROM comics WHERE metadata LIKE '%\"Title\":%'").all();
+        const updateStmt = db.prepare("UPDATE comics SET metadata = ? WHERE id = ?");
+        let cleanedCount = 0;
+        for (const row of rows) {
+          if (!row.metadata) continue;
+          try {
+            const m = JSON.parse(row.metadata);
+            if (m.Title && (isTitleSameAsSeries(m.Title, m.Series || row.series) || (!m.Series && !row.series && isTitleSameAsSeries(m.Title, '')))) {
+              m.Title = '';
+              updateStmt.run(JSON.stringify(m), row.id);
+              cleanedCount++;
+            }
+          } catch {}
+        }
+        await dbRun("INSERT OR REPLACE INTO settings (key, value) VALUES ('migration_title_cleanup_v1', '1')");
+        if (cleanedCount > 0) {
+          log('INFO', 'DB', `Cleaned redundant Title from metadata for ${cleanedCount} comic(s)`);
+        }
+      } catch (e) {
+        log('WARN', 'DB', `Title cleanup migration error: ${e.message}`);
       }
-      if (cleanedCount > 0) {
-        log('INFO', 'DB', `Cleaned redundant Title from metadata for ${cleanedCount} comic(s)`);
-      }
-    } catch (e) {
-      log('WARN', 'DB', `Title cleanup migration error: ${e.message}`);
     }
 
     // Creator role disambiguation migration:
     // Resolve Writer vs Penciller/Artist/Colorist/Letterer across existing comics
-    try {
-      const { resolveCreatorRoles } = require('./services/metadata');
-      const rows = db.prepare("SELECT id, series, metadata FROM comics WHERE metadata LIKE '%\"Writer\":%' OR metadata LIKE '%\"writer\":%'").all();
-      const updateStmt = db.prepare("UPDATE comics SET metadata = ? WHERE id = ?");
-      let disambiguatedCount = 0;
+    // Guarded to run once and skip on subsequent startups
+    const creatorRolesFlag = await dbGet("SELECT value FROM settings WHERE key = 'migration_creator_roles_v1'");
+    if (!creatorRolesFlag) {
+      try {
+        const { resolveCreatorRoles } = require('./services/metadata');
+        const rows = db.prepare("SELECT id, series, metadata FROM comics WHERE metadata LIKE '%\"Writer\":%' OR metadata LIKE '%\"writer\":%'").all();
+        const updateStmt = db.prepare("UPDATE comics SET metadata = ? WHERE id = ?");
+        let disambiguatedCount = 0;
 
-      // Cache known artists per series from existing records
-      const seriesArtistMap = new Map();
-      const allSeriesRows = db.prepare("SELECT series, metadata FROM comics WHERE series IS NOT NULL AND (metadata LIKE '%\"Penciller\":%' OR metadata LIKE '%\"penciller\":%' OR metadata LIKE '%\"Inker\":%' OR metadata LIKE '%\"Colorist\":%')").all();
-      for (const sr of allSeriesRows) {
-        if (!sr.metadata || !sr.series) continue;
-        try {
-          const sm = JSON.parse(sr.metadata);
-          const artists = [
-            sm.Penciller, sm.penciller,
-            sm.Inker, sm.inker,
-            sm.Colorist, sm.colorist,
-            sm.Letterer, sm.letterer,
-            sm.CoverArtist, sm.cover_artist
-          ].filter(Boolean);
-          if (artists.length) {
-            const list = seriesArtistMap.get(sr.series) || [];
-            for (const a of artists) {
-              const parts = String(a).split(/[,;&]|\s+and\s+/i);
-              for (const p of parts) {
-                const trimmed = p.trim();
-                if (trimmed && !list.some(existing => existing.toLowerCase() === trimmed.toLowerCase())) {
-                  list.push(trimmed);
+        // Cache known artists per series from existing records
+        const seriesArtistMap = new Map();
+        const allSeriesRows = db.prepare("SELECT series, metadata FROM comics WHERE series IS NOT NULL AND (metadata LIKE '%\"Penciller\":%' OR metadata LIKE '%\"penciller\":%' OR metadata LIKE '%\"Inker\":%' OR metadata LIKE '%\"Colorist\":%')").all();
+        for (const sr of allSeriesRows) {
+          if (!sr.metadata || !sr.series) continue;
+          try {
+            const sm = JSON.parse(sr.metadata);
+            const artists = [
+              sm.Penciller, sm.penciller,
+              sm.Inker, sm.inker,
+              sm.Colorist, sm.colorist,
+              sm.Letterer, sm.letterer,
+              sm.CoverArtist, sm.cover_artist
+            ].filter(Boolean);
+            if (artists.length) {
+              const list = seriesArtistMap.get(sr.series) || [];
+              for (const a of artists) {
+                const parts = String(a).split(/[,;&]|\s+and\s+/i);
+                for (const p of parts) {
+                  const trimmed = p.trim();
+                  if (trimmed && !list.some(existing => existing.toLowerCase() === trimmed.toLowerCase())) {
+                    list.push(trimmed);
+                  }
                 }
               }
+              seriesArtistMap.set(sr.series, list);
             }
-            seriesArtistMap.set(sr.series, list);
-          }
-        } catch {}
+          } catch {}
+        }
+
+        for (const row of rows) {
+          if (!row.metadata) continue;
+          try {
+            const m = JSON.parse(row.metadata);
+            const origWriter = m.Writer || m.writer || '';
+            const origPenciller = m.Penciller || m.penciller || '';
+            const origColorist = m.Colorist || m.colorist || '';
+
+            const seriesArtists = (row.series && seriesArtistMap.get(row.series)) || [];
+            resolveCreatorRoles(m, seriesArtists);
+
+            const newWriter = m.Writer || m.writer || '';
+            const newPenciller = m.Penciller || m.penciller || '';
+            const newColorist = m.Colorist || m.colorist || '';
+
+            if (newWriter !== origWriter || newPenciller !== origPenciller || newColorist !== origColorist) {
+              updateStmt.run(JSON.stringify(m), row.id);
+              disambiguatedCount++;
+            }
+          } catch {}
+        }
+
+        await dbRun("INSERT OR REPLACE INTO settings (key, value) VALUES ('migration_creator_roles_v1', '1')");
+        if (disambiguatedCount > 0) {
+          log('INFO', 'DB', `Disambiguated creator roles for ${disambiguatedCount} comic(s)`);
+        }
+      } catch (e) {
+        log('WARN', 'DB', `Creator role disambiguation migration error: ${e.message}`);
       }
-
-      for (const row of rows) {
-        if (!row.metadata) continue;
-        try {
-          const m = JSON.parse(row.metadata);
-          const origWriter = m.Writer || m.writer || '';
-          const origPenciller = m.Penciller || m.penciller || '';
-          const origColorist = m.Colorist || m.colorist || '';
-
-          const seriesArtists = (row.series && seriesArtistMap.get(row.series)) || [];
-          resolveCreatorRoles(m, seriesArtists);
-
-          const newWriter = m.Writer || m.writer || '';
-          const newPenciller = m.Penciller || m.penciller || '';
-          const newColorist = m.Colorist || m.colorist || '';
-
-          if (newWriter !== origWriter || newPenciller !== origPenciller || newColorist !== origColorist) {
-            updateStmt.run(JSON.stringify(m), row.id);
-            disambiguatedCount++;
-          }
-        } catch {}
-      }
-
-      if (disambiguatedCount > 0) {
-        log('INFO', 'DB', `Disambiguated creator roles for ${disambiguatedCount} comic(s)`);
-      }
-    } catch (e) {
-      log('WARN', 'DB', `Creator role disambiguation migration error: ${e.message}`);
     }
   } catch (err) {
     await dbRun('ROLLBACK').catch(() => {});
