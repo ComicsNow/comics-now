@@ -1,0 +1,360 @@
+/**
+ * Lore Index Manager Service
+ *
+ * Manages the isolated /opt/comics-now/lore-index.db database.
+ * Stores canonical reading orders, story arcs, and multiverse chronologies across publishers,
+ * computes "owned vs missing" gap analysis against the user's library,
+ * and provides safe on-demand synchronization back into comics-now.db.
+ */
+
+const crypto = require('crypto');
+const Database = require('better-sqlite3');
+
+function getHashId(seed) {
+  return crypto.createHash('sha1').update(String(seed)).digest('hex');
+}
+
+function normalizeStr(s) {
+  return (s || '').trim().toLowerCase();
+}
+
+/**
+ * Initializes the SQLite lore database schema.
+ */
+function initLoreDatabase(dbPath = '/opt/comics-now/lore-index.db') {
+  const db = new Database(dbPath);
+  db.pragma('journal_mode = WAL');
+  db.pragma('foreign_keys = ON');
+
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS reading_orders (
+      id TEXT PRIMARY KEY,
+      publisher TEXT,
+      name TEXT NOT NULL,
+      description TEXT,
+      source_url TEXT,
+      total_canonical_issues INTEGER DEFAULT 0,
+      owned_issues_count INTEGER DEFAULT 0,
+      created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS reading_order_issues (
+      id TEXT PRIMARY KEY,
+      reading_order_id TEXT NOT NULL,
+      sequence_num INTEGER NOT NULL,
+      series TEXT NOT NULL,
+      number TEXT,
+      title TEXT,
+      publisher TEXT,
+      role TEXT,
+      local_comic_id TEXT,
+      is_owned INTEGER DEFAULT 0,
+      FOREIGN KEY (reading_order_id) REFERENCES reading_orders(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS story_arcs (
+      id TEXT PRIMARY KEY,
+      publisher TEXT,
+      name TEXT NOT NULL,
+      start_year INTEGER,
+      end_year INTEGER,
+      description TEXT,
+      multiverse_lore TEXT
+    );
+
+    CREATE TABLE IF NOT EXISTS crossover_bridges (
+      id TEXT PRIMARY KEY,
+      publisher_a TEXT,
+      series_a TEXT,
+      publisher_b TEXT,
+      series_b TEXT,
+      notes TEXT
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_roi_order ON reading_order_issues(reading_order_id);
+    CREATE INDEX IF NOT EXISTS idx_roi_owned ON reading_order_issues(is_owned);
+  `);
+
+  return db;
+}
+
+/**
+ * Matches a canonical issue candidate against the library comics list.
+ */
+function matchComicInLibrary(issue, libraryComics) {
+  if (!Array.isArray(libraryComics) || libraryComics.length === 0) return null;
+
+  const targetSeries = normalizeStr(issue.series);
+  const targetNum = normalizeStr(issue.number);
+
+  // 1. Exact series match and issue number match
+  const exact = libraryComics.find(c => {
+    const s = normalizeStr(c.series);
+    const n = normalizeStr(c.issueNumber || c.number);
+    if (s === targetSeries) {
+      if (targetNum && n === targetNum) return true;
+      if (!targetNum) return true;
+    }
+    return false;
+  });
+  if (exact) return exact;
+
+  // 2. Substring or filename match (e.g. Omnibus / Special / Title in comic name)
+  const partial = libraryComics.find(c => {
+    const s = normalizeStr(c.series);
+    const name = normalizeStr(c.name);
+    const matchesSeries = s.includes(targetSeries) || targetSeries.includes(s) || name.includes(targetSeries);
+    if (!matchesSeries) return false;
+
+    if (targetNum && (name.includes(`#${targetNum}`) || name.includes(` ${targetNum} `) || name.includes(` ${targetNum}.`))) {
+      return true;
+    }
+    if (issue.title && name.includes(normalizeStr(issue.title))) {
+      return true;
+    }
+    return false;
+  });
+  if (partial) return partial;
+
+  // 3. Subtitle / arc title phrase match
+  if (issue.title) {
+    const titleWords = normalizeStr(issue.title)
+      .replace(/vol(ume)?\.?\s*\d+/gi, '')
+      .replace(/#\s*\d+/gi, '')
+      .replace(/[^a-z0-9\s]/g, '')
+      .split(/\s+/)
+      .filter(w => w.length > 3 && w !== 'tempest' && w !== 'issue' && w !== 'part');
+
+    if (titleWords.length > 0) {
+      const titleMatch = libraryComics.find(c => {
+        const s = normalizeStr(c.series);
+        const name = normalizeStr(c.name);
+        const n = normalizeStr(c.issueNumber || c.number);
+
+        // If both have numbers and they conflict, do not match across different issues
+        if (targetNum && n && targetNum !== n) return false;
+
+        const matchesSeries = s.includes(targetSeries) || targetSeries.includes(s) || name.includes(targetSeries);
+        if (!matchesSeries) return false;
+        return titleWords.some(w => name.includes(w) || s.includes(w));
+      });
+      if (titleMatch) return titleMatch;
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Indexes a canonical reading order into lore-index.db and maps owned comics.
+ */
+function indexReadingOrder(loreDb, orderData, libraryComics = []) {
+  if (!orderData || !orderData.name) {
+    throw new Error('Reading order name is required.');
+  }
+
+  const orderId = getHashId(orderData.name);
+  const issues = Array.isArray(orderData.issues) ? orderData.issues : [];
+
+  let ownedCount = 0;
+  const processedIssues = issues.map((issue, idx) => {
+    const matched = matchComicInLibrary(issue, libraryComics);
+    const isOwned = matched ? 1 : 0;
+    if (isOwned) ownedCount++;
+
+    return {
+      id: getHashId(`${orderId}-${idx}-${issue.series}-${issue.number || ''}`),
+      reading_order_id: orderId,
+      sequence_num: idx + 1,
+      series: issue.series || 'Unknown Series',
+      number: issue.number != null ? String(issue.number) : '',
+      title: issue.title || '',
+      publisher: issue.publisher || orderData.publisher || '',
+      role: issue.role || 'Core',
+      local_comic_id: matched ? matched.id : null,
+      is_owned: isOwned
+    };
+  });
+
+  // Begin transaction
+  const upsertOrder = loreDb.prepare(`
+    INSERT INTO reading_orders (id, publisher, name, description, source_url, total_canonical_issues, owned_issues_count, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+    ON CONFLICT(id) DO UPDATE SET
+      publisher = excluded.publisher,
+      description = excluded.description,
+      source_url = excluded.source_url,
+      total_canonical_issues = excluded.total_canonical_issues,
+      owned_issues_count = excluded.owned_issues_count,
+      updated_at = CURRENT_TIMESTAMP
+  `);
+
+  const deleteOldIssues = loreDb.prepare('DELETE FROM reading_order_issues WHERE reading_order_id = ?');
+  const insertIssue = loreDb.prepare(`
+    INSERT INTO reading_order_issues (id, reading_order_id, sequence_num, series, number, title, publisher, role, local_comic_id, is_owned)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+
+  const transaction = loreDb.transaction(() => {
+    upsertOrder.run(
+      orderId,
+      orderData.publisher || 'Multiple',
+      orderData.name,
+      orderData.description || '',
+      orderData.source_url || '',
+      issues.length,
+      ownedCount
+    );
+
+    deleteOldIssues.run(orderId);
+
+    for (const item of processedIssues) {
+      insertIssue.run(
+        item.id,
+        item.reading_order_id,
+        item.sequence_num,
+        item.series,
+        item.number,
+        item.title,
+        item.publisher,
+        item.role,
+        item.local_comic_id,
+        item.is_owned
+      );
+    }
+  });
+
+  transaction();
+  return orderId;
+}
+
+/**
+ * Retrieves unowned canonical issues for gap tracking ("what am I missing?").
+ */
+function getMissingIssuesForOrder(loreDb, orderId) {
+  return loreDb.prepare(`
+    SELECT sequence_num, series, number, title, publisher, role
+    FROM reading_order_issues
+    WHERE reading_order_id = ? AND is_owned = 0
+    ORDER BY sequence_num ASC
+  `).all(orderId);
+}
+
+/**
+ * Safely imports/syncs an indexed lore reading order into comics-now.db.
+ * Enforces all 6 preservation & curation rules:
+ * - Rule 1: Never delete user reading lists or remove comics
+ * - Rule 2: Never reset user reading progress
+ * - Rule 3: Multi-series only
+ * - Rule 4: Threshold >= 3 owned comics
+ * - Rule 5: No duplicate lists
+ * - Rule 6: Multi-user parity sync across all registered users
+ */
+async function syncLoreOrderToComicsNow(loreDb, comicsNowDb, orderId, options = {}) {
+  const order = loreDb.prepare('SELECT * FROM reading_orders WHERE id = ?').get(orderId);
+  if (!order) {
+    return { success: false, reason: `Reading order '${orderId}' not found in lore index.` };
+  }
+
+  // Get owned comics in sequence
+  const ownedIssues = loreDb.prepare(`
+    SELECT sequence_num, series, local_comic_id
+    FROM reading_order_issues
+    WHERE reading_order_id = ? AND is_owned = 1 AND local_comic_id IS NOT NULL
+    ORDER BY sequence_num ASC
+  `).all(orderId);
+
+  // Enforce Rule 4: Minimum Threshold >= 3 comics
+  if (ownedIssues.length < 3) {
+    return {
+      success: false,
+      reason: `Rule 4 violation: Threshold requirement not met. Library only has ${ownedIssues.length} matching comics (minimum 3 required).`
+    };
+  }
+
+  // Enforce Rule 3: Multi-Series Only (>= 2 distinct series)
+  const distinctSeries = new Set(ownedIssues.map(i => normalizeStr(i.series)));
+  if (distinctSeries.size < 2) {
+    return {
+      success: false,
+      reason: `Rule 3 violation: Single-series list rejected (${distinctSeries.size} series). Reading lists must span at least 2 distinct series.`
+    };
+  }
+
+  // Check if target database is better-sqlite3 or async helper
+  const isBetterSqlite = typeof comicsNowDb.prepare === 'function';
+
+  // Helper query methods
+  const queryAll = async (sql, params = []) => {
+    if (isBetterSqlite) return comicsNowDb.prepare(sql).all(...params);
+    return comicsNowDb.dbAll(sql, params);
+  };
+  const queryGet = async (sql, params = []) => {
+    if (isBetterSqlite) return comicsNowDb.prepare(sql).get(...params);
+    return comicsNowDb.dbGet(sql, params);
+  };
+  const queryRun = async (sql, params = []) => {
+    if (isBetterSqlite) return comicsNowDb.prepare(sql).run(...params);
+    return comicsNowDb.dbRun(sql, params);
+  };
+
+  // Enforce Rule 5: Duplicate Prevention
+  const existing = await queryGet('SELECT id FROM reading_lists WHERE name = ? AND userId = ?', [order.name, 'default-user']);
+  if (existing) {
+    return {
+      success: false,
+      reason: `Rule 5 violation: Reading list '${order.name}' already exists in Comics Now.`
+    };
+  }
+
+  // Rule 6: Get all registered users (supports both userId and id column)
+  let users = [];
+  try {
+    const userRows = await queryAll('SELECT userId FROM users');
+    users = (userRows || []).map(u => ({ id: u.userId }));
+  } catch (_) {
+    try {
+      const userRows = await queryAll('SELECT id FROM users');
+      users = (userRows || []).map(u => ({ id: u.id }));
+    } catch (_) {}
+  }
+  if (!users || users.length === 0) {
+    users = [{ id: 'default-user' }];
+  }
+
+  // Insert reading list and items with multi-user parity
+  for (const user of users) {
+    const listId = getHashId(`${user.id}-${order.name}`);
+
+    await queryRun(
+      `INSERT OR IGNORE INTO reading_lists (id, userId, name, description, sortOrder)
+       VALUES (?, ?, ?, ?, 0)`,
+      [listId, user.id, order.name, order.description || '']
+    );
+
+    let itemSort = 0;
+    for (const issue of ownedIssues) {
+      await queryRun(
+        `INSERT OR IGNORE INTO reading_list_items (listId, comicId, sortOrder)
+         VALUES (?, ?, ?)`,
+        [listId, issue.local_comic_id, itemSort++]
+      );
+    }
+  }
+
+  return {
+    success: true,
+    matchedComics: ownedIssues.length,
+    totalCanonical: order.total_canonical_issues,
+    usersSynced: users.length,
+    listName: order.name
+  };
+}
+
+module.exports = {
+  initLoreDatabase,
+  indexReadingOrder,
+  getMissingIssuesForOrder,
+  syncLoreOrderToComicsNow
+};
