@@ -169,6 +169,7 @@ def test_gcd_filters_nn_issues(monkeypatch):
                 return {}
         return Resp()
 
+    monkeypatch.setattr(covers.requests, "get", fake_get)
     monkeypatch.setattr("requests.get", fake_get)
     results = gcd.search_gcd_multi("3-D Batman")
     assert len(results) == 1
@@ -220,6 +221,7 @@ def test_gcd_search_multi_rejects_ssrf_issue_urls(monkeypatch):
                 return {}
         return Resp()
 
+    monkeypatch.setattr(covers.requests, "get", fake_get)
     monkeypatch.setattr("requests.get", fake_get)
     results = gcd.search_gcd_multi("Safe Series")
     # Verify that ONLY the legitimate comics.org URL was requested and SSRF targets were blocked
@@ -243,6 +245,7 @@ def test_compare_covers_python_blocks_metadata_and_loopback_ssrf(monkeypatch, tm
             content = b""
         return Resp()
 
+    monkeypatch.setattr(covers.requests, "get", fake_get)
     monkeypatch.setattr("requests.get", fake_get)
 
     # 1. Cloud metadata IP must be blocked with 0.0 score and NO network call
