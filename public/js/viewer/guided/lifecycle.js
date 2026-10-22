@@ -25,8 +25,15 @@ export function onPageRendered() {
   requestAnimationFrame(state.GuidedView.refreshRender);
 }
 
+let isRefreshingToggle = false;
+let lastFullscreenHiddenState = null;
+
 // Refresh button enabled state and auto-enable per saved preference.
 export async function refreshGuidedToggle() {
+  if (isRefreshingToggle) return;
+  isRefreshingToggle = true;
+
+  try {
   const btn = document.getElementById('manga-guided-toggle-btn');
   const westernBtn = document.getElementById('western-guided-toggle-btn');
   const westernSpeechBtn = document.getElementById('western-speech-zoom');
@@ -182,28 +189,43 @@ export async function refreshGuidedToggle() {
     registry.disableAll({ persist: isContinuous ? true : false });
   }
 
-  if (isContinuous) {
-    const fv = document.getElementById('fullscreen-viewer');
-    if (fv) {
-      fv.classList.remove('guided-stage');
-      fv.classList.remove('guided-zoom-no-touchmenu');
+    if (isContinuous) {
+      const fv = document.getElementById('fullscreen-viewer');
+      if (fv) {
+        if (fv.classList.contains('guided-stage')) {
+          fv.classList.remove('guided-stage');
+        }
+        if (fv.classList.contains('guided-zoom-no-touchmenu')) {
+          fv.classList.remove('guided-zoom-no-touchmenu');
+        }
+      }
+      const overlay = document.getElementById('bubble-magnifier-overlay');
+      if (overlay) {
+        overlay.style.display = 'none';
+        overlay.style.opacity = '0';
+        overlay.style.pointerEvents = 'none';
+      }
     }
-    const overlay = document.getElementById('bubble-magnifier-overlay');
-    if (overlay) {
-      overlay.style.display = 'none';
-      overlay.style.opacity = '0';
-      overlay.style.pointerEvents = 'none';
-    }
-  }
 
-  if (typeof state.GuidedView.updateAllUI === 'function') state.GuidedView.updateAllUI();
+    if (typeof state.GuidedView.updateAllUI === 'function') state.GuidedView.updateAllUI();
+  } finally {
+    isRefreshingToggle = false;
+  }
 }
 
 export function watchFullscreenToggle() {
   const fv = document.getElementById('fullscreen-viewer');
   if (!fv || fv._guidedObserver) return;
+  lastFullscreenHiddenState = fv.classList.contains('hidden');
   const observer = new MutationObserver(() => {
-    const open = isFullscreenOpen();
+    const isHidden = fv.classList.contains('hidden');
+    // Only react when the fullscreen visibility state actually toggles (hidden added/removed).
+    // Ignore internal style or non-visibility class changes to avoid microtask mutation storms.
+    if (isHidden === lastFullscreenHiddenState) {
+      return;
+    }
+    lastFullscreenHiddenState = isHidden;
+    const open = !isHidden;
     if (open) refreshGuidedToggle();
     else state.GuidedView.ModeRegistry.disableAll({ persist: false });
   });

@@ -273,8 +273,8 @@ const global = new Proxy(typeof window !== 'undefined' ? window : globalThis, {
 
     hideFullscreenControls();
 
-    // If no image src was copied, trigger renderPage to load it
-    if (!image.src || image.src === '') {
+    // If no image src was copied and not in continuous mode, trigger renderPage to load it
+    if (!global.isContinuousMode && (!image.src || image.src === '')) {
       if (typeof global.renderPage === 'function') {
         global.renderPage().catch((err) => {
           console.error('[openFullscreen] Error calling renderPage:', err);

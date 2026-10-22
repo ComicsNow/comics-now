@@ -1974,6 +1974,29 @@
         <!-- Results Source Filter Tabs -->
         <div id="cv-source-filter-tabs" class="flex flex-wrap items-center gap-1.5 mb-3 hidden"></div>
 
+        <!-- Source Staging Tray -->
+        <div id="source-staging-tray" class="hidden mb-3 p-3 bg-gray-800/95 rounded-xl border border-gray-700/80 shadow-lg">
+          <div class="flex items-center justify-between gap-2 mb-2">
+            <div class="flex items-center gap-2">
+              <span class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-purple-600/30 text-purple-300 text-xs font-bold">⚡</span>
+              <h3 class="text-xs font-bold uppercase tracking-wider text-gray-300">
+                Staged Sources (<span id="staged-sources-count">0</span>)
+              </h3>
+            </div>
+            <div class="flex items-center gap-2">
+              <button id="clear-staged-sources-btn" type="button" class="text-xs text-gray-400 hover:text-red-400 transition-colors cursor-pointer">
+                Clear All
+              </button>
+              <button id="synthesize-staged-sources-btn" type="button" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white text-xs font-bold shadow-md hover:shadow-purple-500/20 transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed" disabled>
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                <span>Synthesize with Gemini Flash</span>
+              </button>
+            </div>
+          </div>
+          <p id="staging-tray-hint" class="text-[11px] text-gray-400 mb-2">Stage 2 or more sources from search results to synthesize canonical metadata with Gemini Flash.</p>
+          <div id="staged-sources-list" class="flex flex-wrap gap-2"></div>
+        </div>
+
         <ul id="search-results" class="space-y-2"></ul>
 
         <!-- Pager -->

@@ -366,6 +366,68 @@ function sanitizeMetadata(metadata) {
     });
   }
 
+  // 5. Canonicalize alias/lowercase keys and delete duplicate fields
+  const KEY_ALIAS_TO_CANONICAL = {
+    title: 'Title',
+    issue_title: 'Title',
+    series: 'Series',
+    number: 'Number',
+    issue: 'Number',
+    issue_number: 'Number',
+    volume: 'Volume',
+    summary: 'Summary',
+    description: 'Summary',
+    writer: 'Writer',
+    penciller: 'Penciller',
+    inker: 'Inker',
+    colorist: 'Colorist',
+    letterer: 'Letterer',
+    cover_artist: 'CoverArtist',
+    coverartist: 'CoverArtist',
+    editor: 'Editor',
+    publisher: 'Publisher',
+    imprint: 'Imprint',
+    genre: 'Genre',
+    tags: 'Tags',
+    web: 'Web',
+    source_url: 'Web',
+    page_count: 'PageCount',
+    pagecount: 'PageCount',
+    characters: 'Characters',
+    teams: 'Teams',
+    locations: 'Locations',
+    story_arc: 'StoryArc',
+    storyarc: 'StoryArc',
+    story_arc_number: 'StoryArcNumber',
+    storyarcnumber: 'StoryArcNumber',
+    age_rating: 'AgeRating',
+    agerating: 'AgeRating',
+    year: 'Year',
+    month: 'Month',
+    day: 'Day',
+    cover_date: 'CoverDate',
+    coverdate: 'CoverDate',
+    'cover date': 'CoverDate',
+    publish_date: 'CoverDate',
+    store_date: 'StoreDate',
+    storedate: 'StoreDate',
+    'store date': 'StoreDate',
+    notes: 'Notes',
+    isbn: 'ISBN',
+    format: 'Format'
+  };
+
+  for (const [aliasKey, canonicalKey] of Object.entries(KEY_ALIAS_TO_CANONICAL)) {
+    if (Object.prototype.hasOwnProperty.call(metadata, aliasKey)) {
+      if (metadata[canonicalKey] === undefined || metadata[canonicalKey] === '' || metadata[canonicalKey] === null) {
+        if (metadata[aliasKey] !== undefined && metadata[aliasKey] !== '' && metadata[aliasKey] !== null) {
+          metadata[canonicalKey] = metadata[aliasKey];
+        }
+      }
+      delete metadata[aliasKey];
+    }
+  }
+
   return metadata;
 }
 
@@ -445,6 +507,14 @@ function renderMetadataDisplay(metadata, clearForm = true) {
 
   // Show only fields that have values (for both admin and non-admin)
   const merged = { ...(metadata || {}) };
+
+  // Exclude internal non-field properties from rendering in the edit form
+  const nonFieldKeys = new Set([
+    'cover_image_url', 'coverUrl', 'matching_url', 'type', 'id', 'source', 'fullMetadata', 'genres'
+  ]);
+  for (const k of nonFieldKeys) {
+    delete merged[k];
+  }
 
   // Which keys should be chip inputs
   const chipFields = new Set(['Characters', 'Teams', 'Locations', 'StoryArc', 'Genre']);

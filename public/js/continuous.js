@@ -178,9 +178,13 @@ export async function renderContinuousMode() {
     `.page-container[data-index="${currentIndex}"]`
   );
   if (targetContainer) {
-    // Use instant scroll (no animation) for initial position
+    // Use auto/instant scroll (no animation) for initial position
     isInitializingScroll = true;
-    targetContainer.scrollIntoView({ behavior: 'instant', block: 'center' });
+    try {
+      targetContainer.scrollIntoView({ behavior: 'auto', block: 'center' });
+    } catch (_) {
+      try { targetContainer.scrollIntoView(true); } catch (e) {}
+    }
 
     // Clear initialization flag after scroll settles
     setTimeout(() => {
@@ -217,6 +221,7 @@ export async function enableContinuousMode() {
 
   const currentComic = state.currentComic || window.currentComic;
   if (currentComic) {
+    currentComic.continuousMode = true;
     currentComic.guidedMode = false;
     currentComic.bubbleMode = false;
     currentComic.hotZoomMode = false;
@@ -231,6 +236,7 @@ export async function enableContinuousMode() {
     const updateComicInLibrary = state.updateComicInLibrary || window.updateComicInLibrary;
     if (typeof updateComicInLibrary === 'function') {
       updateComicInLibrary(currentComic.id, {
+        continuousMode: true,
         guidedMode: false,
         bubbleMode: false,
         hotZoomMode: false,
@@ -376,6 +382,15 @@ export async function enableContinuousMode() {
 export async function disableContinuousMode() {
   isContinuousMode = false;
   state.isContinuousMode = false;
+
+  const currentComic = state.currentComic || window.currentComic;
+  if (currentComic) {
+    currentComic.continuousMode = false;
+    const updateComicInLibrary = state.updateComicInLibrary || window.updateComicInLibrary;
+    if (typeof updateComicInLibrary === 'function') {
+      updateComicInLibrary(currentComic.id, { continuousMode: false });
+    }
+  }
   
   const refreshGuidedToggle = state.refreshGuidedToggle || window.refreshGuidedToggle;
   if (typeof refreshGuidedToggle === 'function') {
@@ -809,16 +824,28 @@ export async function updateContinuousModeInCache(comicId, continuousMode) {
 // BUTTON HANDLERS
 // ============================================================================
 
+let isSwitchingContinuousMode = false;
+
 /**
  * Setup click handler for continuous mode button
  * @param {HTMLElement} button - Button element
  */
 function setupContinuousModeButtonHandler(button) {
-  if (!button) return;
+  if (!button || button._continuousAttached) return;
+  button._continuousAttached = true;
 
-  button.addEventListener('click', async () => {
+  button.addEventListener('click', async (e) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+
+    if (isSwitchingContinuousMode) return;
+    isSwitchingContinuousMode = true;
+
     const currentComic = state.currentComic || window.currentComic;
     if (!currentComic) {
+      isSwitchingContinuousMode = false;
       return;
     }
 
@@ -890,6 +917,8 @@ function setupContinuousModeButtonHandler(button) {
     } catch (error) {
       console.error('[CONTINUOUS] Error toggling continuous mode:', error);
       alert('Failed to toggle continuous mode. Please try again.');
+    } finally {
+      isSwitchingContinuousMode = false;
     }
   });
 }
