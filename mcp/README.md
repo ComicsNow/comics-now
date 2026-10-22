@@ -96,10 +96,12 @@ claude mcp add comics-now -- /path/to/comics-now/mcp/run.sh
   - `list_libraries()`: List all configured comic root library folders.
   - `get_user_stats(user_id)`: Get detailed reading statistics, read/unread counts, and total pages read for a user.
   - `get_operation_errors()`: Retrieve recent system operation errors, failures, and stack traces.
-- **AI Visual Tagging**:
+- **AI Visual Tagging & Web URL Metadata Extraction**:
   - `get_cover_image(comic_id, page=0)`: Extracts a high-res cover image for visual inspection.
   - `get_tags(comic_id)` / `get_tags_bulk(comic_ids)`: Reads ComicInfo + database tags.
   - `set_tags(comic_id, fields, storage)` / `set_tags_bulk(...)`: Writes ComicInfo (sidecar XML, CBZ archive, or DB).
+  - `extract_metadata_from_url(url, filename=None)`: Scrapes clean markdown from any web URL (Comic Vine, League of Comic Geeks, Fandom, Goodreads, etc.) and synthesizes canonical ComicInfo metadata via Gemini AI.
+  - `tag_comic_from_url(comic_id, url, storage="sidecar")`: One-step web tagging: extracts ComicInfo from a URL via Gemini and automatically commits the tags to the comic while tracking usage against the daily Gemini quota.
   - `tag_workflow()`: Returns step-by-step guidance for cover-driven tagging.
 - **AI Reading List Curation**:
   - `curate_reading_order_event(event_name, apply_changes=False)`: Curate an event or crossover reading order (e.g., 'Civil War', 'Knightfall', 'Absolute DC'). Scrapes canonical orders from DC Universe Infinite, Comic Book Reading Orders, Comic Book Herald, and Wikipedia, matches your library's single issues and omnibuses, and enforces multi-series rules.

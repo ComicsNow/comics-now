@@ -366,6 +366,68 @@ function sanitizeMetadata(metadata) {
     });
   }
 
+  // 5. Canonicalize alias/lowercase keys and delete duplicate fields
+  const KEY_ALIAS_TO_CANONICAL = {
+    title: 'Title',
+    issue_title: 'Title',
+    series: 'Series',
+    number: 'Number',
+    issue: 'Number',
+    issue_number: 'Number',
+    volume: 'Volume',
+    summary: 'Summary',
+    description: 'Summary',
+    writer: 'Writer',
+    penciller: 'Penciller',
+    inker: 'Inker',
+    colorist: 'Colorist',
+    letterer: 'Letterer',
+    cover_artist: 'CoverArtist',
+    coverartist: 'CoverArtist',
+    editor: 'Editor',
+    publisher: 'Publisher',
+    imprint: 'Imprint',
+    genre: 'Genre',
+    tags: 'Tags',
+    web: 'Web',
+    source_url: 'Web',
+    page_count: 'PageCount',
+    pagecount: 'PageCount',
+    characters: 'Characters',
+    teams: 'Teams',
+    locations: 'Locations',
+    story_arc: 'StoryArc',
+    storyarc: 'StoryArc',
+    story_arc_number: 'StoryArcNumber',
+    storyarcnumber: 'StoryArcNumber',
+    age_rating: 'AgeRating',
+    agerating: 'AgeRating',
+    year: 'Year',
+    month: 'Month',
+    day: 'Day',
+    cover_date: 'CoverDate',
+    coverdate: 'CoverDate',
+    'cover date': 'CoverDate',
+    publish_date: 'CoverDate',
+    store_date: 'StoreDate',
+    storedate: 'StoreDate',
+    'store date': 'StoreDate',
+    notes: 'Notes',
+    isbn: 'ISBN',
+    format: 'Format'
+  };
+
+  for (const [aliasKey, canonicalKey] of Object.entries(KEY_ALIAS_TO_CANONICAL)) {
+    if (Object.prototype.hasOwnProperty.call(metadata, aliasKey)) {
+      if (metadata[canonicalKey] === undefined || metadata[canonicalKey] === '' || metadata[canonicalKey] === null) {
+        if (metadata[aliasKey] !== undefined && metadata[aliasKey] !== '' && metadata[aliasKey] !== null) {
+          metadata[canonicalKey] = metadata[aliasKey];
+        }
+      }
+      delete metadata[aliasKey];
+    }
+  }
+
   return metadata;
 }
 
@@ -413,6 +475,93 @@ function isTitleSameAsSeries(title, series) {
   return false;
 }
 
+function createUrlTaggerBox() {
+  const container = document.createElement('div');
+  container.id = 'tag-from-url-container';
+  container.className = 'bg-gray-800/80 border border-blue-500/30 rounded-lg p-3 mb-4';
+
+  container.innerHTML = `
+    <div class="flex items-center justify-between mb-1.5">
+      <label class="text-xs font-semibold text-blue-400 flex items-center gap-1.5" for="tag-url-input">
+        <span>🌐</span> Tag from Web URL (r.jina + Gemini)
+      </label>
+      <span class="text-[11px] text-gray-400">League of Comic Geeks, Fandom Wiki, or store link</span>
+    </div>
+    <div class="flex gap-2">
+      <input type="url" id="tag-url-input" placeholder="https://..." class="bg-gray-700 text-xs text-white p-2 rounded-md flex-1 border border-gray-600 focus:outline-hidden focus:ring-1 focus:ring-blue-500" />
+      <button type="button" id="tag-url-btn" class="bg-blue-600 hover:bg-blue-500 text-white text-xs font-medium px-3 py-1.5 rounded-md flex items-center gap-1 transition-colors cursor-pointer">
+        <span>⚡</span> Extract & Apply
+      </button>
+    </div>
+    <div id="tag-url-status" class="text-[11px] mt-1 text-gray-300 hidden"></div>
+  `;
+
+  const btn = container.querySelector('#tag-url-btn');
+  const input = container.querySelector('#tag-url-input');
+  const status = container.querySelector('#tag-url-status');
+
+  btn.addEventListener('click', async () => {
+    const url = input.value.trim();
+    if (!url || !url.startsWith('http')) {
+      status.className = 'text-[11px] mt-1 text-red-400 block';
+      status.textContent = 'Please enter a valid web URL starting with http:// or https://';
+      return;
+    }
+
+    btn.disabled = true;
+    btn.innerHTML = `<span>⏳</span> Extracting...`;
+    status.className = 'text-[11px] mt-1 text-blue-300 block';
+    status.textContent = 'Fetching clean markdown via r.jina.ai & synthesizing ComicInfo with Gemini...';
+
+    try {
+      const apiBase = global.API_BASE_URL || '';
+      const comicName = global.currentComic ? global.currentComic.name : '';
+      const res = await fetch(`${apiBase}/api/v1/metadata/extract-from-url`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          url,
+          filename: comicName,
+          existingMeta: global.currentMetadata || {}
+        })
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.message || 'Failed to extract metadata');
+      }
+
+      if (data.metadata) {
+        // Merge extracted metadata into currentMetadata
+        global.currentMetadata = { ...(global.currentMetadata || {}), ...data.metadata };
+        if (state) state.metadataHasUnsavedChanges = true;
+        renderMetadataDisplay(global.currentMetadata, true);
+        if (data.dailyUsed !== undefined) {
+          const dailyUsedDiv = document.getElementById('ct-gemini-daily-used');
+          if (dailyUsedDiv) {
+            dailyUsedDiv.textContent = `${data.dailyUsed} requests used`;
+          }
+        }
+
+        const newStatus = global.metadataForm.querySelector('#tag-url-status');
+        if (newStatus) {
+          newStatus.className = 'text-[11px] mt-1 text-green-400 block';
+          const quotaNotice = data.dailyUsed !== undefined ? ` (Gemini requests used today: ${data.dailyUsed})` : '';
+          newStatus.textContent = `✅ Metadata extracted successfully!${quotaNotice} Click "Save Changes" below to commit to comic file.`;
+        }
+      }
+    } catch (err) {
+      status.className = 'text-[11px] mt-1 text-red-400 block';
+      status.textContent = `❌ ${err.message}`;
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = `<span>⚡</span> Extract & Apply`;
+    }
+  });
+
+  return container;
+}
+
 function renderMetadataDisplay(metadata, clearForm = true) {
   if (metadata && typeof metadata === 'object') {
     sanitizeMetadata(metadata);
@@ -432,6 +581,10 @@ function renderMetadataDisplay(metadata, clearForm = true) {
   // Check if user is admin
   const isAdmin = global.syncManager && global.syncManager.userRole === 'admin';
 
+  if (clearForm && isAdmin) {
+    global.metadataForm.appendChild(createUrlTaggerBox());
+  }
+
   // Known fields in display order — used to populate the "missing fields" pills for admins
   const KNOWN_FIELDS = [
     'Title', 'Series', 'Number', 'Summary',
@@ -445,6 +598,14 @@ function renderMetadataDisplay(metadata, clearForm = true) {
 
   // Show only fields that have values (for both admin and non-admin)
   const merged = { ...(metadata || {}) };
+
+  // Exclude internal non-field properties from rendering in the edit form
+  const nonFieldKeys = new Set([
+    'cover_image_url', 'coverUrl', 'matching_url', 'type', 'id', 'source', 'fullMetadata', 'genres'
+  ]);
+  for (const k of nonFieldKeys) {
+    delete merged[k];
+  }
 
   // Which keys should be chip inputs
   const chipFields = new Set(['Characters', 'Teams', 'Locations', 'StoryArc', 'Genre']);
