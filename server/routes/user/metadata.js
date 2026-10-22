@@ -1133,5 +1133,70 @@ module.exports = function attach(router, deps) {
       return res.status(500).json({ message: formatErrorMessage(e, req, 'Failed to synthesize metadata with Gemini') });
     }
   });
+
+  router.post('/api/v1/metadata/extract-from-url', async (req, res) => {
+    try {
+      const { url, filename, existingMeta } = req.body || {};
+
+      if (!url || typeof url !== 'string' || !url.trim().startsWith('http')) {
+        return res.status(400).json({
+          message: 'A valid http/https URL is required for web metadata extraction.'
+        });
+      }
+
+      // Check Gemini API key
+      const { getConfig } = require('../../config');
+      const config = getConfig();
+      let geminiApiKey = (process.env.NODE_ENV === 'test' ? '' : process.env.GEMINI_API_KEY) || config.geminiApiKey || '';
+      let geminiModel = config.geminiModel || 'gemini-3.5-flash-lite';
+
+      try {
+        if (typeof dbGet === 'function') {
+          const keyRow = await dbGet("SELECT value FROM settings WHERE key = 'geminiApiKey'");
+          if (keyRow?.value) {
+            try { geminiApiKey = JSON.parse(keyRow.value); } catch { geminiApiKey = keyRow.value; }
+          }
+          const modelRow = await dbGet("SELECT value FROM settings WHERE key = 'geminiModel'");
+          if (modelRow?.value) {
+            try { geminiModel = JSON.parse(modelRow.value); } catch { geminiModel = modelRow.value; }
+          }
+        }
+      } catch (_) {}
+
+      if (!geminiApiKey) {
+        return res.status(400).json({
+          message: 'Gemini API key is not configured. Please configure your API key in Settings.'
+        });
+      }
+
+      // Publisher codex from library
+      let publisherCodex = [];
+      try {
+        if (typeof dbAll === 'function') {
+          const rows = await dbAll("SELECT DISTINCT publisher FROM comics WHERE publisher IS NOT NULL AND publisher != '' AND publisher != 'Unknown Publisher'");
+          publisherCodex = (rows || []).map(r => r.publisher).filter(Boolean);
+        }
+      } catch (_) {}
+
+      const { extractMetadataFromUrl } = require('../../services/url-metadata-extractor');
+      const metadata = await extractMetadataFromUrl({
+        url: url.trim(),
+        filename: filename || 'Unknown Comic.cbz',
+        existingMeta: existingMeta || {},
+        publisherCodex,
+        apiKey: geminiApiKey,
+        model: geminiModel
+      });
+
+      return res.json({
+        success: true,
+        metadata
+      });
+    } catch (e) {
+      return res.status(500).json({
+        message: formatErrorMessage(e, req, 'Failed to extract metadata from URL')
+      });
+    }
+  });
   }
 };

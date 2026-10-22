@@ -475,6 +475,85 @@ function isTitleSameAsSeries(title, series) {
   return false;
 }
 
+function createUrlTaggerBox() {
+  const container = document.createElement('div');
+  container.id = 'tag-from-url-container';
+  container.className = 'bg-gray-800/80 border border-blue-500/30 rounded-lg p-3 mb-4';
+
+  container.innerHTML = `
+    <div class="flex items-center justify-between mb-1.5">
+      <label class="text-xs font-semibold text-blue-400 flex items-center gap-1.5" for="tag-url-input">
+        <span>🌐</span> Tag from Web URL (r.jina + Gemini)
+      </label>
+      <span class="text-[11px] text-gray-400">League of Comic Geeks, Fandom Wiki, or store link</span>
+    </div>
+    <div class="flex gap-2">
+      <input type="url" id="tag-url-input" placeholder="https://..." class="bg-gray-700 text-xs text-white p-2 rounded-md flex-1 border border-gray-600 focus:outline-hidden focus:ring-1 focus:ring-blue-500" />
+      <button type="button" id="tag-url-btn" class="bg-blue-600 hover:bg-blue-500 text-white text-xs font-medium px-3 py-1.5 rounded-md flex items-center gap-1 transition-colors cursor-pointer">
+        <span>⚡</span> Extract & Apply
+      </button>
+    </div>
+    <div id="tag-url-status" class="text-[11px] mt-1 text-gray-300 hidden"></div>
+  `;
+
+  const btn = container.querySelector('#tag-url-btn');
+  const input = container.querySelector('#tag-url-input');
+  const status = container.querySelector('#tag-url-status');
+
+  btn.addEventListener('click', async () => {
+    const url = input.value.trim();
+    if (!url || !url.startsWith('http')) {
+      status.className = 'text-[11px] mt-1 text-red-400 block';
+      status.textContent = 'Please enter a valid web URL starting with http:// or https://';
+      return;
+    }
+
+    btn.disabled = true;
+    btn.innerHTML = `<span>⏳</span> Extracting...`;
+    status.className = 'text-[11px] mt-1 text-blue-300 block';
+    status.textContent = 'Fetching clean markdown via r.jina.ai & synthesizing ComicInfo with Gemini...';
+
+    try {
+      const apiBase = global.API_BASE_URL || '';
+      const comicName = global.currentComic ? global.currentComic.name : '';
+      const res = await fetch(`${apiBase}/api/v1/metadata/extract-from-url`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          url,
+          filename: comicName,
+          existingMeta: global.currentMetadata || {}
+        })
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.message || 'Failed to extract metadata');
+      }
+
+      if (data.metadata) {
+        // Merge extracted metadata into currentMetadata
+        global.currentMetadata = { ...(global.currentMetadata || {}), ...data.metadata };
+        if (state) state.metadataHasUnsavedChanges = true;
+        renderMetadataDisplay(global.currentMetadata, true);
+        const newStatus = global.metadataForm.querySelector('#tag-url-status');
+        if (newStatus) {
+          newStatus.className = 'text-[11px] mt-1 text-green-400 block';
+          newStatus.textContent = '✅ Metadata extracted successfully! Click "Save Changes" below to commit to comic file.';
+        }
+      }
+    } catch (err) {
+      status.className = 'text-[11px] mt-1 text-red-400 block';
+      status.textContent = `❌ ${err.message}`;
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = `<span>⚡</span> Extract & Apply`;
+    }
+  });
+
+  return container;
+}
+
 function renderMetadataDisplay(metadata, clearForm = true) {
   if (metadata && typeof metadata === 'object') {
     sanitizeMetadata(metadata);
@@ -493,6 +572,10 @@ function renderMetadataDisplay(metadata, clearForm = true) {
 
   // Check if user is admin
   const isAdmin = global.syncManager && global.syncManager.userRole === 'admin';
+
+  if (clearForm && isAdmin) {
+    global.metadataForm.appendChild(createUrlTaggerBox());
+  }
 
   // Known fields in display order — used to populate the "missing fields" pills for admins
   const KNOWN_FIELDS = [
