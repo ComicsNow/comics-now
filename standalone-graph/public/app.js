@@ -581,19 +581,55 @@ function renderDualAxisLayout(data) {
   });
 
   const sortedPubs = Object.keys(pubCounts).sort((a, b) => pubCounts[b] - pubCounts[a]);
-  const primaryPub = sortedPubs[0] || 'Primary Continuity';
-  const secondaryPub = sortedPubs[1] || 'Secondary / Multiverse';
+  const primaryPub = sortedPubs[0] || 'DC Comics';
+  const secondaryPub = sortedPubs[1];
 
   const leftAxisNodes = [];
   const rightAxisNodes = [];
 
-  data.nodes.forEach(n => {
-    if (n.publishers && n.publishers.includes(primaryPub)) {
-      leftAxisNodes.push(n);
-    } else {
-      rightAxisNodes.push(n);
+  let axisALabel = `AXIS A: ${primaryPub.toUpperCase()}`;
+  let axisBLabel = `AXIS B: ${secondaryPub ? secondaryPub.toUpperCase() : 'MULTIVERSE NEXUS'}`;
+
+  // If there are multiple distinct imprints with >= 15% representation, split by imprint
+  const totalNodes = data.nodes.length;
+  const secondaryCount = secondaryPub ? (pubCounts[secondaryPub] || 0) : 0;
+  const hasDistinctImprints = secondaryCount / Math.max(1, totalNodes) >= 0.15;
+
+  if (hasDistinctImprints) {
+    data.nodes.forEach(n => {
+      if (n.publishers && n.publishers.includes(primaryPub)) {
+        leftAxisNodes.push(n);
+      } else {
+        rightAxisNodes.push(n);
+      }
+    });
+  } else {
+    // DC Universe Continuity Split: Canon Anchors & Bridges vs Multiverse Nexus Hubs
+    axisALabel = 'AXIS A: CANON ANCHORS & BRIDGES';
+    axisBLabel = 'AXIS B: MULTIVERSE NEXUS (CRISIS HUBS)';
+
+    data.nodes.forEach(n => {
+      if (n.frictionScore >= 70 || n.frictionLevel === 'Multiverse Nexus') {
+        rightAxisNodes.push(n);
+      } else {
+        leftAxisNodes.push(n);
+      }
+    });
+
+    // If lopsided, balance around median friction score
+    if (leftAxisNodes.length < totalNodes * 0.2 || rightAxisNodes.length < totalNodes * 0.2) {
+      leftAxisNodes.length = 0;
+      rightAxisNodes.length = 0;
+      const sortedByScore = [...data.nodes].sort((a, b) => a.frictionScore - b.frictionScore);
+      const mid = Math.floor(sortedByScore.length / 2);
+      sortedByScore.forEach((n, idx) => {
+        if (idx < mid) leftAxisNodes.push(n);
+        else rightAxisNodes.push(n);
+      });
+      axisALabel = 'AXIS A: CANON ANCHORS';
+      axisBLabel = 'AXIS B: MULTIVERSE & EVENT BRIDGES';
     }
-  });
+  }
 
   leftAxisNodes.sort((a, b) => b.appearances - a.appearances);
   rightAxisNodes.sort((a, b) => b.appearances - a.appearances);
@@ -631,14 +667,14 @@ function renderDualAxisLayout(data) {
     .attr('x', leftX)
     .attr('y', 45)
     .attr('text-anchor', 'middle')
-    .text(`AXIS A: ${primaryPub.toUpperCase()}`);
+    .text(axisALabel);
 
   extraElementsGroup.append('text')
     .attr('class', 'axis-label')
     .attr('x', rightX)
     .attr('y', 45)
     .attr('text-anchor', 'middle')
-    .text(`AXIS B: ${secondaryPub.toUpperCase()}`);
+    .text(axisBLabel);
 
   // Nodes (SVG Layer)
   const nodesG = g.append('g').attr('class', 'nodes');

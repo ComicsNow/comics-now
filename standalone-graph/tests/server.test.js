@@ -110,4 +110,20 @@ describe('Standalone Character & Event Graph API (TDD)', () => {
     expect(data.ok).toBe(true);
     expect(data.publishers).toContain('DC Comics');
   });
+
+  test('backend queries strictly filter to DC Comics and DC imprints', async () => {
+    let capturedSql = '';
+    const spyDb = {
+      prepare: (sql) => {
+        capturedSql = sql;
+        return { all: () => [] };
+      }
+    };
+    const spyApp = createApp({ db: spyDb });
+    const spyServer = spyApp.listen(0);
+    const port = spyServer.address().port;
+    await fetch(`http://127.0.0.1:${port}/api/graph`);
+    spyServer.close();
+    expect(capturedSql).toMatch(/publisher\s*=\s*'DC Comics'|publisher LIKE 'DC%'/i);
+  });
 });

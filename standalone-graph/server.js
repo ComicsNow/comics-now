@@ -31,7 +31,7 @@ function createApp(options = {}) {
   function getAllComics() {
     if (!db) return [];
     try {
-      return db.prepare('SELECT id, publisher, series, name, metadata FROM comics WHERE metadata IS NOT NULL').all();
+      return db.prepare("SELECT id, publisher, series, name, metadata FROM comics WHERE metadata IS NOT NULL AND (publisher = 'DC Comics' OR publisher LIKE 'DC%' OR publisher IN ('Wildstorm', 'Americas Best Comics', 'Paradox Press', 'Vertigo', 'Amalgam Comics'))").all();
     } catch (e) {
       console.error('[Standalone Graph] Query failed:', e);
       return [];
