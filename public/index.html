@@ -481,7 +481,7 @@
                     <option value="1">1 Comic at a time (Sequential)</option>
                     <option value="2" selected>2 Comics in parallel (Modal GPU)</option>
                   </select>
-                  <span class="text-xs text-gray-400">Processes 2 comics simultaneously while capping Raspberry Pi CPU usage &le; 50%. (Clamped to 1 if Modal GPU is disabled).</span>
+                  <span class="text-xs text-gray-400">Processes 2 comics simultaneously while capping host CPU usage &le; 50%. (Clamped to 1 if Modal GPU is disabled).</span>
                 </div>
               </div>
 
@@ -552,19 +552,19 @@
               <div id="ct-scan-status-text" class="text-sm font-medium text-gray-300">Ready to scan comic library</div>
             </div>
             <div class="flex flex-wrap gap-2">
-              <button id="ct-rescan-unmatched-btn" class="bg-amber-600 hover:bg-amber-700 text-white font-bold py-2 px-4 rounded-full transition-colors text-sm flex items-center gap-1 shadow-md disabled:opacity-50 disabled:cursor-not-allowed" title="Re-search comics previously recorded as having no match">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg> Rescan Unmatched <span id="ct-unmatched-count"></span>
+              <button id="ct-rescan-unmatched-btn" class="bg-gray-800 hover:bg-gray-700 text-gray-200 border border-gray-700 hover:border-gray-600 font-semibold py-2 px-3.5 rounded-full transition-all text-sm flex items-center gap-1.5 shadow-xs disabled:opacity-50 disabled:cursor-not-allowed" title="Re-search comics previously recorded as having no match">
+                <svg class="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg> Rescan Unmatched <span id="ct-unmatched-count"></span>
               </button>
-              <button id="ct-rescan-xml-btn" class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-full transition-colors text-sm flex items-center gap-1 shadow-md" title="Force re-scan comics that already have ComicInfo.xml">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg> Rescan Existing XML
+              <button id="ct-rescan-xml-btn" class="bg-gray-800 hover:bg-gray-700 text-gray-200 border border-gray-700 hover:border-gray-600 font-semibold py-2 px-3.5 rounded-full transition-all text-sm flex items-center gap-1.5 shadow-xs" title="Force re-scan comics that already have ComicInfo.xml">
+                <svg class="w-4 h-4 text-purple-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg> Rescan Existing XML
               </button>
-              <button id="ct-run-btn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-full transition-colors text-sm flex items-center gap-1 shadow-md">
+              <button id="ct-run-btn" class="bg-blue-600 hover:bg-blue-500 text-white font-bold py-2 px-4 rounded-full transition-all text-sm flex items-center gap-1.5 shadow-lg hover:shadow-blue-900/50 ring-2 ring-blue-500/30">
                 <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M4 4l12 6-12 6z"/></svg> Run Library Scan
               </button>
               <button id="ct-cancel-btn" class="hidden bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-full transition-colors text-sm flex items-center gap-1 shadow-md">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg> Cancel Scan
               </button>
-              <button id="ct-clear-output" class="bg-gray-700 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-full transition-colors text-sm">Clear</button>
+              <button id="ct-clear-output" class="bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-gray-200 border border-gray-700 hover:border-gray-600 font-medium py-2 px-3.5 rounded-full transition-all text-sm">Clear</button>
             </div>
           </div>
           <!-- Live Progress & Activity Card -->
@@ -1073,41 +1073,45 @@
         </div>
       </div>
 
-      <div class="flex-1 overflow-y-auto p-4 sm:p-6">
-        <!-- Buttons Section -->
-        <div class="mb-6 space-y-2">
-          <button id="create-reading-list-btn" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-lg transition-colors flex items-center justify-center gap-2">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2"><use href="#icon-plus"></use></svg>
-            <span>Create New Reading List</span>
-          </button>
-          <button id="export-all-lists-btn" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg transition-colors flex items-center justify-center gap-2">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2"><use href="#icon-download"></use></svg>
-            <span>Export All Lists</span>
-          </button>
-          <button id="import-lists-btn" class="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg transition-colors flex items-center justify-center gap-2">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2"><use href="#icon-9"></use></svg>
-            <span>Import Lists</span>
-          </button>
-          <input type="file" id="import-file-input" accept=".json" class="hidden" />
-        </div>
-
-        <!-- Your Reading Lists Section -->
-        <div>
-          <div class="flex flex-col sm:flex-row gap-2 mb-3">
-            <h4 class="text-lg font-semibold sm:flex-none self-center">Your Reading Lists</h4>
-            <div class="flex gap-2 flex-1">
-              <input id="reading-list-search"
-                     type="search"
-                     placeholder="Search lists…"
-                     class="flex-1 min-w-0 bg-gray-700 text-white text-sm px-3 py-1.5 rounded-lg focus:outline-hidden placeholder-gray-400" />
-              <select id="reading-list-publisher-filter"
-                      class="w-36 sm:w-44 shrink-0 bg-gray-700 text-white text-sm pl-2.5 pr-8 py-1.5 rounded-lg focus:outline-hidden cursor-pointer truncate">
-                <option value="">All publishers</option>
-              </select>
+      <div id="reading-list-modal-body" class="flex-1 overflow-y-auto p-4 sm:p-6">
+        <div id="reading-lists-overview">
+          <!-- Buttons Section -->
+          <div class="mb-6 space-y-2">
+            <button id="create-reading-list-btn" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-lg transition-colors flex items-center justify-center gap-2">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2"><use href="#icon-plus"></use></svg>
+              <span>Create New Reading List</span>
+            </button>
+            <div class="grid grid-cols-2 gap-2 mt-2">
+              <button id="export-all-lists-btn" class="bg-gray-700/80 hover:bg-gray-600 text-gray-200 border border-gray-600/60 font-semibold py-2 px-3 rounded-lg transition-colors flex items-center justify-center gap-2 text-xs sm:text-sm">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2"><use href="#icon-download"></use></svg>
+                <span>Export All</span>
+              </button>
+              <button id="import-lists-btn" class="bg-gray-700/80 hover:bg-gray-600 text-gray-200 border border-gray-600/60 font-semibold py-2 px-3 rounded-lg transition-colors flex items-center justify-center gap-2 text-xs sm:text-sm">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2"><use href="#icon-9"></use></svg>
+                <span>Import Lists</span>
+              </button>
             </div>
+            <input type="file" id="import-file-input" accept=".json" class="hidden" />
           </div>
-          <div id="reading-lists-container" class="space-y-2">
-            <p class="text-sm text-gray-400 text-center py-4">No reading lists yet. Create one to get started!</p>
+
+          <!-- Your Reading Lists Section -->
+          <div>
+            <div class="flex flex-col sm:flex-row gap-2 mb-3">
+              <h4 class="text-lg font-semibold sm:flex-none self-center">Your Reading Lists</h4>
+              <div class="flex gap-2 flex-1">
+                <input id="reading-list-search"
+                       type="search"
+                       placeholder="Search lists…"
+                       class="flex-1 min-w-0 bg-gray-700 text-white text-sm px-3 py-1.5 rounded-lg focus:outline-hidden placeholder-gray-400" />
+                <select id="reading-list-publisher-filter"
+                        class="w-36 sm:w-44 shrink-0 bg-gray-700 text-white text-sm pl-2.5 pr-8 py-1.5 rounded-lg focus:outline-hidden cursor-pointer truncate">
+                  <option value="">All publishers</option>
+                </select>
+              </div>
+            </div>
+            <div id="reading-lists-container" class="space-y-2">
+              <p class="text-sm text-gray-400 text-center py-4">No reading lists yet. Create one to get started!</p>
+            </div>
           </div>
         </div>
       </div>
@@ -1511,7 +1515,7 @@
       </div>
 
       <!-- Right Group: Reading List, Downloads, Tag Comics Now!, and Settings -->
-      <div class="flex gap-2">
+      <div class="flex items-center gap-2">
         <button id="reading-list-button" aria-label="Reading Lists" title="Reading Lists" class="brutalist-btn btn-cream w-10 h-10 transition-colors" onclick="openReadingListModal()">
           <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2"><use href="#icon-menu"></use></svg>
         </button>
@@ -1684,8 +1688,8 @@
         <h2 id="folder-list-title" class="text-2xl font-bold truncate view-title"></h2>
       </div>
       <div class="smart-filter-mount"></div>
-      <div class="flex justify-center mb-4">
-        <div id="folder-alpha-filter" class="flex flex-wrap gap-2 justify-center"></div>
+      <div class="edge-index-container flex justify-end">
+        <div id="folder-alpha-filter" class="edge-index flex flex-wrap gap-2 justify-center"></div>
       </div>
       <div id="folder-list-container" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6"></div>
     </div>
@@ -1695,8 +1699,8 @@
     <div id="publisher-list" class="hidden">
       <h2 id="publisher-title" class="text-2xl font-bold truncate text-center mb-4 view-title"></h2>
       <div class="smart-filter-mount"></div>
-      <div class="flex justify-center mb-4">
-        <div id="publisher-alpha-filter" class="flex flex-wrap gap-2 justify-center"></div>
+      <div class="edge-index-container flex justify-end">
+        <div id="publisher-alpha-filter" class="edge-index flex flex-wrap gap-2 justify-center"></div>
       </div>
       <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6" id="publisher-list-container"></div>
     </div>
@@ -1705,8 +1709,8 @@
     <div id="series-list" class="hidden">
       <h2 id="series-title" class="text-2xl font-bold truncate text-center mb-4 view-title"></h2>
       <div class="smart-filter-mount"></div>
-      <div class="flex justify-center mb-4">
-        <div id="series-alpha-filter" class="flex flex-wrap gap-2 justify-center"></div>
+      <div class="edge-index-container flex justify-end">
+        <div id="series-alpha-filter" class="edge-index flex flex-wrap gap-2 justify-center"></div>
       </div>
       <div class="flex justify-end items-center mb-4 px-2" id="series-sort-container">
         <label for="series-sort-select" class="text-xs sm:text-sm text-gray-400 font-medium mr-2 flex items-center gap-1.5">
@@ -1726,8 +1730,8 @@
     <div id="comic-list" class="hidden">
       <h2 id="comic-list-title" class="text-2xl font-bold truncate text-center mb-4 view-title"></h2>
       <div class="smart-filter-mount"></div>
-      <div class="flex justify-center mb-4">
-        <div id="comic-alpha-filter" class="flex flex-wrap gap-2 justify-center"></div>
+      <div class="edge-index-container flex justify-end">
+        <div id="comic-alpha-filter" class="edge-index flex flex-wrap gap-2 justify-center"></div>
       </div>
       <div id="comic-list-container" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6"></div>
     </div>
@@ -1979,6 +1983,29 @@
       <div class="pr-2">
         <!-- Results Source Filter Tabs -->
         <div id="cv-source-filter-tabs" class="flex flex-wrap items-center gap-1.5 mb-3 hidden"></div>
+
+        <!-- Source Staging Tray -->
+        <div id="source-staging-tray" class="hidden mb-3 p-3 bg-gray-800/95 rounded-xl border border-gray-700/80 shadow-lg">
+          <div class="flex items-center justify-between gap-2 mb-2">
+            <div class="flex items-center gap-2">
+              <span class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-purple-600/30 text-purple-300 text-xs font-bold">⚡</span>
+              <h3 class="text-xs font-bold uppercase tracking-wider text-gray-300">
+                Staged Sources (<span id="staged-sources-count">0</span>)
+              </h3>
+            </div>
+            <div class="flex items-center gap-2">
+              <button id="clear-staged-sources-btn" type="button" class="text-xs text-gray-400 hover:text-red-400 transition-colors cursor-pointer">
+                Clear All
+              </button>
+              <button id="synthesize-staged-sources-btn" type="button" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white text-xs font-bold shadow-md hover:shadow-purple-500/20 transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed" disabled>
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                <span>Synthesize with Gemini Flash</span>
+              </button>
+            </div>
+          </div>
+          <p id="staging-tray-hint" class="text-[11px] text-gray-400 mb-2">Stage 2 or more sources from search results to synthesize canonical metadata with Gemini Flash.</p>
+          <div id="staged-sources-list" class="flex flex-wrap gap-2"></div>
+        </div>
 
         <ul id="search-results" class="space-y-2"></ul>
 

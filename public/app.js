@@ -1042,7 +1042,10 @@ async function deleteReadingList(listId) {
  */
 async function showReadingListDetail(listId, listName, initialViewMode = null) {
   const modal = document.getElementById('reading-list-modal');
-  const modalContent = document.getElementById('reading-lists-container')?.parentElement;
+  const overviewEl = document.getElementById('reading-lists-overview');
+  const mainListsContainer = document.getElementById('reading-lists-container');
+  const modalBody = document.getElementById('reading-list-modal-body');
+  const modalContent = modalBody || overviewEl?.parentElement || mainListsContainer?.parentElement?.parentElement || mainListsContainer?.parentElement;
   if (!modalContent) return;
 
   const modalContainer = modal?.querySelector('.bg-gray-800');
@@ -1062,8 +1065,9 @@ async function showReadingListDetail(listId, listName, initialViewMode = null) {
     }
   }
 
-  // Hide main list view
-  document.getElementById('reading-lists-container').classList.add('hidden');
+  // Hide overview and main list view
+  if (overviewEl) overviewEl.classList.add('hidden');
+  if (mainListsContainer) mainListsContainer.classList.add('hidden');
 
   // Remove existing detail view if present
   const existingDetail = document.getElementById('reading-list-detail-view');
@@ -1112,15 +1116,15 @@ async function showReadingListDetail(listId, listName, initialViewMode = null) {
           </button>
         </div>
 
-        <button id="download-all-list-btn" class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-3 rounded-lg transition-all shadow-lg hover:shadow-purple-900/40 flex items-center gap-1.5 text-xs">
+        <button id="download-all-list-btn" class="bg-gray-700 hover:bg-gray-600 text-gray-200 border border-gray-600 font-semibold py-2 px-3 rounded-lg transition-all shadow-sm flex items-center gap-1.5 text-xs">
           <span>⬇</span>
           <span class="hidden sm:inline">Download</span>
         </button>
-        <button id="export-list-btn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-3 rounded-lg transition-all shadow-lg hover:shadow-blue-900/40 flex items-center gap-1.5 text-xs">
+        <button id="export-list-btn" class="bg-gray-700 hover:bg-gray-600 text-gray-200 border border-gray-600 font-semibold py-2 px-3 rounded-lg transition-all shadow-sm flex items-center gap-1.5 text-xs">
           <span>📤</span>
           <span class="hidden sm:inline">Export</span>
         </button>
-        <button id="edit-list-btn" class="bg-gray-700 hover:bg-gray-600 text-white font-bold py-2 px-3 rounded-lg transition-all border border-gray-600 shadow-lg flex items-center gap-1.5 text-xs ${isOffline || viewMode === 'dag' ? 'hidden' : ''}">
+        <button id="edit-list-btn" class="bg-gray-700 hover:bg-gray-600 text-gray-200 border border-gray-600 font-semibold py-2 px-3 rounded-lg transition-all shadow-sm flex items-center gap-1.5 text-xs ${isOffline || viewMode === 'dag' ? 'hidden' : ''}">
           <span>✏️</span>
           <span class="hidden sm:inline">Edit</span>
         </button>
@@ -1800,7 +1804,11 @@ function hideReadingListDetail() {
     detailView.remove();
   }
 
-  // Show main list view
+  // Show overview and main list view
+  const overviewEl = document.getElementById('reading-lists-overview');
+  if (overviewEl) {
+    overviewEl.classList.remove('hidden');
+  }
   const mainView = document.getElementById('reading-lists-container');
   if (mainView) {
     mainView.classList.remove('hidden');
