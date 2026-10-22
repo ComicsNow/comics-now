@@ -246,13 +246,65 @@ async function main() {
     process.exit(0);
   }
 
+  // Helper to get Gemini configuration from database
+  function getGeminiConfig() {
+    let apiKey = process.env.GEMINI_API_KEY || '';
+    let model = 'gemini-3.5-flash-lite';
+    try {
+      const row = comicsNowDb.prepare("SELECT value FROM settings WHERE key = 'geminiApiKey'").get();
+      if (row?.value) {
+        try { apiKey = JSON.parse(row.value); } catch { apiKey = row.value; }
+      }
+      const modelRow = comicsNowDb.prepare("SELECT value FROM settings WHERE key = 'geminiModel'").get();
+      if (modelRow?.value) {
+        try { model = JSON.parse(modelRow.value); } catch { model = modelRow.value; }
+      }
+    } catch (_) {}
+    return { apiKey, model };
+  }
+
+  // Command: Scrape any external URL via Jina Reader + Gemini
+  const scrapeIdx = args.indexOf('--scrape');
+  if (scrapeIdx !== -1 && args[scrapeIdx + 1]) {
+    const targetUrl = args[scrapeIdx + 1];
+    const pubIdx = args.indexOf('--publisher');
+    const publisher = pubIdx !== -1 && args[pubIdx + 1] ? args[pubIdx + 1] : 'DC Comics';
+
+    console.log(`\n🌐 Scraping Reading Order via Jina Reader: ${targetUrl}`);
+    const markdown = await fetchUrlAsMarkdown(targetUrl);
+    console.log(`Fetched ${markdown.length} characters of clean markdown.`);
+
+    console.log(`Extracting canonical order and multiverse lore via Gemini...`);
+    const { apiKey, model } = getGeminiConfig();
+    if (!apiKey) {
+      console.error(`[Error] Gemini API key not found in comics-now.db settings.`);
+      process.exit(1);
+    }
+
+    const lore = await parseLoreWithGemini({ markdown, publisher, apiKey, model });
+    const readingList = lore.reading_list;
+    readingList.source_url = targetUrl;
+
+    const libraryComics = getAllLibraryComics(comicsNowDb);
+    const orderId = indexReadingOrder(loreDb, readingList, libraryComics);
+    const row = loreDb.prepare('SELECT total_canonical_issues, owned_issues_count FROM reading_orders WHERE id = ?').get(orderId);
+
+    console.log(`\n✅ Indexed '${readingList.name}' into ${LORE_DB_PATH}!`);
+    console.log(`   Canonical Issues : ${row.total_canonical_issues}`);
+    console.log(`   Owned in Library : ${row.owned_issues_count}`);
+    console.log(`   Lore ID          : ${orderId}`);
+    console.log(`   Run \`node scripts/build-lore-index.js --missing ${orderId}\` to see missing issues.`);
+    process.exit(0);
+  }
+
   console.log(`
 Comics Now - Lore Index Builder & Gap Analyzer
 
 Usage:
-  node scripts/build-lore-index.js --build-presets   # Index core library storylines
+  node scripts/build-lore-index.js --build-presets   # Index core library storylines (LOEG, Ice Cream Man, Tick, etc.)
   node scripts/build-lore-index.js --list            # List all storylines and library coverage
   node scripts/build-lore-index.js --missing <id>    # Show missing issues wishlist for an order
+  node scripts/build-lore-index.js --scrape <URL>    # Scrape any web URL via r.jina.ai & Gemini
   node scripts/build-lore-index.js --sync <id>       # Sync an order into comics-now.db
   node scripts/build-lore-index.js --sync-all        # Sync all eligible orders (>=3 comics, multi-series)
 `);
