@@ -1,0 +1,571 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#090d16">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>Comics Now! - Character & Event Network</title>
+  <!-- Material Design Roboto Typography -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Roboto:ital,wght@0,400;0,500;0,700;0,900;1,400&family=Roboto+Condensed:wght@700&display=swap" rel="stylesheet">
+  <!-- D3.js -->
+  <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+  <style>
+    :root {
+      --bg-dark: #090d16;
+      --card-bg: rgba(18, 24, 38, 0.92);
+      --card-border: rgba(255, 255, 255, 0.12);
+      --dc-blue: #0078f2;
+      --dc-yellow: #ffcc00;
+      --text-main: #f3f4f6;
+      --text-muted: #9ca3af;
+      --accent: #38bdf8;
+      --safe-bottom: env(safe-area-inset-bottom, 16px);
+      --safe-top: env(safe-area-inset-top, 0px);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+    }
+
+    body {
+      font-family: 'Roboto', -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: radial-gradient(circle at 50% 20%, #151f33 0%, #080c14 100%);
+      color: var(--text-main);
+      overflow: hidden;
+      width: 100vw;
+      height: 100vh;
+      height: 100dvh;
+      display: flex;
+      flex-direction: column;
+      position: fixed;
+    }
+
+    /* Halftone dot texture overlay */
+    body::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background-image: radial-gradient(rgba(255, 255, 255, 0.04) 1px, transparent 0);
+      background-size: 20px 20px;
+      pointer-events: none;
+      z-index: 1;
+    }
+
+    /* Header Bar: Mobile & Tablet Optimized */
+    header {
+      position: relative;
+      z-index: 30;
+      display: flex;
+      flex-direction: column;
+      padding: calc(var(--safe-top) + 8px) 16px 8px 16px;
+      background: rgba(10, 15, 25, 0.95);
+      backdrop-filter: blur(16px);
+      border-bottom: 1.5px solid rgba(0, 120, 242, 0.35);
+      gap: 8px;
+    }
+
+    .header-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      width: 100%;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .logo-badge {
+      background: linear-gradient(135deg, #0078f2, #004fb0);
+      color: #fff;
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 18px;
+      letter-spacing: 1.2px;
+      padding: 4px 8px;
+      border-radius: 4px;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+
+    .title-group h1 {
+      font-family: 'Roboto Condensed', sans-serif;
+      font-size: 16px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      color: #fff;
+      text-transform: uppercase;
+      line-height: 1.2;
+    }
+
+    .title-group p {
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    /* Horizontal Scrollable Filter Strip (Native Mobile Pattern) */
+    .filter-scroll-strip {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      overflow-x: auto;
+      padding-bottom: 4px;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: none;
+    }
+
+    .filter-scroll-strip::-webkit-scrollbar {
+      display: none;
+    }
+
+    .pill-select {
+      background: #111827;
+      color: #f3f4f6;
+      border: 1px solid var(--card-border);
+      border-radius: 9999px;
+      padding: 6px 12px;
+      font-size: 12px;
+      font-weight: 500;
+      outline: none;
+      white-space: nowrap;
+      height: 34px;
+    }
+
+    .search-input-pill {
+      background: #111827;
+      color: #fff;
+      border: 1px solid var(--card-border);
+      border-radius: 9999px;
+      padding: 6px 14px;
+      font-size: 12px;
+      min-width: 130px;
+      max-width: 160px;
+      height: 34px;
+      outline: none;
+    }
+
+    .btn-pill {
+      background: #1e293b;
+      color: #fff;
+      border: 1px solid var(--card-border);
+      border-radius: 9999px;
+      padding: 6px 14px;
+      font-size: 12px;
+      font-weight: 600;
+      white-space: nowrap;
+      cursor: pointer;
+      height: 34px;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .btn-pill:active {
+      transform: scale(0.96);
+    }
+
+    /* Graph Viewport */
+    #main-container {
+      position: relative;
+      flex: 1;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      z-index: 2;
+      touch-action: none; /* Allows D3 zoom/pan gestures without page scroll collision */
+    }
+
+    #graph-svg {
+      width: 100%;
+      height: 100%;
+      cursor: grab;
+      touch-action: none;
+    }
+
+    #graph-svg:active {
+      cursor: grabbing;
+    }
+
+    /* Node & Link SVG Styles with Touch Hit-Zones */
+    .link {
+      stroke: rgba(148, 163, 184, 0.22);
+      stroke-opacity: 0.6;
+      transition: stroke-opacity 0.2s, stroke 0.2s;
+    }
+
+    .link.highlighted {
+      stroke: var(--dc-yellow) !important;
+      stroke-opacity: 0.95 !important;
+      stroke-width: 3px !important;
+    }
+
+    .node {
+      cursor: pointer;
+    }
+
+    .node circle {
+      stroke: #fff;
+      stroke-width: 1.5px;
+      transition: all 0.2s;
+    }
+
+    .node.highlighted circle {
+      stroke: var(--dc-yellow);
+      stroke-width: 3.5px;
+      filter: drop-shadow(0 0 12px rgba(255, 204, 0, 0.9));
+    }
+
+    .node text {
+      font-family: 'Roboto', sans-serif;
+      font-size: 11px;
+      font-weight: 600;
+      fill: #f1f5f9;
+      pointer-events: none;
+      text-shadow: 0 1px 4px #000, 0 0 8px #000;
+    }
+
+    /* Floating Touch Floating Action Buttons (FAB) for Tablet/Mobile */
+    .touch-fabs {
+      position: absolute;
+      bottom: calc(var(--safe-bottom) + 12px);
+      left: 16px;
+      display: flex;
+      gap: 8px;
+      z-index: 20;
+    }
+
+    .fab {
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      background: rgba(18, 24, 38, 0.9);
+      backdrop-filter: blur(12px);
+      border: 1px solid var(--card-border);
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      cursor: pointer;
+      box-shadow: 0 4px 14px rgba(0,0,0,0.5);
+    }
+
+    .fab:active {
+      transform: scale(0.92);
+      background: var(--dc-blue);
+    }
+
+    /* Bottom Sheet Modal for Mobile / Slide Drawer for Tablet */
+    #bottom-sheet {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      max-height: 75vh;
+      background: var(--card-bg);
+      backdrop-filter: blur(24px);
+      border-top: 1.5px solid rgba(0, 120, 242, 0.5);
+      border-radius: 20px 20px 0 0;
+      padding: 12px 18px calc(var(--safe-bottom) + 12px) 18px;
+      box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.85);
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      z-index: 40;
+      transform: translateY(105%);
+      transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    /* Tablet breakpoint: turns bottom sheet into right docked sidecard */
+    @media (min-width: 768px) {
+      #bottom-sheet {
+        top: 80px;
+        bottom: 24px;
+        right: 24px;
+        left: auto;
+        width: 380px;
+        max-height: calc(100vh - 104px);
+        border: 1px solid var(--card-border);
+        border-radius: 16px;
+        transform: translateX(420px);
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.8);
+      }
+      #bottom-sheet.open {
+        transform: translateX(0) !important;
+      }
+    }
+
+    #bottom-sheet.open {
+      transform: translateY(0);
+    }
+
+    .sheet-handle {
+      width: 44px;
+      height: 5px;
+      background: rgba(255, 255, 255, 0.25);
+      border-radius: 9999px;
+      margin: 0 auto 6px auto;
+    }
+
+    @media (min-width: 768px) {
+      .sheet-handle { display: none; }
+    }
+
+    .sheet-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .sheet-title h2 {
+      font-family: 'Roboto Condensed', sans-serif;
+      font-size: 20px;
+      color: #fff;
+      font-weight: 700;
+    }
+
+    .badge {
+      display: inline-block;
+      font-size: 11px;
+      padding: 2px 8px;
+      border-radius: 9999px;
+      background: rgba(0, 120, 242, 0.25);
+      color: var(--accent);
+      border: 1px solid rgba(0, 120, 242, 0.4);
+      margin-top: 2px;
+    }
+
+    .close-btn {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.08);
+      border: none;
+      color: #fff;
+      font-size: 18px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .close-btn:active {
+      background: rgba(255, 255, 255, 0.2);
+    }
+
+    .stat-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    .stat-card {
+      background: rgba(255, 255, 255, 0.04);
+      padding: 8px 12px;
+      border-radius: 10px;
+      border: 1px solid rgba(255, 255, 255, 0.07);
+    }
+
+    .stat-label {
+      font-size: 10px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .stat-value {
+      font-size: 18px;
+      font-weight: 700;
+      color: #fff;
+      margin-top: 2px;
+    }
+
+    .section-title {
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--accent);
+      margin-top: 4px;
+    }
+
+    .connected-list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      max-height: 180px;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    .connected-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 12px; /* 44px min tap target height */
+      background: rgba(255, 255, 255, 0.03);
+      border-radius: 8px;
+      font-size: 13px;
+      cursor: pointer;
+      min-height: 44px;
+    }
+
+    .connected-item:active {
+      background: rgba(0, 120, 242, 0.35);
+      transform: scale(0.98);
+    }
+
+    .connected-weight {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--dc-yellow);
+      background: rgba(255, 204, 0, 0.12);
+      padding: 3px 8px;
+      border-radius: 4px;
+    }
+
+    .series-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      max-height: 100px;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    .series-tag {
+      font-size: 11px;
+      padding: 4px 10px;
+      background: #1f2937;
+      border-radius: 6px;
+      color: #cbd5e1;
+    }
+
+    /* Loading Overlay */
+    #loading {
+      position: absolute;
+      inset: 0;
+      background: rgba(9, 13, 22, 0.85);
+      backdrop-filter: blur(8px);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+      gap: 14px;
+    }
+
+    .spinner {
+      width: 44px;
+      height: 44px;
+      border: 3.5px solid rgba(255, 255, 255, 0.1);
+      border-top-color: var(--dc-blue);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="header-top">
+      <div class="brand">
+        <div class="logo-badge">NOW!</div>
+        <div class="title-group">
+          <h1>Narrative Network</h1>
+          <p>Character & Event Graph</p>
+        </div>
+      </div>
+      <button id="reload-btn" class="btn-pill" style="background: var(--dc-blue);">
+        <span>↻</span> Refresh
+      </button>
+    </div>
+
+    <!-- Scrollable Filter Strip for Mobile/Tablet -->
+    <div class="filter-scroll-strip">
+      <select id="entity-type" class="pill-select">
+        <option value="characters" selected>Characters</option>
+        <option value="teams">Teams & Groups</option>
+        <option value="locations">Locations</option>
+        <option value="creators">Creators</option>
+      </select>
+
+      <select id="publisher-filter" class="pill-select">
+        <option value="">All Publishers</option>
+      </select>
+
+      <select id="min-appearances" class="pill-select">
+        <option value="1">Min 1+</option>
+        <option value="2">Min 2+</option>
+        <option value="3" selected>Min 3+</option>
+        <option value="5">Min 5+</option>
+        <option value="10">Min 10+</option>
+        <option value="25">Min 25+</option>
+      </select>
+
+      <input type="text" id="search-input" class="search-input-pill" placeholder="🔍 Search...">
+    </div>
+  </header>
+
+  <div id="main-container">
+    <div id="loading">
+      <div class="spinner"></div>
+      <div style="font-size: 14px; font-weight: 500;">Connecting universe nodes...</div>
+    </div>
+
+    <svg id="graph-svg"></svg>
+
+    <!-- Touch Quick-Action FABs -->
+    <div class="touch-fabs">
+      <button class="fab" id="zoom-in-btn" title="Zoom In">+</button>
+      <button class="fab" id="zoom-out-btn" title="Zoom Out">−</button>
+      <button class="fab" id="reset-zoom-btn" title="Center View">⛶</button>
+    </div>
+
+    <!-- Mobile Bottom Sheet / Tablet Dossier Drawer -->
+    <div id="bottom-sheet">
+      <div class="sheet-handle"></div>
+      <div class="sheet-header">
+        <div class="sheet-title">
+          <h2 id="sb-name">Entity Name</h2>
+          <span class="badge" id="sb-type">Character</span>
+        </div>
+        <button class="close-btn" id="close-sheet">&times;</button>
+      </div>
+
+      <div class="stat-grid">
+        <div class="stat-card">
+          <div class="stat-label">Total Issues</div>
+          <div class="stat-value" id="sb-appearances">0</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Series Count</div>
+          <div class="stat-value" id="sb-series-count">0</div>
+        </div>
+      </div>
+
+      <div class="section-title">Top Allies & Adversaries</div>
+      <ul class="connected-list" id="sb-connected"></ul>
+
+      <div class="section-title">Series Timeline</div>
+      <div class="series-tags" id="sb-series"></div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
