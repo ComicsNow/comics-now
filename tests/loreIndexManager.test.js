@@ -84,6 +84,22 @@ describe('Lore Index Manager & Database Bridge (TDD)', () => {
     expect(issues[4].is_owned).toBe(0); // Tempest 3 is missing
   });
 
+  test('indexReadingOrder matches issue numbers with leading zeros (e.g. 01 vs 1)', () => {
+    const canonicalOrder = {
+      name: 'Ghost Machine Order',
+      publisher: 'Image',
+      issues: [
+        { series: 'The Rocketfellers', number: '1', title: 'The Rocketfellers: 26th Century Family' }
+      ]
+    };
+    const libraryComics = [
+      { id: 'rf1', series: 'The Rocketfellers', issueNumber: '01', name: '01 The Rocketfellers [Image] (2025).cbz' }
+    ];
+    const orderId = indexReadingOrder(loreDb, canonicalOrder, libraryComics);
+    const row = loreDb.prepare('SELECT owned_issues_count FROM reading_orders WHERE id = ?').get(orderId);
+    expect(row.owned_issues_count).toBe(1);
+  });
+
   test('getMissingIssuesForOrder returns unowned canonical issues for gap tracking', () => {
     const canonicalOrder = {
       name: 'The Tick & Invincible Crossover Event',
@@ -165,5 +181,43 @@ describe('Lore Index Manager & Database Bridge (TDD)', () => {
 
     expect(syncResult.success).toBe(false);
     expect(syncResult.reason).toMatch(/Rule 3 violation/i);
+  });
+
+  test('crawlPublishersWithMaxSeries indexes libraries with <= 10 series and ignores Marvel', () => {
+    const { crawlPublishersWithMaxSeries } = require('../server/services/lore-index-manager');
+    
+    // Seed mock comics db with publishers of different sizes
+    mockComicsNowDb.exec(`
+      DELETE FROM comics;
+      -- Publisher with 2 series (<= 10)
+      INSERT INTO comics (id, publisher, series, name, issueNumber) VALUES
+        ('c1', 'Bad Idea Comics', 'Hank Howard, Pizza Detective: A Slice of Life', 'Slice of Life #1', '1'),
+        ('c2', 'Bad Idea Comics', 'Hank Howard, Pizza Detective: A Slice of Life', 'Slice of Life #2', '2'),
+        ('c3', 'Bad Idea Comics', 'Hank Howard Pizza Detective in The Two Hollywoods', 'Two Hollywoods #1', '1');
+      -- Publisher with Marvel (must be ignored)
+      INSERT INTO comics (id, publisher, series, name, issueNumber) VALUES
+        ('m1', 'Marvel Comics', 'Spider-Man', 'Spider-Man #1', '1');
+      -- Publisher with 1 series (<= 10)
+      INSERT INTO comics (id, publisher, series, name, issueNumber) VALUES
+        ('p1', 'Planet Lucy Press', 'Ragmop', 'Ragmop #1', '1'),
+        ('p2', 'Planet Lucy Press', 'Ragmop', 'Ragmop #3', '3');
+    `);
+
+    const result = crawlPublishersWithMaxSeries(loreDb, mockComicsNowDb, { maxSeries: 10 });
+
+    expect(result.publishersProcessed).toBeGreaterThanOrEqual(2);
+    expect(result.ordersIndexed).toBeGreaterThanOrEqual(2);
+
+    // Verify Marvel was skipped
+    const marvelOrder = loreDb.prepare("SELECT * FROM reading_orders WHERE publisher LIKE '%Marvel%'").get();
+    expect(marvelOrder).toBeUndefined();
+
+    // Verify Bad Idea and Planet Lucy are present
+    const badIdeaOrder = loreDb.prepare("SELECT * FROM reading_orders WHERE publisher = 'Bad Idea Comics'").all();
+    expect(badIdeaOrder.length).toBeGreaterThan(0);
+
+    const ragmopOrder = loreDb.prepare("SELECT * FROM reading_orders WHERE name LIKE '%Ragmop%'").get();
+    expect(ragmopOrder).toBeDefined();
+    expect(ragmopOrder.owned_issues_count).toBe(2);
   });
 });

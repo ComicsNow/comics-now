@@ -13,7 +13,8 @@ const {
   initLoreDatabase,
   indexReadingOrder,
   getMissingIssuesForOrder,
-  syncLoreOrderToComicsNow
+  syncLoreOrderToComicsNow,
+  crawlPublishersWithMaxSeries
 } = require('../server/services/lore-index-manager');
 const {
   fetchUrlAsMarkdown,
@@ -243,6 +244,21 @@ async function main() {
     }
 
     console.log(`\n✅ Presets successfully indexed into ${LORE_DB_PATH}!\nRun \`node scripts/build-lore-index.js --list\` to inspect.`);
+    process.exit(0);
+  }
+
+  // Command: Crawl all series across library publishers (default maxSeries: 10, or --all-series)
+  if (args.includes('--crawl-libraries') || args.includes('--all-series')) {
+    const maxSeriesIdx = args.indexOf('--max-series');
+    const maxSeries = maxSeriesIdx !== -1 ? parseInt(args[maxSeriesIdx + 1], 10) : (args.includes('--all-series') ? 99999 : 10);
+    console.log(`\n🚀 Crawling and Indexing Series across Library Publishers (Max Series: ${maxSeries === 99999 ? 'ALL' : maxSeries}, Excluding Marvel)...`);
+    const result = crawlPublishersWithMaxSeries(loreDb, comicsNowDb, { maxSeries });
+    console.log(`\n✅ Finished Crawl!`);
+    console.log(`   Publishers Processed   : ${result.publishersProcessed}`);
+    console.log(`   Reading Orders Indexed : ${result.ordersIndexed}`);
+    console.log(`   Total Canonical Issues : ${result.totalCanonicalIssues}`);
+    console.log(`   Owned Issues in Library: ${result.ownedIssues}`);
+    console.log(`   Missing Issues (Gaps)  : ${result.missingIssues}`);
     process.exit(0);
   }
 

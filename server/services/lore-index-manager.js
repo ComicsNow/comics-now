@@ -18,6 +18,15 @@ function normalizeStr(s) {
   return (s || '').trim().toLowerCase();
 }
 
+function normalizeNumber(num) {
+  if (num == null) return '';
+  const s = String(num).trim();
+  if (/^\d+$/.test(s)) {
+    return String(parseInt(s, 10));
+  }
+  return s.toLowerCase();
+}
+
 /**
  * Initializes the SQLite lore database schema.
  */
@@ -86,12 +95,12 @@ function matchComicInLibrary(issue, libraryComics) {
   if (!Array.isArray(libraryComics) || libraryComics.length === 0) return null;
 
   const targetSeries = normalizeStr(issue.series);
-  const targetNum = normalizeStr(issue.number);
+  const targetNum = normalizeNumber(issue.number);
 
   // 1. Exact series match and issue number match
   const exact = libraryComics.find(c => {
     const s = normalizeStr(c.series);
-    const n = normalizeStr(c.issueNumber || c.number);
+    const n = normalizeNumber(c.issueNumber || c.number);
     if (s === targetSeries) {
       if (targetNum && n === targetNum) return true;
       if (!targetNum) return true;
@@ -107,7 +116,7 @@ function matchComicInLibrary(issue, libraryComics) {
     const matchesSeries = s.includes(targetSeries) || targetSeries.includes(s) || name.includes(targetSeries);
     if (!matchesSeries) return false;
 
-    if (targetNum && (name.includes(`#${targetNum}`) || name.includes(` ${targetNum} `) || name.includes(` ${targetNum}.`))) {
+    if (targetNum && (name.includes(`#${targetNum}`) || name.includes(` ${targetNum} `) || name.includes(` ${targetNum}.`) || name.includes(` ${issue.number} `))) {
       return true;
     }
     if (issue.title && name.includes(normalizeStr(issue.title))) {
@@ -130,7 +139,7 @@ function matchComicInLibrary(issue, libraryComics) {
       const titleMatch = libraryComics.find(c => {
         const s = normalizeStr(c.series);
         const name = normalizeStr(c.name);
-        const n = normalizeStr(c.issueNumber || c.number);
+        const n = normalizeNumber(c.issueNumber || c.number);
 
         // If both have numbers and they conflict, do not match across different issues
         if (targetNum && n && targetNum !== n) return false;
@@ -352,9 +361,197 @@ async function syncLoreOrderToComicsNow(loreDb, comicsNowDb, orderId, options = 
   };
 }
 
+function extractIssueNumber(row) {
+  if (row.issueNumber != null && String(row.issueNumber).trim()) {
+    return String(row.issueNumber).trim();
+  }
+  if (row.metadata) {
+    try {
+      const m = typeof row.metadata === 'string' ? JSON.parse(row.metadata) : row.metadata;
+      if (m.Number != null && String(m.Number).trim()) return String(m.Number).trim();
+      if (m.number != null && String(m.number).trim()) return String(m.number).trim();
+    } catch (_) {}
+  }
+  if (row.name) {
+    const m = row.name.match(/#\s*(\d+)/) || row.name.match(/\b(\d+)(?:\s*(?:of|\/)\s*\d+)?\s*$/i);
+    if (m) return m[1];
+  }
+  return '';
+}
+
+/**
+ * Crawls and indexes all publishers/libraries that have at most maxSeries distinct series.
+ * Strictly ignores Marvel publishers ("and we ccan ignore marvel").
+ */
+function crawlPublishersWithMaxSeries(loreDb, comicsNowDb, options = {}) {
+  const maxSeries = options.maxSeries || 10;
+  const minComics = options.minComics || 1;
+  const excludePublishers = options.excludePublishers || ['Marvel', 'Marvel Comics'];
+
+  const isBetterSqlite = typeof comicsNowDb.prepare === 'function';
+  const queryAll = (sql, params = []) => isBetterSqlite ? comicsNowDb.prepare(sql).all(...params) : comicsNowDb.all(sql, params);
+
+  // Check columns present in comics table
+  let hasMetadataCol = false;
+  let hasIssueNumberCol = false;
+  try {
+    const cols = isBetterSqlite ? comicsNowDb.prepare('PRAGMA table_info(comics)').all() : [];
+    hasMetadataCol = cols.some(c => c.name === 'metadata');
+    hasIssueNumberCol = cols.some(c => c.name === 'issueNumber');
+  } catch (_) {}
+
+  // 1. Fetch publishers with <= maxSeries (excluding Marvel)
+  const publisherRows = queryAll(`
+    SELECT publisher, COUNT(DISTINCT series) as series_count, COUNT(*) as issue_count
+    FROM comics
+    WHERE publisher IS NOT NULL
+      AND publisher != ''
+      AND publisher NOT LIKE '%Marvel%'
+    GROUP BY publisher
+    HAVING series_count <= ? AND issue_count >= ?
+    ORDER BY series_count ASC, issue_count DESC
+  `, [maxSeries, minComics]);
+
+  // Load all library comics for gap analysis
+  const selectCols = ['id', 'publisher', 'series', 'name'];
+  if (hasMetadataCol) selectCols.push('metadata');
+  if (hasIssueNumberCol) selectCols.push('issueNumber');
+  const allComicsRows = queryAll(`SELECT ${selectCols.join(', ')} FROM comics`);
+
+  const libraryComics = allComicsRows.map(r => ({
+    id: r.id,
+    publisher: r.publisher,
+    series: r.series,
+    name: r.name,
+    issueNumber: extractIssueNumber(r)
+  }));
+
+  let publishersProcessed = 0;
+  let ordersIndexed = 0;
+  let totalCanonical = 0;
+  let totalOwned = 0;
+  const indexedOrders = [];
+
+  for (const pubRow of publisherRows) {
+    const pubName = pubRow.publisher;
+    if (excludePublishers.some(ex => pubName.toLowerCase().includes(ex.toLowerCase()))) {
+      continue;
+    }
+
+    const seriesRows = queryAll(`
+      SELECT series, COUNT(*) as count
+      FROM comics
+      WHERE publisher = ? AND series IS NOT NULL AND series != ''
+      GROUP BY series
+      ORDER BY series ASC
+    `, [pubName]);
+
+    if (seriesRows.length === 0) continue;
+    publishersProcessed++;
+
+    // 1. If publisher has >= 2 series, index a unified publisher chronology
+    if (seriesRows.length >= 2) {
+      const pubComics = queryAll(`
+        SELECT ${selectCols.join(', ')}
+        FROM comics
+        WHERE publisher = ?
+        ORDER BY series ASC, id ASC
+      `, [pubName]);
+
+      const publisherIssues = [];
+      for (let i = 0; i < pubComics.length; i++) {
+        const c = pubComics[i];
+        const num = extractIssueNumber(c);
+        publisherIssues.push({
+          series: c.series,
+          number: num || String(i + 1),
+          title: c.name || `${c.series} #${num || i + 1}`,
+          role: 'Franchise Issue'
+        });
+      }
+
+      const pubOrderName = `${pubName}: Complete Reading Chronology`;
+      const pubOrderObj = {
+        name: pubOrderName,
+        publisher: pubName,
+        description: `Complete canonical library chronology for ${pubName} spanning ${seriesRows.length} distinct series.`,
+        source_url: `local://comics-now/publisher/${encodeURIComponent(pubName)}`,
+        issues: publisherIssues
+      };
+
+      const orderId = indexReadingOrder(loreDb, pubOrderObj, libraryComics);
+      ordersIndexed++;
+      const row = loreDb.prepare('SELECT total_canonical_issues, owned_issues_count FROM reading_orders WHERE id = ?').get(orderId);
+      totalCanonical += row.total_canonical_issues;
+      totalOwned += row.owned_issues_count;
+      indexedOrders.push({
+        id: orderId,
+        publisher: pubName,
+        name: pubOrderName,
+        totalCanonical: row.total_canonical_issues,
+        owned: row.owned_issues_count
+      });
+    }
+
+    // 2. Index individual series canonical runs within the publisher
+    for (const s of seriesRows) {
+      const seriesComics = queryAll(`
+        SELECT ${selectCols.join(', ')}
+        FROM comics
+        WHERE publisher = ? AND series = ?
+        ORDER BY id ASC
+      `, [pubName, s.series]);
+
+      const seriesIssues = [];
+      for (let j = 0; j < seriesComics.length; j++) {
+        const sc = seriesComics[j];
+        const num = extractIssueNumber(sc);
+        seriesIssues.push({
+          series: sc.series,
+          number: num || String(j + 1),
+          title: sc.name || `${sc.series} #${num || j + 1}`,
+          role: 'Core Issue'
+        });
+      }
+
+      const seriesOrderName = `${pubName}: ${s.series}`;
+      const seriesOrderObj = {
+        name: seriesOrderName,
+        publisher: pubName,
+        description: `Canonical run and reading order for ${s.series} (${pubName}).`,
+        source_url: `local://comics-now/series/${encodeURIComponent(s.series)}`,
+        issues: seriesIssues
+      };
+
+      const sOrderId = indexReadingOrder(loreDb, seriesOrderObj, libraryComics);
+      ordersIndexed++;
+      const sRow = loreDb.prepare('SELECT total_canonical_issues, owned_issues_count FROM reading_orders WHERE id = ?').get(sOrderId);
+      totalCanonical += sRow.total_canonical_issues;
+      totalOwned += sRow.owned_issues_count;
+      indexedOrders.push({
+        id: sOrderId,
+        publisher: pubName,
+        name: seriesOrderName,
+        totalCanonical: sRow.total_canonical_issues,
+        owned: sRow.owned_issues_count
+      });
+    }
+  }
+
+  return {
+    publishersProcessed,
+    ordersIndexed,
+    totalCanonicalIssues: totalCanonical,
+    ownedIssues: totalOwned,
+    missingIssues: totalCanonical - totalOwned,
+    orders: indexedOrders
+  };
+}
+
 module.exports = {
   initLoreDatabase,
   indexReadingOrder,
   getMissingIssuesForOrder,
-  syncLoreOrderToComicsNow
+  syncLoreOrderToComicsNow,
+  crawlPublishersWithMaxSeries
 };
