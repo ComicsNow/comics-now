@@ -148,7 +148,8 @@ async function parseLoreWithGemini({ markdown, publisher, apiKey, model = 'gemin
       contents: [{ parts: [{ text: prompt }] }],
       generationConfig: {
         responseMimeType: 'application/json',
-        temperature: 0.1
+        temperature: 0.1,
+        maxOutputTokens: 8192
       }
     })
   });
@@ -164,7 +165,53 @@ async function parseLoreWithGemini({ markdown, publisher, apiKey, model = 'gemin
     throw new Error('Empty response received from Gemini.');
   }
 
-  return JSON.parse(rawText);
+  return safeJsonParse(rawText);
+}
+
+/**
+ * Robust JSON parser with trailing-comma repair and unclosed bracket recovery.
+ */
+function safeJsonParse(rawText) {
+  if (!rawText) return null;
+  let cleaned = rawText.trim();
+  cleaned = cleaned.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
+  cleaned = cleaned.replace(/,\s*([\]}])/g, '$1');
+
+  try {
+    return JSON.parse(cleaned);
+  } catch (err) {
+    let stack = [];
+    let inString = false;
+    let escape = false;
+
+    for (let i = 0; i < cleaned.length; i++) {
+      const char = cleaned[i];
+      if (char === '\\' && inString) {
+        escape = !escape;
+        continue;
+      }
+      if (char === '"' && !escape) {
+        inString = !inString;
+      } else if (!inString) {
+        if (char === '{' || char === '[') {
+          stack.push(char === '{' ? '}' : ']');
+        } else if (char === '}' || char === ']') {
+          if (stack.length > 0 && stack[stack.length - 1] === char) {
+            stack.pop();
+          }
+        }
+      }
+      escape = false;
+    }
+
+    if (inString) cleaned += '"';
+    cleaned = cleaned.replace(/,\s*$/, '');
+    while (stack.length > 0) {
+      cleaned += stack.pop();
+    }
+
+    return JSON.parse(cleaned);
+  }
 }
 
 /**

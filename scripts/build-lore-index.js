@@ -262,6 +262,226 @@ async function main() {
     process.exit(0);
   }
 
+  // External sources catalog for polite crawling across the 5 reading order authorities
+  const EXTERNAL_LORE_TARGETS = [
+    {
+      name: 'The Incal / The Jodoverse',
+      publisher: 'Humanoids',
+      source: 'Wikipedia',
+      url: 'https://en.wikipedia.org/wiki/The_Incal'
+    },
+    {
+      name: 'Thorgal Complete Saga',
+      publisher: 'Europe Comics / Cinebook',
+      source: 'Wikipedia',
+      url: 'https://en.wikipedia.org/wiki/Thorgal'
+    },
+    {
+      name: 'The Adventures of Tintin',
+      publisher: 'Casterman',
+      source: 'Wikipedia',
+      url: 'https://en.wikipedia.org/wiki/The_Adventures_of_Tintin'
+    },
+    {
+      name: 'Asterix Complete Canon',
+      publisher: 'Hachette',
+      source: 'Wikipedia',
+      url: 'https://en.wikipedia.org/wiki/Asterix'
+    },
+    {
+      name: 'The Adventures of Blake & Mortimer',
+      publisher: 'Cinebook',
+      source: 'Wikipedia',
+      url: 'https://en.wikipedia.org/wiki/Blake_and_Mortimer'
+    },
+    {
+      name: 'XIII & XIII Mystery',
+      publisher: 'Cinebook / Europe Comics',
+      source: 'Wikipedia',
+      url: 'https://en.wikipedia.org/wiki/XIII_(comics)'
+    },
+    {
+      name: 'Grendel Universe (Matt Wagner)',
+      publisher: 'Dark Horse Comics',
+      source: 'Wikipedia',
+      url: 'https://en.wikipedia.org/wiki/Grendel_(comics)'
+    },
+    {
+      name: 'The Sandman Universe (Neil Gaiman)',
+      publisher: 'DC Comics',
+      source: 'Wikipedia',
+      url: 'https://en.wikipedia.org/wiki/The_Sandman_(comic_book)'
+    },
+    {
+      name: 'Invincible Universe Reading Order',
+      publisher: 'Image / Skybound',
+      source: 'Comic Book Herald',
+      url: 'https://www.comicbookherald.com/the-complete-invincible-reading-order/'
+    },
+    {
+      name: 'The Walking Dead Reading Order',
+      publisher: 'Image / Skybound',
+      source: 'Comic Book Herald',
+      url: 'https://www.comicbookherald.com/the-walking-dead-reading-order/'
+    },
+    {
+      name: 'The Boys Universe Reading Order',
+      publisher: 'Dynamite Entertainment',
+      source: 'Comic Book Herald',
+      url: 'https://www.comicbookherald.com/the-boys-reading-order/'
+    },
+    {
+      name: 'Hellboy / Mignolaverse Complete Chronology',
+      publisher: 'Dark Horse Comics',
+      source: 'Comic Book Herald',
+      url: 'https://www.comicbookherald.com/the-complete-hellboy-reading-order/'
+    },
+    {
+      name: 'Green Lantern: Geoff Johns Era',
+      publisher: 'DC Comics',
+      source: 'Comic Book Herald',
+      url: 'https://www.comicbookherald.com/reading-dc-comics/green-lantern-reading-order/'
+    }
+  ];
+
+  // Command: Polite multi-source external crawl across reading order authorities
+  if (args.includes('--crawl-sources') || args.includes('--crawl-external')) {
+    console.log(`\n🌐 Initiating Polite Multi-Source Crawl across 5 Authorities (${EXTERNAL_LORE_TARGETS.length} targets)...`);
+    const { apiKey, model } = getGeminiConfig();
+    if (!apiKey) {
+      console.error(`[Error] Gemini API key not found in comics-now.db settings.`);
+      process.exit(1);
+    }
+
+    const libraryComics = getAllLibraryComics(comicsNowDb);
+    console.log(`Loaded ${libraryComics.length} local library comics for ownership mapping.\n`);
+
+    let indexedCount = 0;
+    for (let i = 0; i < EXTERNAL_LORE_TARGETS.length; i++) {
+      const target = EXTERNAL_LORE_TARGETS[i];
+      console.log(`[${i + 1}/${EXTERNAL_LORE_TARGETS.length}] Fetching '${target.name}' via ${target.source} (${target.url})...`);
+
+      try {
+        const markdown = await fetchUrlAsMarkdown(target.url);
+        console.log(`  • Fetched ${markdown.length} chars. Extracting canonical lore via Gemini (${model})...`);
+
+        const lore = await parseLoreWithGemini({ markdown, publisher: target.publisher, apiKey, model });
+        const readingList = lore.reading_list || lore;
+        if (!readingList.name) {
+          readingList.name = lore.story_arc?.name || target.name;
+        }
+        if (!readingList.issues && (lore.issues || lore.reading_order)) {
+          readingList.issues = lore.issues || lore.reading_order;
+        }
+        readingList.source_url = target.url;
+
+        const orderId = indexReadingOrder(loreDb, readingList, libraryComics);
+        const row = loreDb.prepare('SELECT total_canonical_issues, owned_issues_count FROM reading_orders WHERE id = ?').get(orderId);
+        const pct = row.total_canonical_issues > 0 ? Math.round((row.owned_issues_count / row.total_canonical_issues) * 100) : 0;
+
+        console.log(`  ✅ Indexed '${readingList.name}'! Coverage: ${row.owned_issues_count} / ${row.total_canonical_issues} issues (${pct}%).`);
+        indexedCount++;
+      } catch (err) {
+        console.warn(`  ⚠️ Failed to process '${target.name}': ${err.message}`);
+      }
+
+      // Polite delay between requests ("scrape very kindly")
+      if (i < EXTERNAL_LORE_TARGETS.length - 1) {
+        console.log(`  ⏳ Polite throttle (2.5s pause)...`);
+        await new Promise(r => setTimeout(r, 2500));
+      }
+    }
+
+    console.log(`\n🎉 Polite multi-source crawl finished! Successfully indexed ${indexedCount} / ${EXTERNAL_LORE_TARGETS.length} major storylines into ${LORE_DB_PATH}.`);
+    process.exit(0);
+  }
+
+  // Command: Dynamically crawl external canonical reading orders for series in library
+  if (args.includes('--crawl-all-series') || args.includes('--auto-crawl-series')) {
+    const limitIdx = args.indexOf('--limit');
+    const limit = limitIdx !== -1 ? parseInt(args[limitIdx + 1], 10) : 30;
+
+    console.log(`\n🔍 Dynamically Querying External Reading Orders for Library Series (Top ${limit} by issue count)...`);
+    const seriesRows = comicsNowDb.prepare(`
+      SELECT series, publisher, COUNT(*) as issue_count
+      FROM comics
+      WHERE publisher NOT LIKE '%Marvel%'
+        AND series IS NOT NULL
+        AND series != ''
+      GROUP BY series, publisher
+      ORDER BY issue_count DESC
+      LIMIT ?
+    `).all(limit);
+
+    console.log(`Found ${seriesRows.length} library series to query across external authorities.\n`);
+
+    const { apiKey, model } = getGeminiConfig();
+    if (!apiKey) {
+      console.error(`[Error] Gemini API key not found in comics-now.db settings.`);
+      process.exit(1);
+    }
+    const libraryComics = getAllLibraryComics(comicsNowDb);
+
+    let indexedCount = 0;
+    for (let i = 0; i < seriesRows.length; i++) {
+      const s = seriesRows[i];
+      console.log(`[${i + 1}/${seriesRows.length}] Resolving '${s.series}' (${s.publisher}, ${s.issue_count} local comics)...`);
+
+      try {
+        // Query Wikipedia OpenSearch API dynamically (try exact series name first, then with (comics))
+        let articleUrl = null;
+        for (const query of [s.series, `${s.series} (comics)`, `${s.series} comic`]) {
+          const searchUrl = `https://en.wikipedia.org/w/api.php?action=opensearch&search=${encodeURIComponent(query)}&limit=3&format=json`;
+          const searchRes = await fetch(searchUrl, { headers: { 'User-Agent': 'ComicsNow-LoreExtractor/2.0' } });
+          const searchData = await searchRes.json();
+          if (searchData[3]?.[0]) {
+            articleUrl = searchData[3][0];
+            break;
+          }
+        }
+
+        if (!articleUrl) {
+          console.log(`  ⭕ No external Wikipedia reading order found for '${s.series}'.`);
+          continue;
+        }
+
+        console.log(`  • Found authority article: ${articleUrl}`);
+        const markdown = await fetchUrlAsMarkdown(articleUrl);
+        const lore = await parseLoreWithGemini({ markdown, publisher: s.publisher, apiKey, model });
+
+        const readingList = lore.reading_list || lore;
+        if (!readingList.name) {
+          readingList.name = `${s.series}: Canonical Chronology`;
+        }
+        if (!readingList.issues && (lore.issues || lore.reading_order)) {
+          readingList.issues = lore.issues || lore.reading_order;
+        }
+        readingList.source_url = articleUrl;
+
+        if (Array.isArray(readingList.issues) && readingList.issues.length > 0) {
+          const orderId = indexReadingOrder(loreDb, readingList, libraryComics);
+          const row = loreDb.prepare('SELECT total_canonical_issues, owned_issues_count FROM reading_orders WHERE id = ?').get(orderId);
+          const pct = row.total_canonical_issues > 0 ? Math.round((row.owned_issues_count / row.total_canonical_issues) * 100) : 0;
+          console.log(`  ✅ Indexed '${readingList.name}'! Coverage: ${row.owned_issues_count} / ${row.total_canonical_issues} canonical issues (${pct}%).`);
+          indexedCount++;
+        } else {
+          console.log(`  ⚠️ No discrete issue list found in article for '${s.series}'.`);
+        }
+      } catch (err) {
+        console.warn(`  ⚠️ Error querying '${s.series}': ${err.message}`);
+      }
+
+      // Polite 2.5s throttle between requests ("scrape very kindly")
+      if (i < seriesRows.length - 1) {
+        console.log(`  ⏳ Polite throttle (2.5s pause)...`);
+        await new Promise(r => setTimeout(r, 2500));
+      }
+    }
+
+    console.log(`\n🎉 Dynamic library crawl complete! Indexed ${indexedCount} reading orders into ${LORE_DB_PATH}.`);
+    process.exit(0);
+  }
+
   // Helper to get Gemini configuration from database
   function getGeminiConfig() {
     let apiKey = process.env.GEMINI_API_KEY || '';
@@ -298,7 +518,13 @@ async function main() {
     }
 
     const lore = await parseLoreWithGemini({ markdown, publisher, apiKey, model });
-    const readingList = lore.reading_list;
+    const readingList = lore.reading_list || lore;
+    if (!readingList.name) {
+      readingList.name = lore.story_arc?.name || lore.name || `${publisher} Reading Order`;
+    }
+    if (!readingList.issues && (lore.issues || lore.reading_order)) {
+      readingList.issues = lore.issues || lore.reading_order;
+    }
     readingList.source_url = targetUrl;
 
     const libraryComics = getAllLibraryComics(comicsNowDb);
