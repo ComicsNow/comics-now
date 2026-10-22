@@ -100,12 +100,31 @@ describe('Database Initialization & Schema Integrity', () => {
       'idx_comics_publisher',
       'idx_comics_series',
       'idx_comics_updatedAt',
-      'idx_reading_list_items_comic'
+      'idx_reading_list_items_comic',
+      'idx_reading_list_items_list_sort',
+      'idx_reading_lists_user_sort',
+      'idx_comics_publisher_series',
+      'idx_user_comic_status_comic'
     ];
 
     for (const idx of expectedIndexes) {
       expect(indexNames).toContain(idx);
     }
+  });
+
+  test('performance pragmas are configured', async () => {
+    const { getDb } = require('../server/db');
+    const dbInstance = getDb ? getDb() : require('../server/db').db;
+    const tempStore = dbInstance.pragma('temp_store', { simple: true });
+    const cacheSize = dbInstance.pragma('cache_size', { simple: true });
+    const mmap = dbInstance.pragma('mmap_size', { simple: true });
+
+    // temp_store should be MEMORY (2)
+    expect(tempStore).toBe(2);
+    // cache_size should be at least 32MB (-32000 or lower)
+    expect(cacheSize).toBeLessThanOrEqual(-32000);
+    // mmap_size should be at least 64MB (67108864)
+    expect(mmap).toBeGreaterThanOrEqual(67108864);
   });
 
   test('initializeDatabase is idempotent and safe to run repeatedly', async () => {
@@ -115,5 +134,14 @@ describe('Database Initialization & Schema Integrity', () => {
     // Verify system user was not duplicated or modified
     const users = await dbAll("SELECT * FROM users WHERE userId = 'default-user'");
     expect(users).toHaveLength(1);
+  });
+
+  test('greenfield database setup succeeds and marks startup migrations as completed', async () => {
+    const titleFlag = await dbGet("SELECT value FROM settings WHERE key = 'migration_title_cleanup_v1'");
+    const creatorFlag = await dbGet("SELECT value FROM settings WHERE key = 'migration_creator_roles_v1'");
+    expect(titleFlag).toBeDefined();
+    expect(titleFlag.value).toBe('1');
+    expect(creatorFlag).toBeDefined();
+    expect(creatorFlag.value).toBe('1');
   });
 });
