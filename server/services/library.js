@@ -149,25 +149,31 @@ async function buildLibrary(userId = 'default-user') {
     });
   }
 
+  // Optimization: Parallelize publisher logo resolution across all publishers concurrently using Promise.all
+  // instead of resolving each publisher's logo sequentially (which blocks on async disk I/O / sharp metadata inspection).
+  const logoTasks = [];
   for (const rootDir in lib) {
     for (const publisherName in lib[rootDir].publishers) {
       const folderName = safeDirName(publisherName);
       const pubLogoDir = path.join(LOGOS_DIRECTORY, folderName);
-      const { logoFile, needsBackground, needsDarkBackground } = await resolveLogo(pubLogoDir);
-
-      if (logoFile) {
-        lib[rootDir].publishers[publisherName].logoUrl =
-          `logos/${encodeURIComponent(folderName)}/${encodeURIComponent(logoFile)}`;
-        lib[rootDir].publishers[publisherName].logoNeedsBackground = needsBackground;
-        lib[rootDir].publishers[publisherName].logoNeedsDarkBackground = Boolean(needsDarkBackground);
-      } else {
-        // Use default blank logo when no publisher logo exists
-        lib[rootDir].publishers[publisherName].logoUrl = 'logos/6373148-blank.png';
-        lib[rootDir].publishers[publisherName].logoNeedsBackground = false;
-        lib[rootDir].publishers[publisherName].logoNeedsDarkBackground = false;
-      }
+      logoTasks.push(
+        resolveLogo(pubLogoDir).then(({ logoFile, needsBackground, needsDarkBackground }) => {
+          const pubObj = lib[rootDir].publishers[publisherName];
+          if (logoFile) {
+            pubObj.logoUrl = `logos/${encodeURIComponent(folderName)}/${encodeURIComponent(logoFile)}`;
+            pubObj.logoNeedsBackground = needsBackground;
+            pubObj.logoNeedsDarkBackground = Boolean(needsDarkBackground);
+          } else {
+            // Use default blank logo when no publisher logo exists
+            pubObj.logoUrl = 'logos/6373148-blank.png';
+            pubObj.logoNeedsBackground = false;
+            pubObj.logoNeedsDarkBackground = false;
+          }
+        })
+      );
     }
   }
+  await Promise.all(logoTasks);
 
   return lib;
 }
