@@ -1,0 +1,3 @@
+## 2026-10-23 - Modal Accessibility Standard Patterns
+**Learning:** Icon-only modal close buttons (`&times;` or `×`) are read by screen readers as "times" or "multiplication sign", leaving assistive tech users unaware of their purpose. Modal overlays without `role="dialog"`, `aria-modal="true"`, and `aria-labelledby` fail screen reader navigation and landmarks.
+**Action:** When adding or updating modal overlays in Comics Now!, always supply `role="dialog"`, `aria-modal="true"`, `aria-labelledby="[header-id]"`, descriptive close button `aria-label`s, and a global `Escape` key handler for quick dismissal.
