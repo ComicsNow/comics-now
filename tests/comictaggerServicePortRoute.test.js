@@ -36,6 +36,10 @@ describe('Tag Comics Now! tagger service port route behaviour', () => {
       getTaggerServiceUrl: jest.fn(() => CURRENT_URL),
       setTaggerServiceUrl: jest.fn(),
       setGoogleBooksApiKey: jest.fn(),
+      setTaggerLowerThreshold: jest.fn(),
+      getTaggerLowerThreshold: jest.fn((val) => 0.85),
+      setTaggerUpperThreshold: jest.fn(),
+      getTaggerUpperThreshold: jest.fn((val) => 0.95),
       saveSetting: jest.fn().mockResolvedValue(undefined),
       stopTaggerWorker: jest.fn(),
       startTaggerWorker: jest.fn().mockResolvedValue(undefined),
@@ -178,6 +182,40 @@ describe('Tag Comics Now! tagger service port route behaviour', () => {
         changed: false,
         taggerServiceUrl: CURRENT_URL
       }));
+    });
+
+    test('valid lowerThreshold and upperThreshold values are accepted and saved', async () => {
+      const req = { body: { lowerThreshold: 0.85, upperThreshold: 0.95 } };
+      const res = makeRes();
+
+      await postScheduleHandler(req, res);
+
+      expect(res.status).not.toHaveBeenCalled();
+      expect(deps.setTaggerLowerThreshold).toHaveBeenCalledWith(0.85);
+      expect(deps.saveSetting).toHaveBeenCalledWith('taggerLowerThreshold', 0.85);
+      expect(deps.setTaggerUpperThreshold).toHaveBeenCalledWith(0.95);
+      expect(deps.saveSetting).toHaveBeenCalledWith('taggerUpperThreshold', 0.95);
+      expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ ok: true }));
+    });
+
+    test.each([-0.5, 1.5, 'invalid', NaN])('rejects invalid lowerThreshold %p with 400', async (badVal) => {
+      const req = { body: { lowerThreshold: badVal } };
+      const res = makeRes();
+
+      await postScheduleHandler(req, res);
+
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(res.json).toHaveBeenCalledWith({ error: 'lowerThreshold must be a number between 0 and 1' });
+    });
+
+    test.each([-0.1, 2.0, 'bad', NaN])('rejects invalid upperThreshold %p with 400', async (badVal) => {
+      const req = { body: { upperThreshold: badVal } };
+      const res = makeRes();
+
+      await postScheduleHandler(req, res);
+
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(res.json).toHaveBeenCalledWith({ error: 'upperThreshold must be a number between 0 and 1' });
     });
   });
 });
