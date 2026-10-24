@@ -536,15 +536,15 @@ module.exports = function attach(router, deps) {
       for (const item of items) {
         if (!item.comicId) continue;
         if (typeof checkComicAccess === 'function' && item.path) {
-          const hasAccess = await checkComicAccess(
-            req.user.userId,
-            userRole,
-            item.path,
-            item.publisher,
-            item.series,
-            dirs,
-            item.comicId
-          );
+          const hasAccess = await checkComicAccess({
+            userId: req.user.userId,
+            userRole: userRole,
+            comicPath: item.path,
+            publisher: item.publisher,
+            series: item.series,
+            rootFolders: dirs,
+            comicId: item.comicId
+          });
           if (!hasAccess) continue;
         }
         accessibleItems.push(item);
