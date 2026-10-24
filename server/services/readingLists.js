@@ -158,8 +158,8 @@ async function deleteReadingListGlobally(identifier, { dbRun, dbGet, dbAll, log 
   }
 
   const listsToDelete = await dbAll('SELECT id, userId FROM reading_lists WHERE name = ? OR id = ?', [name, clean]);
-  for (const l of listsToDelete) {
-    await dbRun('DELETE FROM reading_lists WHERE id = ?', [l.id]);
+  if (listsToDelete.length > 0) {
+    await dbRun('DELETE FROM reading_lists WHERE name = ? OR id = ?', [name, clean]);
   }
 
   return { deletedCount: listsToDelete.length, name };
