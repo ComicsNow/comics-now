@@ -1305,6 +1305,7 @@ def main() -> None:
         starlette_app = Starlette(
             routes=[
                 Mount("/comics-mcp", app=base_app),
+                Mount("/sse", app=base_app),
                 Mount("", app=base_app),
             ],
             lifespan=base_app.router.lifespan_context,
@@ -1352,6 +1353,8 @@ def main() -> None:
                     return
                 if path == "/comics-mcp":
                     scope["path"] = "/comics-mcp/"
+                if path == "/sse":
+                    scope["path"] = "/sse/"
 
             await starlette_app(scope, receive, send)
 
