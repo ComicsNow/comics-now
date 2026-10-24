@@ -203,19 +203,19 @@ async function scanLibrary(force = false) {
               if (fs.existsSync(oldSidecar)) {
                 try {
                   try {
-                    const raw = fs.readFileSync(oldSidecar, 'utf8');
+                    const raw = await fs.promises.readFile(oldSidecar, 'utf8');
                     const parsed = JSON.parse(raw);
                     if (parsed && typeof parsed === 'object' && parsed.pages) {
                       parsed.comicId = id;
-                      fs.writeFileSync(sidecarPath, JSON.stringify(parsed, null, 2), 'utf8');
+                      await fs.promises.writeFile(sidecarPath, JSON.stringify(parsed, null, 2), 'utf8');
                       if (oldSidecar !== sidecarPath && fs.existsSync(oldSidecar)) {
-                        try { fs.unlinkSync(oldSidecar); } catch (_) {}
+                        try { await fs.promises.unlink(oldSidecar); } catch (_) {}
                       }
                     } else {
-                      fs.renameSync(oldSidecar, sidecarPath);
+                      await fs.promises.rename(oldSidecar, sidecarPath);
                     }
                   } catch (_) {
-                    fs.renameSync(oldSidecar, sidecarPath);
+                    await fs.promises.rename(oldSidecar, sidecarPath);
                   }
                   guidedViewStatus = 'completed';
                   guidedViewPath = sidecarPath;
