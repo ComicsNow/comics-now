@@ -35,11 +35,22 @@ async function syncDefaultReadingLists(targetUserId, { dbRun, dbGet, dbAll, log 
 
   if (prune) {
     const userLists = await dbAll('SELECT id, name FROM reading_lists WHERE userId = ?', [targetUserId]);
+    const idsToDelete = [];
+
     for (const uList of userLists) {
       if (!templateNames.has(uList.name)) {
-        await dbRun('DELETE FROM reading_lists WHERE id = ?', [uList.id]);
-        prunedCount++;
+        idsToDelete.push(uList.id);
       }
+    }
+
+    if (idsToDelete.length > 0) {
+      const chunkSize = 500;
+      for (let i = 0; i < idsToDelete.length; i += chunkSize) {
+        const chunk = idsToDelete.slice(i, i + chunkSize);
+        const placeholders = chunk.map(() => '?').join(',');
+        await dbRun(`DELETE FROM reading_lists WHERE id IN (${placeholders})`, chunk);
+      }
+      prunedCount += idsToDelete.length;
     }
   }
 
