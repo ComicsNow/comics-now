@@ -51,16 +51,16 @@ async function buildLibrary(userId = 'default-user') {
     // Access control: Check if user has access to this comic using hierarchical access control
     // Admin has access to everything
     // For non-admin, check hierarchical access: root_folder -> publisher -> series
-    const hasAccess = await checkComicAccess(
+    const hasAccess = await checkComicAccess({
       userId,
       userRole,
-      r.path,
-      r.publisher,
-      r.series,
-      directories,
-      r.id,
-      accessList
-    );
+      comicPath: r.path,
+      publisher: r.publisher,
+      series: r.series,
+      rootFolders: directories,
+      comicId: r.id,
+      preFetchedAccessList: accessList
+    });
 
     if (!hasAccess) {
       continue; // User doesn't have access to this comic, skip it

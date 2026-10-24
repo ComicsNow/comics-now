@@ -287,8 +287,8 @@ describe('Reading List DAG Tests', () => {
     ]);
 
     // Deny access to forbidden-1
-    deps.checkComicAccess.mockImplementation(async (userId, role, path) => {
-      return !path.includes('forbidden');
+    deps.checkComicAccess.mockImplementation(async ({ userId, userRole, comicPath }) => {
+      return !comicPath.includes('forbidden');
     });
 
     const req = {
