@@ -126,16 +126,16 @@ module.exports = function attach(router, deps) {
       const results = [];
       for (const r of rows) {
         // Access control: Check if user has access to this comic
-        const hasAccess = await checkComicAccess(
+        const hasAccess = await checkComicAccess({
           userId,
           userRole,
-          r.path,
-          r.publisher,
-          r.series,
-          directories,
-          r.id,
-          accessList
-        );
+          comicPath: r.path,
+          publisher: r.publisher,
+          series: r.series,
+          rootFolders: directories,
+          comicId: r.id,
+          preFetchedAccessList: accessList
+        });
 
         if (!hasAccess) {
           continue;
@@ -309,16 +309,16 @@ module.exports = function attach(router, deps) {
           const dbComic = dbComicsMap.get(f.path);
           
           if (dbComic) {
-            const hasAccess = await checkComicAccess(
+            const hasAccess = await checkComicAccess({
               userId,
               userRole,
-              dbComic.path,
-              dbComic.publisher,
-              dbComic.series,
-              directories,
-              dbComic.id,
-              userAccessList
-            );
+              comicPath: dbComic.path,
+              publisher: dbComic.publisher,
+              series: dbComic.series,
+              rootFolders: directories,
+              comicId: dbComic.id,
+              preFetchedAccessList: userAccessList
+            });
 
             if (!hasAccess) return null;
 
@@ -341,16 +341,16 @@ module.exports = function attach(router, deps) {
             // Unscanned comic: derive virtual metadata and check access
             const rootFolder = directories.find(d => f.path.startsWith(d));
             const vMeta = generateVirtualMetadata(f.path, rootFolder);
-            const hasAccess = await checkComicAccess(
+            const hasAccess = await checkComicAccess({
               userId,
               userRole,
-              f.path,
-              vMeta.Publisher,
-              vMeta.Series,
-              directories,
-              null,
-              userAccessList
-            );
+              comicPath: f.path,
+              publisher: vMeta.Publisher,
+              series: vMeta.Series,
+              rootFolders: directories,
+              comicId: null,
+              preFetchedAccessList: userAccessList
+            });
 
             if (!hasAccess) return null;
 
