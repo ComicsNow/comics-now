@@ -133,9 +133,7 @@ function impersonationReadOnlyGuard(req, res, next) {
 module.exports = {
   createImpersonationMiddleware,
   impersonationReadOnlyGuard,
-  getSecret,
   signToken,
   setCookie,
-  clearCookie,
-  COOKIE_NAME
+  clearCookie
 };

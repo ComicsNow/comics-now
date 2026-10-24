@@ -120,6 +120,5 @@ async function runWithRetry(fn, {
 
 module.exports = {
   downloadWithResume,
-  runWithRetry,
-  parseTotalFromContentRange
+  runWithRetry
 };

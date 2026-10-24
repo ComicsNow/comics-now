@@ -395,6 +395,5 @@ module.exports = {
   parseGeminiResponse,
   fetchImageAsBase64,
   waitThrottle,
-  resetThrottle,
-  DEFAULT_THROTTLE_MS
+  resetThrottle
 };
