@@ -43,13 +43,20 @@ describe('Admin Rename Route', () => {
   it('should successfully rename a comic with "Cover Date" in metadata', async () => {
     attachRenameRoutes(router, deps);
 
-    // Mock existsSync and renameSync
+    // Mock existsSync, access, and rename
     jest.spyOn(fs, 'existsSync').mockImplementation((p) => {
       if (p === '/comics') return true;
       if (p === '/comics/Justice League.cbz') return true;
       return false; // new path does not exist, safe to rename
     });
-    const renameSpy = jest.spyOn(fs, 'renameSync').mockImplementation(() => {});
+
+    jest.spyOn(fs.promises, 'access').mockImplementation(async (p) => {
+      if (p === '/comics') return;
+      if (p === '/comics/Justice League.cbz') return;
+      throw new Error("ENOENT");
+    });
+
+    const renameSpy = jest.spyOn(fs.promises, 'rename').mockImplementation(async () => {});
 
     // Mock database output containing 'Cover Date' instead of CoverDate
     deps.dbAll.mockResolvedValue([
