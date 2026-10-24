@@ -42,23 +42,30 @@ function createStaticRouter({ getConfig, getComicsDirectories, getPublicLibrarie
     }
   };
 
-  router.get('/service-worker.js', (req, res) => {
+  router.get('/service-worker.js', async (req, res) => {
     res.set('Cache-Control', 'no-store');
     try {
-      let swContent = fs.readFileSync(path.join(PUBLIC_DIR, 'service-worker.js'), 'utf-8');
+      let swContent = await fs.promises.readFile(path.join(PUBLIC_DIR, 'service-worker.js'), 'utf-8');
 
       // Determine build mtime to auto-bump cache version on build
       let buildMtime = '1';
       const distIndexPath = path.join(distDir, 'index.html');
-      if (fs.existsSync(distIndexPath)) {
-        buildMtime = String(Math.floor(fs.statSync(distIndexPath).mtimeMs));
+      try {
+        const stat = await fs.promises.stat(distIndexPath);
+        buildMtime = String(Math.floor(stat.mtimeMs));
+      } catch (err) {
+        // File does not exist, ignore
       }
 
       // Discover any assets in dist/assets
       const distAssetsDir = path.join(distDir, 'assets');
-      const distAssets = fs.existsSync(distAssetsDir)
-        ? fs.readdirSync(distAssetsDir).filter(f => !f.endsWith('.map')).map(f => `assets/${f}`)
-        : [];
+      let distAssets = [];
+      try {
+        const files = await fs.promises.readdir(distAssetsDir);
+        distAssets = files.filter(f => !f.endsWith('.map')).map(f => `assets/${f}`);
+      } catch (err) {
+        // Directory does not exist, ignore
+      }
 
       // Replace CACHE_VERSION with dynamic timestamp
       swContent = swContent.replace(
