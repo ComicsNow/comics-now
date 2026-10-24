@@ -1349,6 +1349,7 @@
           type="button"
           class="pill-button bg-gray-700 hover:bg-gray-600 text-white transition-colors"
           aria-pressed="false"
+          aria-label="Toggle page orientation"
           title="Toggle page orientation"
         >
           <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><use href="#icon-11"></use></svg>
@@ -1358,6 +1359,7 @@
           type="button"
           class="pill-button bg-gray-700 hover:bg-gray-600 text-white transition-colors"
           aria-pressed="false"
+          aria-label="Toggle E-Ink anti-ghosting mode"
           title="E-Ink Anti-Ghosting Mode (Off)"
         >
           <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -1368,6 +1370,7 @@
           id="fullscreen-manga-mode-btn"
           type="button"
           class="manga-mode-btn"
+          aria-label="Toggle Manga Mode"
           title="Toggle Manga Mode"
         >
           <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><use href="#icon-12"></use></svg>
@@ -1376,6 +1379,7 @@
           id="fullscreen-continuous-mode-btn"
           type="button"
           class="continuous-mode-btn"
+          aria-label="Toggle Continuous Mode"
           title="Toggle Continuous Mode"
         >
           <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><use href="#icon-13"></use></svg>
@@ -1384,6 +1388,7 @@
           id="fullscreen-full-image-btn"
           type="button"
           class="continuous-mode-btn"
+          aria-label="Full image view (pan only)"
           title="Full Image (pan only)"
         >
           <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><use href="#icon-14"></use></svg>
@@ -1403,6 +1408,7 @@
           type="button"
           class="pill-button bg-gray-700 hover:bg-gray-600 text-white transition-colors"
           aria-pressed="false"
+          aria-label="Guided panel-by-panel reading"
           title="Guided panel-by-panel reading (requires processed comic)"
           disabled
         >
@@ -1413,6 +1419,7 @@
           type="button"
           class="pill-button bg-gray-700 hover:bg-gray-600 text-white transition-colors"
           aria-pressed="false"
+          aria-label="Guided View across comic dialogue"
           title="Guided View across comic dialogue"
           
         >
@@ -1423,6 +1430,7 @@
           type="button"
           class="pill-button bg-gray-700 hover:bg-gray-600 text-white transition-colors"
           aria-pressed="false"
+          aria-label="User initiated dialog zoom"
           title="User initiated dialog zoom"
         >
           <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><use href="#icon-18"></use></svg>
@@ -1432,6 +1440,7 @@
           type="button"
           class="pill-button bg-gray-700 hover:bg-gray-600 text-white transition-colors"
           aria-pressed="false"
+          aria-label="Click a panel to zoom (Manga)"
           title="Click a panel to zoom (Manga)"
         >
           <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><use href="#icon-19"></use></svg>
@@ -1441,6 +1450,7 @@
           type="button"
           class="pill-button bg-gray-700 hover:bg-gray-600 text-white transition-colors"
           aria-pressed="false"
+          aria-label="Click a speech bubble to zoom (Manga)"
           title="Click a speech bubble to zoom (Manga)"
         >
           <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><use href="#icon-18"></use></svg>
@@ -1495,23 +1505,23 @@
     <div class="flex justify-between items-center mb-6 px-2">
       <!-- Left Group: Logout / Reload -->
       <div class="flex gap-2">
-        <button id="logout-button" aria-label="Logout" class="brutalist-btn btn-vermilion w-10 h-10 transition-colors" onclick="handleLogout()">
+        <button id="logout-button" aria-label="Logout" title="Logout" class="brutalist-btn btn-vermilion w-10 h-10 transition-colors" onclick="handleLogout()">
           <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2"><use href="#icon-8"></use></svg>
         </button>
       </div>
 
       <!-- Right Group: Reading List, Downloads, Tag Comics Now!, and Settings -->
       <div class="flex gap-2">
-        <button id="reading-list-button" aria-label="Reading Lists" class="brutalist-btn btn-cream w-10 h-10 transition-colors" onclick="openReadingListModal()">
+        <button id="reading-list-button" aria-label="Reading Lists" title="Reading Lists" class="brutalist-btn btn-cream w-10 h-10 transition-colors" onclick="openReadingListModal()">
           <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2"><use href="#icon-menu"></use></svg>
         </button>
-        <button id="downloads-button" aria-label="Downloads" class="brutalist-btn btn-cyan w-10 h-10 transition-colors" onclick="openDownloadsPanel()">
+        <button id="downloads-button" aria-label="Downloads" title="Downloads" class="brutalist-btn btn-cyan w-10 h-10 transition-colors" onclick="openDownloadsPanel()">
           <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2"><use href="#icon-download-alt"></use></svg>
         </button>
-        <button id="ct-button" aria-label="Tag Comics Now!" class="brutalist-btn btn-yellow w-10 h-10 transition-colors">
+        <button id="ct-button" aria-label="Tag Comics Now!" title="Tag Comics Now!" class="brutalist-btn btn-yellow w-10 h-10 transition-colors">
           <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2"><use href="#icon-24"></use></svg>
         </button>
-        <button id="settings-button" onclick="openSettingsModal()" aria-label="Settings" class="brutalist-btn btn-ink w-10 h-10 transition-colors">
+        <button id="settings-button" onclick="openSettingsModal()" aria-label="Settings" title="Settings" class="brutalist-btn btn-ink w-10 h-10 transition-colors">
           <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2"><use href="#icon-25"></use></svg>
         </button>
       </div>
@@ -1623,10 +1633,10 @@
       </div>
 
       <div id="smart-scope-mode-toggle" class="hidden flex justify-center gap-2">
-        <button id="smart-list-mode-list-top" class="view-mode-btn p-2 rounded-lg bg-gray-700 text-gray-400" title="List View" type="button">
+        <button id="smart-list-mode-list-top" class="view-mode-btn p-2 rounded-lg bg-gray-700 text-gray-400" aria-label="List View" title="List View" type="button">
           <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2"><use href="#icon-26"></use></svg>
         </button>
-        <button id="smart-list-mode-folders-top" class="view-mode-btn p-2 rounded-lg bg-red-600 text-white" title="Folder View" type="button">
+        <button id="smart-list-mode-folders-top" class="view-mode-btn p-2 rounded-lg bg-red-600 text-white" aria-label="Folder View" title="Folder View" type="button">
           <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2"><use href="#icon-folder"></use></svg>
         </button>
       </div>
@@ -1637,10 +1647,10 @@
       <div class="w-full flex justify-between items-center mb-4">
         <h2 id="search-results-title" class="text-sm font-semibold text-white ml-4 truncate view-title"></h2>
         <div id="search-results-view-toggle" class="flex gap-2">
-          <button id="search-mode-list" class="view-mode-btn active p-2 rounded-lg bg-red-600 text-white" title="List View">
+          <button id="search-mode-list" class="view-mode-btn active p-2 rounded-lg bg-red-600 text-white" aria-label="List View" title="List View">
             <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2"><use href="#icon-26"></use></svg>
           </button>
-          <button id="search-mode-folders" class="view-mode-btn p-2 rounded-lg bg-gray-700 text-gray-400" title="Folder View">
+          <button id="search-mode-folders" class="view-mode-btn p-2 rounded-lg bg-gray-700 text-gray-400" aria-label="Folder View" title="Folder View">
             <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2"><use href="#icon-folder"></use></svg>
           </button>
         </div>
