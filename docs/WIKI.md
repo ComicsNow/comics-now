@@ -75,6 +75,9 @@ For the complete REST endpoint reference — every route under `/api/v1` with pa
 13. [Model Context Protocol (MCP) Server](#13-model-context-protocol-mcp-server)
     - [Overview](#mcp-overview)
     - [Setup & Launcher](#mcp-setup--launcher)
+    - [Configuration & Environment Variables](#mcp-configuration--environment-variables)
+    - [GVE Now Companion Integration](#gve-now-companion-integration)
+    - [Changing the Port & Systemd Service](#changing-the-port--systemd-service)
     - [Client Configuration](#client-configuration)
     - [AI Capabilities (Tagging, Reading Lists, SQL)](#ai-capabilities)
 14. [System Logs & Maintenance](#14-system-logs--maintenance)
@@ -657,7 +660,86 @@ The MCP server communicates locally with Comics Now! as an admin, giving your AI
    npm run mcp
    ```
 
-**Network mode**: The default `stdio` transport has no listening port. For network transports (e.g. remote use), set `MCP_TRANSPORT=sse` (or `streamable-http`), plus `MCP_HOST` (default `127.0.0.1`) and `MCP_PORT` (default `8000`) in `mcp/.env` — `run.sh` loads that file automatically.
+**Network mode**: The default `stdio` transport has no listening port. For network transports (e.g. remote use or SSE), set `MCP_TRANSPORT=sse` (or `streamable-http`), plus `MCP_HOST` and `MCP_PORT` in `mcp/.env` — `run.sh` loads that file automatically.
+
+### MCP Configuration & Environment Variables
+
+All runtime behavior is controlled by environment variables loaded from `mcp/.env`:
+
+| Variable | Default | Description |
+| :--- | :--- | :--- |
+| `COMICS_BASE_URL` | `http://localhost:3000` | Base URL of Comics Now! for API calls. |
+| `GVE_BASE_URL` | `http://localhost:3100` | Base URL of the GVE Now! (Guided View Editor) companion app. |
+| `COMICS_DB_PATH` | `/opt/comics-now/comics-now.db` | Absolute path to SQLite DB used by the read-only `query_db` tool. |
+| `COMICS_ALLOW_DESTRUCTIVE` | `0` | Set to `1` to permit destructive operations (file deletes, renames, migrations). |
+| `COMICS_TIMEOUT` | `60` | HTTP request timeout in seconds. |
+| `COMICS_EXTRA_HEADERS` | `{}` | JSON string of extra headers (e.g. Cloudflare Service Tokens `{"CF-Access-Client-Id":"...","CF-Access-Client-Secret":"..."}`). |
+| `MCP_TRANSPORT` | `stdio` | Transport protocol: `stdio` (local subprocess) or `sse` / `streamable-http` (network). |
+| `MCP_HOST` | `127.0.0.1` | Network bind address. Set to `0.0.0.0` for LAN accessibility. |
+| `MCP_PORT` | `8000` | Port for SSE/network transport (e.g. `3018`). |
+| `MCP_DISABLE_DNS_REBINDING` | `0` | Set to `1` when accessing via local LAN or reverse proxy. |
+
+### GVE Now Companion Integration
+
+Comics Now! integrates natively with **GVE Now!** (port `3100`) for visual guided view editing. The MCP server provides dedicated tools that query GVE Now! under the hood:
+* `inspect_guided_page(comic_id, page)`: Returns page image with panel bounding boxes and reading order badges alongside raw coordinates.
+* `get_guided_page_data(comic_id, page)`: Retrieves page dimensions and sequence items from GVE.
+* `apply_guided_page_fix(comic_id, page, items, order)`: Pushes validated speech/panel coordinates and reading orders directly to GVE Now with automatic backup.
+* `reorder_guided_page(comic_id, page, order)`: Reorders panel and dialogue sequence without changing coordinates.
+
+If GVE Now! is hosted on a different port, host, or behind a reverse proxy, set `GVE_BASE_URL` in `mcp/.env`:
+```ini
+GVE_BASE_URL=http://localhost:3100
+# Or remote instance:
+# GVE_BASE_URL=https://gve.example.com
+```
+
+### Changing the Port & Systemd Service
+
+When running Comics Now MCP in the background as a Linux systemd service (e.g. `comics-mcp.service` on port `3018`):
+
+#### 1. Systemd Service Definition (`/etc/systemd/system/comics-mcp.service`)
+```ini
+[Unit]
+Description=Comics Now! MCP Server (SSE on port 3018)
+After=network.target
+
+[Service]
+Type=simple
+User=raza
+WorkingDirectory=/opt/comics-now/mcp
+Environment=MCP_TRANSPORT=sse
+Environment=MCP_HOST=0.0.0.0
+Environment=MCP_PORT=3018
+Environment=MCP_DISABLE_DNS_REBINDING=1
+EnvironmentFile=/opt/comics-now/mcp/.env
+ExecStart=/opt/comics-now/mcp/.venv/bin/python -m comics_mcp.server
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+```
+
+#### 2. Changing the Listening Port
+To change the port (e.g. from `3018` to another port):
+1. Update `Environment=MCP_PORT=<NEW_PORT>` in `/etc/systemd/system/comics-mcp.service` (or `MCP_PORT=<NEW_PORT>` in `/opt/comics-now/mcp/.env`).
+2. Reload systemd and restart the service:
+   ```bash
+   sudo systemctl daemon-reload
+   sudo systemctl restart comics-mcp.service
+   ```
+3. Verify the service is listening on the new port:
+   ```bash
+   curl -I http://localhost:<NEW_PORT>/sse
+   systemctl status comics-mcp.service
+   ```
+4. If using Homepage dashboard or a reverse proxy, update the port in your configuration:
+   * In `/var/lib/homepage/config/services.yaml`:
+     ```yaml
+     - Comics MCP:
+         href: http://192.168.0.110:<NEW_PORT>/sse
+     ```
 
 ### Client Configuration
 
