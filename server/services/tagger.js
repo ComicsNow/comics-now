@@ -270,6 +270,7 @@ async function runComicTagger(options = {}) {
     let skippedCount = 0;
     let failedCount = 0;
     const itemDurations = [];
+    const failedDbUpdates = [];
 
     const metadataStorage = getMetadataStorage();
     const lowerThreshold = getTaggerLowerThreshold();
@@ -444,16 +445,7 @@ async function runComicTagger(options = {}) {
         }
         ctLog(`✗ Error calling tagger engine for ${entry.name}: ${err.message}`);
         failedCount++;
-        try {
-          await db.dbRun(
-            `INSERT INTO comics (id, path, name, publisher, series, libraryMode, tagStatus, updatedAt)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-             ON CONFLICT(id) DO UPDATE SET
-               tagStatus = excluded.tagStatus,
-               updatedAt = excluded.updatedAt`,
-            [id, filePath, entry.name, existing?.publisher || 'Unknown Publisher', existing?.series || 'Unknown Series', 'metadata', 'failed', null]
-          );
-        } catch (dbErr) {}
+        failedDbUpdates.push([id, filePath, entry.name, existing?.publisher || 'Unknown Publisher', existing?.series || 'Unknown Series', 'metadata', 'failed', null]);
         itemDurations.push(Date.now() - itemStart);
         continue;
       }
@@ -641,6 +633,26 @@ async function runComicTagger(options = {}) {
       }
       itemDurations.push(Date.now() - itemStart);
       ctLog('');
+    }
+
+    if (failedDbUpdates.length > 0) {
+      try {
+        const stmt = db.db.prepare(
+          `INSERT INTO comics (id, path, name, publisher, series, libraryMode, tagStatus, updatedAt)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+           ON CONFLICT(id) DO UPDATE SET
+             tagStatus = excluded.tagStatus,
+             updatedAt = excluded.updatedAt`
+        );
+        const insertMany = db.db.transaction((updates) => {
+          for (const update of updates) {
+            stmt.run(update[0], update[1], update[2], update[3], update[4], update[5], update[6], update[7]);
+          }
+        });
+        insertMany(failedDbUpdates);
+      } catch (dbErr) {
+        ctLog(`✗ Failed to batch update failed records: ${dbErr.message}`);
+      }
     }
 
     if (hasChanges) {
