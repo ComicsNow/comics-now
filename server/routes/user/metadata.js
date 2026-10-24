@@ -37,15 +37,15 @@ module.exports = function attach(router, deps) {
       // Security: Validate user has access to this specific comic
       const comic = await dbGet('SELECT id, publisher, series FROM comics WHERE path = ?', [p]);
       if (comic) {
-        const hasAccess = await checkComicAccess(
-          req.user.userId,
-          req.user.role,
-          p,
-          comic.publisher,
-          comic.series,
-          getComicsDirectories(),
-          comic.id
-        );
+        const hasAccess = await checkComicAccess({
+          userId: req.user.userId,
+          userRole: req.user.role,
+          comicPath: p,
+          publisher: comic.publisher,
+          series: comic.series,
+          rootFolders: getComicsDirectories(),
+          comicId: comic.id
+        });
         if (!hasAccess) {
           log('WARN', 'SECURITY', `User ${req.user.userId} denied access to comic info: ${p}`);
           return res.status(403).json({ message: 'Access denied' });

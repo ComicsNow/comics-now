@@ -20,7 +20,7 @@ describe('Hierarchical Preference Resolution', () => {
 
   describe('resolveReadingModes', () => {
     it('should return false/false by default', () => {
-      const res = resolveReadingModes('id1', 'Series', 'Pub', '/library1/file.cbz', prefMaps, comicsRoots);
+      const res = resolveReadingModes({ comicId: 'id1', series: 'Series', publisher: 'Pub', comicPath: '/library1/file.cbz', prefMaps, comicsRoots });
       expect(res.mangaMode).toBe(false);
       expect(res.continuousMode).toBe(false);
     });
@@ -28,34 +28,34 @@ describe('Hierarchical Preference Resolution', () => {
     it('should resolve mangaMode by comicId (highest priority)', () => {
       prefMaps.comic.set('id1', { mangaMode: true });
       prefMaps.series.set('Series', { mangaMode: false });
-      const res = resolveReadingModes('id1', 'Series', 'Pub', '/library1/file.cbz', prefMaps, comicsRoots);
+      const res = resolveReadingModes({ comicId: 'id1', series: 'Series', publisher: 'Pub', comicPath: '/library1/file.cbz', prefMaps, comicsRoots });
       expect(res.mangaMode).toBe(true);
     });
 
     it('should resolve continuousMode by comicId', () => {
       prefMaps.comic.set('id1', { continuousMode: true });
       prefMaps.library.set('/library1', { continuousMode: false });
-      const res = resolveReadingModes('id1', 'Series', 'Pub', '/library1/file.cbz', prefMaps, comicsRoots);
+      const res = resolveReadingModes({ comicId: 'id1', series: 'Series', publisher: 'Pub', comicPath: '/library1/file.cbz', prefMaps, comicsRoots });
       expect(res.continuousMode).toBe(true);
     });
 
     it('should resolve by series', () => {
       prefMaps.series.set('Series', { mangaMode: true });
       prefMaps.publisher.set('Pub', { mangaMode: false });
-      const res = resolveReadingModes('id1', 'Series', 'Pub', '/library1/file.cbz', prefMaps, comicsRoots);
+      const res = resolveReadingModes({ comicId: 'id1', series: 'Series', publisher: 'Pub', comicPath: '/library1/file.cbz', prefMaps, comicsRoots });
       expect(res.mangaMode).toBe(true);
     });
 
     it('should resolve by publisher', () => {
       prefMaps.publisher.set('Pub', { continuousMode: true });
       prefMaps.library.set('/library1', { continuousMode: false });
-      const res = resolveReadingModes('id1', 'Series', 'Pub', '/library1/file.cbz', prefMaps, comicsRoots);
+      const res = resolveReadingModes({ comicId: 'id1', series: 'Series', publisher: 'Pub', comicPath: '/library1/file.cbz', prefMaps, comicsRoots });
       expect(res.continuousMode).toBe(true);
     });
 
     it('should resolve by library', () => {
       prefMaps.library.set('/library1', { mangaMode: true, continuousMode: true });
-      const res = resolveReadingModes('id1', 'Series', 'Pub', '/library1/file.cbz', prefMaps, comicsRoots);
+      const res = resolveReadingModes({ comicId: 'id1', series: 'Series', publisher: 'Pub', comicPath: '/library1/file.cbz', prefMaps, comicsRoots });
       expect(res.mangaMode).toBe(true);
       expect(res.continuousMode).toBe(true);
     });
@@ -63,7 +63,7 @@ describe('Hierarchical Preference Resolution', () => {
     it('should prefer more specific (series) over less specific (library)', () => {
       prefMaps.library.set('/library1', { mangaMode: true });
       prefMaps.series.set('Series', { mangaMode: false });
-      const res = resolveReadingModes('id1', 'Series', 'Pub', '/library1/file.cbz', prefMaps, comicsRoots);
+      const res = resolveReadingModes({ comicId: 'id1', series: 'Series', publisher: 'Pub', comicPath: '/library1/file.cbz', prefMaps, comicsRoots });
       expect(res.mangaMode).toBe(false);
     });
   });

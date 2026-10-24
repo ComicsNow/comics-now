@@ -14,7 +14,9 @@ module.exports = function attach(router, deps) {
     formatErrorMessage,
     resolvePath,
     validateLastReadPage,
-    validateStatus, validateComicId
+    validateStatus,
+    validateComicId,
+    validateDeviceId
   } = deps;
 
   // ─────────── Sync Update Endpoints ───────────
@@ -26,10 +28,14 @@ module.exports = function attach(router, deps) {
       if (!v.valid) return res.status(400).json({ ok: false, message: v.error });
       const comicId = v.sanitized;
 
-      const { deviceId } = req.query;
-      if (!comicId || !deviceId) {
+      const { deviceId: rawDeviceId } = req.query;
+      if (!comicId || !rawDeviceId) {
         return res.status(400).json({ ok: false, message: 'Missing parameters' });
       }
+
+      const devVal = validateDeviceId(rawDeviceId);
+      if (!devVal.valid) return res.status(400).json({ ok: false, message: devVal.error });
+      const deviceId = devVal.sanitized;
 
       // Get userId from authenticated user (or default if auth disabled)
       const userId = req.user?.userId || 'default-user';
@@ -104,15 +110,19 @@ module.exports = function attach(router, deps) {
 
   router.post('/api/v1/sync/update', async (req, res) => {
     try {
-      const { comicId: rawId, deviceId, lastReadPage } = req.body || {};
+      const { comicId: rawId, deviceId: rawDeviceId, lastReadPage } = req.body || {};
       
       const v = validateComicId(rawId);
       if (!v.valid) return res.status(400).json({ ok: false, message: v.error });
       const comicId = v.sanitized;
 
-      if (!comicId || !deviceId) {
+      if (!comicId || !rawDeviceId) {
         return res.status(400).json({ ok: false, message: 'Missing parameters' });
       }
+
+      const devVal = validateDeviceId(rawDeviceId);
+      if (!devVal.valid) return res.status(400).json({ ok: false, message: devVal.error });
+      const deviceId = devVal.sanitized;
 
       // Get userId from authenticated user (or default if auth disabled)
       const userId = req.user?.userId || 'default-user';
@@ -262,28 +272,36 @@ module.exports = function attach(router, deps) {
       }
 
       const comics = await dbAll(`SELECT id, totalPages FROM comics WHERE ${where}`, params);
+      const now = Date.now();
 
-      for (const c of comics) {
-        const totalPages = c.totalPages || 0;
-        let lastReadPage;
+      await dbRun('BEGIN TRANSACTION');
+      try {
+        for (const c of comics) {
+          const totalPages = c.totalPages || 0;
+          let lastReadPage;
 
-        if (validatedStatus === 'read') {
-          // Mark as read: set to last page (PER-USER)
-          lastReadPage = totalPages > 0 ? totalPages - 1 : 0;
-        } else {
-          // Mark as unread: set to page 0 (PER-USER)
-          lastReadPage = 0;
+          if (validatedStatus === 'read') {
+            // Mark as read: set to last page (PER-USER)
+            lastReadPage = totalPages > 0 ? totalPages - 1 : 0;
+          } else {
+            // Mark as unread: set to page 0 (PER-USER)
+            lastReadPage = 0;
+          }
+
+          // Update per-user status table
+          await dbRun(`
+            INSERT INTO user_comic_status (userId, comicId, lastReadPage, totalPages, updatedAt)
+            VALUES (?, ?, ?, ?, ?)
+            ON CONFLICT(userId, comicId) DO UPDATE SET
+              lastReadPage = excluded.lastReadPage,
+              totalPages = excluded.totalPages,
+              updatedAt = excluded.updatedAt
+          `, [userId, c.id, lastReadPage, totalPages, now]);
         }
-
-        // Update per-user status table
-        await dbRun(`
-          INSERT INTO user_comic_status (userId, comicId, lastReadPage, totalPages, updatedAt)
-          VALUES (?, ?, ?, ?, ?)
-          ON CONFLICT(userId, comicId) DO UPDATE SET
-            lastReadPage = excluded.lastReadPage,
-            totalPages = excluded.totalPages,
-            updatedAt = excluded.updatedAt
-        `, [userId, c.id, lastReadPage, totalPages, Date.now()]);
+        await dbRun('COMMIT');
+      } catch (innerError) {
+        await dbRun('ROLLBACK');
+        throw innerError;
       }
 
       log('INFO', 'STATUS', `Series ${series} (${comics.length} comics) marked as ${validatedStatus} for user ${userId}`);
