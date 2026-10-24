@@ -1,6 +1,6 @@
 const fs = require('fs');
 const path = require('path');
-const { dbGet, dbRun, dbAll } = require('../db');
+const { db, dbGet, dbRun, dbAll } = require('../db');
 const { log } = require('../logger');
 const { getConfig, getScanIntervalMs, getLibraries } = require('../config');
 const { getComicInfoFromArchive, normalizePublisher, cleanDescription, splitVolumeSeriesAndTitle, isTitleSameAsSeries } = require('./metadata');
@@ -405,16 +405,29 @@ async function scanLibrary(force = false) {
       const missingThumbs = await dbAll(
         "SELECT id, path, thumbnailPath FROM comics WHERE thumbnailPath IS NULL OR thumbnailPath = ''"
       );
+
+      const thumbsToUpdate = [];
       for (const item of missingThumbs) {
         if (fs.existsSync(item.path)) {
           const gen = await generateThumbnail(item.path);
           if (gen) {
-            await dbRun("UPDATE comics SET thumbnailPath = ? WHERE id = ?", [gen, item.id]);
-            thumbOk++;
-            log('INFO', 'THUMBNAIL', `Restored missing thumbnail for: ${path.basename(item.path)}`);
+            thumbsToUpdate.push({ id: item.id, gen, path: item.path });
           } else {
             thumbFail++;
           }
+        }
+      }
+
+      if (thumbsToUpdate.length > 0) {
+        await dbRun('BEGIN TRANSACTION');
+        for (const u of thumbsToUpdate) {
+          await dbRun("UPDATE comics SET thumbnailPath = ? WHERE id = ?", [u.gen, u.id]);
+        }
+        await dbRun('COMMIT');
+
+        for (const u of thumbsToUpdate) {
+          thumbOk++;
+          log('INFO', 'THUMBNAIL', `Restored missing thumbnail for: ${path.basename(u.path)}`);
         }
       }
     } catch (repairErr) {
