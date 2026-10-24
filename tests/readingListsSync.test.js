@@ -90,6 +90,13 @@ describe('Reading Lists Sync Service', () => {
         mockDb.reading_lists = mockDb.reading_lists.filter(l => !params.includes(l.id));
         mockDb.reading_list_items = mockDb.reading_list_items.filter(i => !params.includes(i.listId));
       }
+      if (query.includes('DELETE FROM reading_lists WHERE name = ? OR id = ?')) {
+        const name = params[0];
+        const id = params[1];
+        const listIdsToDelete = mockDb.reading_lists.filter(l => l.name === name || l.id === id).map(l => l.id);
+        mockDb.reading_lists = mockDb.reading_lists.filter(l => l.name !== name && l.id !== id);
+        mockDb.reading_list_items = mockDb.reading_list_items.filter(i => !listIdsToDelete.includes(i.listId));
+      }
       if (query.includes('INSERT INTO reading_list_items') || query.includes('INSERT OR IGNORE INTO reading_list_items')) {
         if (query.includes('SELECT')) {
           const targetListId = params[0];
