@@ -29,17 +29,18 @@ module.exports = function attach(router, deps) {
   })();
   const configPath = deps.paths?.CONFIG_FILE || defaultConfigFile;
 
-  function readConfig() {
+  async function readConfig() {
     try {
       if (fs.existsSync(configPath)) {
-        return JSON.parse(fs.readFileSync(configPath, 'utf8'));
+        const raw = await fs.promises.readFile(configPath, 'utf8');
+        return JSON.parse(raw);
       }
     } catch (_) {}
     return {};
   }
 
   async function checkTermsAccepted() {
-    const cfg = readConfig();
+    const cfg = await readConfig();
     if (config.geminiTermsAccepted === true) return true;
     if (typeof dbGet === 'function') {
       try {
@@ -64,7 +65,7 @@ module.exports = function attach(router, deps) {
         res.set('Pragma', 'no-cache');
         res.set('Expires', '0');
       }
-      const cfg = readConfig();
+      const cfg = await readConfig();
       const termsAccepted = await checkTermsAccepted();
 
       let dbApiKey = '';
@@ -123,7 +124,7 @@ module.exports = function attach(router, deps) {
 
   async function handleGetModels(req, res) {
     try {
-      const cfg = readConfig();
+      const cfg = await readConfig();
       const apiKey = (req.query.apiKey || cfg.geminiApiKey || config.geminiApiKey || (process.env.NODE_ENV === 'test' ? '' : process.env.GEMINI_API_KEY) || '').trim();
 
       const fallbackModels = [
@@ -229,7 +230,7 @@ module.exports = function attach(router, deps) {
       if ((geminiApiKey || geminiCoverMatchEnabled) && !cfg.geminiTermsAccepted) {
         cfg.geminiCoverMatchEnabled = false;
         config.geminiCoverMatchEnabled = false;
-        fs.writeFileSync(configPath, JSON.stringify(cfg, null, 2), 'utf8');
+        await fs.promises.writeFile(configPath, JSON.stringify(cfg, null, 2), 'utf8');
         return res.status(400).json({
           error: 'Gemini compliance agreement must be accepted before enabling AI cataloging.',
           termsRequired: true
@@ -285,7 +286,7 @@ module.exports = function attach(router, deps) {
         }
       }
 
-      fs.writeFileSync(configPath, JSON.stringify(cfg, null, 2), 'utf8');
+      await fs.promises.writeFile(configPath, JSON.stringify(cfg, null, 2), 'utf8');
       if (typeof saveConfigToDisk === 'function') {
         saveConfigToDisk();
       }

@@ -184,11 +184,11 @@ function saveConfigToDisk() {
   }
 }
 
-function loadConfigFromDisk() {
+async function loadConfigFromDisk() {
   ensureConfigFileExists();
 
   try {
-    const raw = fs.readFileSync(CONFIG_FILE, 'utf-8');
+    const raw = await fs.promises.readFile(CONFIG_FILE, 'utf-8');
     const parsed = JSON.parse(raw);
     
     // Migration: If legacy comicsDirectories exists, use it to backfill libraries if libraries is empty
