@@ -124,7 +124,7 @@ async function buildLibrary(userId = 'default-user') {
     const progress = progressMap[r.id] || { lastReadPage: 0, totalPages: r.totalPages || 0 };
 
     // Apply hierarchical reading modes preferences
-    const { mangaMode, continuousMode } = resolveReadingModes(r.id, r.series, r.publisher, r.path, prefMaps, directories);
+    const { mangaMode, continuousMode } = resolveReadingModes({ comicId: r.id, series: r.series, publisher: r.publisher, comicPath: r.path, prefMaps, comicsRoots: directories });
 
     // Redact absolute path: Replace absolute root with library ID
     const relativePath = path.relative(isInboxComic ? comicsLocation : absoluteRootDir, r.path);

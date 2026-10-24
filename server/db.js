@@ -510,7 +510,7 @@ async function getReadingPrefMaps(userId = null) {
 /**
  * Resolve reading modes hierarchically
  */
-function resolveReadingModes(comicId, series, publisher, comicPath, prefMaps, comicsRoots) {
+function resolveReadingModes({ comicId, series, publisher, comicPath, prefMaps, comicsRoots }) {
   const levels = [];
   if (prefMaps.comic.has(comicId)) levels.push(prefMaps.comic.get(comicId));
   if (series && prefMaps.series.has(series)) levels.push(prefMaps.series.get(series));
