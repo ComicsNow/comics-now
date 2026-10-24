@@ -191,8 +191,9 @@ describe('Reading Lists Sync Service', () => {
       dbRun: mockDbRun,
       dbGet: mockDbGet,
       dbAll: mockDbAll,
-      log: jest.fn()
-    }, { overwrite: true });
+      log: jest.fn(),
+      overwrite: true
+    });
 
     expect(result.created).toBe(1); // Spider-Man created
     expect(result.updated).toBe(1); // Batman updated
@@ -220,8 +221,9 @@ describe('Reading Lists Sync Service', () => {
       dbRun: mockDbRun,
       dbGet: mockDbGet,
       dbAll: mockDbAll,
-      log: jest.fn()
-    }, { prune: true });
+      log: jest.fn(),
+      prune: true
+    });
 
     expect(result.pruned).toBe(1);
     expect(mockDb.reading_lists.find(l => l.id === 'obsolete-list')).toBeUndefined();
