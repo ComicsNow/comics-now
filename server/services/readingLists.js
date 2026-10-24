@@ -4,14 +4,17 @@ const { createId } = require('../utils');
  * Sync / clone default reading lists (from 'default-user') to a target user.
  * 
  * @param {string} targetUserId - The user ID to sync lists to
- * @param {Object} deps - Database dependencies { dbRun, dbGet, dbAll, log }
- * @param {Object} [options] - Sync options
+ * @param {Object} options - Sync options and dependencies
+ * @param {Function} options.dbRun - Database run dependency
+ * @param {Function} options.dbGet - Database get dependency
+ * @param {Function} options.dbAll - Database all dependency
+ * @param {Function} options.log - Log function dependency
  * @param {boolean} [options.overwrite=false] - If true, overwrite existing list items and sortOrder
  * @param {boolean} [options.prune=false] - If true, delete lists in target user that do not exist in default-user
  * @returns {Promise<{ created: number, updated: number, pruned: number, skipped: number, total: number }>}
  */
-async function syncDefaultReadingLists(targetUserId, { dbRun, dbGet, dbAll, log }, options = {}) {
-  const { overwrite = false, prune = false } = options;
+async function syncDefaultReadingLists(targetUserId, options = {}) {
+  const { dbRun, dbGet, dbAll, log, overwrite = false, prune = false } = options;
   if (!targetUserId || targetUserId === 'default-user') {
     return { created: 0, updated: 0, pruned: 0, skipped: 0, total: 0 };
   }
@@ -129,7 +132,7 @@ async function syncDefaultReadingListsToAllUsers({ dbRun, dbGet, dbAll, log }, o
   let totalPruned = 0;
 
   for (const user of users) {
-    const res = await syncDefaultReadingLists(user.userId, { dbRun, dbGet, dbAll, log }, options);
+    const res = await syncDefaultReadingLists(user.userId, { dbRun, dbGet, dbAll, log, ...options });
     totalCreated += res.created;
     totalUpdated += (res.updated || 0);
     totalPruned += (res.pruned || 0);
