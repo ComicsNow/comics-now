@@ -69,11 +69,14 @@ async function syncDefaultReadingLists(targetUserId, { dbRun, dbGet, dbAll, log 
 
           // Replace items for this user's list
           await dbRun('DELETE FROM reading_list_items WHERE listId = ?', [existing.id]);
-          for (const item of items) {
-            await dbRun(
-              'INSERT INTO reading_list_items (listId, comicId, addedAt, sortOrder) VALUES (?, ?, ?, ?)',
-              [existing.id, item.comicId, item.addedAt || now, item.sortOrder || 0]
-            );
+          if (items && items.length > 0) {
+            const CHUNK_SIZE = 500;
+            for (let i = 0; i < items.length; i += CHUNK_SIZE) {
+              const chunk = items.slice(i, i + CHUNK_SIZE);
+              const placeholders = chunk.map(() => '(?, ?, ?, ?)').join(', ');
+              const params = chunk.flatMap(item => [existing.id, item.comicId, item.addedAt || now, item.sortOrder || 0]);
+              await dbRun(`INSERT INTO reading_list_items (listId, comicId, addedAt, sortOrder) VALUES ${placeholders}`, params);
+            }
           }
           updatedCount++;
         } catch (err) {
@@ -99,11 +102,14 @@ async function syncDefaultReadingLists(targetUserId, { dbRun, dbGet, dbAll, log 
         [list.id]
       );
 
-      for (const item of items) {
-        await dbRun(
-          'INSERT OR IGNORE INTO reading_list_items (listId, comicId, addedAt, sortOrder) VALUES (?, ?, ?, ?)',
-          [newListId, item.comicId, item.addedAt || now, item.sortOrder || 0]
-        );
+      if (items && items.length > 0) {
+        const CHUNK_SIZE = 500;
+        for (let i = 0; i < items.length; i += CHUNK_SIZE) {
+          const chunk = items.slice(i, i + CHUNK_SIZE);
+          const placeholders = chunk.map(() => '(?, ?, ?, ?)').join(', ');
+          const params = chunk.flatMap(item => [newListId, item.comicId, item.addedAt || now, item.sortOrder || 0]);
+          await dbRun(`INSERT OR IGNORE INTO reading_list_items (listId, comicId, addedAt, sortOrder) VALUES ${placeholders}`, params);
+        }
       }
 
       createdCount++;
