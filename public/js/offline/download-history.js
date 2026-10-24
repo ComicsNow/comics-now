@@ -100,7 +100,6 @@ function nextRangeHeader(receivedBytes) {
 module.exports = {
   DOWNLOAD_TTL_MS,
   IN_PROGRESS_STATUSES,
-  isInProgress,
   partitionDownloads,
   selectExpired,
   computeBackoffMs,
