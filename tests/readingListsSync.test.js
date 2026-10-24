@@ -87,12 +87,28 @@ describe('Reading Lists Sync Service', () => {
         mockDb.reading_list_items = mockDb.reading_list_items.filter(i => i.listId !== params[0]);
       }
       if (query.includes('INSERT INTO reading_list_items') || query.includes('INSERT OR IGNORE INTO reading_list_items')) {
-        mockDb.reading_list_items.push({
-          listId: params[0],
-          comicId: params[1],
-          addedAt: params[2],
-          sortOrder: params[3]
-        });
+        if (query.includes('SELECT')) {
+          const targetListId = params[0];
+          const addedAt = params[1];
+          const sourceListId = params[2];
+
+          const sourceItems = mockDb.reading_list_items.filter(i => i.listId === sourceListId);
+          for (const item of sourceItems) {
+            mockDb.reading_list_items.push({
+              listId: targetListId,
+              comicId: item.comicId,
+              addedAt: item.addedAt || addedAt,
+              sortOrder: item.sortOrder || 0
+            });
+          }
+        } else {
+          mockDb.reading_list_items.push({
+            listId: params[0],
+            comicId: params[1],
+            addedAt: params[2],
+            sortOrder: params[3]
+          });
+        }
       }
       return { changes: 1 };
     });
