@@ -14,7 +14,9 @@ module.exports = function attach(router, deps) {
     formatErrorMessage,
     resolvePath,
     validateLastReadPage,
-    validateStatus, validateComicId
+    validateStatus,
+    validateComicId,
+    validateDeviceId
   } = deps;
 
   // ─────────── Sync Update Endpoints ───────────
@@ -26,10 +28,14 @@ module.exports = function attach(router, deps) {
       if (!v.valid) return res.status(400).json({ ok: false, message: v.error });
       const comicId = v.sanitized;
 
-      const { deviceId } = req.query;
-      if (!comicId || !deviceId) {
+      const { deviceId: rawDeviceId } = req.query;
+      if (!comicId || !rawDeviceId) {
         return res.status(400).json({ ok: false, message: 'Missing parameters' });
       }
+
+      const devVal = validateDeviceId(rawDeviceId);
+      if (!devVal.valid) return res.status(400).json({ ok: false, message: devVal.error });
+      const deviceId = devVal.sanitized;
 
       // Get userId from authenticated user (or default if auth disabled)
       const userId = req.user?.userId || 'default-user';
@@ -104,15 +110,19 @@ module.exports = function attach(router, deps) {
 
   router.post('/api/v1/sync/update', async (req, res) => {
     try {
-      const { comicId: rawId, deviceId, lastReadPage } = req.body || {};
+      const { comicId: rawId, deviceId: rawDeviceId, lastReadPage } = req.body || {};
       
       const v = validateComicId(rawId);
       if (!v.valid) return res.status(400).json({ ok: false, message: v.error });
       const comicId = v.sanitized;
 
-      if (!comicId || !deviceId) {
+      if (!comicId || !rawDeviceId) {
         return res.status(400).json({ ok: false, message: 'Missing parameters' });
       }
+
+      const devVal = validateDeviceId(rawDeviceId);
+      if (!devVal.valid) return res.status(400).json({ ok: false, message: devVal.error });
+      const deviceId = devVal.sanitized;
 
       // Get userId from authenticated user (or default if auth disabled)
       const userId = req.user?.userId || 'default-user';
