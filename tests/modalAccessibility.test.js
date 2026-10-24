@@ -63,6 +63,41 @@ describe('Modal Dialog Accessibility & Keyboard Dismissal', () => {
     expect(settingsCloseBtn.getAttribute('aria-label')).toBeTruthy();
   });
 
+  test('header action buttons, view mode toggles, and reader controls have aria-label and title attributes', () => {
+    const iconBtnIds = [
+      'logout-button',
+      'reading-list-button',
+      'downloads-button',
+      'ct-button',
+      'settings-button',
+      'smart-list-mode-list-top',
+      'smart-list-mode-folders-top',
+      'search-mode-list',
+      'search-mode-folders',
+      'fullscreen-orientation-btn',
+      'fullscreen-eink-toggle-btn',
+      'fullscreen-manga-mode-btn',
+      'fullscreen-continuous-mode-btn',
+      'fullscreen-full-image-btn',
+      'manga-guided-toggle-btn',
+      'western-guided-toggle-btn',
+      'western-speech-zoom',
+      'manga-panel-zoom',
+      'manga-speech-zoom-btn'
+    ];
+
+    iconBtnIds.forEach((id) => {
+      const btn = document.getElementById(id);
+      expect(btn).not.toBeNull();
+      const ariaLabel = btn.getAttribute('aria-label');
+      const title = btn.getAttribute('title');
+      expect(ariaLabel).toBeTruthy();
+      expect(title).toBeTruthy();
+      expect(ariaLabel.length).toBeGreaterThan(2);
+      expect(title.length).toBeGreaterThan(2);
+    });
+  });
+
   test('Escape key closes active modal', () => {
     const settingsModal = document.getElementById('settings-modal');
     expect(settingsModal).not.toBeNull();
