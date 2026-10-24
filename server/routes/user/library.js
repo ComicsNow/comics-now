@@ -123,9 +123,8 @@ module.exports = function attach(router, deps) {
         [userId]
       );
 
-      const results = [];
-      for (const r of rows) {
-        // Access control: Check if user has access to this comic
+      // Access control: Check if user has access to these comics concurrently
+      const accessChecks = rows.map(async (r) => {
         const hasAccess = await checkComicAccess(
           userId,
           userRole,
@@ -136,11 +135,12 @@ module.exports = function attach(router, deps) {
           r.id,
           accessList
         );
+        return hasAccess ? r : null;
+      });
+      const accessibleRows = (await Promise.all(accessChecks)).filter(r => r !== null);
 
-        if (!hasAccess) {
-          continue;
-        }
-
+      const results = [];
+      for (const r of accessibleRows) {
         const meta = (() => { try { return JSON.parse(r.metadata || '{}'); } catch { return {}; } })();
         
         // Resolve reading modes using hierarchical helper
