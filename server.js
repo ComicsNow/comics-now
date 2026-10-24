@@ -145,13 +145,15 @@ const {
 } = require('./server/middleware/impersonation');
 
 const dbReady = initializeDatabase();
-loadConfigFromDisk();
 
-if (isAuthEnabled()) {
-  initJwksClient();
-}
+(async () => {
+  await loadConfigFromDisk();
 
-const app = express();
+  if (isAuthEnabled()) {
+    initJwksClient();
+  }
+
+  const app = express();
 const bootConfig = getConfig();
 if (bootConfig.trustProxy !== undefined) {
   app.set('trust proxy', bootConfig.trustProxy);
@@ -394,9 +396,8 @@ try {
   log('WARN', 'GEMINI', `Gemini tagger initialization note: ${err.message}`);
 }
 
-app.use(baseUrl, staticRouter);
+  app.use(baseUrl, staticRouter);
 
-(async () => {
   const PORT = process.env.PORT || config.port || 3000;
 
   await dbReady;

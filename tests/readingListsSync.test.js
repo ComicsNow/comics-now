@@ -86,13 +86,40 @@ describe('Reading Lists Sync Service', () => {
         mockDb.reading_lists = mockDb.reading_lists.filter(l => l.id !== params[0]);
         mockDb.reading_list_items = mockDb.reading_list_items.filter(i => i.listId !== params[0]);
       }
+      if (query.includes('DELETE FROM reading_lists WHERE id IN')) {
+        mockDb.reading_lists = mockDb.reading_lists.filter(l => !params.includes(l.id));
+        mockDb.reading_list_items = mockDb.reading_list_items.filter(i => !params.includes(i.listId));
+      }
+      if (query.includes('DELETE FROM reading_lists WHERE name = ? OR id = ?')) {
+        const name = params[0];
+        const id = params[1];
+        const listIdsToDelete = mockDb.reading_lists.filter(l => l.name === name || l.id === id).map(l => l.id);
+        mockDb.reading_lists = mockDb.reading_lists.filter(l => l.name !== name && l.id !== id);
+        mockDb.reading_list_items = mockDb.reading_list_items.filter(i => !listIdsToDelete.includes(i.listId));
+      }
       if (query.includes('INSERT INTO reading_list_items') || query.includes('INSERT OR IGNORE INTO reading_list_items')) {
-        mockDb.reading_list_items.push({
-          listId: params[0],
-          comicId: params[1],
-          addedAt: params[2],
-          sortOrder: params[3]
-        });
+        if (query.includes('SELECT')) {
+          const targetListId = params[0];
+          const addedAt = params[1];
+          const sourceListId = params[2];
+
+          const sourceItems = mockDb.reading_list_items.filter(i => i.listId === sourceListId);
+          for (const item of sourceItems) {
+            mockDb.reading_list_items.push({
+              listId: targetListId,
+              comicId: item.comicId,
+              addedAt: item.addedAt || addedAt,
+              sortOrder: item.sortOrder || 0
+            });
+          }
+        } else {
+          mockDb.reading_list_items.push({
+            listId: params[0],
+            comicId: params[1],
+            addedAt: params[2],
+            sortOrder: params[3]
+          });
+        }
       }
       return { changes: 1 };
     });
@@ -164,8 +191,9 @@ describe('Reading Lists Sync Service', () => {
       dbRun: mockDbRun,
       dbGet: mockDbGet,
       dbAll: mockDbAll,
-      log: jest.fn()
-    }, { overwrite: true });
+      log: jest.fn(),
+      overwrite: true
+    });
 
     expect(result.created).toBe(1); // Spider-Man created
     expect(result.updated).toBe(1); // Batman updated
@@ -193,8 +221,9 @@ describe('Reading Lists Sync Service', () => {
       dbRun: mockDbRun,
       dbGet: mockDbGet,
       dbAll: mockDbAll,
-      log: jest.fn()
-    }, { prune: true });
+      log: jest.fn(),
+      prune: true
+    });
 
     expect(result.pruned).toBe(1);
     expect(mockDb.reading_lists.find(l => l.id === 'obsolete-list')).toBeUndefined();

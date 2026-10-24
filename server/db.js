@@ -358,8 +358,8 @@ const { checkComicAccess: checkAccessLogic } = require('./access-control');
 
 // Helper function to check if user has access to a specific comic
 // Uses hierarchical access control: root_folder -> publisher -> series
-async function checkComicAccess(userId, userRole, comicPath, publisher, series, rootFolders, comicId = null, preFetchedAccessList = null) {
-  return checkAccessLogic(userId, userRole, comicPath, publisher, series, rootFolders, comicId, preFetchedAccessList, dbAll);
+async function checkComicAccess({ userId, userRole, comicPath, publisher, series, rootFolders, comicId = null, preFetchedAccessList = null }) {
+  return checkAccessLogic({ userId, userRole, comicPath, publisher, series, rootFolders, comicId, preFetchedAccessList, dbAllFunc: dbAll });
 }
 
 // ============================================================================
@@ -510,7 +510,7 @@ async function getReadingPrefMaps(userId = null) {
 /**
  * Resolve reading modes hierarchically
  */
-function resolveReadingModes(comicId, series, publisher, comicPath, prefMaps, comicsRoots) {
+function resolveReadingModes({ comicId, series, publisher, comicPath, prefMaps, comicsRoots }) {
   const levels = [];
   if (prefMaps.comic.has(comicId)) levels.push(prefMaps.comic.get(comicId));
   if (series && prefMaps.series.has(series)) levels.push(prefMaps.series.get(series));
