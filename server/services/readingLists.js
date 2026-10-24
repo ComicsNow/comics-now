@@ -61,20 +61,15 @@ async function syncDefaultReadingLists(targetUserId, { dbRun, dbGet, dbAll, log 
             [list.description || '', list.sortOrder || 0, now, existing.id]
           );
 
-          // Get template items
-          const items = await dbAll(
-            'SELECT comicId, addedAt, sortOrder FROM reading_list_items WHERE listId = ? ORDER BY sortOrder ASC',
-            [list.id]
-          );
-
           // Replace items for this user's list
           await dbRun('DELETE FROM reading_list_items WHERE listId = ?', [existing.id]);
-          for (const item of items) {
-            await dbRun(
-              'INSERT INTO reading_list_items (listId, comicId, addedAt, sortOrder) VALUES (?, ?, ?, ?)',
-              [existing.id, item.comicId, item.addedAt || now, item.sortOrder || 0]
-            );
-          }
+
+          await dbRun(`
+            INSERT INTO reading_list_items (listId, comicId, addedAt, sortOrder)
+            SELECT ?, comicId, COALESCE(addedAt, ?), COALESCE(sortOrder, 0)
+            FROM reading_list_items
+            WHERE listId = ?
+          `, [existing.id, now, list.id]);
           updatedCount++;
         } catch (err) {
           if (log) log('ERROR', 'READING_LISTS', `Failed to update list "${list.name}" for user "${targetUserId}": ${err.message}`);
@@ -93,18 +88,12 @@ async function syncDefaultReadingLists(targetUserId, { dbRun, dbGet, dbAll, log 
         [newListId, targetUserId, list.name, list.description || '', list.sortOrder || 0, list.created || now, list.updated || now]
       );
 
-      // Get comics for this list
-      const items = await dbAll(
-        'SELECT comicId, addedAt, sortOrder FROM reading_list_items WHERE listId = ? ORDER BY sortOrder ASC',
-        [list.id]
-      );
-
-      for (const item of items) {
-        await dbRun(
-          'INSERT OR IGNORE INTO reading_list_items (listId, comicId, addedAt, sortOrder) VALUES (?, ?, ?, ?)',
-          [newListId, item.comicId, item.addedAt || now, item.sortOrder || 0]
-        );
-      }
+      await dbRun(`
+        INSERT OR IGNORE INTO reading_list_items (listId, comicId, addedAt, sortOrder)
+        SELECT ?, comicId, COALESCE(addedAt, ?), COALESCE(sortOrder, 0)
+        FROM reading_list_items
+        WHERE listId = ?
+      `, [newListId, now, list.id]);
 
       createdCount++;
     } catch (err) {
