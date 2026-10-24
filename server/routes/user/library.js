@@ -144,7 +144,7 @@ module.exports = function attach(router, deps) {
         const meta = (() => { try { return JSON.parse(r.metadata || '{}'); } catch { return {}; } })();
         
         // Resolve reading modes using hierarchical helper
-        const { mangaMode, continuousMode } = resolveReadingModes(r.id, r.series, r.publisher, r.path, prefMaps, directories);
+        const { mangaMode, continuousMode } = resolveReadingModes({ comicId: r.id, series: r.series, publisher: r.publisher, comicPath: r.path, prefMaps, comicsRoots: directories });
 
         const userProg = progressMap[r.id] || {};
 
@@ -322,7 +322,7 @@ module.exports = function attach(router, deps) {
 
             if (!hasAccess) return null;
 
-            const { mangaMode, continuousMode } = resolveReadingModes(dbComic.id, dbComic.series, dbComic.publisher, dbComic.path, prefMaps, directories);
+            const { mangaMode, continuousMode } = resolveReadingModes({ comicId: dbComic.id, series: dbComic.series, publisher: dbComic.publisher, comicPath: dbComic.path, prefMaps, comicsRoots: directories });
 
             return {
               id: dbComic.id,
