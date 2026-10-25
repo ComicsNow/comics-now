@@ -196,106 +196,17 @@ async function getScanScopeCounts() {
   }
 }
 
-async function runComicTagger(options = {}) {
-  if (ctRunning) {
-    ctLog('Tagger already running.');
-    return;
-  }
-  ctRunning = true;
-  ctCancelled = false;
-  ctAbortController = new AbortController();
-  const mode = resolveScanMode(options);
-  const bypassCoreGates = (mode === 'force' || mode === 'existing-xml');
-  const bypassNoMatchGate = (mode !== 'default');
-  const forceReprocess = (mode !== 'default');
-  const scanStartTime = Date.now();
-  try {
-    ctLog('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-    const headerSuffix = mode === 'unmatched'
-      ? ' (🔁 Rescan Unmatched — comics previously marked no-match)'
-      : (mode === 'existing-xml'
-        ? ' (⚡ Force Re-Scan — comics with existing ComicInfo.xml)'
-        : (mode === 'force' ? ' (⚡ Force Re-Scan: Existing ComicInfo.xml will be re-scanned)' : ''));
-    ctLog(`Starting Tag Comics Now library scan...${headerSuffix}`);
-    ctLog('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-    
-    const serviceUrl = getTaggerServiceUrl() || 'http://127.0.0.1:5000';
-    
-    // Ensure worker is alive
-    if (!(await isWorkerOnline(serviceUrl))) {
-      ctLog(`Internal tagger worker is offline, attempting start...`);
-      await startTaggerWorker();
-    }
 
-    // Health check
-    try {
-      const healthRes = await fetch(`${serviceUrl}/api/health`, { signal: AbortSignal.timeout(3000) });
-      if (!healthRes.ok) throw new Error(`Status ${healthRes.status}`);
-      const health = await healthRes.json();
-      ctLog(`✓ Tagger engine is online. Version: ${health.version || '1.0'}`);
-    } catch (err) {
-      ctLog(`✗ ERROR: Tagger engine is offline or unreachable: ${err.message}`);
-      return;
-    }
+async function processComicFile(entry, context) {
+  const {
+    mode, bypassCoreGates, bypassNoMatchGate, forceReprocess, serviceUrl, dir,
+    metadataStorage, lowerThreshold, upperThreshold, enabledSources,
+    comicvineApiKey, googleBooksApiKey, metronUser, metronPass, gcdUser, gcdPass,
+    publisherCodex, totalFiles
+  } = context;
+  const fileIndex = context.fileIndex;
 
-    const config = getConfig();
-    const dir = config.comicsLocation;
-    if (!dir || !fs.existsSync(dir)) {
-      ctLog(`✗ Comics directory does not exist: ${dir}`);
-      return;
-    }
 
-    const entries = await fs.promises.readdir(dir, { withFileTypes: true });
-    const allowedFormats = config.allowed_formats || 'cbz';
-    const comicFiles = entries.filter(e => {
-      if (!e.isFile()) return false;
-      const ext = path.extname(e.name).toLowerCase();
-      if (ext === '.cbz') return allowedFormats === 'cbz' || allowedFormats === 'both';
-      if (ext === '.cbr') return allowedFormats === 'cbr' || allowedFormats === 'both';
-      return false;
-    });
-
-    if (comicFiles.length === 0) {
-      ctLog(`ⓘ No supported comic files found to process (Allowed: ${allowedFormats})`);
-      return;
-    }
-
-    const totalFiles = comicFiles.length;
-    ctLog(`ⓘ Found ${totalFiles} comic file(s) in smart folder`);
-    ctLog('');
-
-    let hasChanges = false;
-    let fileIndex = 0;
-    let taggedCount = 0;
-    let reviewCount = 0;
-    let skippedCount = 0;
-    let failedCount = 0;
-    const itemDurations = [];
-    const failedDbUpdates = [];
-
-    const metadataStorage = getMetadataStorage();
-    const lowerThreshold = getTaggerLowerThreshold();
-    const upperThreshold = getTaggerUpperThreshold();
-    const enabledSources = getTaggerEnabledSources();
-    const comicvineApiKey = getComicVineApiKey();
-    const googleBooksApiKey = getGoogleBooksApiKey();
-    const metronUser = getMetronUser();
-    const metronPass = getMetronPassword();
-    const gcdUser = typeof getGcdUser === 'function' ? getGcdUser() : '';
-    const gcdPass = typeof getGcdPassword === 'function' ? getGcdPassword() : '';
-
-    let publisherCodex = [];
-    try {
-      const pubRows = await db.dbAll("SELECT DISTINCT publisher FROM comics WHERE publisher IS NOT NULL AND publisher != '' AND publisher != 'Unknown Publisher'");
-      publisherCodex = (pubRows || []).map(r => r.publisher).filter(Boolean);
-    } catch (e) {}
-
-    for (const entry of comicFiles) {
-      if (ctCancelled) {
-        ctLog('🛑 Scan cancelled by user.');
-        break;
-      }
-      fileIndex++;
       const itemStart = Date.now();
       const filePath = path.join(dir, entry.name);
       const isCbr = path.extname(entry.name).toLowerCase() === '.cbr';
@@ -305,7 +216,7 @@ async function runComicTagger(options = {}) {
       try {
         stats = await fs.promises.stat(filePath);
       } catch (e) {
-        continue;
+        return;
       }
 
       // Check if comic was already scanned into the database
@@ -318,18 +229,18 @@ async function runComicTagger(options = {}) {
 
       // Scoped mode: only re-search comics previously recorded as no-match
       if (mode === 'unmatched' && !(existing && existing.tagStatus === 'failed')) {
-        skippedCount++;
-        itemDurations.push(Date.now() - itemStart);
+        context.skippedCount++;
+        context.itemDurations.push(Date.now() - itemStart);
         ctLog(`➜ SKIPPED: Not previously marked no-match (${entry.name})`);
-        continue;
+        return;
       }
 
       // 1. If already scanned and tagged successfully, and file is not modified -> SKIP (unless forced)
       if (!bypassCoreGates && existing && !isModified && existing.tagStatus === 'successful') {
-        skippedCount++;
-        itemDurations.push(Date.now() - itemStart);
+        context.skippedCount++;
+        context.itemDurations.push(Date.now() - itemStart);
         ctLog(`➜ SKIPPED: Already scanned and tagged (${entry.name})`);
-        continue;
+        return;
       }
 
       // 2. If the file on disk already contains complete metadata (Series, Publisher, Date, Number) -> ONLY skip if NOT forced
@@ -375,34 +286,34 @@ async function runComicTagger(options = {}) {
             [id, filePath, entry.name, pub, ser, 'metadata', 'successful', stats.mtimeMs, JSON.stringify(dbMeta)]
           );
 
-          skippedCount++;
-          itemDurations.push(Date.now() - itemStart);
+          context.skippedCount++;
+          context.itemDurations.push(Date.now() - itemStart);
           ctLog(`✓ SUCCESS → Already contains complete metadata: ${entry.name}`);
-          continue;
+          return;
         } catch (err) {}
       }
 
       // Scoped mode: only re-scan comics that already carry a complete ComicInfo.xml
       if (mode === 'existing-xml' && !(isAlreadyComplete || (existing && existing.tagStatus === 'successful'))) {
-        skippedCount++;
-        itemDurations.push(Date.now() - itemStart);
+        context.skippedCount++;
+        context.itemDurations.push(Date.now() - itemStart);
         ctLog(`➜ SKIPPED: No existing ComicInfo.xml (${entry.name})`);
-        continue;
+        return;
       }
 
       // 3. If previously scanned with no match and file has not been modified -> SKIP (unless forced)
       if (!bypassNoMatchGate && existing && !isModified && existing.tagStatus === 'failed') {
-        skippedCount++;
-        itemDurations.push(Date.now() - itemStart);
+        context.skippedCount++;
+        context.itemDurations.push(Date.now() - itemStart);
         ctLog(`➜ SKIPPED: Previously scanned with no match (file unmodified) (${entry.name})`);
-        continue;
+        return;
       }
 
       // Compute moving average ETA for files requiring online search
       const percent = Math.round(((fileIndex - 1) / totalFiles) * 100);
       let etaStr = '';
-      if (itemDurations.length > 0) {
-        const avgItemMs = itemDurations.reduce((a, b) => a + b, 0) / itemDurations.length;
+      if (context.itemDurations.length > 0) {
+        const avgItemMs = context.itemDurations.reduce((a, b) => a + b, 0) / context.itemDurations.length;
         const remainingItems = totalFiles - (fileIndex - 1);
         etaStr = ` | Est. remaining: ~${formatDuration(remainingItems * avgItemMs)}`;
       }
@@ -442,13 +353,13 @@ async function runComicTagger(options = {}) {
       } catch (err) {
         if (ctCancelled || err.name === 'AbortError') {
           ctLog(`🛑 Processing aborted for ${entry.name}`);
-          break;
+          return;
         }
         ctLog(`✗ Error calling tagger engine for ${entry.name}: ${err.message}`);
-        failedCount++;
-        failedDbUpdates.push([id, filePath, entry.name, existing?.publisher || 'Unknown Publisher', existing?.series || 'Unknown Series', 'metadata', 'failed', null]);
-        itemDurations.push(Date.now() - itemStart);
-        continue;
+        context.failedCount++;
+        context.failedDbUpdates.push([id, filePath, entry.name, existing?.publisher || 'Unknown Publisher', existing?.series || 'Unknown Series', 'metadata', 'failed', null]);
+        context.itemDurations.push(Date.now() - itemStart);
+        return;
       }
 
       if (res.status === 'tagged') {
@@ -502,18 +413,18 @@ async function runComicTagger(options = {}) {
             [id, filePath, entry.name, pub, ser, 'metadata', tagStatus, newStats.mtimeMs, dbMetaStr]
           );
           if (isSuccessful) {
-            taggedCount++;
+            context.taggedCount++;
             ctLog(`✓ SUCCESS → Auto-tagged: ${res.matched_title || entry.name} (${res.confidence || 100}% confidence)`);
           } else {
-            failedCount++;
+            context.failedCount++;
             ctLog(`⚠ WARNING → Auto-tagged file but missing required fields in final file (marked failed): ${entry.name}`);
           }
-          hasChanges = true;
+          context.hasChanges = true;
         } catch (err) {
           ctLog(`✗ Failed to update database status: ${err.message}`);
         }
       } else if (res.status === 'review') {
-        reviewCount++;
+        context.reviewCount++;
         ctLog(`ⓘ Review required for: ${entry.name} (Confidence: ${res.confidence}%)`);
         
         const absolutePath = path.isAbsolute(filePath) ? filePath : path.resolve(filePath);
@@ -593,7 +504,7 @@ async function runComicTagger(options = {}) {
         await new Promise((resolveLoop) => {
           choicePromise.then(async (action) => {
             if (action === 'apply') {
-              hasChanges = true;
+              context.hasChanges = true;
               pendingMatchState = null;
             } else if (action === 'skip') {
               pendingMatchState = null;
@@ -612,9 +523,9 @@ async function runComicTagger(options = {}) {
       } else {
         // status is skipped or failed
         if (res.status === 'failed') {
-          failedCount++;
+          context.failedCount++;
         } else {
-          skippedCount++;
+          context.skippedCount++;
         }
         try {
           const currentStats = await fs.promises.stat(filePath).catch(() => stats);
@@ -632,11 +543,121 @@ async function runComicTagger(options = {}) {
         } catch (err) {}
         ctLog(`➜ SKIPPED: ${res.reason || 'No match above threshold'} (${entry.name})`);
       }
-      itemDurations.push(Date.now() - itemStart);
+      context.itemDurations.push(Date.now() - itemStart);
       ctLog('');
+}
+
+async function runComicTagger(options = {}) {
+  if (ctRunning) {
+    ctLog('Tagger already running.');
+    return;
+  }
+  ctRunning = true;
+  ctCancelled = false;
+  ctAbortController = new AbortController();
+  const mode = resolveScanMode(options);
+  const bypassCoreGates = (mode === 'force' || mode === 'existing-xml');
+  const bypassNoMatchGate = (mode !== 'default');
+  const forceReprocess = (mode !== 'default');
+  const scanStartTime = Date.now();
+  try {
+    ctLog('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    const headerSuffix = mode === 'unmatched'
+      ? ' (🔁 Rescan Unmatched — comics previously marked no-match)'
+      : (mode === 'existing-xml'
+        ? ' (⚡ Force Re-Scan — comics with existing ComicInfo.xml)'
+        : (mode === 'force' ? ' (⚡ Force Re-Scan: Existing ComicInfo.xml will be re-scanned)' : ''));
+    ctLog(`Starting Tag Comics Now library scan...${headerSuffix}`);
+    ctLog('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+
+    const serviceUrl = getTaggerServiceUrl() || 'http://127.0.0.1:5000';
+
+    // Ensure worker is alive
+    if (!(await isWorkerOnline(serviceUrl))) {
+      ctLog(`Internal tagger worker is offline, attempting start...`);
+      await startTaggerWorker();
     }
 
-    if (failedDbUpdates.length > 0) {
+    // Health check
+    try {
+      const healthRes = await fetch(`${serviceUrl}/api/health`, { signal: AbortSignal.timeout(3000) });
+      if (!healthRes.ok) throw new Error(`Status ${healthRes.status}`);
+      const health = await healthRes.json();
+      ctLog(`✓ Tagger engine is online. Version: ${health.version || '1.0'}`);
+    } catch (err) {
+      ctLog(`✗ ERROR: Tagger engine is offline or unreachable: ${err.message}`);
+      return;
+    }
+
+    const config = getConfig();
+    const dir = config.comicsLocation;
+    if (!dir || !fs.existsSync(dir)) {
+      ctLog(`✗ Comics directory does not exist: ${dir}`);
+      return;
+    }
+
+    const entries = await fs.promises.readdir(dir, { withFileTypes: true });
+    const allowedFormats = config.allowed_formats || 'cbz';
+    const comicFiles = entries.filter(e => {
+      if (!e.isFile()) return false;
+      const ext = path.extname(e.name).toLowerCase();
+      if (ext === '.cbz') return allowedFormats === 'cbz' || allowedFormats === 'both';
+      if (ext === '.cbr') return allowedFormats === 'cbr' || allowedFormats === 'both';
+      return false;
+    });
+
+    if (comicFiles.length === 0) {
+      ctLog(`ⓘ No supported comic files found to process (Allowed: ${allowedFormats})`);
+      return;
+    }
+
+    const totalFiles = comicFiles.length;
+    ctLog(`ⓘ Found ${totalFiles} comic file(s) in smart folder`);
+    ctLog('');
+    const context = {
+      mode,
+      bypassCoreGates,
+      bypassNoMatchGate,
+      forceReprocess,
+      serviceUrl,
+      dir,
+      metadataStorage: getMetadataStorage(),
+      lowerThreshold: getTaggerLowerThreshold(),
+      upperThreshold: getTaggerUpperThreshold(),
+      enabledSources: getTaggerEnabledSources(),
+      comicvineApiKey: getComicVineApiKey(),
+      googleBooksApiKey: getGoogleBooksApiKey(),
+      metronUser: getMetronUser(),
+      metronPass: getMetronPassword(),
+      gcdUser: typeof getGcdUser === 'function' ? getGcdUser() : '',
+      gcdPass: typeof getGcdPassword === 'function' ? getGcdPassword() : '',
+      publisherCodex: [],
+      totalFiles,
+      hasChanges: false,
+      fileIndex: 0,
+      taggedCount: 0,
+      reviewCount: 0,
+      skippedCount: 0,
+      failedCount: 0,
+      itemDurations: [],
+      failedDbUpdates: []
+    };
+
+    try {
+      const pubRows = await db.dbAll("SELECT DISTINCT publisher FROM comics WHERE publisher IS NOT NULL AND publisher != '' AND publisher != 'Unknown Publisher'");
+      context.publisherCodex = (pubRows || []).map(r => r.publisher).filter(Boolean);
+    } catch (e) {}
+
+    for (const entry of comicFiles) {
+      if (ctCancelled) {
+        ctLog('🛑 Scan cancelled by user.');
+        break;
+      }
+      context.fileIndex++;
+      await processComicFile(entry, context);
+    }
+
+    if (context.failedDbUpdates.length > 0) {
       try {
         const stmt = db.db.prepare(
           `INSERT INTO comics (id, path, name, publisher, series, libraryMode, tagStatus, updatedAt)
@@ -650,13 +671,13 @@ async function runComicTagger(options = {}) {
             stmt.run(update[0], update[1], update[2], update[3], update[4], update[5], update[6], update[7]);
           }
         });
-        insertMany(failedDbUpdates);
+        insertMany(context.failedDbUpdates);
       } catch (dbErr) {
         ctLog(`✗ Failed to batch update failed records: ${dbErr.message}`);
       }
     }
 
-    if (hasChanges) {
+    if (context.hasChanges) {
       ctLog('ⓘ Triggering library scan due to updated metadata');
       const scan = getScanLibrary();
       if (scan) scan();
@@ -665,7 +686,7 @@ async function runComicTagger(options = {}) {
     const totalDuration = Date.now() - scanStartTime;
     ctLog('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     ctLog(`✓ Tag Comics Now scan completed in ${formatDuration(totalDuration)}`);
-    ctLog(`📊 Results: ${taggedCount} tagged, ${reviewCount} review required, ${skippedCount} skipped, ${failedCount} failed (${totalFiles} total)`);
+    ctLog(`📊 Results: ${context.taggedCount} tagged, ${context.reviewCount} review required, ${context.skippedCount} skipped, ${context.failedCount} failed (${totalFiles} total)`);
     ctLog('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 
   } catch (err) {
