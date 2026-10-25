@@ -1,17 +1,24 @@
 const path = require('path');
+const configModule = require('./config');
 
+/**
+ * Access control verification for comics based on user role, root folder, and metadata grants.
+ * Optimized by moving module imports out of the hot function path to eliminate repeated `require` calls during batch checks.
+ */
 async function checkComicAccess({ userId, userRole, comicPath, publisher, series, rootFolders, comicId = null, preFetchedAccessList = null, dbAllFunc }) {
   // Determine which root folder this comic belongs to
   let rootFolder = 'Unknown';
-  for (const folder of rootFolders) {
-    if (comicPath === folder || comicPath.startsWith(folder + path.sep)) {
-      rootFolder = folder;
-      break;
+  if (rootFolders && rootFolders.length > 0) {
+    for (const folder of rootFolders) {
+      if (comicPath === folder || comicPath.startsWith(folder + path.sep)) {
+        rootFolder = folder;
+        break;
+      }
     }
   }
 
   // Always grant access to files in the inbox / comicsLocation
-  const config = require('./config').getConfig();
+  const config = configModule.getConfig();
   if (config.comicsLocation) {
     const normLocation = config.comicsLocation.replace(/\\/g, '/');
     const normPath = comicPath.replace(/\\/g, '/');
@@ -38,7 +45,7 @@ async function checkComicAccess({ userId, userRole, comicPath, publisher, series
   );
 
   // Retrieve library mode from config
-  const libraries = require('./config').getLibraries();
+  const libraries = configModule.getLibraries();
   const library = libraries.find(l => l.path === rootFolder);
   const isFolderMode = library?.hierarchyMode === 'folder';
 
