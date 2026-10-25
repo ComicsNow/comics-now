@@ -276,27 +276,35 @@ module.exports = function attach(router, deps) {
 
       await dbRun('BEGIN TRANSACTION');
       try {
-        for (const c of comics) {
-          const totalPages = c.totalPages || 0;
-          let lastReadPage;
+        const chunkSize = 100;
+        for (let i = 0; i < comics.length; i += chunkSize) {
+          const chunk = comics.slice(i, i + chunkSize);
+          const placeholders = chunk.map(() => '(?, ?, ?, ?, ?)').join(', ');
+          const params = [];
 
-          if (validatedStatus === 'read') {
-            // Mark as read: set to last page (PER-USER)
-            lastReadPage = totalPages > 0 ? totalPages - 1 : 0;
-          } else {
-            // Mark as unread: set to page 0 (PER-USER)
-            lastReadPage = 0;
+          for (const c of chunk) {
+            const totalPages = c.totalPages || 0;
+            let lastReadPage;
+
+            if (validatedStatus === 'read') {
+              // Mark as read: set to last page (PER-USER)
+              lastReadPage = totalPages > 0 ? totalPages - 1 : 0;
+            } else {
+              // Mark as unread: set to page 0 (PER-USER)
+              lastReadPage = 0;
+            }
+            params.push(userId, c.id, lastReadPage, totalPages, now);
           }
 
           // Update per-user status table
           await dbRun(`
             INSERT INTO user_comic_status (userId, comicId, lastReadPage, totalPages, updatedAt)
-            VALUES (?, ?, ?, ?, ?)
+            VALUES ${placeholders}
             ON CONFLICT(userId, comicId) DO UPDATE SET
               lastReadPage = excluded.lastReadPage,
               totalPages = excluded.totalPages,
               updatedAt = excluded.updatedAt
-          `, [userId, c.id, lastReadPage, totalPages, now]);
+          `, params);
         }
         await dbRun('COMMIT');
       } catch (innerError) {
