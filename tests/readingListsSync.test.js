@@ -126,7 +126,8 @@ describe('Reading Lists Sync Service', () => {
   });
 
   test('syncDefaultReadingLists clones lists from default-user to target user', async () => {
-    const result = await syncDefaultReadingLists('user-1', {
+    const result = await syncDefaultReadingLists({
+      targetUserId: 'user-1',
       dbRun: mockDbRun,
       dbGet: mockDbGet,
       dbAll: mockDbAll,
@@ -158,7 +159,8 @@ describe('Reading Lists Sync Service', () => {
       updated: 500
     });
 
-    const result = await syncDefaultReadingLists('user-1', {
+    const result = await syncDefaultReadingLists({
+      targetUserId: 'user-1',
       dbRun: mockDbRun,
       dbGet: mockDbGet,
       dbAll: mockDbAll,
@@ -187,7 +189,8 @@ describe('Reading Lists Sync Service', () => {
       sortOrder: 0
     });
 
-    const result = await syncDefaultReadingLists('user-1', {
+    const result = await syncDefaultReadingLists({
+      targetUserId: 'user-1',
       dbRun: mockDbRun,
       dbGet: mockDbGet,
       dbAll: mockDbAll,
@@ -217,7 +220,8 @@ describe('Reading Lists Sync Service', () => {
       sortOrder: 0
     });
 
-    const result = await syncDefaultReadingLists('user-1', {
+    const result = await syncDefaultReadingLists({
+      targetUserId: 'user-1',
       dbRun: mockDbRun,
       dbGet: mockDbGet,
       dbAll: mockDbAll,
@@ -248,7 +252,8 @@ describe('Reading Lists Sync Service', () => {
       name: 'Batman Saga'
     });
 
-    const result = await deleteReadingListGlobally('Batman Saga', {
+    const result = await deleteReadingListGlobally({
+      identifier: 'Batman Saga',
       dbRun: mockDbRun,
       dbGet: mockDbGet,
       dbAll: mockDbAll,
@@ -260,7 +265,8 @@ describe('Reading Lists Sync Service', () => {
   });
 
   test('autoSeedNewUserReadingLists seeds if user has 0 lists', async () => {
-    await autoSeedNewUserReadingLists('user-1', {
+    await autoSeedNewUserReadingLists({
+      userId: 'user-1',
       dbRun: mockDbRun,
       dbGet: mockDbGet,
       dbAll: mockDbAll,
@@ -278,7 +284,8 @@ describe('Reading Lists Sync Service', () => {
       name: 'My Custom List'
     });
 
-    await autoSeedNewUserReadingLists('user-1', {
+    await autoSeedNewUserReadingLists({
+      userId: 'user-1',
       dbRun: mockDbRun,
       dbGet: mockDbGet,
       dbAll: mockDbAll,

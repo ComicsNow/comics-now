@@ -270,7 +270,7 @@ async function extractUserFromJWT(req, res, next) {
     };
 
     // Auto-seed default reading lists for new users
-    autoSeedNewUserReadingLists(user.userId, { dbRun, dbGet, dbAll, log }).catch(err => {
+    autoSeedNewUserReadingLists({ userId: user.userId, dbRun, dbGet, dbAll, log }).catch(err => {
       log('ERROR', 'AUTH', `Auto-seed reading lists error: ${err.message}`);
     });
 
