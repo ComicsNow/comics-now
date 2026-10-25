@@ -3,7 +3,7 @@
  * 
  * Handles comic metadata retrieval and ComicVine searching.
  */
-const { cleanFormatAndEdition, splitVolumeSeriesAndTitle, isTitleSameAsSeries, sanitizeMetadata } = require('../../services/metadata');
+const { sanitizeMetadata } = require('../../services/metadata');
 
 module.exports = function attach(router, deps) {
   const {
