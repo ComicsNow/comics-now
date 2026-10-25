@@ -124,20 +124,23 @@ module.exports = function attach(router, deps) {
       );
 
       // Access control: Check if user has access to these comics concurrently
-      const accessChecks = rows.map(async (r) => {
-        const hasAccess = await checkComicAccess({
-          userId,
-          userRole,
-          comicPath: r.path,
-          publisher: r.publisher,
-          series: r.series,
-          rootFolders: directories,
-          comicId: r.id,
-          preFetchedAccessList: accessList
+      let accessibleRows = rows;
+      if (userRole !== 'admin') {
+        const accessChecks = rows.map(async (r) => {
+          const hasAccess = await checkComicAccess({
+            userId,
+            userRole,
+            comicPath: r.path,
+            publisher: r.publisher,
+            series: r.series,
+            rootFolders: directories,
+            comicId: r.id,
+            preFetchedAccessList: accessList
+          });
+          return hasAccess ? r : null;
         });
-        return hasAccess ? r : null;
-      });
-      const accessibleRows = (await Promise.all(accessChecks)).filter(r => r !== null);
+        accessibleRows = (await Promise.all(accessChecks)).filter(r => r !== null);
+      }
 
       const results = [];
       for (const r of accessibleRows) {
@@ -309,7 +312,7 @@ module.exports = function attach(router, deps) {
           const dbComic = dbComicsMap.get(f.path);
           
           if (dbComic) {
-            const hasAccess = await checkComicAccess({
+            const hasAccess = userRole === 'admin' ? true : await checkComicAccess({
               userId,
               userRole,
               comicPath: dbComic.path,
@@ -341,7 +344,7 @@ module.exports = function attach(router, deps) {
             // Unscanned comic: derive virtual metadata and check access
             const rootFolder = directories.find(d => f.path.startsWith(d));
             const vMeta = generateVirtualMetadata(f.path, rootFolder);
-            const hasAccess = await checkComicAccess({
+            const hasAccess = userRole === 'admin' ? true : await checkComicAccess({
               userId,
               userRole,
               comicPath: f.path,

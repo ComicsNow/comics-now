@@ -47,25 +47,25 @@ async function buildLibrary(userId = 'default-user') {
     [userId]
   );
 
-  for (const r of rows) {
-    // Access control: Check if user has access to this comic using hierarchical access control
-    // Admin has access to everything
-    // For non-admin, check hierarchical access: root_folder -> publisher -> series
-    const hasAccess = await checkComicAccess({
-      userId,
-      userRole,
-      comicPath: r.path,
-      publisher: r.publisher,
-      series: r.series,
-      rootFolders: directories,
-      comicId: r.id,
-      preFetchedAccessList: accessList
+  let accessibleRows = rows;
+  if (userRole !== 'admin') {
+    const accessChecks = rows.map(async (r) => {
+      const hasAccess = await checkComicAccess({
+        userId,
+        userRole,
+        comicPath: r.path,
+        publisher: r.publisher,
+        series: r.series,
+        rootFolders: directories,
+        comicId: r.id,
+        preFetchedAccessList: accessList
+      });
+      return hasAccess ? r : null;
     });
+    accessibleRows = (await Promise.all(accessChecks)).filter(r => r !== null);
+  }
 
-    if (!hasAccess) {
-      continue; // User doesn't have access to this comic, skip it
-    }
-
+  for (const r of accessibleRows) {
     // User has access to this comic, include it in the library
     const absoluteRootDir = directories.find(d => r.path.startsWith(d));
     const configObj = require('../config').getConfig();
