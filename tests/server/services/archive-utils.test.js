@@ -1,10 +1,10 @@
 const { openArchive, listPages, getEntryBuffer } = require('../../../server/services/archive-utils');
 const path = require('path');
 const fs = require('fs');
-const { createExtractorFromData } = require('node-unrar-js');
+const { createExtractorFromFile } = require('node-unrar-js');
 
 jest.mock('node-unrar-js', () => ({
-    createExtractorFromData: jest.fn()
+    createExtractorFromFile: jest.fn()
 }));
 
 jest.mock('fs', () => ({
@@ -84,12 +84,12 @@ describe('archive-utils', () => {
                 }),
                 extract: jest.fn()
             };
-            createExtractorFromData.mockResolvedValue(mockExtractor);
+            createExtractorFromFile.mockResolvedValue(mockExtractor);
             
             const archive = await openArchive('dummy.cbr'); 
             const entries = await archive.listEntries();
             expect(entries).toEqual(['page1.jpg', 'page2.jpg']);
-            expect(createExtractorFromData).toHaveBeenCalled();
+            expect(createExtractorFromFile).toHaveBeenCalled();
         });
 
         test('readBuffer in a RAR file', async () => {
@@ -102,7 +102,7 @@ describe('archive-utils', () => {
                     files: [{ extraction: Buffer.from('fake image data') }]
                 })
             };
-            createExtractorFromData.mockResolvedValue(mockExtractor);
+            createExtractorFromFile.mockResolvedValue(mockExtractor);
 
             const archive = await openArchive('dummy.cbr');
             const buffer = await archive.readBuffer('page1.jpg');
@@ -131,7 +131,7 @@ describe('archive-utils', () => {
                 }),
                 extract: jest.fn()
             };
-            createExtractorFromData.mockResolvedValue(mockExtractor);
+            createExtractorFromFile.mockResolvedValue(mockExtractor);
 
             const pages = await listPages('dummy.cbr');
             expect(pages).toEqual(['01.jpg', '02.jpg', '10.jpg']);
