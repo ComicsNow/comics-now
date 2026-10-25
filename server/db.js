@@ -375,8 +375,8 @@ const { checkComicAccess: checkAccessLogic } = require('./access-control');
 
 // Helper function to check if user has access to a specific comic
 // Uses hierarchical access control: root_folder -> publisher -> series
-async function checkComicAccess({ userId, userRole, comicPath, publisher, series, rootFolders, comicId = null, preFetchedAccessList = null }) {
-  return checkAccessLogic({ userId, userRole, comicPath, publisher, series, rootFolders, comicId, preFetchedAccessList, dbAllFunc: dbAll });
+async function checkComicAccess(options) {
+  return checkAccessLogic({ ...options, dbAllFunc: dbAll });
 }
 
 // ============================================================================
