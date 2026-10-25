@@ -176,6 +176,49 @@ function resolveScanMode(options = {}) {
   return (getTaggerForceReprocess && getTaggerForceReprocess()) ? 'existing-xml' : 'default';
 }
 
+async function ensureTaggerEngineOnline(serviceUrl) {
+  // Ensure worker is alive
+  if (!(await isWorkerOnline(serviceUrl))) {
+    ctLog(`Internal tagger worker is offline, attempting start...`);
+    await startTaggerWorker();
+  }
+
+  // Health check
+  try {
+    const healthRes = await fetch(`${serviceUrl}/api/health`, { signal: AbortSignal.timeout(3000) });
+    if (!healthRes.ok) throw new Error(`Status ${healthRes.status}`);
+    const health = await healthRes.json();
+    ctLog(`✓ Tagger engine is online. Version: ${health.version || '1.0'}`);
+    return true;
+  } catch (err) {
+    ctLog(`✗ ERROR: Tagger engine is offline or unreachable: ${err.message}`);
+    return false;
+  }
+}
+
+async function getEligibleComicFiles(dir, allowedFormats) {
+  if (!dir || !fs.existsSync(dir)) {
+    ctLog(`✗ Comics directory does not exist: ${dir}`);
+    return null;
+  }
+
+  const entries = await fs.promises.readdir(dir, { withFileTypes: true });
+  const comicFiles = entries.filter(e => {
+    if (!e.isFile()) return false;
+    const ext = path.extname(e.name).toLowerCase();
+    if (ext === '.cbz') return allowedFormats === 'cbz' || allowedFormats === 'both';
+    if (ext === '.cbr') return allowedFormats === 'cbr' || allowedFormats === 'both';
+    return false;
+  });
+
+  if (comicFiles.length === 0) {
+    ctLog(`ⓘ No supported comic files found to process (Allowed: ${allowedFormats})`);
+    return [];
+  }
+
+  return comicFiles;
+}
+
 // DB-exact count of inbox comics previously recorded as no-match.
 async function getScanScopeCounts() {
   try {
@@ -221,42 +264,17 @@ async function runComicTagger(options = {}) {
     
     const serviceUrl = getTaggerServiceUrl() || 'http://127.0.0.1:5000';
     
-    // Ensure worker is alive
-    if (!(await isWorkerOnline(serviceUrl))) {
-      ctLog(`Internal tagger worker is offline, attempting start...`);
-      await startTaggerWorker();
-    }
-
-    // Health check
-    try {
-      const healthRes = await fetch(`${serviceUrl}/api/health`, { signal: AbortSignal.timeout(3000) });
-      if (!healthRes.ok) throw new Error(`Status ${healthRes.status}`);
-      const health = await healthRes.json();
-      ctLog(`✓ Tagger engine is online. Version: ${health.version || '1.0'}`);
-    } catch (err) {
-      ctLog(`✗ ERROR: Tagger engine is offline or unreachable: ${err.message}`);
+    const isOnline = await ensureTaggerEngineOnline(serviceUrl);
+    if (!isOnline) {
       return;
     }
 
     const config = getConfig();
     const dir = config.comicsLocation;
-    if (!dir || !fs.existsSync(dir)) {
-      ctLog(`✗ Comics directory does not exist: ${dir}`);
-      return;
-    }
-
-    const entries = await fs.promises.readdir(dir, { withFileTypes: true });
     const allowedFormats = config.allowed_formats || 'cbz';
-    const comicFiles = entries.filter(e => {
-      if (!e.isFile()) return false;
-      const ext = path.extname(e.name).toLowerCase();
-      if (ext === '.cbz') return allowedFormats === 'cbz' || allowedFormats === 'both';
-      if (ext === '.cbr') return allowedFormats === 'cbr' || allowedFormats === 'both';
-      return false;
-    });
 
-    if (comicFiles.length === 0) {
-      ctLog(`ⓘ No supported comic files found to process (Allowed: ${allowedFormats})`);
+    const comicFiles = await getEligibleComicFiles(dir, allowedFormats);
+    if (!comicFiles || comicFiles.length === 0) {
       return;
     }
 
@@ -290,350 +308,48 @@ async function runComicTagger(options = {}) {
       publisherCodex = (pubRows || []).map(r => r.publisher).filter(Boolean);
     } catch (e) {}
 
+    const context = {
+      mode, bypassCoreGates, bypassNoMatchGate, forceReprocess, serviceUrl, totalFiles,
+      metadataStorage, lowerThreshold, upperThreshold, enabledSources, comicvineApiKey,
+      googleBooksApiKey, metronUser, metronPass, gcdUser, gcdPass, publisherCodex,
+      fileIndex: 0, itemDurations
+    };
+
     for (const entry of comicFiles) {
       if (ctCancelled) {
         ctLog('🛑 Scan cancelled by user.');
         break;
       }
-      fileIndex++;
-      const itemStart = Date.now();
-      const filePath = path.join(dir, entry.name);
-      const isCbr = path.extname(entry.name).toLowerCase() === '.cbr';
-      const id = require('../utils').createId(filePath);
+      context.fileIndex++;
 
-      let stats;
-      try {
-        stats = await fs.promises.stat(filePath);
-      } catch (e) {
+      const result = await processSingleComicFile(entry, dir, context);
+
+      if (result.status === 'aborted') {
+        break;
+      }
+      if (result.status === 'continue') {
         continue;
       }
 
-      // Check if comic was already scanned into the database
-      const existing = await db.dbGet(
-        'SELECT id, updatedAt, tagStatus, metadata, series, publisher FROM comics WHERE id = ?',
-        [id]
-      );
-
-      const isModified = !existing || !existing.updatedAt || Math.abs(stats.mtimeMs - existing.updatedAt) > 1000;
-
-      // Scoped mode: only re-search comics previously recorded as no-match
-      if (mode === 'unmatched' && !(existing && existing.tagStatus === 'failed')) {
-        skippedCount++;
-        itemDurations.push(Date.now() - itemStart);
-        ctLog(`➜ SKIPPED: Not previously marked no-match (${entry.name})`);
-        continue;
+      if (result.hasChanges) {
+        hasChanges = true;
       }
-
-      // 1. If already scanned and tagged successfully, and file is not modified -> SKIP (unless forced)
-      if (!bypassCoreGates && existing && !isModified && existing.tagStatus === 'successful') {
-        skippedCount++;
-        itemDurations.push(Date.now() - itemStart);
-        ctLog(`➜ SKIPPED: Already scanned and tagged (${entry.name})`);
-        continue;
+      if (result.duration > 0) {
+        itemDurations.push(result.duration);
       }
-
-      // 2. If the file on disk already contains complete metadata (Series, Publisher, Date, Number) -> ONLY skip if NOT forced
-      const isAlreadyComplete = await checkFileSuccess(filePath);
-      if (!bypassCoreGates && isAlreadyComplete) {
-        try {
-          const { getComicInfoFromArchive, normalizePublisher, cleanDescription, splitVolumeSeriesAndTitle, isTitleSameAsSeries } = require('./metadata');
-          const info = await getComicInfoFromArchive(filePath);
-          const rawPub = info.Publisher || existing?.publisher || 'Unknown Publisher';
-          const pub = normalizePublisher(rawPub, publisherCodex);
-          let ser = info.Series || existing?.series || 'Unknown Series';
-          let title = info.Title || '';
-          let num = info.Number || '';
-          let vol = info.Volume || '';
-          const volSplit = splitVolumeSeriesAndTitle(ser, title);
-          if (volSplit.series && volSplit.number) {
-            ser = volSplit.series;
-            title = volSplit.title;
-            if (!num || num === '1' || num === '01') {
-              num = volSplit.number;
-            }
-            if (!vol) {
-              vol = volSplit.volume;
-            }
-          }
-          if (!num && vol) {
-            num = vol;
-          }
-          if (title && (isTitleSameAsSeries(title, ser) || (!ser && isTitleSameAsSeries(title, '')))) {
-            title = '';
-          }
-          const dbMeta = buildTaggedDbMeta(info, { title, series: ser, number: num, volume: vol, publisher: pub });
-
-          await db.dbRun(
-            `INSERT INTO comics (id, path, name, publisher, series, libraryMode, tagStatus, updatedAt, metadata)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-             ON CONFLICT(id) DO UPDATE SET
-               tagStatus = excluded.tagStatus,
-               publisher = excluded.publisher,
-               series = excluded.series,
-               updatedAt = excluded.updatedAt,
-               metadata = COALESCE(excluded.metadata, comics.metadata)`,
-            [id, filePath, entry.name, pub, ser, 'metadata', 'successful', stats.mtimeMs, JSON.stringify(dbMeta)]
-          );
-
-          skippedCount++;
-          itemDurations.push(Date.now() - itemStart);
-          ctLog(`✓ SUCCESS → Already contains complete metadata: ${entry.name}`);
-          continue;
-        } catch (err) {}
-      }
-
-      // Scoped mode: only re-scan comics that already carry a complete ComicInfo.xml
-      if (mode === 'existing-xml' && !(isAlreadyComplete || (existing && existing.tagStatus === 'successful'))) {
-        skippedCount++;
-        itemDurations.push(Date.now() - itemStart);
-        ctLog(`➜ SKIPPED: No existing ComicInfo.xml (${entry.name})`);
-        continue;
-      }
-
-      // 3. If previously scanned with no match and file has not been modified -> SKIP (unless forced)
-      if (!bypassNoMatchGate && existing && !isModified && existing.tagStatus === 'failed') {
-        skippedCount++;
-        itemDurations.push(Date.now() - itemStart);
-        ctLog(`➜ SKIPPED: Previously scanned with no match (file unmodified) (${entry.name})`);
-        continue;
-      }
-
-      // Compute moving average ETA for files requiring online search
-      const percent = Math.round(((fileIndex - 1) / totalFiles) * 100);
-      let etaStr = '';
-      if (itemDurations.length > 0) {
-        const avgItemMs = itemDurations.reduce((a, b) => a + b, 0) / itemDurations.length;
-        const remainingItems = totalFiles - (fileIndex - 1);
-        etaStr = ` | Est. remaining: ~${formatDuration(remainingItems * avgItemMs)}`;
-      }
-
-      ctLog(`─────────────────────────────────────────`);
-      ctLog(`[${fileIndex}/${totalFiles}] Processing: ${entry.name} (${percent}% complete${etaStr})`);
       
-      // Determine storage mode: CBR files always use sidecar
-      const effectiveStorage = isCbr ? 'sidecar' : metadataStorage;
-
-      let res;
-      try {
-        res = await callTaggerEngineWithProgress(
-          serviceUrl,
-          {
-            path: filePath,
-            metadata_storage: effectiveStorage,
-            comicvine_api_key: comicvineApiKey,
-            google_books_api_key: googleBooksApiKey,
-            metron_user: metronUser,
-            metron_pass: metronPass,
-            gcd_user: gcdUser,
-            gcd_pass: gcdPass,
-            lower_threshold: lowerThreshold,
-            upper_threshold: upperThreshold,
-            enabled_sources: enabledSources,
-            force_reprocess: forceReprocess,
-            publisher_codex: publisherCodex
-          },
-          ctAbortController ? ctAbortController.signal : undefined,
-          (prog) => {
-            const srcLabel = prog.source || 'Search';
-            const msg = prog.message || '';
-            ctLog(`  ↳ [${srcLabel}] ${msg}`);
-          }
-        );
-      } catch (err) {
-        if (ctCancelled || err.name === 'AbortError') {
-          ctLog(`🛑 Processing aborted for ${entry.name}`);
-          break;
-        }
-        ctLog(`✗ Error calling tagger engine for ${entry.name}: ${err.message}`);
-        failedCount++;
-        failedDbUpdates.push([id, filePath, entry.name, existing?.publisher || 'Unknown Publisher', existing?.series || 'Unknown Series', 'metadata', 'failed', null]);
-        itemDurations.push(Date.now() - itemStart);
-        continue;
-      }
-
-      if (res.status === 'tagged') {
-        try {
-          const isSuccessful = await checkFileSuccess(filePath);
-          const tagStatus = isSuccessful ? 'successful' : 'failed';
-          const newStats = await fs.promises.stat(filePath).catch(() => stats);
-          
-          const { getComicInfoFromArchive, normalizePublisher, cleanDescription, splitVolumeSeriesAndTitle, isTitleSameAsSeries } = require('./metadata');
-          let dbMetaStr = null;
-          let rawPub = res.metadata?.publisher || existing?.publisher || 'Unknown Publisher';
-          let pub = normalizePublisher(rawPub, publisherCodex);
-          let ser = res.metadata?.series || res.metadata?.title || existing?.series || 'Unknown Series';
-          try {
-            const info = await getComicInfoFromArchive(filePath);
-            pub = normalizePublisher(info.Publisher || pub, publisherCodex);
-            ser = info.Series || ser;
-            let title = info.Title || '';
-            let num = info.Number || '';
-            let vol = info.Volume || '';
-            const volSplit = splitVolumeSeriesAndTitle(ser, title);
-            if (volSplit.series && volSplit.number) {
-              ser = volSplit.series;
-              title = volSplit.title;
-              if (!num || num === '1' || num === '01') {
-                num = volSplit.number;
-              }
-              if (!vol) {
-                vol = volSplit.volume;
-              }
-            }
-            if (!num && vol) {
-              num = vol;
-            }
-            if (title && (isTitleSameAsSeries(title, ser) || (!ser && isTitleSameAsSeries(title, '')))) {
-              title = '';
-            }
-            const dbMeta = buildTaggedDbMeta(info, { title, series: ser, number: num, volume: vol, publisher: pub });
-            dbMetaStr = JSON.stringify(dbMeta);
-          } catch (e) {}
-
-          await db.dbRun(
-            `INSERT INTO comics (id, path, name, publisher, series, libraryMode, tagStatus, updatedAt, metadata)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-             ON CONFLICT(id) DO UPDATE SET
-               tagStatus = excluded.tagStatus,
-               publisher = excluded.publisher,
-               series = excluded.series,
-               updatedAt = excluded.updatedAt,
-               metadata = COALESCE(excluded.metadata, comics.metadata)`,
-            [id, filePath, entry.name, pub, ser, 'metadata', tagStatus, newStats.mtimeMs, dbMetaStr]
-          );
-          if (isSuccessful) {
-            taggedCount++;
-            ctLog(`✓ SUCCESS → Auto-tagged: ${res.matched_title || entry.name} (${res.confidence || 100}% confidence)`);
-          } else {
-            failedCount++;
-            ctLog(`⚠ WARNING → Auto-tagged file but missing required fields in final file (marked failed): ${entry.name}`);
-          }
-          hasChanges = true;
-        } catch (err) {
-          ctLog(`✗ Failed to update database status: ${err.message}`);
-        }
-      } else if (res.status === 'review') {
+      if (result.status === 'tagged') {
+        taggedCount++;
+      } else if (result.status === 'review') {
         reviewCount++;
-        ctLog(`ⓘ Review required for: ${entry.name} (Confidence: ${res.confidence}%)`);
-        
-        const absolutePath = path.isAbsolute(filePath) ? filePath : path.resolve(filePath);
-        
-        const formattedMatches = (res.candidates || []).map((c, index) => {
-          const meta = c.metadata || {};
-          const candidateTitle = meta.title || (meta.series ? `${meta.series} #${meta.number || meta.issue || '?'}` : 'Unknown Title');
-          return {
-            choice: String(index + 1),
-            title: candidateTitle,
-            year: meta.publish_date ? new Date(meta.publish_date).getFullYear().toString() : (meta.year || 'Unknown Year'),
-            issue: meta.issue || meta.number || '?',
-            publisher: meta.publisher || 'Unknown Publisher',
-            extra: meta.description ? meta.description.substring(0, 150) + '...' : null,
-            coverUrl: meta.cover_image_url || null,
-            fullMetadata: meta,
-            score: c.score,
-            source: c.source
-          };
-        });
-
-        // Enrich covers: if a candidate (e.g. from GCD) lacks a cover or has a Cloudflare-blocked cover,
-        // check if another candidate from the same search (e.g. ComicVine, Metron) has an accessible cover for this series
-        for (const m of formattedMatches) {
-          const isBlockedCover = !m.coverUrl || m.coverUrl.includes('comics.org');
-          if (isBlockedCover) {
-            const partner = formattedMatches.find(other =>
-              other !== m &&
-              other.coverUrl &&
-              !other.coverUrl.includes('comics.org') &&
-              other.fullMetadata?.series &&
-              m.fullMetadata?.series &&
-              other.fullMetadata.series.toLowerCase().trim() === m.fullMetadata.series.toLowerCase().trim()
-            );
-            if (partner) {
-              m.coverUrl = partner.coverUrl;
-            }
-          }
+      } else if (result.status === 'skipped') {
+        skippedCount++;
+      } else if (result.status === 'failed') {
+        failedCount++;
+        if (result.dbUpdate) {
+          failedDbUpdates.push(result.dbUpdate);
         }
-
-        pendingMatchState = {
-          fileName: entry.name,
-          filePath: absolutePath,
-          matches: formattedMatches,
-          timestamp: new Date().toISOString(),
-          waitingForResponse: true,
-          isFinal: true,
-          previewBuffer: null,
-          previewMime: null,
-          waitingLogId: `ct-wait-${++waitingLogSeq}`
-        };
-
-        const choicePromise = new Promise((resolveChoice) => {
-          userChoiceResolver = resolveChoice;
-        });
-
-        // Background extract and cache the preview image
-        (async () => {
-          try {
-            const library = require('./library.js');
-            const pages = await library.getComicPages(absolutePath);
-            if (pages && pages.length > 0) {
-              const firstPage = pages[0];
-              const buffer = await library.extractPageBuffer(absolutePath, firstPage);
-              if (buffer && pendingMatchState && pendingMatchState.filePath === absolutePath) {
-                const { getMimeFromExt } = require('../utils');
-                pendingMatchState.previewBuffer = buffer;
-                pendingMatchState.previewMime = getMimeFromExt(firstPage);
-                ctLog(`ⓘ Cached preview image for: ${entry.name}`);
-              }
-            }
-          } catch (err) {}
-        })();
-
-        ctLog(`>>> WAITING FOR USER SELECTION (Found ${formattedMatches.length} candidates)`, { id: pendingMatchState.waitingLogId });
-        
-        await new Promise((resolveLoop) => {
-          choicePromise.then(async (action) => {
-            if (action === 'apply') {
-              hasChanges = true;
-              pendingMatchState = null;
-            } else if (action === 'skip') {
-              pendingMatchState = null;
-            } else if (action === 'scan_cancelled') {
-              // Retain pendingMatchState so user can review and apply/skip after scan cancellation
-            }
-            userChoiceResolver = null;
-            resolveLoop();
-          }).catch((err) => {
-            ctLog(`✗ Error in selection promise: ${err.message}`);
-            pendingMatchState = null;
-            userChoiceResolver = null;
-            resolveLoop();
-          });
-        });
-      } else {
-        // status is skipped or failed
-        if (res.status === 'failed') {
-          failedCount++;
-        } else {
-          skippedCount++;
-        }
-        try {
-          const currentStats = await fs.promises.stat(filePath).catch(() => stats);
-          const isSuccessful = await checkFileSuccess(filePath);
-          const tagStatus = isSuccessful ? 'successful' : 'failed';
-          
-          await db.dbRun(
-            `INSERT INTO comics (id, path, name, publisher, series, libraryMode, tagStatus, updatedAt)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-             ON CONFLICT(id) DO UPDATE SET
-               tagStatus = excluded.tagStatus,
-               updatedAt = excluded.updatedAt`,
-            [id, filePath, entry.name, existing?.publisher || 'Unknown Publisher', existing?.series || 'Unknown Series', 'metadata', tagStatus, currentStats.mtimeMs]
-          );
-        } catch (err) {}
-        ctLog(`➜ SKIPPED: ${res.reason || 'No match above threshold'} (${entry.name})`);
       }
-      itemDurations.push(Date.now() - itemStart);
-      ctLog('');
     }
 
     if (failedDbUpdates.length > 0) {
@@ -940,3 +656,356 @@ module.exports = {
   getScanLogDetail,
   clearEnhancedTracking
 };
+async function processSingleComicFile(entry, dir, context) {
+  const {
+    mode, bypassCoreGates, bypassNoMatchGate, forceReprocess, serviceUrl, totalFiles,
+    metadataStorage, lowerThreshold, upperThreshold, enabledSources, comicvineApiKey,
+    googleBooksApiKey, metronUser, metronPass, gcdUser, gcdPass, publisherCodex
+  } = context;
+
+  // Since we extract counters/accumulators, we need to pass them in context
+  // or return them. Returning a result object is better.
+  const result = {
+    status: 'skipped', // 'skipped', 'tagged', 'review', 'failed', 'aborted', 'continue'
+    duration: 0,
+    hasChanges: false,
+    dbUpdate: null // if it fails
+  };
+
+  const itemStart = Date.now();
+  const filePath = path.join(dir, entry.name);
+  const isCbr = path.extname(entry.name).toLowerCase() === '.cbr';
+  const id = require('../utils').createId(filePath);
+
+  let stats;
+  try {
+    stats = await fs.promises.stat(filePath);
+  } catch (e) {
+    result.status = 'continue';
+    return result;
+  }
+
+  // Check if comic was already scanned into the database
+  const existing = await db.dbGet(
+    'SELECT id, updatedAt, tagStatus, metadata, series, publisher FROM comics WHERE id = ?',
+    [id]
+  );
+
+  const isModified = !existing || !existing.updatedAt || Math.abs(stats.mtimeMs - existing.updatedAt) > 1000;
+
+  // Scoped mode: only re-search comics previously recorded as no-match
+  if (mode === 'unmatched' && !(existing && existing.tagStatus === 'failed')) {
+    result.duration = Date.now() - itemStart;
+    ctLog(`➜ SKIPPED: Not previously marked no-match (${entry.name})`);
+    return result;
+  }
+
+  // 1. If already scanned and tagged successfully, and file is not modified -> SKIP (unless forced)
+  if (!bypassCoreGates && existing && !isModified && existing.tagStatus === 'successful') {
+    result.duration = Date.now() - itemStart;
+    ctLog(`➜ SKIPPED: Already scanned and tagged (${entry.name})`);
+    return result;
+  }
+
+  // 2. If the file on disk already contains complete metadata (Series, Publisher, Date, Number) -> ONLY skip if NOT forced
+  const isAlreadyComplete = await checkFileSuccess(filePath);
+  if (!bypassCoreGates && isAlreadyComplete) {
+    try {
+      const { getComicInfoFromArchive, normalizePublisher, cleanDescription, splitVolumeSeriesAndTitle, isTitleSameAsSeries } = require('./metadata');
+      const info = await getComicInfoFromArchive(filePath);
+      const rawPub = info.Publisher || existing?.publisher || 'Unknown Publisher';
+      const pub = normalizePublisher(rawPub, publisherCodex);
+      let ser = info.Series || existing?.series || 'Unknown Series';
+      let title = info.Title || '';
+      let num = info.Number || '';
+      let vol = info.Volume || '';
+      const volSplit = splitVolumeSeriesAndTitle(ser, title);
+      if (volSplit.series && volSplit.number) {
+        ser = volSplit.series;
+        title = volSplit.title;
+        if (!num || num === '1' || num === '01') {
+          num = volSplit.number;
+        }
+        if (!vol) {
+          vol = volSplit.volume;
+        }
+      }
+      if (!num && vol) {
+        num = vol;
+      }
+      if (title && (isTitleSameAsSeries(title, ser) || (!ser && isTitleSameAsSeries(title, '')))) {
+        title = '';
+      }
+      const dbMeta = buildTaggedDbMeta(info, { title, series: ser, number: num, volume: vol, publisher: pub });
+
+      await db.dbRun(
+        `INSERT INTO comics (id, path, name, publisher, series, libraryMode, tagStatus, updatedAt, metadata)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+         ON CONFLICT(id) DO UPDATE SET
+           tagStatus = excluded.tagStatus,
+           publisher = excluded.publisher,
+           series = excluded.series,
+           updatedAt = excluded.updatedAt,
+           metadata = COALESCE(excluded.metadata, comics.metadata)`,
+        [id, filePath, entry.name, pub, ser, 'metadata', 'successful', stats.mtimeMs, JSON.stringify(dbMeta)]
+      );
+
+      result.duration = Date.now() - itemStart;
+      ctLog(`✓ SUCCESS → Already contains complete metadata: ${entry.name}`);
+      return result;
+    } catch (err) {}
+  }
+
+  // Scoped mode: only re-scan comics that already carry a complete ComicInfo.xml
+  if (mode === 'existing-xml' && !(isAlreadyComplete || (existing && existing.tagStatus === 'successful'))) {
+    result.duration = Date.now() - itemStart;
+    ctLog(`➜ SKIPPED: No existing ComicInfo.xml (${entry.name})`);
+    return result;
+  }
+
+  // 3. If previously scanned with no match and file has not been modified -> SKIP (unless forced)
+  if (!bypassNoMatchGate && existing && !isModified && existing.tagStatus === 'failed') {
+    result.duration = Date.now() - itemStart;
+    ctLog(`➜ SKIPPED: Previously scanned with no match (file unmodified) (${entry.name})`);
+    return result;
+  }
+
+  // Compute moving average ETA for files requiring online search
+  const percent = Math.round(((context.fileIndex - 1) / totalFiles) * 100);
+  let etaStr = '';
+  if (context.itemDurations.length > 0) {
+    const avgItemMs = context.itemDurations.reduce((a, b) => a + b, 0) / context.itemDurations.length;
+    const remainingItems = totalFiles - (context.fileIndex - 1);
+    etaStr = ` | Est. remaining: ~${formatDuration(remainingItems * avgItemMs)}`;
+  }
+
+  ctLog(`─────────────────────────────────────────`);
+  ctLog(`[${context.fileIndex}/${totalFiles}] Processing: ${entry.name} (${percent}% complete${etaStr})`);
+
+  // Determine storage mode: CBR files always use sidecar
+  const effectiveStorage = isCbr ? 'sidecar' : metadataStorage;
+
+  let res;
+  try {
+    res = await callTaggerEngineWithProgress(
+      serviceUrl,
+      {
+        path: filePath,
+        metadata_storage: effectiveStorage,
+        comicvine_api_key: comicvineApiKey,
+        google_books_api_key: googleBooksApiKey,
+        metron_user: metronUser,
+        metron_pass: metronPass,
+        gcd_user: gcdUser,
+        gcd_pass: gcdPass,
+        lower_threshold: lowerThreshold,
+        upper_threshold: upperThreshold,
+        enabled_sources: enabledSources,
+        force_reprocess: forceReprocess,
+        publisher_codex: publisherCodex
+      },
+      ctAbortController ? ctAbortController.signal : undefined,
+      (prog) => {
+        const srcLabel = prog.source || 'Search';
+        const msg = prog.message || '';
+        ctLog(`  ↳ [${srcLabel}] ${msg}`);
+      }
+    );
+  } catch (err) {
+    if (ctCancelled || err.name === 'AbortError') {
+      ctLog(`🛑 Processing aborted for ${entry.name}`);
+      result.status = 'aborted';
+      return result;
+    }
+    ctLog(`✗ Error calling tagger engine for ${entry.name}: ${err.message}`);
+    result.status = 'failed';
+    result.dbUpdate = [id, filePath, entry.name, existing?.publisher || 'Unknown Publisher', existing?.series || 'Unknown Series', 'metadata', 'failed', null];
+    result.duration = Date.now() - itemStart;
+    return result;
+  }
+
+  if (res.status === 'tagged') {
+    try {
+      const isSuccessful = await checkFileSuccess(filePath);
+      const tagStatus = isSuccessful ? 'successful' : 'failed';
+      const newStats = await fs.promises.stat(filePath).catch(() => stats);
+
+      const { getComicInfoFromArchive, normalizePublisher, cleanDescription, splitVolumeSeriesAndTitle, isTitleSameAsSeries } = require('./metadata');
+      let dbMetaStr = null;
+      let rawPub = res.metadata?.publisher || existing?.publisher || 'Unknown Publisher';
+      let pub = normalizePublisher(rawPub, publisherCodex);
+      let ser = res.metadata?.series || res.metadata?.title || existing?.series || 'Unknown Series';
+      try {
+        const info = await getComicInfoFromArchive(filePath);
+        pub = normalizePublisher(info.Publisher || pub, publisherCodex);
+        ser = info.Series || ser;
+        let title = info.Title || '';
+        let num = info.Number || '';
+        let vol = info.Volume || '';
+        const volSplit = splitVolumeSeriesAndTitle(ser, title);
+        if (volSplit.series && volSplit.number) {
+          ser = volSplit.series;
+          title = volSplit.title;
+          if (!num || num === '1' || num === '01') {
+            num = volSplit.number;
+          }
+          if (!vol) {
+            vol = volSplit.volume;
+          }
+        }
+        if (!num && vol) {
+          num = vol;
+        }
+        if (title && (isTitleSameAsSeries(title, ser) || (!ser && isTitleSameAsSeries(title, '')))) {
+          title = '';
+        }
+        const dbMeta = buildTaggedDbMeta(info, { title, series: ser, number: num, volume: vol, publisher: pub });
+        dbMetaStr = JSON.stringify(dbMeta);
+      } catch (e) {}
+
+      await db.dbRun(
+        `INSERT INTO comics (id, path, name, publisher, series, libraryMode, tagStatus, updatedAt, metadata)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+         ON CONFLICT(id) DO UPDATE SET
+           tagStatus = excluded.tagStatus,
+           publisher = excluded.publisher,
+           series = excluded.series,
+           updatedAt = excluded.updatedAt,
+           metadata = COALESCE(excluded.metadata, comics.metadata)`,
+        [id, filePath, entry.name, pub, ser, 'metadata', tagStatus, newStats.mtimeMs, dbMetaStr]
+      );
+      if (isSuccessful) {
+        result.status = 'tagged';
+        ctLog(`✓ SUCCESS → Auto-tagged: ${res.matched_title || entry.name} (${res.confidence || 100}% confidence)`);
+      } else {
+        result.status = 'failed';
+        ctLog(`⚠ WARNING → Auto-tagged file but missing required fields in final file (marked failed): ${entry.name}`);
+      }
+      result.hasChanges = true;
+    } catch (err) {
+      ctLog(`✗ Failed to update database status: ${err.message}`);
+    }
+  } else if (res.status === 'review') {
+    result.status = 'review';
+    ctLog(`ⓘ Review required for: ${entry.name} (Confidence: ${res.confidence}%)`);
+
+    const absolutePath = path.isAbsolute(filePath) ? filePath : path.resolve(filePath);
+
+    const formattedMatches = (res.candidates || []).map((c, index) => {
+      const meta = c.metadata || {};
+      const candidateTitle = meta.title || (meta.series ? `${meta.series} #${meta.number || meta.issue || '?'}` : 'Unknown Title');
+      return {
+        choice: String(index + 1),
+        title: candidateTitle,
+        year: meta.publish_date ? new Date(meta.publish_date).getFullYear().toString() : (meta.year || 'Unknown Year'),
+        issue: meta.issue || meta.number || '?',
+        publisher: meta.publisher || 'Unknown Publisher',
+        extra: meta.description ? meta.description.substring(0, 150) + '...' : null,
+        coverUrl: meta.cover_image_url || null,
+        fullMetadata: meta,
+        score: c.score,
+        source: c.source
+      };
+    });
+
+    // Enrich covers: if a candidate (e.g. from GCD) lacks a cover or has a Cloudflare-blocked cover,
+    // check if another candidate from the same search (e.g. ComicVine, Metron) has an accessible cover for this series
+    for (const m of formattedMatches) {
+      const isBlockedCover = !m.coverUrl || m.coverUrl.includes('comics.org');
+      if (isBlockedCover) {
+        const partner = formattedMatches.find(other =>
+          other !== m &&
+          other.coverUrl &&
+          !other.coverUrl.includes('comics.org') &&
+          other.fullMetadata?.series &&
+          m.fullMetadata?.series &&
+          other.fullMetadata.series.toLowerCase().trim() === m.fullMetadata.series.toLowerCase().trim()
+        );
+        if (partner) {
+          m.coverUrl = partner.coverUrl;
+        }
+      }
+    }
+
+    pendingMatchState = {
+      fileName: entry.name,
+      filePath: absolutePath,
+      matches: formattedMatches,
+      timestamp: new Date().toISOString(),
+      waitingForResponse: true,
+      isFinal: true,
+      previewBuffer: null,
+      previewMime: null,
+      waitingLogId: `ct-wait-${++waitingLogSeq}`
+    };
+
+    const choicePromise = new Promise((resolveChoice) => {
+      userChoiceResolver = resolveChoice;
+    });
+
+    // Background extract and cache the preview image
+    (async () => {
+      try {
+        const library = require('./library.js');
+        const pages = await library.getComicPages(absolutePath);
+        if (pages && pages.length > 0) {
+          const firstPage = pages[0];
+          const buffer = await library.extractPageBuffer(absolutePath, firstPage);
+          if (buffer && pendingMatchState && pendingMatchState.filePath === absolutePath) {
+            const { getMimeFromExt } = require('../utils');
+            pendingMatchState.previewBuffer = buffer;
+            pendingMatchState.previewMime = getMimeFromExt(firstPage);
+            ctLog(`ⓘ Cached preview image for: ${entry.name}`);
+          }
+        }
+      } catch (err) {}
+    })();
+
+    ctLog(`>>> WAITING FOR USER SELECTION (Found ${formattedMatches.length} candidates)`, { id: pendingMatchState.waitingLogId });
+
+    await new Promise((resolveLoop) => {
+      choicePromise.then(async (action) => {
+        if (action === 'apply') {
+          result.hasChanges = true;
+          pendingMatchState = null;
+        } else if (action === 'skip') {
+          pendingMatchState = null;
+        } else if (action === 'scan_cancelled') {
+          // Retain pendingMatchState so user can review and apply/skip after scan cancellation
+        }
+        userChoiceResolver = null;
+        resolveLoop();
+      }).catch((err) => {
+        ctLog(`✗ Error in selection promise: ${err.message}`);
+        pendingMatchState = null;
+        userChoiceResolver = null;
+        resolveLoop();
+      });
+    });
+  } else {
+    // status is skipped or failed
+    if (res.status === 'failed') {
+      result.status = 'failed';
+    } else {
+      result.status = 'skipped';
+    }
+    try {
+      const currentStats = await fs.promises.stat(filePath).catch(() => stats);
+      const isSuccessful = await checkFileSuccess(filePath);
+      const tagStatus = isSuccessful ? 'successful' : 'failed';
+
+      await db.dbRun(
+        `INSERT INTO comics (id, path, name, publisher, series, libraryMode, tagStatus, updatedAt)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+         ON CONFLICT(id) DO UPDATE SET
+           tagStatus = excluded.tagStatus,
+           updatedAt = excluded.updatedAt`,
+        [id, filePath, entry.name, existing?.publisher || 'Unknown Publisher', existing?.series || 'Unknown Series', 'metadata', tagStatus, currentStats.mtimeMs]
+      );
+    } catch (err) {}
+    ctLog(`➜ SKIPPED: ${res.reason || 'No match above threshold'} (${entry.name})`);
+  }
+
+  result.duration = Date.now() - itemStart;
+  return result;
+}
