@@ -34,8 +34,7 @@ function getScanLibrary() {
  * Teams, Locations, StoryArc/StoryArcNumber, AgeRating, Web, Genre, PageCount.
  * Empty fields are dropped so `metadata LIKE '%"StoryArc"%'` style queries stay accurate.
  */
-function buildTaggedDbMeta(info, overrides = {}) {
-  const { title, series, number, volume, publisher } = overrides;
+function buildTaggedDbMeta({ info, title, series, number, volume, publisher }) {
   const { cleanDescription, cleanGenreAndTags } = require('./metadata');
   const m = {
     Title: title,
@@ -361,7 +360,7 @@ async function runComicTagger(options = {}) {
           if (title && (isTitleSameAsSeries(title, ser) || (!ser && isTitleSameAsSeries(title, '')))) {
             title = '';
           }
-          const dbMeta = buildTaggedDbMeta(info, { title, series: ser, number: num, volume: vol, publisher: pub });
+          const dbMeta = buildTaggedDbMeta({ info, title, series: ser, number: num, volume: vol, publisher: pub });
 
           await db.dbRun(
             `INSERT INTO comics (id, path, name, publisher, series, libraryMode, tagStatus, updatedAt, metadata)
@@ -486,7 +485,7 @@ async function runComicTagger(options = {}) {
             if (title && (isTitleSameAsSeries(title, ser) || (!ser && isTitleSameAsSeries(title, '')))) {
               title = '';
             }
-            const dbMeta = buildTaggedDbMeta(info, { title, series: ser, number: num, volume: vol, publisher: pub });
+            const dbMeta = buildTaggedDbMeta({ info, title, series: ser, number: num, volume: vol, publisher: pub });
             dbMetaStr = JSON.stringify(dbMeta);
           } catch (e) {}
 
@@ -751,7 +750,8 @@ async function applyUserSelection(selections) {
       if (title && (isTitleSameAsSeries(title, ser) || (!ser && isTitleSameAsSeries(title, '')))) {
         title = '';
       }
-      const dbMeta = buildTaggedDbMeta(info, {
+      const dbMeta = buildTaggedDbMeta({
+        info,
         title,
         series: info.Series || ser,
         number: info.Number || info.Volume || '',
