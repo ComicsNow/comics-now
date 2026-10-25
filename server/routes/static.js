@@ -9,6 +9,15 @@ const {
 } = require('../constants');
 const { log } = require('../logger');
 
+async function fileExists(filePath) {
+  try {
+    await fs.promises.access(filePath, fs.constants.F_OK);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function createStaticRouter({ getConfig, getComicsDirectories, getPublicLibraries }) {
   const router = express.Router();
   const distDir = path.join(PUBLIC_DIR, 'dist');
@@ -135,7 +144,7 @@ function createStaticRouter({ getConfig, getComicsDirectories, getPublicLibrarie
     if (!full.startsWith(resolvedDir + path.sep)) {
       return res.status(403).send('Forbidden');
     }
-    if (fs.existsSync(full)) {
+    if (await fileExists(full)) {
       return res.sendFile(safeFilename, { root: resolvedDir });
     }
     const id = path.basename(safeFilename, path.extname(safeFilename));
@@ -143,10 +152,10 @@ function createStaticRouter({ getConfig, getComicsDirectories, getPublicLibrarie
       const { dbGet, dbRun } = require('../db');
       const { generateThumbnail } = require('../services/library-pages');
       const comic = await dbGet('SELECT id, path FROM comics WHERE id = ? OR thumbnailPath = ?', [id, safeFilename]);
-      if (comic && fs.existsSync(comic.path)) {
+      if (comic && await fileExists(comic.path)) {
         const gen = await generateThumbnail(comic.path);
         const safeGen = gen ? path.basename(gen) : null;
-        if (safeGen && fs.existsSync(path.join(resolvedDir, safeGen))) {
+        if (safeGen && await fileExists(path.join(resolvedDir, safeGen))) {
           await dbRun('UPDATE comics SET thumbnailPath = ? WHERE id = ?', [safeGen, comic.id]);
           return res.sendFile(safeGen, { root: resolvedDir });
         }
