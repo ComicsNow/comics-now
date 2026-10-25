@@ -81,10 +81,13 @@
     "yauzl": "^2.10.0"
   },
   "devDependencies": {
+    "@babel/core": "^8.0.9",
+    "@babel/preset-env": "^8.0.7",
     "@playwright/test": "1.63.0",
     "@tailwindcss/cli": "4.3.3",
+    "babel-jest": "^30.5.2",
     "jest": "^30.4.2",
-    "jest-environment-jsdom": "^30.4.1",
+    "jest-environment-jsdom": "^30.5.2",
     "tailwindcss": "4.3.3",
     "vite": "^8.3.3"
   },
