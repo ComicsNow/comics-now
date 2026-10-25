@@ -241,27 +241,18 @@ async function updateComicIdentity({
   thumbnailsDir,
   guidedViewDir
 }) {
-  const existsAsync = async (p) => {
-    try {
-      await fs.promises.access(p);
-      return true;
-    } catch {
-      return false;
-    }
-  };
-
   // 1. Move/Rename comic file if path changed
-  if (oldPath !== newPath && await existsAsync(oldPath)) {
+  if (oldPath !== newPath && fs.existsSync(oldPath)) {
     const destDir = path.dirname(newPath);
-    if (!(await existsAsync(destDir))) {
-      await fs.promises.mkdir(destDir, { recursive: true });
+    if (!fs.existsSync(destDir)) {
+      fs.mkdirSync(destDir, { recursive: true });
     }
     try {
-      await fs.promises.rename(oldPath, newPath);
+      fs.renameSync(oldPath, newPath);
     } catch (renameErr) {
       if (renameErr.code === 'EXDEV') {
-        await fs.promises.copyFile(oldPath, newPath);
-        await fs.promises.unlink(oldPath);
+        fs.copyFileSync(oldPath, newPath);
+        fs.unlinkSync(oldPath);
       } else {
         throw renameErr;
       }
@@ -272,14 +263,14 @@ async function updateComicIdentity({
   const oldExt = path.extname(oldPath);
   const newExt = path.extname(newPath);
   const oldSidecar = path.join(path.dirname(oldPath), path.basename(oldPath, oldExt) + '.ComicInfo.xml');
-  if (await existsAsync(oldSidecar)) {
+  if (fs.existsSync(oldSidecar)) {
     const newSidecar = path.join(path.dirname(newPath), path.basename(newPath, newExt) + '.ComicInfo.xml');
     try {
-      await fs.promises.rename(oldSidecar, newSidecar);
+      fs.renameSync(oldSidecar, newSidecar);
     } catch (sErr) {
       if (sErr.code === 'EXDEV') {
-        await fs.promises.copyFile(oldSidecar, newSidecar);
-        await fs.promises.unlink(oldSidecar);
+        fs.copyFileSync(oldSidecar, newSidecar);
+        fs.unlinkSync(oldSidecar);
       } else {
         console.warn(`[ORGANIZATION] Failed to move sidecar: ${sErr.message}`);
       }
@@ -290,9 +281,9 @@ async function updateComicIdentity({
   if (thumbnailsDir && oldId !== newId) {
     const oldThumb = path.join(thumbnailsDir, `${oldId}.jpg`);
     const newThumb = path.join(thumbnailsDir, `${newId}.jpg`);
-    if (await existsAsync(oldThumb)) {
+    if (fs.existsSync(oldThumb)) {
       try {
-        await fs.promises.rename(oldThumb, newThumb);
+        fs.renameSync(oldThumb, newThumb);
       } catch (tErr) {
         console.warn(`[ORGANIZATION] Failed to rename thumbnail: ${tErr.message}`);
       }
@@ -305,26 +296,26 @@ async function updateComicIdentity({
   if (guidedViewDir && oldId !== newId) {
     const oldGv = path.join(guidedViewDir, `${oldId}.json`);
     const newGv = path.join(guidedViewDir, `${newId}.json`);
-    if (await existsAsync(oldGv)) {
+    if (fs.existsSync(oldGv)) {
       try {
         let sidecarData = null;
         try {
-          const raw = await fs.promises.readFile(oldGv, 'utf8');
+          const raw = fs.readFileSync(oldGv, 'utf8');
           sidecarData = JSON.parse(raw);
         } catch (_) {}
 
         if (sidecarData && typeof sidecarData === 'object' && sidecarData.pages) {
           sidecarData.comicId = newId;
-          await fs.promises.writeFile(newGv, JSON.stringify(sidecarData, null, 2), 'utf8');
-          if (oldGv !== newGv && await existsAsync(oldGv)) {
-            try { await fs.promises.unlink(oldGv); } catch (_) {}
+          fs.writeFileSync(newGv, JSON.stringify(sidecarData, null, 2), 'utf8');
+          if (oldGv !== newGv && fs.existsSync(oldGv)) {
+            try { fs.unlinkSync(oldGv); } catch (_) {}
           }
           newGvPath = newGv;
           newGvStatus = 'completed';
         } else {
           // Corrupt or invalid JSON sidecar, clean up and flag for regeneration
-          if (await existsAsync(oldGv)) try { await fs.promises.unlink(oldGv); } catch (_) {}
-          if (await existsAsync(newGv)) try { await fs.promises.unlink(newGv); } catch (_) {}
+          if (fs.existsSync(oldGv)) try { fs.unlinkSync(oldGv); } catch (_) {}
+          if (fs.existsSync(newGv)) try { fs.unlinkSync(newGv); } catch (_) {}
           newGvPath = null;
           newGvStatus = 'pending';
         }
@@ -333,21 +324,21 @@ async function updateComicIdentity({
         newGvPath = null;
         newGvStatus = 'pending';
       }
-    } else if (await existsAsync(newGv)) {
+    } else if (fs.existsSync(newGv)) {
       // Sidecar already exists at target ID
       try {
-        const raw = await fs.promises.readFile(newGv, 'utf8');
+        const raw = fs.readFileSync(newGv, 'utf8');
         const sidecarData = JSON.parse(raw);
         if (sidecarData && typeof sidecarData === 'object' && sidecarData.pages) {
           newGvPath = newGv;
           newGvStatus = 'completed';
         } else {
-          try { await fs.promises.unlink(newGv); } catch (_) {}
+          try { fs.unlinkSync(newGv); } catch (_) {}
           newGvPath = null;
           newGvStatus = 'pending';
         }
       } catch (_) {
-        try { await fs.promises.unlink(newGv); } catch (_) {}
+        try { fs.unlinkSync(newGv); } catch (_) {}
         newGvPath = null;
         newGvStatus = 'pending';
       }

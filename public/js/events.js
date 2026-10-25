@@ -466,25 +466,3 @@ document.addEventListener('click', (e) => {
     }
   }
 }, true);
-
-// --- Modal Dismissal via Escape Key ---
-document.addEventListener('keydown', (e) => {
-  if (e.key !== 'Escape') return;
-
-  const modals = [
-    { el: document.getElementById('mgmt-confirm-modal'), close: () => document.getElementById('mgmt-confirm-cancel-btn')?.click() },
-    { el: document.getElementById('gemini-compliance-modal'), close: () => document.getElementById('gemini-compliance-disagree-btn')?.click() },
-    { el: document.getElementById('directory-selection-modal'), close: () => document.getElementById('directory-cancel-btn')?.click() },
-    { el: document.getElementById('add-to-list-modal'), close: () => document.getElementById('add-to-list-cancel-btn')?.click() },
-    { el: document.getElementById('ct-modal'), close: () => (state.closeCTModal || window.closeCTModal)?.() },
-    { el: document.getElementById('settings-modal'), close: () => (state.closeSettingsModal || window.closeSettingsModal)?.() },
-    { el: document.getElementById('reading-list-modal'), close: () => document.getElementById('reading-list-close-btn')?.click() }
-  ];
-
-  for (const modal of modals) {
-    if (modal.el && !modal.el.classList.contains('hidden')) {
-      modal.close();
-      break;
-    }
-  }
-});

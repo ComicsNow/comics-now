@@ -51,16 +51,16 @@ async function buildLibrary(userId = 'default-user') {
     // Access control: Check if user has access to this comic using hierarchical access control
     // Admin has access to everything
     // For non-admin, check hierarchical access: root_folder -> publisher -> series
-    const hasAccess = await checkComicAccess({
+    const hasAccess = await checkComicAccess(
       userId,
       userRole,
-      comicPath: r.path,
-      publisher: r.publisher,
-      series: r.series,
-      rootFolders: directories,
-      comicId: r.id,
-      preFetchedAccessList: accessList
-    });
+      r.path,
+      r.publisher,
+      r.series,
+      directories,
+      r.id,
+      accessList
+    );
 
     if (!hasAccess) {
       continue; // User doesn't have access to this comic, skip it
@@ -124,7 +124,7 @@ async function buildLibrary(userId = 'default-user') {
     const progress = progressMap[r.id] || { lastReadPage: 0, totalPages: r.totalPages || 0 };
 
     // Apply hierarchical reading modes preferences
-    const { mangaMode, continuousMode } = resolveReadingModes({ comicId: r.id, series: r.series, publisher: r.publisher, comicPath: r.path, prefMaps, comicsRoots: directories });
+    const { mangaMode, continuousMode } = resolveReadingModes(r.id, r.series, r.publisher, r.path, prefMaps, directories);
 
     // Redact absolute path: Replace absolute root with library ID
     const relativePath = path.relative(isInboxComic ? comicsLocation : absoluteRootDir, r.path);
@@ -149,31 +149,25 @@ async function buildLibrary(userId = 'default-user') {
     });
   }
 
-  // Optimization: Parallelize publisher logo resolution across all publishers concurrently using Promise.all
-  // instead of resolving each publisher's logo sequentially (which blocks on async disk I/O / sharp metadata inspection).
-  const logoTasks = [];
   for (const rootDir in lib) {
     for (const publisherName in lib[rootDir].publishers) {
       const folderName = safeDirName(publisherName);
       const pubLogoDir = path.join(LOGOS_DIRECTORY, folderName);
-      logoTasks.push(
-        resolveLogo(pubLogoDir).then(({ logoFile, needsBackground, needsDarkBackground }) => {
-          const pubObj = lib[rootDir].publishers[publisherName];
-          if (logoFile) {
-            pubObj.logoUrl = `logos/${encodeURIComponent(folderName)}/${encodeURIComponent(logoFile)}`;
-            pubObj.logoNeedsBackground = needsBackground;
-            pubObj.logoNeedsDarkBackground = Boolean(needsDarkBackground);
-          } else {
-            // Use default blank logo when no publisher logo exists
-            pubObj.logoUrl = 'logos/6373148-blank.png';
-            pubObj.logoNeedsBackground = false;
-            pubObj.logoNeedsDarkBackground = false;
-          }
-        })
-      );
+      const { logoFile, needsBackground, needsDarkBackground } = await resolveLogo(pubLogoDir);
+
+      if (logoFile) {
+        lib[rootDir].publishers[publisherName].logoUrl =
+          `logos/${encodeURIComponent(folderName)}/${encodeURIComponent(logoFile)}`;
+        lib[rootDir].publishers[publisherName].logoNeedsBackground = needsBackground;
+        lib[rootDir].publishers[publisherName].logoNeedsDarkBackground = Boolean(needsDarkBackground);
+      } else {
+        // Use default blank logo when no publisher logo exists
+        lib[rootDir].publishers[publisherName].logoUrl = 'logos/6373148-blank.png';
+        lib[rootDir].publishers[publisherName].logoNeedsBackground = false;
+        lib[rootDir].publishers[publisherName].logoNeedsDarkBackground = false;
+      }
     }
   }
-  await Promise.all(logoTasks);
 
   return lib;
 }

@@ -33,8 +33,6 @@ For the complete REST endpoint reference — every route under `/api/v1` with pa
    - [The 3 Metadata Storage Options](#the-3-metadata-storage-options)
 7. [The Tagging Engine & File Organization](#7-the-tagging-engine--file-organization)
    - [Multi-Source Metadata APIs](#multi-source-metadata-apis)
-   - [Web URL Tagging & Gemini AI Synthesis](#web-url-tagging--gemini-ai-synthesis)
-   - [Multi-Source Synthesis & Manual Staging Modal](#multi-source-synthesis--manual-staging-modal)
    - [Grand Comics Database (GCD) & Cover Cascade](#grand-comics-database-gcd--cover-cascade)
    - [The Tag Comics Now! UI & Matching Workflow](#the-tag-comics-now-ui--matching-workflow)
    - [Automatic Renaming & Moving](#automatic-renaming--moving)
@@ -60,7 +58,6 @@ For the complete REST endpoint reference — every route under `/api/v1` with pa
     - [Installing as an Offline PWA](#installing-as-an-offline-pwa)
     - [Active Connectivity Probing & Doze Self-Healing](#active-connectivity-probing--doze-self-healing)
 11. [UI Navigation, Views & Long-Press Menus](#11-ui-navigation-views--long-press-menus)
-    - [Comic Card & Viewer Typography Hierarchy](#comic-card--viewer-typography-hierarchy)
     - [Library Card View (Long-Press Actions)](#library-card-view-long-press-actions)
     - [Publisher View (Long-Press Actions)](#publisher-view-long-press-actions)
     - [Series View (Long-Press Actions)](#series-view-long-press-actions)
@@ -75,15 +72,9 @@ For the complete REST endpoint reference — every route under `/api/v1` with pa
 13. [Model Context Protocol (MCP) Server](#13-model-context-protocol-mcp-server)
     - [Overview](#mcp-overview)
     - [Setup & Launcher](#mcp-setup--launcher)
-    - [Configuration & Environment Variables](#mcp-configuration--environment-variables)
-    - [GVE Now Companion Integration](#gve-now-companion-integration)
-    - [Changing the Port & Systemd Service](#changing-the-port--systemd-service)
     - [Client Configuration](#client-configuration)
     - [AI Capabilities (Tagging, Reading Lists, SQL)](#ai-capabilities)
 14. [System Logs & Maintenance](#14-system-logs--maintenance)
-    - [Logs Viewer](#logs-viewer)
-    - [SQLite High-Performance Architecture & Compaction](#sqlite-high-performance-architecture--compaction)
-    - [Database Backups](#database-backups)
 
 **Companion Document:** [REST API Reference (docs/API.md)](API.md)
 
@@ -315,20 +306,6 @@ The tagger queries the following providers:
 - **Goodreads & Amazon**: Ideal for trade paperbacks, graphic novels, and ISBN lookups.
 - **Google Books, Blackwells, Waterstones, LCG**: Supplemental publisher and store indicia.
 
-### Web URL Tagging & Gemini AI Synthesis
-Comics Now! supports direct one-click tagging from any web URL:
-- **Universal URL Extraction**: Paste any link from League of Comic Geeks, ComicVine, Marvel Fandom, DC Database, Wikipedia, Goodreads, Amazon, or comic publisher stores directly into the tagger UI or via API endpoint `POST /api/v1/metadata/extract-from-url`.
-- **Markdown Web Scraper**: Utilizes Jina Reader (`r.jina.ai`) to extract clean, ad-free semantic markdown from web pages without requiring brittle site-specific DOM scrapers.
-- **Gemini AI Structured Extraction**: Extracted web markdown is processed by Google Gemini AI (such as `gemini-2.5-flash`), synthesizing canonical ComicInfo fields: Series, Issue Number, Volume, Story Title, Publisher, Imprint, Publication Date (Year, Month, Day), Issue Synopsis, Creators (Writers, Pencillers, Inkers, Colorists, Letterers, Cover Artists, Editors), Characters, Teams, Locations, and Genres.
-- **Daily Quota Tracking**: The UI features an integrated Google Gemini daily usage counter (`#ct-gemini-daily-used`) calibrated against the 1,000 requests/day free tier, providing live visual feedback on remaining quota and automatic midnight reset tracking.
-- **AI Agent Automation**: Fully accessible through native MCP tools `tag_comic_from_url` and `extract_metadata_from_url`.
-
-### Multi-Source Synthesis & Manual Staging Modal
-When tagging complex issues across divergent sources (e.g., ComicVine having full artist credits while GCD holds precise historical release dates and Goodreads provides graphic novel summaries):
-- **Weighted Field Synthesis**: Automatically combines the most authoritative metadata fields from multiple scraping passes into a cohesive ComicInfo dataset.
-- **Side-by-Side Staging Modal**: Preview proposed changes side-by-side with current file metadata. Inspect field differences before committing writes to your library.
-- **Target Selection**: Save synthesized tags to **Sidecar XML (`.ComicInfo.xml`)**, **Database Only**, or **Archive Write-Back** directly into the CBZ archive.
-
 ### Grand Comics Database (GCD) & Cover Cascade
 Comics Now! includes full native support for querying the **Grand Comics Database (GCD)** — one of the largest non-profit historical comic archives:
 - **Authentication**: Optional GCD login credentials can be supplied under **Tag Comics Now! → Settings & Sources** to unlock member queries and higher rate limits.
@@ -549,14 +526,6 @@ Comics Now! incorporates an intelligent self-healing connectivity loop:
 
 Comics Now! features responsive touch controls and context menus accessible via right-click (desktop) or long-press (touch devices):
 
-### Comic Card & Viewer Typography Hierarchy
-Comics Now! applies modern comic editorial typography rules across comic cards, list views, search results, and reader headers:
-- **Strict 2-Line Hierarchy**:
-  - **Line 1 (Series & Issue Number)**: Rendered in punchy, high-contrast Anton condensed display typography (`{Series} #{Number}`).
-  - **Line 2 (Story Title Subtitle)**: Displays the genuine narrative or story arc title (e.g., *"The Court of Owls"*, *"Knightfall Part 1"*).
-  - **Zero Filename Leakage**: Technical filenames (e.g., `Batman_001_(2011)_(Digital)_(Zone-Empire).cbz`) are completely filtered out of subtitle candidates. If a comic does not have an explicit story arc title, Line 2 is left cleanly empty rather than displaying file extensions or redundant series names.
-- **Electric Blue Focus Halos**: Card selection states, keyboard focus, and multi-select modes feature high-contrast electric blue halos (`ring-2 ring-blue-500/80 shadow-[0_0_15px_rgba(59,130,246,0.35)]`) inspired by modern DC Comics design language.
-
 ### Library Card View (Long-Press Actions)
 - **Rescan Folder**: Triggers an immediate rescan of that specific library path.
 - **Edit Library**: Modify display name or storage paths (Admin only).
@@ -660,86 +629,7 @@ The MCP server communicates locally with Comics Now! as an admin, giving your AI
    npm run mcp
    ```
 
-**Network mode**: The default `stdio` transport has no listening port. For network transports (e.g. remote use or SSE), set `MCP_TRANSPORT=sse` (or `streamable-http`), plus `MCP_HOST` and `MCP_PORT` in `mcp/.env` — `run.sh` loads that file automatically.
-
-### MCP Configuration & Environment Variables
-
-All runtime behavior is controlled by environment variables loaded from `mcp/.env`:
-
-| Variable | Default | Description |
-| :--- | :--- | :--- |
-| `COMICS_BASE_URL` | `http://localhost:3000` | Base URL of Comics Now! for API calls. |
-| `GVE_BASE_URL` | `http://localhost:3100` | Base URL of the GVE Now! (Guided View Editor) companion app. |
-| `COMICS_DB_PATH` | `/opt/comics-now/comics-now.db` | Absolute path to SQLite DB used by the read-only `query_db` tool. |
-| `COMICS_ALLOW_DESTRUCTIVE` | `0` | Set to `1` to permit destructive operations (file deletes, renames, migrations). |
-| `COMICS_TIMEOUT` | `60` | HTTP request timeout in seconds. |
-| `COMICS_EXTRA_HEADERS` | `{}` | JSON string of extra headers (e.g. Cloudflare Service Tokens `{"CF-Access-Client-Id":"...","CF-Access-Client-Secret":"..."}`). |
-| `MCP_TRANSPORT` | `stdio` | Transport protocol: `stdio` (local subprocess) or `sse` / `streamable-http` (network). |
-| `MCP_HOST` | `127.0.0.1` | Network bind address. Set to `0.0.0.0` for LAN accessibility. |
-| `MCP_PORT` | `8000` | Port for SSE/network transport (e.g. `3018`). |
-| `MCP_DISABLE_DNS_REBINDING` | `0` | Set to `1` when accessing via local LAN or reverse proxy. |
-
-### GVE Now Companion Integration
-
-Comics Now! integrates natively with **GVE Now!** (port `3100`) for visual guided view editing. The MCP server provides dedicated tools that query GVE Now! under the hood:
-* `inspect_guided_page(comic_id, page)`: Returns page image with panel bounding boxes and reading order badges alongside raw coordinates.
-* `get_guided_page_data(comic_id, page)`: Retrieves page dimensions and sequence items from GVE.
-* `apply_guided_page_fix(comic_id, page, items, order)`: Pushes validated speech/panel coordinates and reading orders directly to GVE Now with automatic backup.
-* `reorder_guided_page(comic_id, page, order)`: Reorders panel and dialogue sequence without changing coordinates.
-
-If GVE Now! is hosted on a different port, host, or behind a reverse proxy, set `GVE_BASE_URL` in `mcp/.env`:
-```ini
-GVE_BASE_URL=http://localhost:3100
-# Or remote instance:
-# GVE_BASE_URL=https://gve.example.com
-```
-
-### Changing the Port & Systemd Service
-
-When running Comics Now MCP in the background as a Linux systemd service (e.g. `comics-mcp.service` on port `3018`):
-
-#### 1. Systemd Service Definition (`/etc/systemd/system/comics-mcp.service`)
-```ini
-[Unit]
-Description=Comics Now! MCP Server (SSE on port 3018)
-After=network.target
-
-[Service]
-Type=simple
-User=raza
-WorkingDirectory=/opt/comics-now/mcp
-Environment=MCP_TRANSPORT=sse
-Environment=MCP_HOST=0.0.0.0
-Environment=MCP_PORT=3018
-Environment=MCP_DISABLE_DNS_REBINDING=1
-EnvironmentFile=/opt/comics-now/mcp/.env
-ExecStart=/opt/comics-now/mcp/.venv/bin/python -m comics_mcp.server
-Restart=always
-RestartSec=5
-
-[Install]
-WantedBy=multi-user.target
-```
-
-#### 2. Changing the Listening Port
-To change the port (e.g. from `3018` to another port):
-1. Update `Environment=MCP_PORT=<NEW_PORT>` in `/etc/systemd/system/comics-mcp.service` (or `MCP_PORT=<NEW_PORT>` in `/opt/comics-now/mcp/.env`).
-2. Reload systemd and restart the service:
-   ```bash
-   sudo systemctl daemon-reload
-   sudo systemctl restart comics-mcp.service
-   ```
-3. Verify the service is listening on the new port:
-   ```bash
-   curl -I http://localhost:<NEW_PORT>/sse
-   systemctl status comics-mcp.service
-   ```
-4. If using Homepage dashboard or a reverse proxy, update the port in your configuration:
-   * In `/var/lib/homepage/config/services.yaml`:
-     ```yaml
-     - Comics MCP:
-         href: http://192.168.0.110:<NEW_PORT>/sse
-     ```
+**Network mode**: The default `stdio` transport has no listening port. For network transports (e.g. remote use), set `MCP_TRANSPORT=sse` (or `streamable-http`), plus `MCP_HOST` (default `127.0.0.1`) and `MCP_PORT` (default `8000`) in `mcp/.env` — `run.sh` loads that file automatically.
 
 ### Client Configuration
 
@@ -771,8 +661,6 @@ claude mcp add comics-now -- /path/to/comics-now/mcp/run.sh
 ```
 
 ### AI Capabilities
-- **Web URL Metadata Extraction & Tagging (`tag_comic_from_url`, `extract_metadata_from_url`)**:
-  Ask the AI: *"Tag comic #412 using this League of Comic Geeks / Comic Vine / Fandom URL."* The MCP server scrapes clean markdown via Jina Reader, synthesizes canonical ComicInfo fields via Gemini AI, writes the tags directly to the comic file (sidecar XML, CBZ archive, or DB), and tracks requests against your daily Gemini quota counter.
 - **Visual Cover Tagging (`get_cover_image`, `tag_workflow`, `set_tags`)**:
   The AI extracts native resolution cover art, inspects logos, issue numbers, and trade dress, searches the web to verify the exact issue, and writes ComicInfo metadata.
 - **Reading List Generation (`create_reading_lists_bulk`)**:
@@ -793,22 +681,6 @@ Navigate to **Settings → Logs**:
   - `TAGGER`: Metadata API calls, cover matching, and renaming actions.
   - `META`: `ComicInfo.xml` reading and archive write-back.
   - `DB`: SQLite migrations, statement caching, and query health.
-
-### SQLite High-Performance Architecture & Compaction
-Comics Now! is powered by SQLite via `better-sqlite3`, optimized for instant responsiveness across massive comic collections (100,000+ issues):
-- **Memory-Mapped I/O (`mmap_size = 256MB`)**: Bypasses user-space buffer copying, allowing the OS kernel to page database blocks directly from memory into application space.
-- **In-Memory Sorts & Temp Tables (`temp_store = MEMORY`)**: Heavy operations like complex reading list continuity DAG computations, multi-table sorting, and group-by aggregations execute entirely in RAM.
-- **Expanded Page Cache (`cache_size = -64000`)**: Allocates 64MB of high-priority database cache in RAM, eliminating disk thrashing during library-wide browsing and search queries.
-- **Write-Ahead Logging (`journal_mode = WAL`)**: Concurrent readers never block writers, and writes never block readers.
-- **Optimized Covering & Composite Indexes**:
-  - `idx_reading_list_items_list_sort`: Indexes `(readingListId, sortOrder)` on `reading_list_items`, delivering sub-millisecond reading list loads and continuity lane generation with zero table scans.
-  - `idx_reading_lists_user_sort`: Indexes `(userId, sortOrder)` on `reading_lists` for instant dashboard and reading list drawer rendering.
-  - `idx_comics_publisher_series`: Indexes `(publisher, series)` on `comics` to accelerate publisher/series navigation and breadcrumbs.
-  - `idx_user_comic_status_comic`: Indexes `(comicId, userId)` on `user_comic_status` for fast read progress badge lookups across all card grids.
-- **Startup Migration Idempotency Guards**:
-  - Historical database migration loops (such as `migration_title_cleanup_v1` and `migration_creator_roles_v1`) are tracked with dedicated schema version entries in `schema_version`. Migrations run once on upgrade and exit immediately on subsequent boots, cutting server boot time to single-digit milliseconds.
-- **Zero-Data-Loss Compaction (`VACUUM`)**:
-  - Over extended usage, comic scans, thumbnail caching, and repeated metadata updates create unallocated free database pages. Running `VACUUM` defragments the database file and reclaims unallocated pages, offering potential storage savings of up to 40%–60%+ depending on catalog history and churn, without altering user lists or resetting user reading progress (strictly adhering to Project Rules 1 & 2).
 
 ### Database Backups
 All server state resides in SQLite databases inside your data directory (`/app/data/comics-now.db`).

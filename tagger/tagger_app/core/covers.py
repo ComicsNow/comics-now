@@ -83,30 +83,6 @@ def is_safe_cover_url(url: str) -> bool:
         return False
 
 
-def _compute_phash(img, hash_size=16):
-    try:
-        import imagehash
-        return imagehash.phash(img, hash_size=hash_size)
-    except ImportError:
-        import numpy as np
-        import scipy.fftpack
-        from PIL import Image
-
-        class _FallbackHash:
-            def __init__(self, binary_array):
-                self.hash = binary_array
-            def __sub__(self, other):
-                return int(np.count_nonzero(self.hash.flatten() != other.hash.flatten()))
-
-        img_size = hash_size * 4
-        gray = img.convert("L").resize((img_size, img_size), Image.LANCZOS)
-        pixels = np.asarray(gray, dtype=np.float64)
-        dct = scipy.fftpack.dct(scipy.fftpack.dct(pixels, axis=0), axis=1)
-        dctlowfreq = dct[:hash_size, :hash_size]
-        med = np.median(dctlowfreq)
-        return _FallbackHash(dctlowfreq > med)
-
-
 def compare_covers_python(local_image_path, candidate_image_url, hash_size=16):
     """
     Compares a local cover image against a candidate cover URL using a perceptual hash
@@ -126,6 +102,7 @@ def compare_covers_python(local_image_path, candidate_image_url, hash_size=16):
     try:
         from PIL import Image
         import io
+        import imagehash
 
         # Check candidate cover pHash cache
         h_cand = tagger_cache.get_cover_phash(candidate_image_url)
@@ -139,11 +116,11 @@ def compare_covers_python(local_image_path, candidate_image_url, hash_size=16):
                 return 0.0
 
             cand_img = Image.open(io.BytesIO(img_res.content)).convert("RGB")
-            h_cand = _compute_phash(cand_img, hash_size=hash_size)
+            h_cand = imagehash.phash(cand_img, hash_size=hash_size)
             tagger_cache.set_cover_phash(candidate_image_url, h_cand)
 
         local_img = Image.open(local_image_path).convert("RGB")
-        h_local = _compute_phash(local_img, hash_size=hash_size)
+        h_local = imagehash.phash(local_img, hash_size=hash_size)
 
         bits = hash_size * hash_size
         distance = h_local - h_cand            # Hamming distance

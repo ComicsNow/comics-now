@@ -26,11 +26,9 @@ Most digital comic servers were built a decade ago as basic file browsers. **Com
 * 🖼️ **Fullscreen Page Preview Grid, Filmstrip & Scrubber**: Navigate issues visually with a dynamic, lazy-loaded page preview grid, a bottom precision page scrubber, and a horizontal touch-scrollable thumbnail filmstrip. Full-resolution WebP on-the-fly transcoding backed by an LRU disk cache cuts bandwidth while keeping 1:1 pixel coordinates for panel zoom.
 * 🔄 **True Cross-Device Sync**: Pick up right where you left off. Reading progress syncs in real-time between your phone, tablet, and PC.
 * 📱 **Resumable Offline PWA & Self-Healing Connectivity**: Install Comics Now! to your iOS, iPadOS, Android, or desktop home screen. Queue comics with HTTP `Range` resumable transfers, native Android Background Fetch, and active health probing that self-heals when waking from mobile sleep mode.
-* 🤖 **Google Gemini AI Vision & Multi-Source Tagging**: Built-in enrichment engine querying ComicVine, Metron, GCD, Goodreads, Amazon, Google Books, and web URLs with perceptual cover hashing. Powered by Google Gemini AI Vision to visually identify issue numbers, series, publishers, and release years directly from cover art when standard scraping fails, plus one-step **Web URL Tagging** with daily quota tracking and manual metadata staging.
-* ⚡ **High-Throughput SQLite Architecture**: Native zero-scan covering and composite indexes for reading lists and DAG views, backed by 256MB memory-mapped I/O (`mmap`), in-memory temporary tables/sorts, and an expanded 64MB RAM cache. Instantaneous server boots with guarded startup migrations and potential database storage savings of up to 50%+.
-* 🎨 **DC All In Typography & Clean 2-Line Hierarchy**: Punchier Anton display typography with electric blue selection halos. Strict 2-line layout displaying **Series & Issue Number on Line 1** and **Story Title on Line 2** — eliminating raw filename leakage across cards and viewer headers.
+* 🤖 **Google Gemini AI Vision & Multi-Source Tagging**: Built-in enrichment engine querying ComicVine, Metron, GCD, Goodreads, Amazon, Google Books, and additional sources with perceptual cover hashing. Powered by Google Gemini AI Vision to visually identify issue numbers, series, publishers, and release years directly from cover art when standard scraping fails.
 * 📁 **Configurable File & Folder Organization**: Flexible 4-tab management panel with customizable token naming rules and folder hierarchy templates, with live preview and safe, type-to-confirm batch execution for entire libraries.
-* 🔌 **AI Model Context Protocol (MCP)**: Native Python MCP server exposing 60+ tools allowing Claude, Cursor, and Gemini to curate reading lists, tag comics directly from web URLs (`tag_comic_from_url`), inspect cover art, trigger guided view detection, reorganize directories, and query your collection with natural language.
+* 🔌 **AI Model Context Protocol (MCP)**: Native Python MCP server exposing 13+ tools allowing Claude, Cursor, and Gemini to curate reading lists, inspect cover art, trigger guided view detection, reorganize directories, and query your collection with natural language.
 * 🛡️ **Cloudflare Zero Trust Ready**: Zero open ports needed. Full integration with Cloudflare Access JWT authentication, granular user permissions (down to publisher and series), and admin impersonation.
 * 📂 **Metadata Mode & Folder Mode**: Organize your library by metadata tags (Publisher → Series → Issue) or mirror your physical directory tree directly.
 * 💻 **Client-Side Local Reader**: Drag and drop local CBZ/CBR files directly into the browser to read instantly with WebAssembly—no file upload required.
@@ -207,7 +205,6 @@ npm run mcp
 
 **What your AI agent can do:**
 - 🔍 *"Create a chronological reading list for the Infinity Gauntlet event across all my comics."*
-- 🌐 *"Tag comic #412 using this League of Comic Geeks / Comic Vine web URL."*
 - 🤖 *"Use Gemini AI Vision to inspect the cover of comic #412 and identify its canonical publisher, series, and year."*
 - 🎨 *"Inspect the cover of comic #412, verify the issue via web search, and tag the writer and artist."*
 - 📐 *"Trigger incremental guided view panel detection for the Batman (2016) series."*

@@ -228,7 +228,7 @@ class RarReader {
 }
 
 async function createRarReader(filePath) {
-    const data = await fs.promises.readFile(filePath);
+    const data = fs.readFileSync(filePath);
     const extractor = await createExtractorFromData({ data });
     return new RarReader(extractor, data);
 }

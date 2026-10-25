@@ -1,6 +1,15 @@
 const fs = require('fs');
 const path = require('path');
-const { db, dbGet, dbRun, dbAll } = require('../db');
+const { dbGet, dbRun, dbAll } = require('../db');
+
+async function existsAsync(p) {
+  try {
+    await fs.promises.access(p);
+    return true;
+  } catch {
+    return false;
+  }
+}
 const { log } = require('../logger');
 const { getConfig, getScanIntervalMs, getLibraries } = require('../config');
 const { getComicInfoFromArchive, normalizePublisher, cleanDescription, splitVolumeSeriesAndTitle, isTitleSameAsSeries } = require('./metadata');
@@ -59,7 +68,7 @@ async function scanLibrary(force = false) {
   let subDirScanErrors = 0;
 
   const walkDir = async (dir, libraryMode, libraryRootPath) => {
-    if (!fs.existsSync(dir)) {
+    if (!(await existsAsync(dir))) {
       log('ERROR', 'SCAN', `Missing dir: ${dir}`);
       subDirScanErrors++;
       return;
@@ -166,7 +175,7 @@ async function scanLibrary(force = false) {
         fileSystemComics.add(filePath);
         const id = createId(filePath);
         const existing = await dbGet('SELECT updatedAt, thumbnailPath, metadata, lastReadPage, totalPages, convertedAt, guidedViewStatus, guidedViewPath, guidedViewError, tagStatus FROM comics WHERE id = ?', [id]);
-        const hasValidThumbnail = Boolean(existing?.thumbnailPath && fs.existsSync(path.join(THUMBNAILS_DIRECTORY, existing.thumbnailPath)));
+        const hasValidThumbnail = Boolean(existing?.thumbnailPath && (await existsAsync(path.join(THUMBNAILS_DIRECTORY, existing.thumbnailPath))));
 
         if (!force && !wasConverted && existing && existing.updatedAt === stats.mtimeMs && hasValidThumbnail) {
           return;
@@ -186,11 +195,11 @@ async function scanLibrary(force = false) {
         const sidecarPath = path.join(GUIDED_VIEW_DIR, `${id}.json`);
 
         if (guidedViewStatus === 'completed') {
-          if (!fs.existsSync(sidecarPath)) {
+          if (!(await existsAsync(sidecarPath))) {
             guidedViewStatus = 'pending';
             guidedViewPath = null;
           }
-        } else if (fs.existsSync(sidecarPath)) {
+        } else if (await existsAsync(sidecarPath)) {
           guidedViewStatus = 'completed';
           guidedViewPath = sidecarPath;
           log('INFO', 'SCAN', `Reconnected guided-view sidecar: ${path.basename(filePath)}`);
@@ -198,9 +207,9 @@ async function scanLibrary(force = false) {
           // If moved outside the app, check if a missing comic record has an existing sidecar to migrate
           const baseName = path.basename(filePath);
           for (const [oldPath, oldRec] of dbComicsMap.entries()) {
-            if (path.basename(oldPath) === baseName && oldRec.id !== id && !fs.existsSync(oldPath)) {
+            if (path.basename(oldPath) === baseName && oldRec.id !== id && !(await existsAsync(oldPath))) {
               const oldSidecar = path.join(GUIDED_VIEW_DIR, `${oldRec.id}.json`);
-              if (fs.existsSync(oldSidecar)) {
+              if (await existsAsync(oldSidecar)) {
                 try {
                   try {
                     const raw = await fs.promises.readFile(oldSidecar, 'utf8');
@@ -208,7 +217,7 @@ async function scanLibrary(force = false) {
                     if (parsed && typeof parsed === 'object' && parsed.pages) {
                       parsed.comicId = id;
                       await fs.promises.writeFile(sidecarPath, JSON.stringify(parsed, null, 2), 'utf8');
-                      if (oldSidecar !== sidecarPath && fs.existsSync(oldSidecar)) {
+                      if (oldSidecar !== sidecarPath && (await existsAsync(oldSidecar))) {
                         try { await fs.promises.unlink(oldSidecar); } catch (_) {}
                       }
                     } else {
@@ -371,7 +380,7 @@ async function scanLibrary(force = false) {
     } else {
       for (const p of toDelete) {
         // Critical safeguard: verify file is actually gone from filesystem before deleting from DB
-        if (fs.existsSync(p)) {
+        if (await existsAsync(p)) {
           log('WARN', 'SCAN', `Safeguard: preserving comic that exists on disk but was missed in scan: ${path.basename(p)}`);
           continue;
         }
@@ -380,7 +389,7 @@ async function scanLibrary(force = false) {
         await dbRun('DELETE FROM comics WHERE path = ?', [p]);
         if (record?.thumbnailPath) {
           const full = path.join(THUMBNAILS_DIRECTORY, record.thumbnailPath);
-          if (fs.existsSync(full)) {
+          if (await existsAsync(full)) {
             await fs.promises.unlink(full).catch(() => {});
             log('INFO', 'SCAN', `Deleted orphan thumbnail: ${record.thumbnailPath}`);
           }
@@ -392,7 +401,7 @@ async function scanLibrary(force = false) {
         ].filter(Boolean);
         for (const gv of gvCandidates) {
           const fullGv = path.isAbsolute(gv) ? gv : path.resolve(ROOT_DIR, gv);
-          if (fs.existsSync(fullGv)) {
+          if (await existsAsync(fullGv)) {
             await fs.promises.unlink(fullGv).catch(() => {});
             log('INFO', 'SCAN', `Deleted orphan guided view sidecar: ${path.basename(fullGv)}`);
           }
@@ -405,29 +414,16 @@ async function scanLibrary(force = false) {
       const missingThumbs = await dbAll(
         "SELECT id, path, thumbnailPath FROM comics WHERE thumbnailPath IS NULL OR thumbnailPath = ''"
       );
-
-      const thumbsToUpdate = [];
       for (const item of missingThumbs) {
-        if (fs.existsSync(item.path)) {
+        if (await existsAsync(item.path)) {
           const gen = await generateThumbnail(item.path);
           if (gen) {
-            thumbsToUpdate.push({ id: item.id, gen, path: item.path });
+            await dbRun("UPDATE comics SET thumbnailPath = ? WHERE id = ?", [gen, item.id]);
+            thumbOk++;
+            log('INFO', 'THUMBNAIL', `Restored missing thumbnail for: ${path.basename(item.path)}`);
           } else {
             thumbFail++;
           }
-        }
-      }
-
-      if (thumbsToUpdate.length > 0) {
-        await dbRun('BEGIN TRANSACTION');
-        for (const u of thumbsToUpdate) {
-          await dbRun("UPDATE comics SET thumbnailPath = ? WHERE id = ?", [u.gen, u.id]);
-        }
-        await dbRun('COMMIT');
-
-        for (const u of thumbsToUpdate) {
-          thumbOk++;
-          log('INFO', 'THUMBNAIL', `Restored missing thumbnail for: ${path.basename(u.path)}`);
         }
       }
     } catch (repairErr) {

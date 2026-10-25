@@ -183,28 +183,7 @@ function createContinuousToggleItem(comics, labelPrefix = '') {
     for (const comic of comicsArray) {
       await state.toggleContinuousMode?.(comic.id, comic.continuousMode || false);
       comic.continuousMode = newMode;
-      if (newMode) {
-        // Automatically unselect any guided mode as the two cannot work together
-        comic.guidedMode = false;
-        comic.bubbleMode = false;
-        comic.hotZoomMode = false;
-        comic.mangaBubbleHotMode = false;
-        try {
-          if (typeof localStorage !== 'undefined' && localStorage) {
-            localStorage.setItem(`guided_pref_${comic.id}`, 'none');
-            localStorage.setItem('guided_pref_global_active', 'false');
-          }
-        } catch (_) {}
-      }
-      updateComicInLibrary(comic.id, {
-        continuousMode: newMode,
-        ...(newMode ? {
-          guidedMode: false,
-          bubbleMode: false,
-          hotZoomMode: false,
-          mangaBubbleHotMode: false
-        } : {})
-      });
+      updateComicInLibrary(comic.id, { continuousMode: newMode });
     }
     if (typeof state.updateContinuousModeInCache === 'function') {
       for (const comic of comicsArray) await state.updateContinuousModeInCache(comic.id, newMode);
@@ -213,18 +192,6 @@ function createContinuousToggleItem(comics, labelPrefix = '') {
     
     if (comicsArray.length === 1 && state.currentComic && state.currentComic.id === comicsArray[0].id) {
       state.currentComic.continuousMode = newMode;
-      if (newMode) {
-        const GuidedView = state.GuidedView || (typeof window !== 'undefined' && window.GuidedView);
-        const registry = GuidedView?.ModeRegistry || state.GuidedView?.ModeRegistry;
-        if (registry && typeof registry.disableAll === 'function') {
-          registry.disableAll({ persist: true });
-        } else if (typeof GuidedView?.disableAll === 'function') {
-          GuidedView.disableAll({ persist: true });
-        }
-        if (typeof GuidedView?.updateAllUI === 'function') {
-          GuidedView.updateAllUI();
-        }
-      }
       if (typeof state.updateContinuousModeUI === 'function') state.updateContinuousModeUI(newMode);
     }
   }, {

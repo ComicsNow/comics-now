@@ -155,29 +155,14 @@ module.exports = function attach(router, deps) {
         await saveSetting('metadata_storage', metadataStorage);
       }
 
-      // Security: Validate and sanitize lowerThreshold & upperThreshold inputs
-      if (lowerThreshold !== undefined) {
-        const parsedLower = Number(lowerThreshold);
-        if (isNaN(parsedLower) || parsedLower < 0.0 || parsedLower > 1.0) {
-          return res.status(400).json({ error: 'lowerThreshold must be a number between 0 and 1' });
-        }
-        if (setTaggerLowerThreshold) {
-          setTaggerLowerThreshold(parsedLower);
-          const sanitizedLower = getTaggerLowerThreshold ? getTaggerLowerThreshold() : parsedLower;
-          await saveSetting('taggerLowerThreshold', sanitizedLower);
-        }
+      if (lowerThreshold !== undefined && setTaggerLowerThreshold) {
+        setTaggerLowerThreshold(lowerThreshold);
+        await saveSetting('taggerLowerThreshold', lowerThreshold);
       }
 
-      if (upperThreshold !== undefined) {
-        const parsedUpper = Number(upperThreshold);
-        if (isNaN(parsedUpper) || parsedUpper < 0.0 || parsedUpper > 1.0) {
-          return res.status(400).json({ error: 'upperThreshold must be a number between 0 and 1' });
-        }
-        if (setTaggerUpperThreshold) {
-          setTaggerUpperThreshold(parsedUpper);
-          const sanitizedUpper = getTaggerUpperThreshold ? getTaggerUpperThreshold() : parsedUpper;
-          await saveSetting('taggerUpperThreshold', sanitizedUpper);
-        }
+      if (upperThreshold !== undefined && setTaggerUpperThreshold) {
+        setTaggerUpperThreshold(upperThreshold);
+        await saveSetting('taggerUpperThreshold', upperThreshold);
       }
 
       if (enabledSources && setTaggerEnabledSources) {

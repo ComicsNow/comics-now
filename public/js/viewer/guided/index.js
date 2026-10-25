@@ -158,14 +158,6 @@ function init() {
       .guided-zoom-no-touchmenu:has(#comic-page-grid-overlay) * {
         touch-action: auto !important;
       }
-      /* Continuous mode handles native vertical touch scrolling and must never
-         be suppressed by lingering guided zoom touch-action rules. */
-      .guided-zoom-no-touchmenu.continuous-active,
-      .guided-zoom-no-touchmenu.continuous-active *,
-      .guided-zoom-no-touchmenu:has(#fullscreen-pages-continuous:not(.hidden)),
-      .guided-zoom-no-touchmenu:has(#fullscreen-pages-continuous:not(.hidden)) * {
-        touch-action: pan-y !important;
-      }
     `;
     document.head.appendChild(style);
   }

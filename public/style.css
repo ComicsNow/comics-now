@@ -518,9 +518,8 @@ body.is-offline .comic-context-menu-item.hide-offline {
 }
 
 /* Override flex display when continuous mode is active */
-.fullscreen-viewer:has(#fullscreen-pages-continuous:not(.hidden)),
-.fullscreen-viewer.continuous-active {
-    display: block !important;
+.fullscreen-viewer:has(#fullscreen-pages-continuous:not(.hidden)) {
+    display: block;
 }
 
 .fullscreen-image {
@@ -581,7 +580,6 @@ body.is-offline .comic-context-menu-item.hide-offline {
     text-overflow: ellipsis;
     white-space: nowrap;
     pointer-events: none;
-    transition: opacity 0.25s ease, transform 0.25s ease;
 }
 
 .fullscreen-close-button {
@@ -641,7 +639,6 @@ body.is-offline .comic-context-menu-item.hide-offline {
     z-index: 70;
     backdrop-filter: blur(8px);
     -webkit-backdrop-filter: blur(8px);
-    transition: opacity 0.25s ease, transform 0.25s ease;
 }
 
 .fullscreen-progress-indicator {
@@ -1091,14 +1088,12 @@ body.is-offline .comic-context-menu-item.hide-offline {
     opacity: 0;
 }
 .status-read {
-    background: linear-gradient(180deg, #10b981 0%, #047857 100%);
-    color: #ffffff;
-    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.7);
-    border-bottom: 2px solid rgba(0, 0, 0, 0.85);
-    letter-spacing: 0.08em;
-    font-weight: 800;
-    font-size: 0.75rem;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+    background: linear-gradient(135deg, rgba(16, 185, 129, 0.88), rgba(5, 150, 105, 0.88));
+    color: #ecfdf5;
+    text-shadow: none;
+    border-bottom: none;
+    letter-spacing: 0.06em;
+    font-size: 0.7rem;
 }
 .status-in-progress {
     background: linear-gradient(135deg, rgba(245, 158, 11, 0.9), rgba(217, 119, 6, 0.9));
@@ -1556,7 +1551,7 @@ body.is-offline .comic-context-menu-item.hide-offline {
     overflow-y: scroll;
     overflow-x: hidden;
     -webkit-overflow-scrolling: touch;
-    touch-action: pan-y !important;
+    touch-action: pan-y;
     overscroll-behavior-y: contain;
     padding: 1rem 0;
     background-color: #000000;
@@ -1567,7 +1562,7 @@ body.is-offline .comic-context-menu-item.hide-offline {
     width: 100%;
     min-height: 200px;
     overflow: hidden;
-    touch-action: pan-y !important;
+    touch-action: pan-y;
 }
 
 #fullscreen-pages-continuous img {
@@ -1810,17 +1805,13 @@ body.eink-color-mode * {
 
 /* Grayscale + Contrast optimization for monochrome E-Ink screens */
 body.eink-mode #fullscreen-image,
-body.eink-mode #bubble-magnifier-img,
-body.eink-mode #fullscreen-pages-continuous img,
-body.eink-mode #viewer-pages-continuous img {
+body.eink-mode #bubble-magnifier-img {
     filter: grayscale(100%) contrast(140%) brightness(102%) !important;
 }
 
 /* Saturation + Contrast optimization for Color E-Ink screens */
 body.eink-color-mode #fullscreen-image,
-body.eink-color-mode #bubble-magnifier-img,
-body.eink-color-mode #fullscreen-pages-continuous img,
-body.eink-color-mode #viewer-pages-continuous img {
+body.eink-color-mode #bubble-magnifier-img {
     filter: contrast(125%) saturate(135%) brightness(102%) !important;
 }
 
@@ -2135,22 +2126,13 @@ body.eink-color-mode #viewer-pages-continuous img {
     background: none !important;
 }
 
-/* Card hover, focus, and selection state (DC All In Electric Blue halo) */
+/* Card hover animation (shifts panel, not the whole card) */
 .comic-card:hover > div:first-child,
 .series-card:hover > div:first-child,
-.folder-card:hover > div:first-child,
-.comic-card:focus-visible > div:first-child,
-.series-card:focus-visible > div:first-child,
-.folder-card:focus-visible > div:first-child,
-.comic-card.selected > div:first-child,
-.series-card.selected > div:first-child,
-.folder-card.selected > div:first-child,
-.comic-card[aria-selected="true"] > div:first-child,
-.series-card[aria-selected="true"] > div:first-child,
-.folder-card[aria-selected="true"] > div:first-child {
+.folder-card:hover > div:first-child {
     transform: translateY(-4px) scale(1.02) !important;
     border-color: var(--dc-all-in-blue) !important;
-    box-shadow: 0 16px 36px rgba(0, 0, 0, 0.75), 0 0 0 2px var(--dc-all-in-blue), 0 0 16px rgba(0, 85, 255, 0.45) !important;
+    box-shadow: 0 16px 36px rgba(0, 0, 0, 0.75), 0 0 0 1px var(--dc-all-in-blue) !important;
 }
 
 .comic-card:active > div:first-child,
@@ -2159,16 +2141,14 @@ body.eink-color-mode #viewer-pages-continuous img {
     transform: scale(0.97) !important;
 }
 
-/* Card titles — Punchier Comic Typography (Anton, uppercase, crisp tracking) */
+/* Card titles */
 .comic-card h3, 
 .series-card h3, 
 .folder-card h3,
 .comic-card p {
-    font-family: 'Anton', var(--font-display) !important;
+    font-family: var(--font-body) !important;
     font-weight: 800 !important;
     font-size: 15px !important;
-    text-transform: uppercase !important;
-    letter-spacing: 0.05em !important;
     color: var(--paper) !important;
     text-align: center !important;
     margin: 12px 0 9px !important;
@@ -2176,8 +2156,6 @@ body.eink-color-mode #viewer-pages-continuous img {
     white-space: normal !important;
     word-break: break-word !important;
     line-height: 1.2 !important;
-    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.75) !important;
-    transition: color 0.15s ease, text-shadow 0.15s ease !important;
 }
 
 /* Independent styling for library/folder card publisher/count subtext to avoid overlapping */
@@ -2194,29 +2172,11 @@ body.eink-color-mode #viewer-pages-continuous img {
 
 /* Independent styling for series and publisher card titles (sleeker collection card size) */
 .series-card h3 {
-    font-family: 'Anton', var(--font-display) !important;
-    font-weight: 800 !important;
+    font-family: var(--font-body) !important;
+    font-weight: 700 !important;
     font-size: 0.8rem !important;
-    text-transform: uppercase !important;
-    letter-spacing: 0.06em !important;
     margin-top: 0.5rem !important;
     margin-bottom: 0.25rem !important;
-}
-
-/* Title brightening on hover / selection */
-.comic-card:hover h3,
-.series-card:hover h3,
-.folder-card:hover h3,
-.comic-card:hover p,
-.comic-card.selected h3,
-.series-card.selected h3,
-.folder-card.selected h3,
-.comic-card[aria-selected="true"] h3,
-.series-card[aria-selected="true"] h3,
-.comic-card[aria-selected="true"] p,
-.series-card[aria-selected="true"] p {
-    color: #ffffff !important;
-    text-shadow: 0 0 10px rgba(0, 85, 255, 0.4), 0 1px 3px rgba(0, 0, 0, 0.9) !important;
 }
 
 .comic-card .p-2 {
@@ -3782,86 +3742,3 @@ body.modal-open {
 .dl-batch-btn.start:hover { border-color: #22c55e; color: #86efac; }
 .dl-batch-btn.pause:hover { border-color: #f59e0b; color: #fcd34d; }
 .dl-batch-btn.cancel:hover { border-color: #ef4444; color: #fca5a5; }
-
-/* ==========================================================================
-   Mobile Layout Modernization: Edge Index & Bleed Styling
-   ========================================================================== */
-
-/* Edge Index (Vertical Alphabet Rail / Scrubber) */
-.edge-index,
-.edge-index-rail {
-    position: fixed;
-    right: 4px;
-    top: 50%;
-    transform: translateY(-50%);
-    z-index: 35;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    background: rgba(15, 15, 15, 0.88);
-    backdrop-filter: blur(10px);
-    border: 1px solid rgba(255, 255, 255, 0.12);
-    border-radius: 9999px;
-    padding: 6px 2px;
-    gap: 1px;
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
-    user-select: none;
-    touch-action: none;
-}
-
-.edge-index-item,
-.edge-index .alpha-filter-btn {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 18px !important;
-    height: 15px !important;
-    min-width: 18px !important;
-    min-height: 15px !important;
-    border-radius: 3px !important;
-    border: none !important;
-    background: transparent !important;
-    box-shadow: none !important;
-    font-family: var(--font-mono) !important;
-    font-size: 9px !important;
-    font-weight: 800 !important;
-    color: #9ca3af !important;
-    padding: 0 !important;
-    margin: 0 !important;
-    line-height: 1 !important;
-    transition: color 0.1s ease, transform 0.1s ease, background-color 0.1s ease !important;
-    cursor: pointer;
-}
-
-.edge-index-item:hover,
-.edge-index .alpha-filter-btn:hover {
-    color: #ffffff !important;
-    background: rgba(255, 255, 255, 0.15) !important;
-    transform: scale(1.2);
-}
-
-.edge-index-item.active,
-.edge-index .alpha-filter-btn.active {
-    background-color: var(--yellow) !important;
-    color: var(--ink) !important;
-    box-shadow: 0 0 6px rgba(255, 206, 58, 0.6) !important;
-    transform: scale(1.25);
-    border-radius: 9999px !important;
-}
-
-@media (min-width: 640px) {
-    .edge-index,
-    .edge-index-rail {
-        right: 8px;
-        padding: 8px 3px;
-        gap: 2px;
-    }
-    .edge-index-item,
-    .edge-index .alpha-filter-btn {
-        width: 20px !important;
-        height: 18px !important;
-        font-size: 10px !important;
-    }
-}
-

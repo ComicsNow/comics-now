@@ -306,57 +306,8 @@ export function pickMetadataValue(metadata = {}, keys = []) {
   return '';
 }
 
-export function sanitizeComicTitle(rawTitle) {
-  if (!rawTitle || typeof rawTitle !== 'string') return '';
-  let clean = rawTitle.trim();
-  const isDirtyRelease = /\[[^\]]*\]/.test(clean) || /^\s*\d{1,3}\s*[-._]/.test(clean);
-  // Strip common archive and ebook extensions
-  clean = clean.replace(/\.(cbz|cbr|cb7|cbt|zip|rar|tar|pdf)$/i, '');
-  // Strip bracketed release / scanner tags (e.g. [215 INK], [Digital-HD])
-  clean = clean.replace(/\[[^\]]*\]/g, ' ');
-  // Strip leading track / sorting index prefixes like "01 ", "001 - ", "01. "
-  clean = clean.replace(/^\s*\d{1,3}\s*[-._]\s*(?=[a-zA-Z])/i, '');
-  clean = clean.replace(/^\s*\d{1,3}\s+(?=[a-zA-Z])/i, '');
-  // Strip release year parenthesis if dirty release filename and preceding an issue marker, e.g. "Future Heroes (2015) #86" -> "Future Heroes #86"
-  if (isDirtyRelease) {
-    clean = clean.replace(/\s*\((?:19|20)\d{2}\b[^\)]*\)\s*(?=#\d+)/i, ' ');
-  }
-  // Replace underscores and collapse duplicate whitespace
-  clean = clean.replace(/_/g, ' ').replace(/\s+/g, ' ').trim();
-  return clean || rawTitle.trim();
-}
-
-function isTitleRedundantWithSeries(title, series) {
-  if (!title) return true;
-  const t = String(title).trim().toLowerCase();
-  if (!t) return true;
-  // If title is just a number, issue, or volume tag (e.g. "#1", "01", "Issue 1", "Vol. 1")
-  if (/^(?:(?:#|(?:issue|no\.?|vol(?:ume)?\.?|pt\.?|part|book|bk\.?)\s*#?)\s*\d*|\d+)\s*$/i.test(t)) {
-    return true;
-  }
-  if (!series) return false;
-  const s = String(series).trim().toLowerCase();
-  if (!s) return false;
-  if (t === s) return true;
-  // Check if title starts with series name and remainder is only issue / volume / year
-  if (t.startsWith(s)) {
-    const rem = t.slice(s.length).replace(/[:\s\-_–—#()]+/g, ' ').trim();
-    if (!rem || /^(?:(?:issue|no|vol|volume|pt|part|book|bk)\s*)?\d+(?:\s*(?:of|\/)\s*\d+)?(?:\s*\d{4})?$/i.test(rem)) {
-      return true;
-    }
-  }
-  return false;
-}
-
 export function buildComicDisplayInfo(comic = {}) {
-  let metadata = comic.metadata || {};
-  if (typeof metadata === 'string') {
-    try {
-      metadata = JSON.parse(metadata);
-    } catch {
-      metadata = {};
-    }
-  }
+  const metadata = comic.metadata || {};
 
   const issueNumber = pickMetadataValue(metadata, ['Number', 'Issue', 'IssueNumber', 'SortNumber', 'AlternateNumber']);
   let seriesName = pickMetadataValue(metadata, ['Series', 'SeriesName', 'AlternateSeries']);
@@ -365,40 +316,35 @@ export function buildComicDisplayInfo(comic = {}) {
   }
   const titleText = pickMetadataValue(metadata, ['Title', 'DisplayTitle', 'SortName', 'FullTitle', 'StoryTitle']);
 
-  // If there's no real metadata (series is missing or "Unknown Series"), use clean filename fallback for Line 1
-  const hasNoMetadata = (!seriesName || seriesName === 'Unknown Series') && !titleText && !issueNumber;
+  // If there's no real metadata (series is "Unknown Series"), use filename directly
+  const hasNoMetadata = seriesName === 'Unknown Series' && !titleText && !issueNumber;
 
   const seriesWithIssue = seriesName
     ? (issueNumber ? `${seriesName} #${issueNumber}` : seriesName)
     : (issueNumber ? `Issue ${issueNumber}` : '');
 
-  const cleanFallbackName = sanitizeComicTitle(comic.name) || toTrimmedString(comic.name) || 'Untitled Comic';
-
-  // Rule Line 1: Series on line 1 (with issue number if available).
-  // If series is missing, fall back to title or clean filename.
   const displayTitle = hasNoMetadata
-    ? cleanFallbackName
+    ? (toTrimmedString(comic.name) || 'Untitled Comic')
     : ([
         seriesWithIssue,
         titleText,
         toTrimmedString(comic.title),
-        cleanFallbackName
+        toTrimmedString(comic.name)
       ].find(Boolean) || 'Untitled Comic');
 
-  // Rule Line 2: If there is a title, that should be on line 2.
-  // REMOVE THE FILE NAME! Never fall back to cleanFallbackName or comic.name.
+  const subtitleCandidates = [
+    titleText,
+    toTrimmedString(comic.title),
+    toTrimmedString(comic.name)
+  ];
+  const seen = new Set([displayTitle]);
   let subtitle = '';
-  const rawStoryTitle = titleText || toTrimmedString(comic.title);
-  if (rawStoryTitle) {
-    const trimmedTitle = toTrimmedString(rawStoryTitle);
-    const isFilename = /\.(cbz|cbr|cb7|cbt|zip|rar|tar|pdf)$/i.test(trimmedTitle) ||
-                       (comic.name && trimmedTitle.toLowerCase() === toTrimmedString(comic.name).toLowerCase());
-    const isRedundant = isTitleRedundantWithSeries(trimmedTitle, seriesName) ||
-                        trimmedTitle.toLowerCase() === displayTitle.toLowerCase();
-
-    if (trimmedTitle && !isFilename && !isRedundant) {
-      subtitle = trimmedTitle;
-    }
+  for (const candidate of subtitleCandidates) {
+    const trimmed = toTrimmedString(candidate);
+    if (!trimmed || seen.has(trimmed)) continue;
+    if (/\.[a-z0-9]{2,4}$/i.test(trimmed)) continue; // Skip likely filenames
+    subtitle = trimmed;
+    break;
   }
 
   const altText = displayTitle || subtitle || 'Comic cover';
@@ -741,7 +687,6 @@ const globalsObj = {
   getComicById,
   turnToPage,
   pickMetadataValue,
-  sanitizeComicTitle,
   buildComicDisplayInfo,
   applyDisplayInfoToComic,
   applyDisplayInfoToLibrary,

@@ -154,7 +154,7 @@ async function buildQueue(scope = null) {
 
     const rows = await dbAll(sql, params);
     for (const r of rows) {
-      const { mangaMode } = resolveReadingModes({ comicId: r.id, series: r.series, publisher: r.publisher, comicPath: r.path, prefMaps: readingMaps, comicsRoots: roots });
+      const { mangaMode } = resolveReadingModes(r.id, r.series, r.publisher, r.path, readingMaps, roots);
       const type = mangaMode ? 'manga' : 'western';
       queue.push({ ...r, _root: root, type });
     }

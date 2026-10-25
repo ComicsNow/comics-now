@@ -14,15 +14,10 @@ function createStaticRouter({ getConfig, getComicsDirectories, getPublicLibrarie
   const distDir = path.join(PUBLIC_DIR, 'dist');
   const STATIC_DIR = fs.existsSync(path.join(distDir, 'index.html')) ? distDir : PUBLIC_DIR;
 
-  let cachedIndexHtml = null;
-
-  const sendAppShell = async (req, res) => {
+  const sendAppShell = (req, res) => {
     try {
       const config = getConfig();
-      if (!cachedIndexHtml) {
-        cachedIndexHtml = await fs.promises.readFile(path.join(STATIC_DIR, 'index.html'), 'utf-8');
-      }
-      const indexHtml = cachedIndexHtml;
+      const indexHtml = fs.readFileSync(path.join(STATIC_DIR, 'index.html'), 'utf-8');
       const baseHref = config.baseUrl.endsWith('/') ? config.baseUrl : (config.baseUrl + '/');
       const hideSupport = config.hideSupportForAdmin || process.env.HIDE_SUPPORT_FOR_ADMIN === 'true';
       const supportCss = hideSupport ? '\n  <style>#kofi-settings-link { display: none !important; }</style>' : '';
@@ -47,37 +42,23 @@ function createStaticRouter({ getConfig, getComicsDirectories, getPublicLibrarie
     }
   };
 
-  let cachedSwContent = null;
-
-  router.get('/service-worker.js', async (req, res) => {
+  router.get('/service-worker.js', (req, res) => {
     res.set('Cache-Control', 'no-store');
     try {
-      if (cachedSwContent) {
-        res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
-        return res.send(cachedSwContent);
-      }
-
-      let swContent = await fs.promises.readFile(path.join(PUBLIC_DIR, 'service-worker.js'), 'utf-8');
+      let swContent = fs.readFileSync(path.join(PUBLIC_DIR, 'service-worker.js'), 'utf-8');
 
       // Determine build mtime to auto-bump cache version on build
       let buildMtime = '1';
       const distIndexPath = path.join(distDir, 'index.html');
-      try {
-        const stat = await fs.promises.stat(distIndexPath);
-        buildMtime = String(Math.floor(stat.mtimeMs));
-      } catch (e) {
-        // file doesn't exist or unable to stat, ignore
+      if (fs.existsSync(distIndexPath)) {
+        buildMtime = String(Math.floor(fs.statSync(distIndexPath).mtimeMs));
       }
 
       // Discover any assets in dist/assets
       const distAssetsDir = path.join(distDir, 'assets');
-      let distAssets = [];
-      try {
-        const files = await fs.promises.readdir(distAssetsDir);
-        distAssets = files.filter(f => !f.endsWith('.map')).map(f => `assets/${f}`);
-      } catch (e) {
-        // directory doesn't exist or unable to read, ignore
-      }
+      const distAssets = fs.existsSync(distAssetsDir)
+        ? fs.readdirSync(distAssetsDir).filter(f => !f.endsWith('.map')).map(f => `assets/${f}`)
+        : [];
 
       // Replace CACHE_VERSION with dynamic timestamp
       swContent = swContent.replace(
@@ -97,7 +78,6 @@ function createStaticRouter({ getConfig, getComicsDirectories, getPublicLibrarie
         );
       }
 
-      cachedSwContent = swContent;
       res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
       res.send(swContent);
     } catch (e) {

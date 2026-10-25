@@ -18,17 +18,6 @@ let scrollTimeout = null;
 let continuousClickHandler = null;
 let isInitializingScroll = false;
 
-/**
- * Helper to check whether E-Ink/Kindle screen mode is currently active
- */
-function isEinkActive() {
-  const einkMode = state.einkMode || (typeof window !== 'undefined' ? window.einkMode : 'none');
-  const bodyHasEink = typeof document !== 'undefined' && document.body && (
-    document.body.classList.contains('eink-mode') || document.body.classList.contains('eink-color-mode')
-  );
-  return !!(bodyHasEink || (einkMode && einkMode !== 'none'));
-}
-
 // Store original navigation state for restoration
 let originalNavigationState = {
   prevBtnText: '←',
@@ -90,17 +79,12 @@ async function loadPage(pageName, container) {
 
     const img = document.createElement('img');
     img.alt = `Page ${pageName}`;
-    const eink = isEinkActive();
-    if (!eink) {
-      img.style.opacity = '0';
-      img.style.transition = 'opacity 0.2s';
-    }
+    img.style.opacity = '0';
+    img.style.transition = 'opacity 0.2s';
 
     // Set up load handler
     img.onload = () => {
-      if (!eink) {
-        img.style.opacity = '1';
-      }
+      img.style.opacity = '1';
       applyLandscapeToPage(container, img);
     };
 
@@ -178,13 +162,9 @@ export async function renderContinuousMode() {
     `.page-container[data-index="${currentIndex}"]`
   );
   if (targetContainer) {
-    // Use auto/instant scroll (no animation) for initial position
+    // Use instant scroll (no animation) for initial position
     isInitializingScroll = true;
-    try {
-      targetContainer.scrollIntoView({ behavior: 'auto', block: 'center' });
-    } catch (_) {
-      try { targetContainer.scrollIntoView(true); } catch (e) {}
-    }
+    targetContainer.scrollIntoView({ behavior: 'instant', block: 'center' });
 
     // Clear initialization flag after scroll settles
     setTimeout(() => {
@@ -210,45 +190,9 @@ export async function renderContinuousMode() {
  */
 export async function enableContinuousMode() {
   // Continuous scrolls a vertical stream of pages and is incompatible with
-  // any of the guided-view overlays. Automatically unselect any guided mode.
+  // any of the guided-view overlays.
   const GuidedView = state.GuidedView || window.GuidedView;
-  const registry = GuidedView?.ModeRegistry || state.GuidedView?.ModeRegistry;
-  if (registry && typeof registry.disableAll === 'function') {
-    registry.disableAll({ persist: true });
-  } else if (typeof GuidedView?.disableAll === 'function') {
-    GuidedView.disableAll({ persist: true });
-  }
-
-  const currentComic = state.currentComic || window.currentComic;
-  if (currentComic) {
-    currentComic.continuousMode = true;
-    currentComic.guidedMode = false;
-    currentComic.bubbleMode = false;
-    currentComic.hotZoomMode = false;
-    currentComic.mangaBubbleHotMode = false;
-    try {
-      if (typeof localStorage !== 'undefined' && localStorage) {
-        localStorage.setItem(`guided_pref_${currentComic.id}`, 'none');
-        localStorage.setItem('guided_pref_global_active', 'false');
-      }
-    } catch (_) {}
-
-    const updateComicInLibrary = state.updateComicInLibrary || window.updateComicInLibrary;
-    if (typeof updateComicInLibrary === 'function') {
-      updateComicInLibrary(currentComic.id, {
-        continuousMode: true,
-        guidedMode: false,
-        bubbleMode: false,
-        hotZoomMode: false,
-        mangaBubbleHotMode: false
-      });
-    }
-  }
-
-  if (typeof GuidedView?.updateAllUI === 'function') {
-    GuidedView.updateAllUI();
-  }
-
+  GuidedView?.disableAll?.();
   isContinuousMode = true;
   state.isContinuousMode = true;
   
@@ -266,17 +210,6 @@ export async function enableContinuousMode() {
   }
 
   fullscreenViewer.classList.add('continuous-active');
-  // Strip any lingering guided layout classes that could block touch/scroll
-  fullscreenViewer.classList.remove('guided-stage');
-  fullscreenViewer.classList.remove('guided-zoom-no-touchmenu');
-
-  // Force-hide any active guided magnifier overlay so it doesn't intercept touch/pointer gestures
-  const bubbleOverlay = document.getElementById('bubble-magnifier-overlay');
-  if (bubbleOverlay) {
-    bubbleOverlay.style.display = 'none';
-    bubbleOverlay.style.opacity = '0';
-    bubbleOverlay.style.pointerEvents = 'none';
-  }
 
   // Hide fullscreen single image
   const fullscreenImage = document.getElementById('fullscreen-image');
@@ -382,15 +315,6 @@ export async function enableContinuousMode() {
 export async function disableContinuousMode() {
   isContinuousMode = false;
   state.isContinuousMode = false;
-
-  const currentComic = state.currentComic || window.currentComic;
-  if (currentComic) {
-    currentComic.continuousMode = false;
-    const updateComicInLibrary = state.updateComicInLibrary || window.updateComicInLibrary;
-    if (typeof updateComicInLibrary === 'function') {
-      updateComicInLibrary(currentComic.id, { continuousMode: false });
-    }
-  }
   
   const refreshGuidedToggle = state.refreshGuidedToggle || window.refreshGuidedToggle;
   if (typeof refreshGuidedToggle === 'function') {
@@ -544,13 +468,6 @@ async function updateCurrentPageFromScroll() {
   if (state.currentPageIndex !== closestPage) {
     state.currentPageIndex = closestPage;
 
-    if (isEinkActive()) {
-      const triggerEinkFlash = state.triggerEinkFlash || (typeof window !== 'undefined' ? window.triggerEinkFlash : null);
-      if (typeof triggerEinkFlash === 'function') {
-        triggerEinkFlash();
-      }
-    }
-
     const getViewerPages = state.getViewerPages || window.getViewerPages;
     const updateViewerPageCounter = state.updateViewerPageCounter || window.updateViewerPageCounter;
     // Update page counter
@@ -668,9 +585,6 @@ export function scrollToNextPage() {
     }
   });
 
-  const isEink = isEinkActive();
-  const behavior = isEink ? 'instant' : 'smooth';
-
   // Scroll to next page
   const nextPageIndex = currentPageIndex + 1;
   const nextContainer = continuousContainer.querySelector(
@@ -678,20 +592,13 @@ export function scrollToNextPage() {
   );
 
   if (nextContainer) {
-    nextContainer.scrollIntoView({ behavior, block: 'center' });
+    nextContainer.scrollIntoView({ behavior: 'smooth', block: 'center' });
   } else {
     // At last page, scroll to bottom
     continuousContainer.scrollTo({
       top: continuousContainer.scrollHeight,
-      behavior
+      behavior: 'smooth'
     });
-  }
-
-  if (isEink) {
-    const triggerEinkFlash = state.triggerEinkFlash || (typeof window !== 'undefined' ? window.triggerEinkFlash : null);
-    if (typeof triggerEinkFlash === 'function') {
-      triggerEinkFlash();
-    }
   }
 }
 
@@ -725,9 +632,6 @@ export function scrollToPreviousPage() {
     }
   });
 
-  const isEink = isEinkActive();
-  const behavior = isEink ? 'instant' : 'smooth';
-
   // Scroll to previous page
   const prevPageIndex = currentPageIndex - 1;
   const prevContainer = continuousContainer.querySelector(
@@ -735,20 +639,13 @@ export function scrollToPreviousPage() {
   );
 
   if (prevContainer) {
-    prevContainer.scrollIntoView({ behavior, block: 'center' });
+    prevContainer.scrollIntoView({ behavior: 'smooth', block: 'center' });
   } else {
     // At first page, scroll to top
     continuousContainer.scrollTo({
       top: 0,
-      behavior
+      behavior: 'smooth'
     });
-  }
-
-  if (isEink) {
-    const triggerEinkFlash = state.triggerEinkFlash || (typeof window !== 'undefined' ? window.triggerEinkFlash : null);
-    if (typeof triggerEinkFlash === 'function') {
-      triggerEinkFlash();
-    }
   }
 }
 
@@ -824,28 +721,16 @@ export async function updateContinuousModeInCache(comicId, continuousMode) {
 // BUTTON HANDLERS
 // ============================================================================
 
-let isSwitchingContinuousMode = false;
-
 /**
  * Setup click handler for continuous mode button
  * @param {HTMLElement} button - Button element
  */
 function setupContinuousModeButtonHandler(button) {
-  if (!button || button._continuousAttached) return;
-  button._continuousAttached = true;
+  if (!button) return;
 
-  button.addEventListener('click', async (e) => {
-    if (e) {
-      e.preventDefault();
-      e.stopPropagation();
-    }
-
-    if (isSwitchingContinuousMode) return;
-    isSwitchingContinuousMode = true;
-
+  button.addEventListener('click', async () => {
     const currentComic = state.currentComic || window.currentComic;
     if (!currentComic) {
-      isSwitchingContinuousMode = false;
       return;
     }
 
@@ -864,31 +749,6 @@ function setupContinuousModeButtonHandler(button) {
 
       // 2. Perform mode switch immediately without blocking on cache/disk writes
       if (newMode) {
-        // Automatically unselect any guided mode as the two cannot work together
-        const GuidedView = state.GuidedView || window.GuidedView;
-        const registry = GuidedView?.ModeRegistry || state.GuidedView?.ModeRegistry;
-        if (registry && typeof registry.disableAll === 'function') {
-          registry.disableAll({ persist: true });
-        } else if (typeof GuidedView?.disableAll === 'function') {
-          GuidedView.disableAll({ persist: true });
-        }
-
-        currentComic.guidedMode = false;
-        currentComic.bubbleMode = false;
-        currentComic.hotZoomMode = false;
-        currentComic.mangaBubbleHotMode = false;
-
-        try {
-          if (typeof localStorage !== 'undefined' && localStorage) {
-            localStorage.setItem(`guided_pref_${currentComic.id}`, 'none');
-            localStorage.setItem('guided_pref_global_active', 'false');
-          }
-        } catch (_) {}
-
-        if (typeof GuidedView?.updateAllUI === 'function') {
-          GuidedView.updateAllUI();
-        }
-
         await enableContinuousMode();
       } else {
         await disableContinuousMode();
@@ -917,8 +777,6 @@ function setupContinuousModeButtonHandler(button) {
     } catch (error) {
       console.error('[CONTINUOUS] Error toggling continuous mode:', error);
       alert('Failed to toggle continuous mode. Please try again.');
-    } finally {
-      isSwitchingContinuousMode = false;
     }
   });
 }

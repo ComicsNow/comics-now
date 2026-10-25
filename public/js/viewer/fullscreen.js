@@ -135,49 +135,11 @@ const global = new Proxy(typeof window !== 'undefined' ? window : globalThis, {
   global.applyLandscapeTransform = applyLandscapeTransform;
   global.resetLandscapePan = resetLandscapePan;
 
-  function sanitizeComicTitleLocal(rawTitle) {
-    if (!rawTitle || typeof rawTitle !== 'string') return '';
-    let clean = rawTitle.trim();
-    const isDirtyRelease = /\[[^\]]*\]/.test(clean) || /^\s*\d{1,3}\s*[-._]/.test(clean);
-    clean = clean.replace(/\.(cbz|cbr|cb7|cbt|zip|rar|tar|pdf)$/i, '');
-    clean = clean.replace(/\[[^\]]*\]/g, ' ');
-    clean = clean.replace(/^\s*\d{1,3}\s*[-._]\s*(?=[a-zA-Z])/i, '');
-    clean = clean.replace(/^\s*\d{1,3}\s+(?=[a-zA-Z])/i, '');
-    if (isDirtyRelease) {
-      clean = clean.replace(/\s*\((?:19|20)\d{2}\b[^\)]*\)\s*(?=#\d+)/i, ' ');
-    }
-    clean = clean.replace(/_/g, ' ').replace(/\s+/g, ' ').trim();
-    return clean || rawTitle.trim();
-  }
-
-  function getCleanComicTitle(comic) {
-    if (!comic) return '';
-    const applyFn = global.applyDisplayInfoToComic || window.applyDisplayInfoToComic || global.state?.applyDisplayInfoToComic;
-    const displayInfo = typeof applyFn === 'function' ? applyFn(comic) : null;
-    let candidate = displayInfo?.displayTitle || comic.displayName || comic.cleanTitle;
-    if (!candidate) {
-      const series = comic.series ? String(comic.series).trim() : '';
-      const rawName = comic.name ? String(comic.name).trim() : '';
-      candidate = rawName || series || 'Untitled';
-    }
-    const sanitizeFn = global.sanitizeComicTitle || sanitizeComicTitleLocal;
-    return sanitizeFn(candidate);
-  }
-
   function syncFullscreenTitle() {
     const title = global.fullscreenTitle;
     if (!title) return;
     const comic = global.currentComic;
-    if (!comic) {
-      title.textContent = '';
-      return;
-    }
-    const cleanTitle = getCleanComicTitle(comic);
-    title.textContent = cleanTitle;
-    if (typeof title.setAttribute === 'function') {
-      title.setAttribute('title', cleanTitle);
-      title.setAttribute('aria-label', cleanTitle);
-    }
+    title.textContent = comic ? (comic.name || comic.series || 'Untitled') : '';
   }
 
   function showFullscreenControls(autoHide = false) {
@@ -263,18 +225,32 @@ const global = new Proxy(typeof window !== 'undefined' ? window : globalThis, {
     }
 
     // Check if continuous mode should be enabled
-    if (global.currentComic?.continuousMode) {
-      state.isContinuousMode = true;
-      global.isContinuousMode = true;
-      if (typeof global.enableContinuousMode === 'function') {
-        global.enableContinuousMode();
-      }
+    if (global.currentComic?.continuousMode && typeof global.enableContinuousMode === 'function') {
+      // Enable continuous mode after a short delay to ensure fullscreen is ready
+      setTimeout(async () => {
+        await global.enableContinuousMode();
+      }, 100);
     }
 
     hideFullscreenControls();
+    if (typeof global.resetFullscreenZoom === 'function') {
+      global.resetFullscreenZoom();
+    }
+    applyFullscreenFitMode();
 
-    // If no image src was copied and not in continuous mode, trigger renderPage to load it
-    if (!global.isContinuousMode && (!image.src || image.src === '')) {
+    if (viewer.requestFullscreen) {
+      viewer.requestFullscreen().catch((error) => {
+
+      });
+    }
+
+    const closeBtn = global.fullscreenCloseBtn;
+    if (closeBtn) {
+      closeBtn.focus();
+    }
+
+    // If no image src was copied, trigger renderPage to load it
+    if (!image.src || image.src === '') {
       if (typeof global.renderPage === 'function') {
         global.renderPage().catch((err) => {
           console.error('[openFullscreen] Error calling renderPage:', err);
@@ -1405,13 +1381,7 @@ const global = new Proxy(typeof window !== 'undefined' ? window : globalThis, {
           `.page-container[data-index="${targetIndex}"]`
         );
         if (targetContainer) {
-          const isEink = (typeof document !== 'undefined' && document.body && (
-            document.body.classList.contains('eink-mode') || document.body.classList.contains('eink-color-mode')
-          )) || (global.einkMode && global.einkMode !== 'none');
-          targetContainer.scrollIntoView({ behavior: isEink ? 'instant' : 'smooth', block: 'center' });
-          if (isEink && typeof global.triggerEinkFlash === 'function') {
-            global.triggerEinkFlash();
-          }
+          targetContainer.scrollIntoView({ behavior: 'smooth', block: 'center' });
         }
       }
     } else {
@@ -1617,8 +1587,6 @@ export {
   FULLSCREEN_MAX_ZOOM_SCALE,
   showFullscreenControls,
   hideFullscreenControls,
-  syncFullscreenTitle,
-  getCleanComicTitle,
   openFullscreen,
   closeFullscreen,
   handleFullscreenImageClick,
@@ -1651,8 +1619,6 @@ state.FULLSCREEN_MIN_ZOOM_SCALE = FULLSCREEN_MIN_ZOOM_SCALE;
 state.FULLSCREEN_MAX_ZOOM_SCALE = FULLSCREEN_MAX_ZOOM_SCALE;
 state.showFullscreenControls = showFullscreenControls;
 state.hideFullscreenControls = hideFullscreenControls;
-state.syncFullscreenTitle = syncFullscreenTitle;
-state.getCleanComicTitle = getCleanComicTitle;
 state.openFullscreen = openFullscreen;
 state.closeFullscreen = closeFullscreen;
 state.handleFullscreenImageClick = handleFullscreenImageClick;
@@ -1685,8 +1651,6 @@ if (typeof window !== 'undefined') {
   window.FULLSCREEN_MAX_ZOOM_SCALE = FULLSCREEN_MAX_ZOOM_SCALE;
   window.showFullscreenControls = showFullscreenControls;
   window.hideFullscreenControls = hideFullscreenControls;
-  window.syncFullscreenTitle = syncFullscreenTitle;
-  window.getCleanComicTitle = getCleanComicTitle;
   window.openFullscreen = openFullscreen;
   window.closeFullscreen = closeFullscreen;
   window.handleFullscreenImageClick = handleFullscreenImageClick;

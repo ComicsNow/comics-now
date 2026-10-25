@@ -173,19 +173,15 @@ export function applyFilterAndRender() {
 
 export function renderAlphaFilter(targetDiv, data, renderFn, type) {
   targetDiv.innerHTML = '';
-  if (!targetDiv.classList.contains('edge-index')) {
-    targetDiv.classList.add('edge-index');
-  }
   const characters = ['All', '#', ...'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('')];
   characters.forEach(char => {
     const button = document.createElement('button');
-    button.className = 'alpha-filter-btn edge-index-item';
+    button.className = 'alpha-filter-btn';
     if (char === state.activeAlphaFilter) {
       button.classList.add('active');
+      if (char === 'All') button.style.width = '2.5rem';
     }
     button.textContent = char;
-    button.setAttribute('data-char', char);
-    button.setAttribute('aria-label', `Filter by ${char}`);
     button.addEventListener('click', (e) => {
       state.activeAlphaFilter = char;
       if (typeof window !== 'undefined') {
@@ -235,22 +231,6 @@ export function renderAlphaFilter(targetDiv, data, renderFn, type) {
     });
     targetDiv.appendChild(button);
   });
-
-  if (!targetDiv._hasEdgeScrubber && typeof window !== 'undefined' && typeof document !== 'undefined') {
-    targetDiv._hasEdgeScrubber = true;
-    let isTouching = false;
-    targetDiv.addEventListener('touchstart', () => { isTouching = true; }, { passive: true });
-    targetDiv.addEventListener('touchmove', (e) => {
-      if (!isTouching || !e.touches || !e.touches[0]) return;
-      const touch = e.touches[0];
-      const el = typeof document.elementFromPoint === 'function' ? document.elementFromPoint(touch.clientX, touch.clientY) : null;
-      if (el && el.classList && el.classList.contains('alpha-filter-btn') && !el.classList.contains('active')) {
-        el.click();
-      }
-    }, { passive: true });
-    targetDiv.addEventListener('touchend', () => { isTouching = false; }, { passive: true });
-    targetDiv.addEventListener('touchcancel', () => { isTouching = false; }, { passive: true });
-  }
 
   const applyDisplayInfoToComic = state.applyDisplayInfoToComic || window.applyDisplayInfoToComic;
 
