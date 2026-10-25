@@ -3,8 +3,8 @@ const { createId } = require('../utils');
 /**
  * Sync / clone default reading lists (from 'default-user') to a target user.
  * 
- * @param {string} targetUserId - The user ID to sync lists to
  * @param {Object} options - Sync options and dependencies
+ * @param {string} options.targetUserId - The user ID to sync lists to
  * @param {Function} options.dbRun - Database run dependency
  * @param {Function} options.dbGet - Database get dependency
  * @param {Function} options.dbAll - Database all dependency
@@ -13,8 +13,8 @@ const { createId } = require('../utils');
  * @param {boolean} [options.prune=false] - If true, delete lists in target user that do not exist in default-user
  * @returns {Promise<{ created: number, updated: number, pruned: number, skipped: number, total: number }>}
  */
-async function syncDefaultReadingLists(targetUserId, options = {}) {
-  const { dbRun, dbGet, dbAll, log, overwrite = false, prune = false } = options;
+async function syncDefaultReadingLists(options = {}) {
+  const { targetUserId, dbRun, dbGet, dbAll, log, overwrite = false, prune = false } = options;
   if (!targetUserId || targetUserId === 'default-user') {
     return { created: 0, updated: 0, pruned: 0, skipped: 0, total: 0 };
   }
@@ -121,18 +121,24 @@ async function syncDefaultReadingLists(targetUserId, options = {}) {
 /**
  * Sync default reading lists to ALL non-default users in the database.
  * 
- * @param {Object} deps - Database dependencies { dbRun, dbGet, dbAll, log }
- * @param {Object} [options] - Sync options (overwrite, prune)
+ * @param {Object} options - Sync options and dependencies
+ * @param {Function} options.dbRun - Database run dependency
+ * @param {Function} options.dbGet - Database get dependency
+ * @param {Function} options.dbAll - Database all dependency
+ * @param {Function} options.log - Log function dependency
+ * @param {boolean} [options.overwrite=false] - If true, overwrite existing list items and sortOrder
+ * @param {boolean} [options.prune=false] - If true, delete lists in target user that do not exist in default-user
  * @returns {Promise<{ usersCount: number, totalCreated: number, totalUpdated: number, totalPruned: number }>}
  */
-async function syncDefaultReadingListsToAllUsers({ dbRun, dbGet, dbAll, log }, options = {}) {
+async function syncDefaultReadingListsToAllUsers(options = {}) {
+  const { dbRun, dbGet, dbAll, log, overwrite = false, prune = false } = options;
   const users = await dbAll('SELECT userId, email FROM users WHERE userId != ?', ['default-user']);
   let totalCreated = 0;
   let totalUpdated = 0;
   let totalPruned = 0;
 
   for (const user of users) {
-    const res = await syncDefaultReadingLists(user.userId, { dbRun, dbGet, dbAll, log, ...options });
+    const res = await syncDefaultReadingLists({ targetUserId: user.userId, dbRun, dbGet, dbAll, log, overwrite, prune });
     totalCreated += res.created;
     totalUpdated += (res.updated || 0);
     totalPruned += (res.pruned || 0);
@@ -144,11 +150,16 @@ async function syncDefaultReadingListsToAllUsers({ dbRun, dbGet, dbAll, log }, o
 /**
  * Delete a reading list globally across all users by list name or list ID.
  * 
- * @param {string} identifier - List name or list ID
- * @param {Object} deps - Database dependencies { dbRun, dbGet, dbAll, log }
+ * @param {Object} options - Options and dependencies
+ * @param {string} options.identifier - List name or list ID
+ * @param {Function} options.dbRun - Database run dependency
+ * @param {Function} options.dbGet - Database get dependency
+ * @param {Function} options.dbAll - Database all dependency
+ * @param {Function} options.log - Log function dependency
  * @returns {Promise<{ deletedCount: number, name: string }>}
  */
-async function deleteReadingListGlobally(identifier, { dbRun, dbGet, dbAll, log }) {
+async function deleteReadingListGlobally(options = {}) {
+  const { identifier, dbRun, dbGet, dbAll, log } = options;
   if (!identifier || !identifier.trim()) {
     return { deletedCount: 0, name: '' };
   }
@@ -171,17 +182,22 @@ async function deleteReadingListGlobally(identifier, { dbRun, dbGet, dbAll, log 
 /**
  * Auto-seed reading lists for a new user if they have zero lists.
  * 
- * @param {string} userId - User ID
- * @param {Object} deps - Database dependencies { dbRun, dbGet, dbAll, log }
+ * @param {Object} options - Options and dependencies
+ * @param {string} options.userId - User ID
+ * @param {Function} options.dbRun - Database run dependency
+ * @param {Function} options.dbGet - Database get dependency
+ * @param {Function} options.dbAll - Database all dependency
+ * @param {Function} options.log - Log function dependency
  */
-async function autoSeedNewUserReadingLists(userId, { dbRun, dbGet, dbAll, log }) {
+async function autoSeedNewUserReadingLists(options = {}) {
+  const { userId, dbRun, dbGet, dbAll, log } = options;
   if (!userId || userId === 'default-user') return;
 
   try {
     const row = await dbGet('SELECT COUNT(*) as count FROM reading_lists WHERE userId = ?', [userId]);
     if (!row || row.count === 0) {
       if (log) log('INFO', 'AUTH', `Auto-seeding default reading lists for user: ${userId}`);
-      await syncDefaultReadingLists(userId, { dbRun, dbGet, dbAll, log });
+      await syncDefaultReadingLists({ targetUserId: userId, dbRun, dbGet, dbAll, log });
     }
   } catch (err) {
     if (log) log('ERROR', 'AUTH', `Failed to auto-seed reading lists for user "${userId}": ${err.message}`);
