@@ -24,19 +24,11 @@ def _free_port():
 
 def test_app_boots_and_serves():
     port = _free_port()
-    env = {
-        **os.environ,
-        "APP_HOST": "127.0.0.1",
-        "APP_PORT": str(port),
-        "FLASK_DEBUG": "0",
-        "no_proxy": f"127.0.0.1,localhost,{os.environ.get('no_proxy', '')}",
-        "NO_PROXY": f"127.0.0.1,localhost,{os.environ.get('NO_PROXY', '')}",
-    }
+    env = {**os.environ, "APP_HOST": "127.0.0.1", "APP_PORT": str(port), "FLASK_DEBUG": "0"}
     proc = subprocess.Popen(
         [sys.executable, "app.py"], cwd=ROOT, env=env,
         stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
     )
-    opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
     try:
         url = f"http://127.0.0.1:{port}/api/health"
         deadline = time.time() + 15
@@ -46,7 +38,7 @@ def test_app_boots_and_serves():
                 out = proc.stdout.read() if proc.stdout else ""
                 raise AssertionError(f"app.py exited early (code {proc.returncode}):\n{out}")
             try:
-                with opener.open(url, timeout=1) as r:
+                with urllib.request.urlopen(url, timeout=1) as r:
                     assert r.status == 200
                     return  # booted and served — success
             except Exception as e:
@@ -57,11 +49,6 @@ def test_app_boots_and_serves():
     finally:
         proc.terminate()
         try:
-            proc.wait(timeout=3)
+            proc.wait(timeout=5)
         except subprocess.TimeoutExpired:
             proc.kill()
-        if proc.stdout:
-            try:
-                proc.stdout.close()
-            except Exception:
-                pass

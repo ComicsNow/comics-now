@@ -148,21 +148,21 @@ describe('Manga Smart Filter Regression Tests', () => {
 
     test('authenticated user with no custom record for manga comic inherits default-user mangaMode=true', async () => {
       const prefMaps = await getReadingPrefMaps(testUserId);
-      const res = resolveReadingModes({ comicId: mangaComicId, series: 'Series', publisher: 'Pub', comicPath: '/lib/file.cbz', prefMaps, comicsRoots: ['/lib'] });
+      const res = resolveReadingModes(mangaComicId, 'Series', 'Pub', '/lib/file.cbz', prefMaps, ['/lib']);
 
       expect(res.mangaMode).toBe(true);
     });
 
     test('authenticated user retains explicit override mangaMode=false over default-user mangaMode=true', async () => {
       const prefMaps = await getReadingPrefMaps(testUserId);
-      const res = resolveReadingModes({ comicId: overrideComicId, series: 'Series', publisher: 'Pub', comicPath: '/lib/file.cbz', prefMaps, comicsRoots: ['/lib'] });
+      const res = resolveReadingModes(overrideComicId, 'Series', 'Pub', '/lib/file.cbz', prefMaps, ['/lib']);
 
       expect(res.mangaMode).toBe(false);
     });
 
     test('western comic remains mangaMode=false', async () => {
       const prefMaps = await getReadingPrefMaps(testUserId);
-      const res = resolveReadingModes({ comicId: westernComicId, series: 'Series', publisher: 'Pub', comicPath: '/lib/file.cbz', prefMaps, comicsRoots: ['/lib'] });
+      const res = resolveReadingModes(westernComicId, 'Series', 'Pub', '/lib/file.cbz', prefMaps, ['/lib']);
 
       expect(res.mangaMode).toBe(false);
     });

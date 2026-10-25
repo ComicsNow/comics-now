@@ -43,15 +43,15 @@ module.exports = function attach(router, deps) {
       if (!row) return res.status(404).json({ ok: false, message: 'Comic not found' });
 
       // Security: Validate user has access to this comic
-      const hasAccess = await checkComicAccess({
-        userId: req.user?.userId,
-        userRole: req.user?.role,
-        comicPath: row.path,
-        publisher: row.publisher,
-        series: row.series,
-        rootFolders: getComicsDirectories(),
-        comicId: row.id
-      });
+      const hasAccess = await checkComicAccess(
+        req.user?.userId,
+        req.user?.role,
+        row.path,
+        row.publisher,
+        row.series,
+        getComicsDirectories(),
+        row.id
+      );
       if (!hasAccess) {
         return res.status(403).json({ ok: false, message: 'Access denied' });
       }
@@ -92,15 +92,15 @@ module.exports = function attach(router, deps) {
       // paths and path-based root-folder grants, but denies otherwise — so an
       // unscanned file in a restricted library fails closed instead of open.
       const comic = await dbGet('SELECT id, publisher, series FROM comics WHERE path = ?', [p]);
-      const hasAccess = await checkComicAccess({
-        userId: req.user.userId,
-        userRole: req.user.role,
-        comicPath: p,
-        publisher: comic?.publisher ?? null,
-        series: comic?.series ?? null,
-        rootFolders: getComicsDirectories(),
-        comicId: comic?.id ?? null
-      });
+      const hasAccess = await checkComicAccess(
+        req.user.userId,
+        req.user.role,
+        p,
+        comic?.publisher ?? null,
+        comic?.series ?? null,
+        getComicsDirectories(),
+        comic?.id ?? null
+      );
       if (!hasAccess) {
         log('WARN', 'SECURITY', `User ${req.user.userId} denied access to comic pages: ${p}`);
         return res.status(403).json({ pages: [], error: 'Access denied' });
@@ -132,15 +132,15 @@ module.exports = function attach(router, deps) {
       // a restricted library fail closed. checkComicAccess still grants admins,
       // inbox paths and path-based root-folder grants.
       const comic = await dbGet('SELECT id, publisher, series FROM comics WHERE path = ?', [p]);
-      const hasAccess = await checkComicAccess({
-        userId: req.user.userId,
-        userRole: req.user.role,
-        comicPath: p,
-        publisher: comic?.publisher ?? null,
-        series: comic?.series ?? null,
-        rootFolders: getComicsDirectories(),
-        comicId: comic?.id ?? null
-      });
+      const hasAccess = await checkComicAccess(
+        req.user.userId,
+        req.user.role,
+        p,
+        comic?.publisher ?? null,
+        comic?.series ?? null,
+        getComicsDirectories(),
+        comic?.id ?? null
+      );
       if (!hasAccess) {
         log('WARN', 'SECURITY', `User ${req.user.userId} denied access to comic image: ${p}`);
         return res.status(403).end();
@@ -262,15 +262,15 @@ module.exports = function attach(router, deps) {
       // a restricted library fail closed. checkComicAccess still grants admins,
       // inbox paths and path-based root-folder grants.
       const comic = await dbGet('SELECT id, publisher, series FROM comics WHERE path = ?', [p]);
-      const hasAccess = await checkComicAccess({
-        userId: req.user.userId,
-        userRole: req.user.role,
-        comicPath: p,
-        publisher: comic?.publisher ?? null,
-        series: comic?.series ?? null,
-        rootFolders: getComicsDirectories(),
-        comicId: comic?.id ?? null
-      });
+      const hasAccess = await checkComicAccess(
+        req.user.userId,
+        req.user.role,
+        p,
+        comic?.publisher ?? null,
+        comic?.series ?? null,
+        getComicsDirectories(),
+        comic?.id ?? null
+      );
       if (!hasAccess) {
         log('WARN', 'SECURITY', `User ${req.user.userId} denied download of comic: ${p}`);
         return res.status(403).json({ message: 'Access denied' });

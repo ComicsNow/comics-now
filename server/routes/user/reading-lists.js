@@ -436,17 +436,14 @@ module.exports = function attach(router, deps) {
           continue;
         }
 
-        // Optimization: batch fetch totalPages with JOIN to eliminate N+1 SELECT queries across bulk list items
         const items = await dbAll(
-          `SELECT rli.comicId, COALESCE(c.totalPages, 0) as totalPages
-           FROM reading_list_items rli
-           LEFT JOIN comics c ON rli.comicId = c.id
-           WHERE rli.listId = ?`,
+          'SELECT comicId FROM reading_list_items WHERE listId = ?',
           [listId]
         );
 
         for (const item of items) {
-          const totalPages = item.totalPages || 0;
+          const comic = await dbGet('SELECT totalPages FROM comics WHERE id = ?', [item.comicId]);
+          const totalPages = comic?.totalPages || 0;
           const lastReadPage = read ? (totalPages > 0 ? totalPages - 1 : 1) : 0;
 
           await dbRun(
@@ -536,15 +533,15 @@ module.exports = function attach(router, deps) {
       for (const item of items) {
         if (!item.comicId) continue;
         if (typeof checkComicAccess === 'function' && item.path) {
-          const hasAccess = await checkComicAccess({
-            userId: req.user.userId,
-            userRole: userRole,
-            comicPath: item.path,
-            publisher: item.publisher,
-            series: item.series,
-            rootFolders: dirs,
-            comicId: item.comicId
-          });
+          const hasAccess = await checkComicAccess(
+            req.user.userId,
+            userRole,
+            item.path,
+            item.publisher,
+            item.series,
+            dirs,
+            item.comicId
+          );
           if (!hasAccess) continue;
         }
         accessibleItems.push(item);
@@ -890,13 +887,9 @@ module.exports = function attach(router, deps) {
         return res.status(404).json({ message: 'Reading list not found' });
       }
 
-      // Get all comics and totalPages in this list via a single JOIN
-      // Optimization: batch fetch totalPages with JOIN to eliminate N+1 SELECT queries
+      // Get all comics in this list
       const items = await dbAll(
-        `SELECT rli.comicId, COALESCE(c.totalPages, 0) as totalPages
-         FROM reading_list_items rli
-         LEFT JOIN comics c ON rli.comicId = c.id
-         WHERE rli.listId = ?`,
+        'SELECT comicId FROM reading_list_items WHERE listId = ?',
         [req.params.id]
       );
 
@@ -904,7 +897,8 @@ module.exports = function attach(router, deps) {
 
       // Update status for each comic
       for (const item of items) {
-        const totalPages = item.totalPages || 0;
+        const comic = await dbGet('SELECT totalPages FROM comics WHERE id = ?', [item.comicId]);
+        const totalPages = comic?.totalPages || 0;
         const lastReadPage = read ? (totalPages > 0 ? totalPages - 1 : 1) : 0;
 
         await dbRun(

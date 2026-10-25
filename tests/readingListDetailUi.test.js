@@ -23,9 +23,7 @@ describe('Reading List Detail UI - Cover view, List view, Edit mode, Read/Resume
           <button id="edit-reading-lists-btn">Edit</button>
           <button id="save-reading-lists-order-btn" class="hidden" hidden>Save</button>
           <button id="cancel-reading-lists-edit-btn" class="hidden" hidden>Cancel</button>
-          <div id="reading-lists-overview">
-            <div id="reading-lists-container"></div>
-          </div>
+          <div id="reading-lists-container"></div>
         </div>
       </div>
     `;
@@ -550,69 +548,6 @@ describe('Reading List Detail UI - Cover view, List view, Edit mode, Read/Resume
     expect(resumeBtn.textContent).toContain('Resume');
     expect(resumeBtn.classList.contains('flex-1')).toBe(true);
     expect(resumeBtn.classList.contains('min-w-0')).toBe(true);
-  });
-
-  it('9. isolates detail view by hiding overview controls and unhiding on back, and unifies detail toolbar secondary buttons', async () => {
-    sandbox.state.ReadingLists.getReadingListDetails.mockResolvedValue({
-      id: 'list-1',
-      name: 'Batman Run',
-      items: sampleItems
-    });
-
-    const overview = document.getElementById('reading-lists-overview');
-    expect(overview).not.toBeNull();
-    expect(overview.classList.contains('hidden')).toBe(false);
-
-    await sandbox.showReadingListDetail('list-1', 'Batman Run', 'detailed');
-
-    // Overview controls must be hidden when entering detail view
-    expect(overview.classList.contains('hidden')).toBe(true);
-
-    // Detail view secondary buttons styling
-    const downloadBtn = document.getElementById('download-all-list-btn');
-    const exportBtn = document.getElementById('export-list-btn');
-    const editBtn = document.getElementById('edit-list-btn');
-
-    expect(downloadBtn).not.toBeNull();
-    expect(exportBtn).not.toBeNull();
-    expect(editBtn).not.toBeNull();
-
-    // Secondary buttons must use unified gray styling rather than clashing individual colors
-    expect(downloadBtn.className).toContain('bg-gray-700');
-    expect(downloadBtn.className).not.toContain('bg-purple-600');
-    expect(exportBtn.className).toContain('bg-gray-700');
-    expect(exportBtn.className).not.toContain('bg-blue-600');
-    expect(editBtn.className).toContain('bg-gray-700');
-
-    // Clicking back button restores overview controls and removes detail view
-    const backBtn = document.getElementById('back-to-lists-btn');
-    expect(backBtn).not.toBeNull();
-    backBtn.dispatchEvent(new window.MouseEvent('click', { bubbles: true, cancelable: true }));
-
-    expect(overview.classList.contains('hidden')).toBe(false);
-    expect(document.getElementById('reading-list-detail-view')).toBeNull();
-  });
-
-  it('10. reading list overview modal and tag comics now modal markup structure in index.html', () => {
-    const html = fs.readFileSync(path.resolve(__dirname, '../public/index.html'), 'utf8');
-
-    // Reading lists overview container exists and wraps export/import buttons in a 2-column secondary grid
-    expect(html).toContain('id="reading-lists-overview"');
-    expect(html).toMatch(/<button id="export-all-lists-btn"[^>]*>[\s\S]*?<button id="import-lists-btn"/);
-    expect(html).toContain('grid grid-cols-2');
-
-    // Tag Comics Now button palette:
-    // Hero action: ct-run-btn is blue
-    expect(html).toMatch(/id="ct-run-btn"[^>]*class="[^"]*bg-blue-600/);
-
-    // Secondary modifiers: ct-rescan-unmatched-btn & ct-rescan-xml-btn are NOT loud amber/purple backgrounds
-    expect(html).not.toMatch(/id="ct-rescan-unmatched-btn"[^>]*class="[^"]*bg-amber-600/);
-    expect(html).not.toMatch(/id="ct-rescan-xml-btn"[^>]*class="[^"]*bg-purple-600/);
-    expect(html).toMatch(/id="ct-rescan-unmatched-btn"[^>]*class="[^"]*bg-gray-800/);
-    expect(html).toMatch(/id="ct-rescan-xml-btn"[^>]*class="[^"]*bg-gray-800/);
-
-    // Subtle clear button
-    expect(html).toMatch(/id="ct-clear-output"[^>]*class="[^"]*bg-gray-800[^"]*text-gray-400/);
   });
 });
 

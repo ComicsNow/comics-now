@@ -25,15 +25,8 @@ export function onPageRendered() {
   requestAnimationFrame(state.GuidedView.refreshRender);
 }
 
-let isRefreshingToggle = false;
-let lastFullscreenHiddenState = null;
-
 // Refresh button enabled state and auto-enable per saved preference.
 export async function refreshGuidedToggle() {
-  if (isRefreshingToggle) return;
-  isRefreshingToggle = true;
-
-  try {
   const btn = document.getElementById('manga-guided-toggle-btn');
   const westernBtn = document.getElementById('western-guided-toggle-btn');
   const westernSpeechBtn = document.getElementById('western-speech-zoom');
@@ -52,7 +45,7 @@ export async function refreshGuidedToggle() {
 
   const isManga = !!(comic && (comic.mangaMode === true || comic.mangaMode == 1));
   const processed = !!(comic && comic.guidedViewStatus === 'completed');
-  const isContinuous = !!(state.isContinuousMode || window.isContinuousMode || (comic && comic.continuousMode));
+  const isContinuous = !!(state.isContinuousMode || window.isContinuousMode);
   const isFullImage = !!(state.isFullImageMode || window.isFullImageMode);
   const isLandscape = !!(state.isLandscapeOrientation || window.isLandscapeOrientation);
 
@@ -160,11 +153,6 @@ export async function refreshGuidedToggle() {
     }
   }
 
-  // Continuous reading mode is mutually exclusive with any guided mode
-  if (isContinuous) {
-    preferredMode = null;
-  }
-
   // Sync comic object flags with preferredMode
   comic.guidedMode = preferredMode === 'guided';
   comic.bubbleMode = preferredMode === 'bubble';
@@ -186,46 +174,17 @@ export async function refreshGuidedToggle() {
       registry.disableAll({ persist: false });
     }
   } else if (activeModeName) {
-    registry.disableAll({ persist: isContinuous ? true : false });
+    registry.disableAll({ persist: false });
   }
 
-    if (isContinuous) {
-      const fv = document.getElementById('fullscreen-viewer');
-      if (fv) {
-        if (fv.classList.contains('guided-stage')) {
-          fv.classList.remove('guided-stage');
-        }
-        if (fv.classList.contains('guided-zoom-no-touchmenu')) {
-          fv.classList.remove('guided-zoom-no-touchmenu');
-        }
-      }
-      const overlay = document.getElementById('bubble-magnifier-overlay');
-      if (overlay) {
-        overlay.style.display = 'none';
-        overlay.style.opacity = '0';
-        overlay.style.pointerEvents = 'none';
-      }
-    }
-
-    if (typeof state.GuidedView.updateAllUI === 'function') state.GuidedView.updateAllUI();
-  } finally {
-    isRefreshingToggle = false;
-  }
+  if (typeof state.GuidedView.updateAllUI === 'function') state.GuidedView.updateAllUI();
 }
 
 export function watchFullscreenToggle() {
   const fv = document.getElementById('fullscreen-viewer');
   if (!fv || fv._guidedObserver) return;
-  lastFullscreenHiddenState = fv.classList.contains('hidden');
   const observer = new MutationObserver(() => {
-    const isHidden = fv.classList.contains('hidden');
-    // Only react when the fullscreen visibility state actually toggles (hidden added/removed).
-    // Ignore internal style or non-visibility class changes to avoid microtask mutation storms.
-    if (isHidden === lastFullscreenHiddenState) {
-      return;
-    }
-    lastFullscreenHiddenState = isHidden;
-    const open = !isHidden;
+    const open = isFullscreenOpen();
     if (open) refreshGuidedToggle();
     else state.GuidedView.ModeRegistry.disableAll({ persist: false });
   });

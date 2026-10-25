@@ -4,17 +4,14 @@ const { createId } = require('../utils');
  * Sync / clone default reading lists (from 'default-user') to a target user.
  * 
  * @param {string} targetUserId - The user ID to sync lists to
- * @param {Object} options - Sync options and dependencies
- * @param {Function} options.dbRun - Database run dependency
- * @param {Function} options.dbGet - Database get dependency
- * @param {Function} options.dbAll - Database all dependency
- * @param {Function} options.log - Log function dependency
+ * @param {Object} deps - Database dependencies { dbRun, dbGet, dbAll, log }
+ * @param {Object} [options] - Sync options
  * @param {boolean} [options.overwrite=false] - If true, overwrite existing list items and sortOrder
  * @param {boolean} [options.prune=false] - If true, delete lists in target user that do not exist in default-user
  * @returns {Promise<{ created: number, updated: number, pruned: number, skipped: number, total: number }>}
  */
-async function syncDefaultReadingLists(targetUserId, options = {}) {
-  const { dbRun, dbGet, dbAll, log, overwrite = false, prune = false } = options;
+async function syncDefaultReadingLists(targetUserId, { dbRun, dbGet, dbAll, log }, options = {}) {
+  const { overwrite = false, prune = false } = options;
   if (!targetUserId || targetUserId === 'default-user') {
     return { created: 0, updated: 0, pruned: 0, skipped: 0, total: 0 };
   }
@@ -38,22 +35,11 @@ async function syncDefaultReadingLists(targetUserId, options = {}) {
 
   if (prune) {
     const userLists = await dbAll('SELECT id, name FROM reading_lists WHERE userId = ?', [targetUserId]);
-    const idsToDelete = [];
-
     for (const uList of userLists) {
       if (!templateNames.has(uList.name)) {
-        idsToDelete.push(uList.id);
+        await dbRun('DELETE FROM reading_lists WHERE id = ?', [uList.id]);
+        prunedCount++;
       }
-    }
-
-    if (idsToDelete.length > 0) {
-      const chunkSize = 500;
-      for (let i = 0; i < idsToDelete.length; i += chunkSize) {
-        const chunk = idsToDelete.slice(i, i + chunkSize);
-        const placeholders = chunk.map(() => '?').join(',');
-        await dbRun(`DELETE FROM reading_lists WHERE id IN (${placeholders})`, chunk);
-      }
-      prunedCount += idsToDelete.length;
     }
   }
 
@@ -75,15 +61,20 @@ async function syncDefaultReadingLists(targetUserId, options = {}) {
             [list.description || '', list.sortOrder || 0, now, existing.id]
           );
 
+          // Get template items
+          const items = await dbAll(
+            'SELECT comicId, addedAt, sortOrder FROM reading_list_items WHERE listId = ? ORDER BY sortOrder ASC',
+            [list.id]
+          );
+
           // Replace items for this user's list
           await dbRun('DELETE FROM reading_list_items WHERE listId = ?', [existing.id]);
-
-          await dbRun(`
-            INSERT INTO reading_list_items (listId, comicId, addedAt, sortOrder)
-            SELECT ?, comicId, COALESCE(addedAt, ?), COALESCE(sortOrder, 0)
-            FROM reading_list_items
-            WHERE listId = ?
-          `, [existing.id, now, list.id]);
+          for (const item of items) {
+            await dbRun(
+              'INSERT INTO reading_list_items (listId, comicId, addedAt, sortOrder) VALUES (?, ?, ?, ?)',
+              [existing.id, item.comicId, item.addedAt || now, item.sortOrder || 0]
+            );
+          }
           updatedCount++;
         } catch (err) {
           if (log) log('ERROR', 'READING_LISTS', `Failed to update list "${list.name}" for user "${targetUserId}": ${err.message}`);
@@ -102,12 +93,18 @@ async function syncDefaultReadingLists(targetUserId, options = {}) {
         [newListId, targetUserId, list.name, list.description || '', list.sortOrder || 0, list.created || now, list.updated || now]
       );
 
-      await dbRun(`
-        INSERT OR IGNORE INTO reading_list_items (listId, comicId, addedAt, sortOrder)
-        SELECT ?, comicId, COALESCE(addedAt, ?), COALESCE(sortOrder, 0)
-        FROM reading_list_items
-        WHERE listId = ?
-      `, [newListId, now, list.id]);
+      // Get comics for this list
+      const items = await dbAll(
+        'SELECT comicId, addedAt, sortOrder FROM reading_list_items WHERE listId = ? ORDER BY sortOrder ASC',
+        [list.id]
+      );
+
+      for (const item of items) {
+        await dbRun(
+          'INSERT OR IGNORE INTO reading_list_items (listId, comicId, addedAt, sortOrder) VALUES (?, ?, ?, ?)',
+          [newListId, item.comicId, item.addedAt || now, item.sortOrder || 0]
+        );
+      }
 
       createdCount++;
     } catch (err) {
@@ -132,7 +129,7 @@ async function syncDefaultReadingListsToAllUsers({ dbRun, dbGet, dbAll, log }, o
   let totalPruned = 0;
 
   for (const user of users) {
-    const res = await syncDefaultReadingLists(user.userId, { dbRun, dbGet, dbAll, log, ...options });
+    const res = await syncDefaultReadingLists(user.userId, { dbRun, dbGet, dbAll, log }, options);
     totalCreated += res.created;
     totalUpdated += (res.updated || 0);
     totalPruned += (res.pruned || 0);
@@ -161,8 +158,8 @@ async function deleteReadingListGlobally(identifier, { dbRun, dbGet, dbAll, log 
   }
 
   const listsToDelete = await dbAll('SELECT id, userId FROM reading_lists WHERE name = ? OR id = ?', [name, clean]);
-  if (listsToDelete.length > 0) {
-    await dbRun('DELETE FROM reading_lists WHERE name = ? OR id = ?', [name, clean]);
+  for (const l of listsToDelete) {
+    await dbRun('DELETE FROM reading_lists WHERE id = ?', [l.id]);
   }
 
   return { deletedCount: listsToDelete.length, name };

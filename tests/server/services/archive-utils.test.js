@@ -9,11 +9,7 @@ jest.mock('node-unrar-js', () => ({
 
 jest.mock('fs', () => ({
     ...jest.requireActual('fs'),
-    readFileSync: jest.fn(),
-    promises: {
-        ...jest.requireActual('fs').promises,
-        readFile: jest.fn()
-    }
+    readFileSync: jest.fn()
 }));
 
 describe('archive-utils', () => {
@@ -25,13 +21,6 @@ describe('archive-utils', () => {
         fs.readFileSync.mockImplementation((path) => {
             if (path.endsWith('.cbz')) {
                 return jest.requireActual('fs').readFileSync(path);
-            }
-            return Buffer.from('fake data');
-        });
-
-        fs.promises.readFile.mockImplementation(async (path) => {
-            if (path.endsWith('.cbz')) {
-                return jest.requireActual('fs').promises.readFile(path);
             }
             return Buffer.from('fake data');
         });

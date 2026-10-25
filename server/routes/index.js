@@ -24,9 +24,14 @@ const {
   resolveReadingModes
 } = require('../db');
 
-function createExtendedDeps(deps) {
-  const { log, getComicsDirectories, getPathFromLibraryId } = deps;
+function createApiRouter(deps) {
+  const {
+    log,
+    getComicsDirectories,
+    getPathFromLibraryId
+  } = deps;
 
+  // Create the shared helpers
   const formatErrorMessage = (error, req, fallbackMessage) =>
     sharedFormatErrorMessage(log, error, req, fallbackMessage);
 
@@ -38,7 +43,8 @@ function createExtendedDeps(deps) {
   const resolvePath = (requestedPath) =>
     resolveLibraryPath(requestedPath, getPathFromLibraryId);
 
-  return {
+  // Merge extra deps for new sub-routers
+  const extendedDeps = {
     ...deps,
     formatErrorMessage,
     isPathSafe,
@@ -59,9 +65,8 @@ function createExtendedDeps(deps) {
     resolveReadingModes,
     modalDetector: require('../services/modal-detector')
   };
-}
 
-function createAuthMiddlewares(deps) {
+  // Middleware wrappers to prevent blocking static SPA routes that fall through
   const requireUserAuth = (req, res, next) => {
     const normalizedPath = path.posix.normalize(req.path);
     if (!normalizedPath.startsWith('/api')) return next();
@@ -74,6 +79,11 @@ function createAuthMiddlewares(deps) {
     return deps.requireAdmin(req, res, next);
   };
 
+  // Guards ONLY the impersonation-control endpoints, judged by the REAL
+  // identity. While impersonating, req.user is the (non-admin) target, so the
+  // blanket requireAdmin on adminRouter would reject "stop"/"status". This
+  // router is mounted before adminRouter so those paths resolve here; every
+  // other path passes straight through untouched.
   const requireRealAdminAuth = (req, res, next) => {
     const normalizedPath = path.posix.normalize(req.path);
     if (!normalizedPath.startsWith('/api/v1/admin/impersonate')) return next();
@@ -85,17 +95,15 @@ function createAuthMiddlewares(deps) {
     next();
   };
 
-  return { requireUserAuth, requireAdminAuth, requireRealAdminAuth };
-}
+  const router = express.Router();
 
-function setupPublicRoutes(router, extendedDeps) {
+  // Public routes
   const publicRouter = express.Router();
   require('./public/auth')(publicRouter, extendedDeps);
   require('./public/health')(publicRouter, extendedDeps);
   router.use(publicRouter);
-}
 
-function setupUserRoutes(router, extendedDeps, requireUserAuth) {
+  // Extract user routes
   const userRouter = express.Router();
   userRouter.use(requireUserAuth);
   require('./user/settings')(userRouter, extendedDeps);
@@ -106,10 +114,8 @@ function setupUserRoutes(router, extendedDeps, requireUserAuth) {
   require('./user/library')(userRouter, extendedDeps);
   require('./user/pages')(userRouter, extendedDeps);
   require('./user/metadata')(userRouter, extendedDeps);
-  router.use(userRouter);
-}
 
-function setupAdminRoutes(router, extendedDeps, requireAdminAuth) {
+  // Extract admin routes
   const adminRouter = express.Router();
   adminRouter.use(requireAdminAuth);
   require('./admin/users')(adminRouter, extendedDeps);
@@ -121,29 +127,20 @@ function setupAdminRoutes(router, extendedDeps, requireAdminAuth) {
   require('./admin/mcp-tools')(adminRouter, extendedDeps);
   require('./admin/user-stats')(adminRouter, extendedDeps);
   require('./admin/gemini')(adminRouter, extendedDeps);
-  router.use(adminRouter);
-}
 
-function setupImpersonationRoutes(router, extendedDeps, requireRealAdminAuth) {
+  // Impersonation control (judged by the real admin identity, not the swap).
+  // Must be registered BEFORE adminRouter so its /api/v1/admin/impersonate/*
+  // routes resolve here and bypass adminRouter's blanket requireAdmin (which
+  // sees the swapped non-admin identity while impersonating).
   const impersonationRouter = express.Router();
   impersonationRouter.use(requireRealAdminAuth);
   require('./admin/impersonate')(impersonationRouter, extendedDeps);
+
+  // Register extracted routes
   router.use(impersonationRouter);
-}
-
-function createApiRouter(deps) {
-  const extendedDeps = createExtendedDeps(deps);
-  const { requireUserAuth, requireAdminAuth, requireRealAdminAuth } = createAuthMiddlewares(deps);
-
-  const router = express.Router();
-
-  setupPublicRoutes(router, extendedDeps);
+  router.use(userRouter);
+  router.use(adminRouter);
   
-  // Register impersonation routes before admin routes
-  setupImpersonationRoutes(router, extendedDeps, requireRealAdminAuth);
-  setupUserRoutes(router, extendedDeps, requireUserAuth);
-  setupAdminRoutes(router, extendedDeps, requireAdminAuth);
-
   return router;
 }
 

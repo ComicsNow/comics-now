@@ -290,7 +290,7 @@ export function renderReadingListDAG(mountContainer, dagData, options = {}) {
   const seriesColorMap = new Map((dagData.seriesLanes || []).map(sl => [sl.series, sl.color]));
 
   mountContainer.innerHTML = `
-    <div class="rl-dag-wrapper flex flex-col h-[76vh] sm:h-[82vh] min-h-[500px] bg-gray-950 rounded-2xl border border-gray-800/80 overflow-hidden relative shadow-2xl select-none">
+    <div class="rl-dag-wrapper flex flex-col h-[70vh] sm:h-[75vh] min-h-[480px] bg-gray-950 rounded-2xl border border-gray-800/80 overflow-hidden relative shadow-2xl select-none">
       <!-- DAG Toolbar -->
       <div class="flex flex-wrap items-center justify-between gap-3 p-3 bg-gray-900/90 border-b border-gray-800 backdrop-blur-md z-20">
         <div class="flex items-center gap-2.5 min-w-0">

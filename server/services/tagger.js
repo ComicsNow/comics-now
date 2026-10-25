@@ -34,8 +34,7 @@ function getScanLibrary() {
  * Teams, Locations, StoryArc/StoryArcNumber, AgeRating, Web, Genre, PageCount.
  * Empty fields are dropped so `metadata LIKE '%"StoryArc"%'` style queries stay accurate.
  */
-function buildTaggedDbMeta(info, overrides = {}) {
-  const { title, series, number, volume, publisher } = overrides;
+function buildTaggedDbMeta({ title, series, number, volume, publisher, info }) {
   const { cleanDescription, cleanGenreAndTags } = require('./metadata');
   const m = {
     Title: title,
@@ -271,7 +270,6 @@ async function runComicTagger(options = {}) {
     let skippedCount = 0;
     let failedCount = 0;
     const itemDurations = [];
-    const failedDbUpdates = [];
 
     const metadataStorage = getMetadataStorage();
     const lowerThreshold = getTaggerLowerThreshold();
@@ -361,7 +359,7 @@ async function runComicTagger(options = {}) {
           if (title && (isTitleSameAsSeries(title, ser) || (!ser && isTitleSameAsSeries(title, '')))) {
             title = '';
           }
-          const dbMeta = buildTaggedDbMeta(info, { title, series: ser, number: num, volume: vol, publisher: pub });
+          const dbMeta = buildTaggedDbMeta({ title, series: ser, number: num, volume: vol, publisher: pub, info });
 
           await db.dbRun(
             `INSERT INTO comics (id, path, name, publisher, series, libraryMode, tagStatus, updatedAt, metadata)
@@ -446,7 +444,16 @@ async function runComicTagger(options = {}) {
         }
         ctLog(`✗ Error calling tagger engine for ${entry.name}: ${err.message}`);
         failedCount++;
-        failedDbUpdates.push([id, filePath, entry.name, existing?.publisher || 'Unknown Publisher', existing?.series || 'Unknown Series', 'metadata', 'failed', null]);
+        try {
+          await db.dbRun(
+            `INSERT INTO comics (id, path, name, publisher, series, libraryMode, tagStatus, updatedAt)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+             ON CONFLICT(id) DO UPDATE SET
+               tagStatus = excluded.tagStatus,
+               updatedAt = excluded.updatedAt`,
+            [id, filePath, entry.name, existing?.publisher || 'Unknown Publisher', existing?.series || 'Unknown Series', 'metadata', 'failed', null]
+          );
+        } catch (dbErr) {}
         itemDurations.push(Date.now() - itemStart);
         continue;
       }
@@ -486,7 +493,7 @@ async function runComicTagger(options = {}) {
             if (title && (isTitleSameAsSeries(title, ser) || (!ser && isTitleSameAsSeries(title, '')))) {
               title = '';
             }
-            const dbMeta = buildTaggedDbMeta(info, { title, series: ser, number: num, volume: vol, publisher: pub });
+            const dbMeta = buildTaggedDbMeta({ title, series: ser, number: num, volume: vol, publisher: pub, info });
             dbMetaStr = JSON.stringify(dbMeta);
           } catch (e) {}
 
@@ -636,26 +643,6 @@ async function runComicTagger(options = {}) {
       ctLog('');
     }
 
-    if (failedDbUpdates.length > 0) {
-      try {
-        const stmt = db.db.prepare(
-          `INSERT INTO comics (id, path, name, publisher, series, libraryMode, tagStatus, updatedAt)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-           ON CONFLICT(id) DO UPDATE SET
-             tagStatus = excluded.tagStatus,
-             updatedAt = excluded.updatedAt`
-        );
-        const insertMany = db.db.transaction((updates) => {
-          for (const update of updates) {
-            stmt.run(update[0], update[1], update[2], update[3], update[4], update[5], update[6], update[7]);
-          }
-        });
-        insertMany(failedDbUpdates);
-      } catch (dbErr) {
-        ctLog(`✗ Failed to batch update failed records: ${dbErr.message}`);
-      }
-    }
-
     if (hasChanges) {
       ctLog('ⓘ Triggering library scan due to updated metadata');
       const scan = getScanLibrary();
@@ -751,12 +738,13 @@ async function applyUserSelection(selections) {
       if (title && (isTitleSameAsSeries(title, ser) || (!ser && isTitleSameAsSeries(title, '')))) {
         title = '';
       }
-      const dbMeta = buildTaggedDbMeta(info, {
+      const dbMeta = buildTaggedDbMeta({
         title,
         series: info.Series || ser,
         number: info.Number || info.Volume || '',
         volume: info.Volume || '',
-        publisher: pub
+        publisher: pub,
+        info
       });
       dbMetaStr = JSON.stringify(dbMeta);
     } catch (e) {}

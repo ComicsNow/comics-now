@@ -123,28 +123,28 @@ module.exports = function attach(router, deps) {
         [userId]
       );
 
-      // Access control: Check if user has access to these comics concurrently
-      const accessChecks = rows.map(async (r) => {
-        const hasAccess = await checkComicAccess({
+      const results = [];
+      for (const r of rows) {
+        // Access control: Check if user has access to this comic
+        const hasAccess = await checkComicAccess(
           userId,
           userRole,
-          comicPath: r.path,
-          publisher: r.publisher,
-          series: r.series,
-          rootFolders: directories,
-          comicId: r.id,
-          preFetchedAccessList: accessList
-        });
-        return hasAccess ? r : null;
-      });
-      const accessibleRows = (await Promise.all(accessChecks)).filter(r => r !== null);
+          r.path,
+          r.publisher,
+          r.series,
+          directories,
+          r.id,
+          accessList
+        );
 
-      const results = [];
-      for (const r of accessibleRows) {
+        if (!hasAccess) {
+          continue;
+        }
+
         const meta = (() => { try { return JSON.parse(r.metadata || '{}'); } catch { return {}; } })();
         
         // Resolve reading modes using hierarchical helper
-        const { mangaMode, continuousMode } = resolveReadingModes({ comicId: r.id, series: r.series, publisher: r.publisher, comicPath: r.path, prefMaps, comicsRoots: directories });
+        const { mangaMode, continuousMode } = resolveReadingModes(r.id, r.series, r.publisher, r.path, prefMaps, directories);
 
         const userProg = progressMap[r.id] || {};
 
@@ -309,20 +309,20 @@ module.exports = function attach(router, deps) {
           const dbComic = dbComicsMap.get(f.path);
           
           if (dbComic) {
-            const hasAccess = await checkComicAccess({
+            const hasAccess = await checkComicAccess(
               userId,
               userRole,
-              comicPath: dbComic.path,
-              publisher: dbComic.publisher,
-              series: dbComic.series,
-              rootFolders: directories,
-              comicId: dbComic.id,
-              preFetchedAccessList: userAccessList
-            });
+              dbComic.path,
+              dbComic.publisher,
+              dbComic.series,
+              directories,
+              dbComic.id,
+              userAccessList
+            );
 
             if (!hasAccess) return null;
 
-            const { mangaMode, continuousMode } = resolveReadingModes({ comicId: dbComic.id, series: dbComic.series, publisher: dbComic.publisher, comicPath: dbComic.path, prefMaps, comicsRoots: directories });
+            const { mangaMode, continuousMode } = resolveReadingModes(dbComic.id, dbComic.series, dbComic.publisher, dbComic.path, prefMaps, directories);
 
             return {
               id: dbComic.id,
@@ -341,16 +341,16 @@ module.exports = function attach(router, deps) {
             // Unscanned comic: derive virtual metadata and check access
             const rootFolder = directories.find(d => f.path.startsWith(d));
             const vMeta = generateVirtualMetadata(f.path, rootFolder);
-            const hasAccess = await checkComicAccess({
+            const hasAccess = await checkComicAccess(
               userId,
               userRole,
-              comicPath: f.path,
-              publisher: vMeta.Publisher,
-              series: vMeta.Series,
-              rootFolders: directories,
-              comicId: null,
-              preFetchedAccessList: userAccessList
-            });
+              f.path,
+              vMeta.Publisher,
+              vMeta.Series,
+              directories,
+              null,
+              userAccessList
+            );
 
             if (!hasAccess) return null;
 

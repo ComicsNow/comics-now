@@ -71,5 +71,3 @@ mcp/.venv/
 scripts/modal/tests/fixtures/*.cbz
 scripts/modal/tests/fixtures/*.cbr
 
-bench_test_dir/
-bench_test_dir2/
