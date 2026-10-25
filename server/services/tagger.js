@@ -621,14 +621,7 @@ async function runComicTagger(options = {}) {
           const isSuccessful = await checkFileSuccess(filePath);
           const tagStatus = isSuccessful ? 'successful' : 'failed';
           
-          await db.dbRun(
-            `INSERT INTO comics (id, path, name, publisher, series, libraryMode, tagStatus, updatedAt)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-             ON CONFLICT(id) DO UPDATE SET
-               tagStatus = excluded.tagStatus,
-               updatedAt = excluded.updatedAt`,
-            [id, filePath, entry.name, existing?.publisher || 'Unknown Publisher', existing?.series || 'Unknown Series', 'metadata', tagStatus, currentStats.mtimeMs]
-          );
+          failedDbUpdates.push([id, filePath, entry.name, existing?.publisher || 'Unknown Publisher', existing?.series || 'Unknown Series', 'metadata', tagStatus, currentStats.mtimeMs]);
         } catch (err) {}
         ctLog(`➜ SKIPPED: ${res.reason || 'No match above threshold'} (${entry.name})`);
       }
