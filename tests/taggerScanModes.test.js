@@ -66,6 +66,7 @@ describe('runComicTagger scoped scan modes', () => {
   const originalFetch = global.fetch;
   let dbGetSpy;
   let dbRunSpy;
+  let dbStmtSpy;
   let metaSpy;
 
   function mockSingleComic(name = 'Batman 01.cbz') {
@@ -103,6 +104,11 @@ describe('runComicTagger scoped scan modes', () => {
     });
     dbGetSpy = jest.spyOn(db, 'dbGet').mockResolvedValue(null);
     dbRunSpy = jest.spyOn(db, 'dbRun').mockResolvedValue();
+    dbStmtSpy = jest.fn();
+    db.db = {
+      prepare: jest.fn().mockReturnValue({ run: dbStmtSpy }),
+      transaction: jest.fn().mockImplementation((fn) => (items) => fn(items))
+    };
     metaSpy = jest.spyOn(metadataService, 'getComicInfoFromArchive').mockResolvedValue({});
   });
 
@@ -147,10 +153,7 @@ describe('runComicTagger scoped scan modes', () => {
 
     expect(tagFileCalls().length).toBe(0);
     expect(logsText().some(m => m.includes('Already contains complete metadata'))).toBe(true);
-    expect(dbRunSpy).toHaveBeenCalledWith(
-      expect.stringContaining('INSERT INTO comics'),
-      expect.arrayContaining(['successful'])
-    );
+    expect(dbStmtSpy).toHaveBeenCalledWith(expect.anything(), expect.anything(), expect.anything(), expect.anything(), expect.anything(), expect.anything(), 'successful', expect.anything(), expect.anything());
   });
 
   test('existing-xml mode re-scans a failed comic that has complete XML', async () => {

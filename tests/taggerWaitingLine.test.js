@@ -15,6 +15,7 @@ describe('WAITING FOR USER SELECTION log line lifecycle', () => {
   const originalFetch = global.fetch;
   let dbGetSpy;
   let dbRunSpy;
+  let dbStmtSpy;
   let metaSpy;
 
   const completeMeta = { Series: 'The Amazing Spider-Man', Publisher: 'Marvel Comics', Number: '1', Year: '1963' };
@@ -66,6 +67,11 @@ describe('WAITING FOR USER SELECTION log line lifecycle', () => {
     global.fetch = reviewFetchMock();
     dbGetSpy = jest.spyOn(db, 'dbGet').mockResolvedValue(null);
     dbRunSpy = jest.spyOn(db, 'dbRun').mockResolvedValue();
+    dbStmtSpy = jest.fn();
+    db.db = {
+      prepare: jest.fn().mockReturnValue({ run: dbStmtSpy }),
+      transaction: jest.fn().mockImplementation((fn) => (items) => fn(items))
+    };
     metaSpy = jest.spyOn(metadataService, 'getComicInfoFromArchive').mockResolvedValue({});
   });
 
