@@ -83,7 +83,9 @@ describe('Modal Dialog Accessibility & Keyboard Dismissal', () => {
       'western-guided-toggle-btn',
       'western-speech-zoom',
       'manga-panel-zoom',
-      'manga-speech-zoom-btn'
+      'manga-speech-zoom-btn',
+      'orientation-toggle-btn',
+      'clear-search-btn'
     ];
 
     iconBtnIds.forEach((id) => {
