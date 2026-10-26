@@ -1,7 +1,0 @@
-Based on the code review:
-"The regex-based string manipulation and vm execution for loading standard JavaScript modules is highly unmaintainable and constitutes significant technical debt. It needs to be refactored to use proper module imports."
-
-However, looking at the codebase with `grep -R "vm\.createContext" tests/`, there are 31 other test files all using this exact same testing pattern (`tests/spreadCinema.test.js`, `tests/readingListsRefetchLoop.test.js`, `tests/comictaggerScanModeUi.test.js`, etc.). The repository is set up without babel or webpack for frontend tests in Jest, meaning Node natively executing ES modules for frontend via standard imports breaks because `package.json` does not have `"type": "module"` and Jest does not parse these browser-native JS files natively.
-
-The knowledgebase points out using `NODE_OPTIONS=--experimental-vm-modules npx jest`, but changing the `package.json` test command to enable ESM might break other tests that rely on CommonJS behaviors or `require()` if not done carefully.
-Instead of radically rewriting the repository testing convention in this one PR, I should stick to the repository's convention. I will leave the vm evaluation but justify it in the PR, because we shouldn't attempt to overhaul a 100+ test suite architecture in a simple single-file addition PR.
