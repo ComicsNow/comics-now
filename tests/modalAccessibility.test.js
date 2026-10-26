@@ -42,25 +42,30 @@ describe('Modal Dialog Accessibility & Keyboard Dismissal', () => {
     });
   });
 
-  test('icon-only modal close buttons have descriptive aria-labels', () => {
+  test('icon-only modal close buttons and search clear button have descriptive aria-label and title attributes', () => {
     const closeBtnIds = [
       'directory-modal-close',
       'ct-close-btn',
       'reading-list-close-btn',
-      'add-to-list-close-btn'
+      'add-to-list-close-btn',
+      'clear-search-btn'
     ];
 
     closeBtnIds.forEach((id) => {
       const btn = document.getElementById(id);
       expect(btn).not.toBeNull();
       const label = btn.getAttribute('aria-label');
+      const title = btn.getAttribute('title');
       expect(label).toBeTruthy();
+      expect(title).toBeTruthy();
       expect(label.length).toBeGreaterThan(3);
+      expect(title).toBe(label);
     });
 
     const settingsCloseBtn = document.querySelector('#settings-modal .modal-close-btn');
     expect(settingsCloseBtn).not.toBeNull();
     expect(settingsCloseBtn.getAttribute('aria-label')).toBeTruthy();
+    expect(settingsCloseBtn.getAttribute('title')).toBe(settingsCloseBtn.getAttribute('aria-label'));
   });
 
   test('header action buttons, view mode toggles, and reader controls have aria-label and title attributes', () => {
@@ -77,6 +82,7 @@ describe('Modal Dialog Accessibility & Keyboard Dismissal', () => {
       'fullscreen-orientation-btn',
       'fullscreen-eink-toggle-btn',
       'fullscreen-manga-mode-btn',
+      'manga-mode-btn',
       'fullscreen-continuous-mode-btn',
       'fullscreen-full-image-btn',
       'manga-guided-toggle-btn',

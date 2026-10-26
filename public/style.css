@@ -2919,6 +2919,12 @@ body.modal-open {
 .modal-close-btn:hover {
     color: var(--paper) !important;
 }
+.modal-close-btn:focus-visible,
+.search-clear-btn:focus-visible {
+    outline: 2px solid var(--yellow) !important;
+    outline-offset: 2px !important;
+    border-radius: 4px !important;
+}
 
 /* Modal action buttons (excluding top-right close buttons, segmented controls, back button, and hidden buttons) */
 #settings-modal button:not(.modal-close-btn):not(.remove-library-btn):not(.hidden):not([hidden]),
