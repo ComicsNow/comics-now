@@ -209,7 +209,9 @@ module.exports = function attach(router, deps) {
         geminiTermsAccepted
       } = req.body || {};
 
-      const cfg = readConfig();
+      // Security: Must await readConfig() so cfg is the config object rather than a Promise instance.
+      // Serializing a Promise with JSON.stringify() evaluates to {} which would wipe config.json.
+      const cfg = await readConfig();
       const alreadyAccepted = await checkTermsAccepted();
 
       if (geminiTermsAccepted === true || alreadyAccepted) {
