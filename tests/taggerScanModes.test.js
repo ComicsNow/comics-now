@@ -67,6 +67,7 @@ describe('runComicTagger scoped scan modes', () => {
   let dbGetSpy;
   let dbRunSpy;
   let metaSpy;
+  let stmtRunSpy;
 
   function mockSingleComic(name = 'Batman 01.cbz') {
     jest.spyOn(fs, 'existsSync').mockReturnValue(true);
@@ -104,6 +105,11 @@ describe('runComicTagger scoped scan modes', () => {
     dbGetSpy = jest.spyOn(db, 'dbGet').mockResolvedValue(null);
     dbRunSpy = jest.spyOn(db, 'dbRun').mockResolvedValue();
     metaSpy = jest.spyOn(metadataService, 'getComicInfoFromArchive').mockResolvedValue({});
+    stmtRunSpy = jest.fn();
+    db.db = {
+      prepare: jest.fn().mockReturnValue({ run: stmtRunSpy }),
+      transaction: jest.fn().mockImplementation((fn) => (...args) => fn(...args))
+    };
   });
 
   afterEach(() => {
@@ -147,9 +153,8 @@ describe('runComicTagger scoped scan modes', () => {
 
     expect(tagFileCalls().length).toBe(0);
     expect(logsText().some(m => m.includes('Already contains complete metadata'))).toBe(true);
-    expect(dbRunSpy).toHaveBeenCalledWith(
-      expect.stringContaining('INSERT INTO comics'),
-      expect.arrayContaining(['successful'])
+    expect(stmtRunSpy).toHaveBeenCalledWith(
+      expect.any(String), expect.any(String), expect.any(String), expect.any(String), expect.any(String), expect.any(String), 'successful', expect.any(Number), expect.any(String)
     );
   });
 

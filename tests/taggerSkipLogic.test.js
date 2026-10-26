@@ -9,9 +9,17 @@ describe('runComicTagger - Skip & Tagging Logic', () => {
   let dbGetSpy;
   let dbRunSpy;
   let metaSpy;
+  let transactionSpy;
+  let stmtRunSpy;
 
   beforeEach(() => {
     jest.clearAllMocks();
+
+    stmtRunSpy = jest.fn();
+    db.db = {
+      prepare: jest.fn().mockReturnValue({ run: stmtRunSpy }),
+      transaction: jest.fn().mockImplementation((fn) => (...args) => fn(...args))
+    };
     global.fetch = jest.fn().mockImplementation(async (url) => {
       if (typeof url === 'string' && url.includes('/api/health')) {
         return {
@@ -107,9 +115,8 @@ describe('runComicTagger - Skip & Tagging Logic', () => {
 
     // /api/tag-file SHOULD be called because file was modified
     expect(global.fetch).toHaveBeenCalledWith('http://127.0.0.1:5000/api/tag-file', expect.any(Object));
-    expect(dbRunSpy).toHaveBeenCalledWith(
-      expect.stringContaining('INSERT INTO comics'),
-      expect.arrayContaining(['successful'])
+    expect(stmtRunSpy).toHaveBeenCalledWith(
+      expect.any(String), expect.any(String), expect.any(String), expect.any(String), expect.any(String), expect.any(String), 'successful', expect.any(Number), expect.any(String)
     );
   });
 
@@ -138,9 +145,8 @@ describe('runComicTagger - Skip & Tagging Logic', () => {
       expect.stringContaining('/api/tag-file'),
       expect.any(Object)
     );
-    expect(dbRunSpy).toHaveBeenCalledWith(
-      expect.stringContaining('INSERT INTO comics'),
-      expect.arrayContaining(['Superman', 'DC Comics', 'successful'])
+    expect(stmtRunSpy).toHaveBeenCalledWith(
+      expect.any(String), expect.any(String), expect.any(String), 'DC Comics', 'Superman', expect.any(String), 'successful', expect.any(Number), expect.any(String)
     );
     const logs = getCtLogs().map(l => l.message);
     expect(logs.some(m => m.includes('Already contains complete metadata'))).toBe(true);
@@ -604,9 +610,8 @@ describe('runComicTagger - Skip & Tagging Logic', () => {
       expect.stringContaining('/api/tag-file'),
       expect.any(Object)
     );
-    expect(dbRunSpy).toHaveBeenCalledWith(
-      expect.stringContaining('INSERT INTO comics'),
-      expect.arrayContaining(['successful'])
+    expect(stmtRunSpy).toHaveBeenCalledWith(
+      expect.any(String), expect.any(String), expect.any(String), expect.any(String), expect.any(String), expect.any(String), 'successful', expect.any(Number), expect.any(String)
     );
   });
 });
