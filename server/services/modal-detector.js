@@ -1,7 +1,6 @@
 const { spawn } = require('child_process');
 const fs = require('fs');
 const path = require('path');
-const { log } = require('../logger');
 const { GUIDED_VIEW_DIR } = require('./panel-detector');
 
 const SCRIPT_PATH = path.join(__dirname, '../../scripts/modal_guided_detect.py');

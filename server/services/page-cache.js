@@ -158,7 +158,6 @@ async function initPageCache() {
 module.exports = {
   getCacheDir,
   setCustomCacheDir,
-  getMaxCacheBytes,
   getPageCacheKey,
   getPageCachePath,
   hasPageCache,
