@@ -113,12 +113,14 @@ describe('Reading Lists Sync Service', () => {
             });
           }
         } else {
-          mockDb.reading_list_items.push({
-            listId: params[0],
-            comicId: params[1],
-            addedAt: params[2],
-            sortOrder: params[3]
-          });
+          for (let i = 0; i < params.length; i += 4) {
+            mockDb.reading_list_items.push({
+              listId: params[i],
+              comicId: params[i + 1],
+              addedAt: params[i + 2],
+              sortOrder: params[i + 3]
+            });
+          }
         }
       }
       return { changes: 1 };
