@@ -1,5 +1,5 @@
 const yauzl = require('yauzl');
-const { createExtractorFromData } = require('node-unrar-js');
+const { createExtractorFromFile } = require('node-unrar-js');
 const fs = require('fs');
 const path = require('path');
 const { Readable } = require('stream');
@@ -228,9 +228,8 @@ class RarReader {
 }
 
 async function createRarReader(filePath) {
-    const data = await fs.promises.readFile(filePath);
-    const extractor = await createExtractorFromData({ data });
-    return new RarReader(extractor, data);
+    const extractor = await createExtractorFromFile({ filepath: filePath });
+    return new RarReader(extractor, null);
 }
 
 async function openArchive(filePath) {
