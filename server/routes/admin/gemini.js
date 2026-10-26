@@ -274,7 +274,14 @@ module.exports = function attach(router, deps) {
         }
       }
       if (geminiCoverDailyCap !== undefined) {
-        const cap = parseInt(geminiCoverDailyCap, 10);
+        // Security: Validate and sanitize geminiCoverDailyCap (must be integer between 1 and 10000)
+        const parsedCap = typeof geminiCoverDailyCap === 'string' && geminiCoverDailyCap.trim() !== ''
+          ? Number(geminiCoverDailyCap)
+          : Number(geminiCoverDailyCap);
+        if (!Number.isInteger(parsedCap) || parsedCap < 1 || parsedCap > 10000) {
+          return res.status(400).json({ error: 'geminiCoverDailyCap must be an integer between 1 and 10000' });
+        }
+        const cap = parsedCap;
         cfg.geminiCoverDailyCap = cap;
         config.geminiCoverDailyCap = cap;
         try {
