@@ -136,12 +136,24 @@ module.exports = function attach(router, deps) {
             [userListId, u.userId, name.trim(), description || '', now, now]
           );
           if (comicIds && Array.isArray(comicIds) && comicIds.length > 0) {
-            for (const [index, comicId] of comicIds.entries()) {
+            const values = [];
+            const params = [];
+            let validIndex = 0;
+            for (const comicId of comicIds) {
               const v = validateComicId(comicId);
               if (v.valid) {
+                values.push('(?, ?, ?, ?)');
+                params.push(userListId, v.sanitized, now, validIndex++);
+              }
+            }
+            if (values.length > 0) {
+              const chunkSize = 100;
+              for (let i = 0; i < values.length; i += chunkSize) {
+                const chunkValues = values.slice(i, i + chunkSize);
+                const chunkParams = params.slice(i * 4, (i + chunkSize) * 4);
                 await dbRun(
-                  'INSERT OR IGNORE INTO reading_list_items (listId, comicId, addedAt, sortOrder) VALUES (?, ?, ?, ?)',
-                  [userListId, v.sanitized, now, index]
+                  `INSERT OR IGNORE INTO reading_list_items (listId, comicId, addedAt, sortOrder) VALUES ${chunkValues.join(', ')}`,
+                  chunkParams
                 );
               }
             }
@@ -194,14 +206,26 @@ module.exports = function attach(router, deps) {
 
           let comicsAdded = 0;
           if (listData.comicIds && Array.isArray(listData.comicIds) && listData.comicIds.length > 0) {
-            for (const [cIdx, comicId] of listData.comicIds.entries()) {
+            const values = [];
+            const params = [];
+            let validIndex = 0;
+            for (const comicId of listData.comicIds) {
               const v = validateComicId(comicId);
               if (v.valid) {
-                await dbRun(
-                  'INSERT OR IGNORE INTO reading_list_items (listId, comicId, addedAt, sortOrder) VALUES (?, ?, ?, ?)',
-                  [listId, v.sanitized, now, cIdx]
-                );
+                values.push('(?, ?, ?, ?)');
+                params.push(listId, v.sanitized, now, validIndex++);
                 comicsAdded++;
+              }
+            }
+            if (values.length > 0) {
+              const chunkSize = 100;
+              for (let i = 0; i < values.length; i += chunkSize) {
+                const chunkValues = values.slice(i, i + chunkSize);
+                const chunkParams = params.slice(i * 4, (i + chunkSize) * 4);
+                await dbRun(
+                  `INSERT OR IGNORE INTO reading_list_items (listId, comicId, addedAt, sortOrder) VALUES ${chunkValues.join(', ')}`,
+                  chunkParams
+                );
               }
             }
           }
@@ -213,13 +237,25 @@ module.exports = function attach(router, deps) {
                 'INSERT OR IGNORE INTO reading_lists (id, userId, name, description, created, updated) VALUES (?, ?, ?, ?, ?, ?)',
                 [userListId, u.userId, name, listData.description || '', now, now]
               );
-              if (listData.comicIds && Array.isArray(listData.comicIds)) {
-                for (const [cIdx, comicId] of listData.comicIds.entries()) {
+              if (listData.comicIds && Array.isArray(listData.comicIds) && listData.comicIds.length > 0) {
+                const values = [];
+                const params = [];
+                let validIndex = 0;
+                for (const comicId of listData.comicIds) {
                   const v = validateComicId(comicId);
                   if (v.valid) {
+                    values.push('(?, ?, ?, ?)');
+                    params.push(userListId, v.sanitized, now, validIndex++);
+                  }
+                }
+                if (values.length > 0) {
+                  const chunkSize = 100;
+                  for (let i = 0; i < values.length; i += chunkSize) {
+                    const chunkValues = values.slice(i, i + chunkSize);
+                    const chunkParams = params.slice(i * 4, (i + chunkSize) * 4);
                     await dbRun(
-                      'INSERT OR IGNORE INTO reading_list_items (listId, comicId, addedAt, sortOrder) VALUES (?, ?, ?, ?)',
-                      [userListId, v.sanitized, now, cIdx]
+                      `INSERT OR IGNORE INTO reading_list_items (listId, comicId, addedAt, sortOrder) VALUES ${chunkValues.join(', ')}`,
+                      chunkParams
                     );
                   }
                 }
@@ -329,16 +365,28 @@ module.exports = function attach(router, deps) {
         let nextOrder = (maxSort?.maxOrder ?? -1) + 1;
         let addedCount = 0;
 
+        const values = [];
+        const params = [];
         for (const comicId of comicIds) {
           const v = validateComicId(comicId);
           if (v.valid) {
+            values.push('(?, ?, ?, ?)');
+            params.push(listId, v.sanitized, now, nextOrder);
+            nextOrder++;
+            addedCount++;
+          }
+        }
+
+        if (values.length > 0) {
+          const chunkSize = 100;
+          for (let i = 0; i < values.length; i += chunkSize) {
+            const chunkValues = values.slice(i, i + chunkSize);
+            const chunkParams = params.slice(i * 4, (i + chunkSize) * 4);
             try {
               await dbRun(
-                'INSERT OR IGNORE INTO reading_list_items (listId, comicId, addedAt, sortOrder) VALUES (?, ?, ?, ?)',
-                [listId, v.sanitized, now, nextOrder]
+                `INSERT OR IGNORE INTO reading_list_items (listId, comicId, addedAt, sortOrder) VALUES ${chunkValues.join(', ')}`,
+                chunkParams
               );
-              nextOrder++;
-              addedCount++;
             } catch {}
           }
         }
@@ -764,19 +812,31 @@ module.exports = function attach(router, deps) {
       const now = Date.now();
 
       // Add comics (ignore duplicates)
+      const values = [];
+      const params = [];
       for (const [index, comicId] of comicIds.entries()) {
         const v = validateComicId(comicId);
         if (!v.valid) return res.status(400).json({ message: `Invalid comic ID at index ${index}: ${v.error}` });
         const cleanId = v.sanitized;
 
-        try {
-          await dbRun(
-            'INSERT OR IGNORE INTO reading_list_items (listId, comicId, addedAt, sortOrder) VALUES (?, ?, ?, ?)',
-            [req.params.id, cleanId, now, nextOrder]
-          );
-          nextOrder++;
-        } catch (err) {
-          // Skip if already exists
+        values.push('(?, ?, ?, ?)');
+        params.push(req.params.id, cleanId, now, nextOrder);
+        nextOrder++;
+      }
+
+      if (values.length > 0) {
+        const chunkSize = 100;
+        for (let i = 0; i < values.length; i += chunkSize) {
+          const chunkValues = values.slice(i, i + chunkSize);
+          const chunkParams = params.slice(i * 4, (i + chunkSize) * 4);
+          try {
+            await dbRun(
+              `INSERT OR IGNORE INTO reading_list_items (listId, comicId, addedAt, sortOrder) VALUES ${chunkValues.join(', ')}`,
+              chunkParams
+            );
+          } catch (err) {
+            // Skip if error occurs
+          }
         }
       }
 
