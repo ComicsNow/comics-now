@@ -1541,7 +1541,7 @@
           </span>
           <input type="search" id="library-search-query" class="flex-1 min-w-0 bg-transparent text-white text-sm px-3 py-2.5 focus:outline-hidden placeholder-gray-500" placeholder="Search the stacks..." autocomplete="off" enterkeyhint="search" inputmode="search">
           <!-- Inline clear button — hidden when input is empty (CSS via :placeholder-shown) -->
-          <button type="button" id="clear-search-btn" class="search-clear-btn" aria-label="Clear search">
+          <button type="button" id="clear-search-btn" class="search-clear-btn" aria-label="Clear search" title="Clear search">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5"><use href="#icon-close"></use></svg>
           </button>
         </div>
@@ -1777,6 +1777,7 @@
           id="orientation-toggle-btn"
           type="button"
           class="pill-button bg-gray-700 hover:bg-gray-600 text-white transition-colors"
+          aria-label="Toggle page orientation"
           aria-pressed="false"
           title="Toggle page orientation"
         >
