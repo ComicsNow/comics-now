@@ -28,20 +28,38 @@ def check_credits() -> dict:
         from modal.workspace import _Workspace
         ws = _Workspace.from_context()
         summary = asyncio.run(ws.billing.summary(cycle="this month"))
-        total_credits = float(abs(summary.adjustments.get("Credits", 0)))
-        metered_cost = float(summary.metered_cost)
+
+        # 1. Total monthly credits (Modal default is $30.00 / month)
+        monthly_budget = float(os.environ.get("MODAL_MONTHLY_CREDITS", 30.0))
+
+        # 2. Credits used this billing cycle (reported by Modal as a negative adjustment)
+        credits_used = float(abs(summary.adjustments.get("Credits", 0)))
+        total_credits = max(monthly_budget, round(credits_used, 2))
+
+        # 3. Available credits remaining
+        available_credits = max(0.0, total_credits - credits_used)
+
+        # 4. Billed cost (charges incurred after credits are exhausted)
         billed_cost = float(summary.billed_cost)
-        remaining = max(0.0, total_credits - metered_cost)
-        spend_limit_exceeded = billed_cost > 0 or (total_credits > 0 and metered_cost >= total_credits)
+
+        # 5. Net metered cost (gross metered cost minus free allowances like Free Storage & Network Egress)
+        free_adjustments = sum(
+            float(abs(v)) for k, v in summary.adjustments.items()
+            if k != "Credits" and float(v) < 0
+        )
+        net_metered_cost = max(0.0, float(summary.metered_cost) - free_adjustments)
+
+        # 6. Spend limit exceeded only if available credits are exhausted or direct billing is incurred
+        spend_limit_exceeded = (available_credits <= 0.0) or (billed_cost > 0.0)
         ws_name = getattr(ws, "_name", None) or "default"
 
         return {
             "ok": True,
             "workspace": ws_name,
             "totalCredits": round(total_credits, 2),
-            "meteredCost": round(metered_cost, 2),
+            "meteredCost": round(net_metered_cost, 2),
             "billedCost": round(billed_cost, 2),
-            "availableCredits": round(remaining, 2),
+            "availableCredits": round(available_credits, 2),
             "spendLimitExceeded": spend_limit_exceeded,
             "currency": "USD"
         }
