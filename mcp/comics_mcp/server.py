@@ -918,6 +918,75 @@ def set_tags(comic_id: str, fields: dict, storage: str = "sidecar") -> str:
 
 
 @mcp.tool()
+def extract_metadata_from_url(url: str, filename: Optional[str] = None) -> str:
+    """Extract and synthesize ComicInfo metadata from a web page URL (e.g. Comic Vine,
+    League of Comic Geeks, DC/Marvel Fandom, Goodreads, publisher site) using Jina Reader and Gemini AI.
+
+    Args:
+        url: Direct web URL of the comic page (must start with http:// or https://).
+        filename: Optional comic filename (e.g. 'Batman 001 (2016).cbz') to assist extraction.
+    """
+    body = {"url": url}
+    if filename:
+        body["filename"] = filename
+    return _dump(_request("POST", "/api/v1/metadata/extract-from-url", body=body))
+
+
+@mcp.tool()
+def tag_comic_from_url(comic_id: str, url: str, storage: str = "sidecar") -> str:
+    """Extract metadata from a web URL using Gemini and write ComicInfo tags to the comic in one step.
+
+    Scrapes clean markdown from the provided web URL (Comic Vine, League of Comic Geeks,
+    DC/Marvel Fandom, Goodreads, etc.), uses Gemini AI to synthesize canonical ComicInfo
+    fields, and saves the tags to the comic via sidecar XML, CBZ archive, or DB.
+    Also tracks usage against the daily Gemini AI quota counter.
+
+    Args:
+        comic_id: Target comic ID.
+        url: Direct web URL of the comic page (must start with http:// or https://).
+        storage: "sidecar" (adjacent .ComicInfo.xml, default), "db" (database only),
+                 or "archive" (repack ComicInfo.xml INTO the .cbz archive).
+    """
+    # 1. Fetch current comic tags & filename
+    tags_resp = _request("GET", f"/api/v1/comics/{comic_id}/tags")
+    comic_data = tags_resp.get("data", {}) if isinstance(tags_resp, dict) else {}
+    filename = comic_data.get("name") or "Comic.cbz"
+    existing_meta = comic_data.get("dbMetadata") or {}
+
+    # 2. Extract metadata via web URL endpoint
+    extract_resp = _request(
+        "POST",
+        "/api/v1/metadata/extract-from-url",
+        body={"url": url, "filename": filename, "existingMeta": existing_meta},
+    )
+    extract_data = extract_resp.get("data", {}) if isinstance(extract_resp, dict) else {}
+    extracted_fields = extract_data.get("metadata")
+
+    if not extracted_fields or not isinstance(extracted_fields, dict):
+        raise ValueError(f"Failed to extract metadata from {url}: {extract_resp}")
+
+    # 3. Apply extracted tags to comic
+    apply_resp = _request(
+        "POST",
+        f"/api/v1/comics/{comic_id}/tags",
+        body={"fields": extracted_fields, "storage": storage},
+    )
+
+    return _dump({
+        "status": 200,
+        "ok": True,
+        "data": {
+            "comicId": comic_id,
+            "url": url,
+            "storage": storage,
+            "fields": extracted_fields,
+            "dailyUsed": extract_data.get("dailyUsed"),
+            "applyResult": apply_resp.get("data") if isinstance(apply_resp, dict) else apply_resp,
+        }
+    })
+
+
+@mcp.tool()
 def get_tags_bulk(comic_ids: list[str]) -> str:
     """Read ComicInfo metadata (from sidecar/zip) plus DB metadata for multiple comics in a single batch request.
 
@@ -1236,6 +1305,7 @@ def main() -> None:
         starlette_app = Starlette(
             routes=[
                 Mount("/comics-mcp", app=base_app),
+                Mount("/sse", app=base_app),
                 Mount("", app=base_app),
             ],
             lifespan=base_app.router.lifespan_context,
@@ -1283,6 +1353,8 @@ def main() -> None:
                     return
                 if path == "/comics-mcp":
                     scope["path"] = "/comics-mcp/"
+                if path == "/sse":
+                    scope["path"] = "/sse/"
 
             await starlette_app(scope, receive, send)
 

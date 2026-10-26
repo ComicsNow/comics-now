@@ -1,6 +1,6 @@
 const path = require('path');
 
-async function checkComicAccess(userId, userRole, comicPath, publisher, series, rootFolders, comicId = null, preFetchedAccessList = null, dbAllFunc) {
+async function checkComicAccess({ userId, userRole, comicPath, publisher, series, rootFolders, comicId = null, preFetchedAccessList = null, dbAllFunc }) {
   // Determine which root folder this comic belongs to
   let rootFolder = 'Unknown';
   for (const folder of rootFolders) {

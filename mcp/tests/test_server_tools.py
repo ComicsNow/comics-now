@@ -208,6 +208,75 @@ class TestMcpTools(unittest.TestCase):
         mock_req.assert_called_once_with("GET", "/api/v1/operation-errors")
         self.assertEqual(res["data"], [])
 
+    @patch.object(server, "_request")
+    def test_extract_metadata_from_url(self, mock_req):
+        mock_req.return_value = {
+            "status": 200,
+            "ok": True,
+            "data": {
+                "success": True,
+                "metadata": {
+                    "Series": "Batman",
+                    "Number": "1",
+                    "Publisher": "DC Comics",
+                    "Writer": "Tom King",
+                },
+                "dailyUsed": 8,
+            },
+        }
+        res_str = server.extract_metadata_from_url("https://leagueofcomicgeeks.com/comic/123/batman-1", filename="Batman 001.cbz")
+        res = json.loads(res_str)
+        mock_req.assert_called_once_with(
+            "POST",
+            "/api/v1/metadata/extract-from-url",
+            body={"url": "https://leagueofcomicgeeks.com/comic/123/batman-1", "filename": "Batman 001.cbz"},
+        )
+        self.assertEqual(res["data"]["metadata"]["Series"], "Batman")
+        self.assertEqual(res["data"]["dailyUsed"], 8)
+
+    @patch.object(server, "_request")
+    def test_tag_comic_from_url(self, mock_req):
+        mock_req.side_effect = [
+            # 1. GET /api/v1/comics/c_123/tags
+            {
+                "status": 200,
+                "ok": True,
+                "data": {
+                    "comicId": "c_123",
+                    "name": "Batman 001.cbz",
+                    "dbMetadata": {"Series": "Batman"},
+                },
+            },
+            # 2. POST /api/v1/metadata/extract-from-url
+            {
+                "status": 200,
+                "ok": True,
+                "data": {
+                    "success": True,
+                    "metadata": {
+                        "Series": "Batman",
+                        "Number": "1",
+                        "Publisher": "DC Comics",
+                        "Writer": "Tom King",
+                    },
+                    "dailyUsed": 9,
+                },
+            },
+            # 3. POST /api/v1/comics/c_123/tags
+            {
+                "status": 200,
+                "ok": True,
+                "data": {"storage": "sidecar", "fields": {"Series": "Batman", "Number": "1"}},
+            },
+        ]
+        res_str = server.tag_comic_from_url("c_123", "https://leagueofcomicgeeks.com/comic/123/batman-1", storage="sidecar")
+        res = json.loads(res_str)
+        self.assertTrue(res["ok"])
+        self.assertEqual(res["data"]["comicId"], "c_123")
+        self.assertEqual(res["data"]["fields"]["Series"], "Batman")
+        self.assertEqual(res["data"]["dailyUsed"], 9)
+        self.assertEqual(mock_req.call_count, 3)
+
 
 if __name__ == "__main__":
     unittest.main()

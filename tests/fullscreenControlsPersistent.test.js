@@ -6,7 +6,7 @@ const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 
-describe('Fullscreen persistent header controls', () => {
+describe('Fullscreen persistent header controls & clean display title', () => {
   let sandbox;
   let state;
 
@@ -17,6 +17,7 @@ describe('Fullscreen persistent header controls', () => {
         <button id="fullscreen-close-btn" class="fullscreen-close-button hidden" type="button">
           <span aria-hidden="true">&times;</span>
         </button>
+        <div id="fullscreen-info-bar" class="fullscreen-info-bar"></div>
         <div id="fullscreen-controls" class="fullscreen-controls hidden"></div>
         <img id="fullscreen-image" src="test.jpg" />
         <div id="fullscreen-scrubber-container" class="hidden"></div>
@@ -27,6 +28,7 @@ describe('Fullscreen persistent header controls', () => {
       fullscreenViewer: document.getElementById('fullscreen-viewer'),
       fullscreenTitle: document.getElementById('fullscreen-title'),
       fullscreenCloseBtn: document.getElementById('fullscreen-close-btn'),
+      fullscreenInfoBar: document.getElementById('fullscreen-info-bar'),
       fullscreenControls: document.getElementById('fullscreen-controls'),
       fullscreenImage: document.getElementById('fullscreen-image'),
       currentComic: { name: 'Batman (2016) #1', series: 'Batman' },
@@ -115,6 +117,30 @@ describe('Fullscreen persistent header controls', () => {
     expect(titleEl.classList.contains('hidden')).toBe(false);
     expect(closeBtn.classList.contains('hidden')).toBe(false);
     expect(titleEl.textContent).toBe('Batman (2016) #1');
+  });
+
+  test('syncFullscreenTitle cleans raw filenames with archive extensions, tags, and track numbers', () => {
+    const titleEl = document.getElementById('fullscreen-title');
+    state.currentComic = { name: '01 Future Heroes [215 INK] (2015) #86.cbz', series: 'Future Heroes' };
+
+    sandbox.syncFullscreenTitle();
+    expect(titleEl.textContent).toBe('Future Heroes #86');
+  });
+
+  test('syncFullscreenTitle utilizes applyDisplayInfoToComic when available', () => {
+    const titleEl = document.getElementById('fullscreen-title');
+    state.currentComic = {
+      name: '01 Future Heroes [215 INK] (2015) #86.cbz',
+      series: 'Future Heroes',
+      metadata: { Number: '86', Series: 'Future Heroes' }
+    };
+    state.applyDisplayInfoToComic = jest.fn((comic) => ({
+      displayTitle: `${comic.metadata.Series} #${comic.metadata.Number}`
+    }));
+
+    sandbox.syncFullscreenTitle();
+    expect(state.applyDisplayInfoToComic).toHaveBeenCalledWith(state.currentComic);
+    expect(titleEl.textContent).toBe('Future Heroes #86');
   });
 
   test('zoom overlay has higher z-index in style.css than fullscreen title and close button', () => {
