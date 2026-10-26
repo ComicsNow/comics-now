@@ -2,7 +2,13 @@ node_modules
 .git
 config.json
 .env
+**/.env
 .env.*
+mcp/.venv
+.agent-handoff.md
+.jules
+.Jules
+benchmark_search.js
 *.db
 *.db-*
 *.db.bak*

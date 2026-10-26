@@ -1318,39 +1318,9 @@ def main() -> None:
             allow_headers=["*"],
         )
 
-        OIDC_ISSUER = "https://yourteam.cloudflareaccess.com/cdn-cgi/access/sso/oidc/0000000000000000000000000000000000000000000000000000000000000000"
-
-        OAUTH_PROTECTED_RESOURCE = json.dumps({
-            "resource": "http://localhost:3018/comics-mcp",
-            "authorization_servers": ["http://localhost:3018/comics-mcp"],
-            "scopes_supported": ["openid", "email", "profile"],
-        }).encode("utf-8")
-
-        OAUTH_AUTH_SERVER = json.dumps({
-            "issuer": OIDC_ISSUER,
-            "authorization_endpoint": f"{OIDC_ISSUER}/authorization",
-            "token_endpoint": f"{OIDC_ISSUER}/token",
-            "jwks_uri": f"{OIDC_ISSUER}/jwks",
-            "userinfo_endpoint": f"{OIDC_ISSUER}/userinfo",
-            "scopes_supported": ["openid", "email", "profile"],
-            "response_types_supported": ["code"],
-            "grant_types_supported": ["authorization_code"],
-            "token_endpoint_auth_methods": ["client_secret_basic", "client_secret_post"],
-        }).encode("utf-8")
-
         async def app(scope, receive, send):
             if scope["type"] == "http":
                 path = scope.get("path", "")
-                if "/.well-known/oauth-protected-resource" in path:
-                    from starlette.responses import Response
-                    res = Response(OAUTH_PROTECTED_RESOURCE, media_type="application/json", headers={"Access-Control-Allow-Origin": "*"})
-                    await res(scope, receive, send)
-                    return
-                if "/.well-known/oauth-authorization-server" in path or "/.well-known/openid-configuration" in path:
-                    from starlette.responses import Response
-                    res = Response(OAUTH_AUTH_SERVER, media_type="application/json", headers={"Access-Control-Allow-Origin": "*"})
-                    await res(scope, receive, send)
-                    return
                 if path == "/comics-mcp":
                     scope["path"] = "/comics-mcp/"
                 if path == "/sse":

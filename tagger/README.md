@@ -252,7 +252,7 @@ Open [http://localhost:5000](http://localhost:5000) in your web browser to acces
 
 When used as part of Comics Now:
 - The Node.js server automatically manages and spawns `app.py` via `server/services/tagger-process.js`.
-- All tagger requests from Comics Now UI routes (`/comics/api/tag-comics-now/*`) proxy directly to the internal Python daemon on port 5000.
+- All tagger requests from Comics Now UI routes (`/api/tag-comics-now/*`) proxy directly to the internal Python daemon on port 5000.
 - When Comics Now is managed via systemd (`comics-now.service`), restarting the main service automatically handles the tagger worker process.
 
 ---

@@ -29,10 +29,22 @@ metadata/
 .deploy-backups/
 temp/
 
-# Environment files
+# Environment & local config files
+config.json
 .env
+**/.env
 .env.*
 !.env.example
+mcp/.venv/
+.agent-handoff.md
+.jules/
+.Jules/
+GEMINI.md
+CLAUDE.md
+AGENTS.md
+backups/
+page-cache/
+benchmark_search.js
 
 # Lock files
 pnpm-lock.yaml
