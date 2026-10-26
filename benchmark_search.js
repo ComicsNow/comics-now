@@ -27,16 +27,16 @@ async function runBenchmark(usePromiseAll) {
   if (!usePromiseAll) {
     const results = [];
     for (const r of rows) {
-      const hasAccess = await checkComicAccess(
+      const hasAccess = await checkComicAccess({
         userId,
         userRole,
-        r.path,
-        r.publisher,
-        r.series,
-        directories,
-        r.id,
-        accessList
-      );
+        comicPath: r.path,
+        publisher: r.publisher,
+        series: r.series,
+        rootFolders: directories,
+        comicId: r.id,
+        preFetchedAccessList: accessList
+      });
       if (hasAccess) {
         results.push(r);
       }
@@ -45,16 +45,16 @@ async function runBenchmark(usePromiseAll) {
   } else {
     // Optimization technique 1: Promise.all map
     const checks = rows.map(async (r) => {
-      const hasAccess = await checkComicAccess(
+      const hasAccess = await checkComicAccess({
         userId,
         userRole,
-        r.path,
-        r.publisher,
-        r.series,
-        directories,
-        r.id,
-        accessList
-      );
+        comicPath: r.path,
+        publisher: r.publisher,
+        series: r.series,
+        rootFolders: directories,
+        comicId: r.id,
+        preFetchedAccessList: accessList
+      });
       return hasAccess ? r : null;
     });
     const results = (await Promise.all(checks)).filter(r => r !== null);
