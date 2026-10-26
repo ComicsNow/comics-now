@@ -29,7 +29,188 @@ function installTaggerHook(ctx) {
   const originalFetch = globalThis.fetch;
   const logger = ctx.log || (() => {});
 
-  function getConfig() {
+
+
+  if (ctx.db) {
+    try {
+      startMidnightPacificScheduler({ db: ctx.db, log: logger });
+    } catch (_) {}
+  }
+
+
+
+
+
+
+
+
+
+
+  // Override global fetch
+  globalThis.fetch = async function hookFetch(input, init) {
+    const urlStr = typeof input === 'string' ? input : (input?.url || input?.toString() || '');
+
+    const isStream = urlStr.includes('/api/tag-file-stream');
+    const isTagFile = !isStream && urlStr.includes('/api/tag-file');
+
+    if (!isStream && !isTagFile) {
+      return originalFetch(input, init);
+    }
+
+    let reqBody = {};
+    try {
+      reqBody = typeof init?.body === 'string' ? JSON.parse(init.body) : (init?.body || {});
+    } catch (_) {
+      return originalFetch(input, init);
+    }
+
+    const config = getConfig(ctx);
+
+    if (!config.termsAccepted && ctx.db && typeof ctx.db.dbGet === 'function') {
+      try {
+        const row = await ctx.db.dbGet("SELECT value FROM settings WHERE key = 'geminiTermsAccepted'");
+        if (row && (row.value === 'true' || row.value === '"true"' || row.value === true)) {
+          config.termsAccepted = true;
+          if (ctx.config) ctx.config.geminiTermsAccepted = true;
+        }
+      } catch (_) {}
+    }
+
+    if (!config.apiKey && ctx.db && typeof ctx.db.dbGet === 'function') {
+      try {
+        const keyRow = await ctx.db.dbGet("SELECT value FROM settings WHERE key = 'geminiApiKey'");
+        if (keyRow?.value) {
+          try { config.apiKey = JSON.parse(keyRow.value); } catch { config.apiKey = keyRow.value; }
+          if (ctx.config) ctx.config.geminiApiKey = config.apiKey;
+        }
+      } catch (_) {}
+    }
+
+    // If Gemini is disabled, has no API key, or terms have not been accepted, pass through completely unaltered
+    if (!config.enabled || !config.apiKey || !config.termsAccepted) {
+      return originalFetch(input, init);
+    }
+
+    // Check quota
+    const quota = await checkAndIncrementQuota(ctx, config.dailyCap);
+    if (!quota.allowed) {
+      logger('WARN', 'TAGGER_HOOK', `Daily Gemini quota reached (${quota.count}/${config.dailyCap}). Using standard tagger cover matching (pHash).`);
+      return originalFetch(input, init);
+    }
+
+    // Adjust request to Python so it gathers candidates without auto-writing with pHash
+    const pythonReqBody = {
+      ...reqBody,
+      upper_threshold: 1.01, // Prevent premature pHash auto-tagging
+      lower_threshold: 0.30  // Allow all viable title matches through for Gemini visual evaluation
+    };
+
+    const newInit = {
+      ...init,
+      body: JSON.stringify(pythonReqBody)
+    };
+
+    if (isStream) {
+      const originalRes = await originalFetch(input, newInit);
+      if (!originalRes.ok || !originalRes.body) {
+        return originalRes;
+      }
+
+      const textEncoder = new TextEncoder();
+      const textDecoder = new TextDecoder();
+      const reader = originalRes.body.getReader();
+      let buffer = '';
+      let finalResultData = null;
+
+      const customStream = new ReadableStream({
+        async start(controller) {
+          try {
+            while (true) {
+              const { done, value } = await reader.read();
+              if (done) break;
+              buffer += textDecoder.decode(value, { stream: true });
+              const lines = buffer.split('\n');
+              buffer = lines.pop();
+
+              for (const line of lines) {
+                const trimmed = line.trim();
+                if (!trimmed || trimmed.startsWith(':')) {
+                  controller.enqueue(textEncoder.encode(line + '\n'));
+                  continue;
+                }
+                if (trimmed.startsWith('data: ')) {
+                  try {
+                    const data = JSON.parse(trimmed.slice(6));
+                    if (data.type === 'progress') {
+                      controller.enqueue(textEncoder.encode(line + '\n'));
+                    } else if (data.type === 'result') {
+                      finalResultData = data.data;
+                    } else {
+                      controller.enqueue(textEncoder.encode(line + '\n'));
+                    }
+                  } catch (_) {
+                    controller.enqueue(textEncoder.encode(line + '\n'));
+                  }
+                } else {
+                  controller.enqueue(textEncoder.encode(line + '\n'));
+                }
+              }
+            }
+
+            // Python search complete. If candidates exist, evaluate with Gemini Vision!
+            if (finalResultData && Array.isArray(finalResultData.candidates) && finalResultData.candidates.length > 0) {
+              controller.enqueue(textEncoder.encode(`data: ${JSON.stringify({
+                type: 'progress',
+                source: 'Gemini Vision',
+                message: `Comparing cover art with Gemini Vision against ${finalResultData.candidates.length} candidate(s)...`
+              })}\n\n`));
+
+              finalResultData = await evaluateWithGemini(ctx, originalFetch, logger, finalResultData, reqBody, config, controller, textEncoder);
+            }
+
+            if (finalResultData) {
+              controller.enqueue(textEncoder.encode(`data: ${JSON.stringify({
+                type: 'result',
+                data: finalResultData
+              })}\n\n`));
+            }
+
+            controller.close();
+          } catch (streamErr) {
+            controller.error(streamErr);
+          }
+        }
+      });
+
+      return new Response(customStream, {
+        status: originalRes.status,
+        statusText: originalRes.statusText,
+        headers: originalRes.headers
+      });
+    } else {
+      // Non-streaming /api/tag-file fallback
+      const originalRes = await originalFetch(input, newInit);
+      if (!originalRes.ok) {
+        return originalRes;
+      }
+
+      let resData = await originalRes.json();
+      if (resData && Array.isArray(resData.candidates) && resData.candidates.length > 0) {
+        resData = await evaluateWithGemini(ctx, originalFetch, logger, resData, reqBody, config, null, null);
+      }
+
+      return new Response(JSON.stringify(resData), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+  };
+
+  logger('INFO', 'EXT_COVER', '✓ Gemini Vision transparent cover matcher hooked into Tag Comics Now! scan.');
+}
+
+
+function getConfig(ctx) {
     let fileConfig = {};
     try {
       const defaultConfigFile = (() => {
@@ -64,18 +245,11 @@ function installTaggerHook(ctx) {
     return { enabled, apiKey, model, dailyCap, taggerServiceUrl, termsAccepted };
   }
 
-  if (ctx.db) {
-    try {
-      startMidnightPacificScheduler({ db: ctx.db, log: logger });
-    } catch (_) {}
-  }
-
-  async function checkAndIncrementQuota(dailyCap) {
+async function checkAndIncrementQuota(ctx, dailyCap) {
     return incrementDailyUsage(ctx.db, dailyCap);
   }
 
-
-  async function resolveLocalCover(filePath) {
+async function resolveLocalCover(ctx, filePath, logger) {
     try {
       // 1. Check existing thumbnail from SQLite
       if (ctx.db && typeof ctx.db.dbGet === 'function') {
@@ -113,7 +287,7 @@ function installTaggerHook(ctx) {
     return null;
   }
 
-  async function recordDecision(filePath, decision, winnerTitle) {
+async function recordDecision(ctx, filePath, decision, winnerTitle) {
     if (!ctx.db || typeof ctx.db.dbRun !== 'function') return;
     try {
       const comicRow = await ctx.db.dbGet("SELECT id FROM comics WHERE path = ?", [filePath]);
@@ -131,13 +305,13 @@ function installTaggerHook(ctx) {
     } catch (_) {}
   }
 
-  async function evaluateWithGemini(res, reqBody, config, controller, textEncoder) {
+async function evaluateWithGemini(ctx, originalFetch, logger, res, reqBody, config, controller, textEncoder) {
     const filePath = reqBody.path;
     const candidates = res.candidates || [];
     const upperThreshold = typeof reqBody.upper_threshold === 'number' ? reqBody.upper_threshold : 0.85;
     const lowerThreshold = typeof reqBody.lower_threshold === 'number' ? reqBody.lower_threshold : 0.80;
 
-    const localCoverPath = await resolveLocalCover(filePath);
+    const localCoverPath = await resolveLocalCover(ctx, filePath, logger);
     if (!localCoverPath) {
       if (controller && textEncoder) {
         controller.enqueue(textEncoder.encode(`data: ${JSON.stringify({
@@ -172,14 +346,14 @@ function installTaggerHook(ctx) {
     const winner = (bestIndex >= 0 && bestIndex < candidates.length) ? candidates[bestIndex] : null;
     const winnerTitle = winner ? (winner.metadata?.title || winner.title || 'Unknown Title') : null;
 
-    recordDecision(filePath, decision, winnerTitle);
+    recordDecision(ctx, filePath, decision, winnerTitle);
 
     if (winner) {
       const pct = Math.round(confidence * 100);
 
       // Request 2: Metadata Synthesis & Normalization (only for confirmed matches >= lowerThreshold)
       let finalMetadata = winner.metadata || {};
-      const metaQuota = await checkAndIncrementQuota(config.dailyCap);
+      const metaQuota = await checkAndIncrementQuota(ctx, config.dailyCap);
       if (metaQuota.allowed) {
         if (controller && textEncoder) {
           controller.enqueue(textEncoder.encode(`data: ${JSON.stringify({
@@ -318,167 +492,5 @@ function installTaggerHook(ctx) {
     return res;
   }
 
-  // Override global fetch
-  globalThis.fetch = async function hookFetch(input, init) {
-    const urlStr = typeof input === 'string' ? input : (input?.url || input?.toString() || '');
-
-    const isStream = urlStr.includes('/api/tag-file-stream');
-    const isTagFile = !isStream && urlStr.includes('/api/tag-file');
-
-    if (!isStream && !isTagFile) {
-      return originalFetch(input, init);
-    }
-
-    let reqBody = {};
-    try {
-      reqBody = typeof init?.body === 'string' ? JSON.parse(init.body) : (init?.body || {});
-    } catch (_) {
-      return originalFetch(input, init);
-    }
-
-    const config = getConfig();
-
-    if (!config.termsAccepted && ctx.db && typeof ctx.db.dbGet === 'function') {
-      try {
-        const row = await ctx.db.dbGet("SELECT value FROM settings WHERE key = 'geminiTermsAccepted'");
-        if (row && (row.value === 'true' || row.value === '"true"' || row.value === true)) {
-          config.termsAccepted = true;
-          if (ctx.config) ctx.config.geminiTermsAccepted = true;
-        }
-      } catch (_) {}
-    }
-
-    if (!config.apiKey && ctx.db && typeof ctx.db.dbGet === 'function') {
-      try {
-        const keyRow = await ctx.db.dbGet("SELECT value FROM settings WHERE key = 'geminiApiKey'");
-        if (keyRow?.value) {
-          try { config.apiKey = JSON.parse(keyRow.value); } catch { config.apiKey = keyRow.value; }
-          if (ctx.config) ctx.config.geminiApiKey = config.apiKey;
-        }
-      } catch (_) {}
-    }
-
-    // If Gemini is disabled, has no API key, or terms have not been accepted, pass through completely unaltered
-    if (!config.enabled || !config.apiKey || !config.termsAccepted) {
-      return originalFetch(input, init);
-    }
-
-    // Check quota
-    const quota = await checkAndIncrementQuota(config.dailyCap);
-    if (!quota.allowed) {
-      logger('WARN', 'TAGGER_HOOK', `Daily Gemini quota reached (${quota.count}/${config.dailyCap}). Using standard tagger cover matching (pHash).`);
-      return originalFetch(input, init);
-    }
-
-    // Adjust request to Python so it gathers candidates without auto-writing with pHash
-    const pythonReqBody = {
-      ...reqBody,
-      upper_threshold: 1.01, // Prevent premature pHash auto-tagging
-      lower_threshold: 0.30  // Allow all viable title matches through for Gemini visual evaluation
-    };
-
-    const newInit = {
-      ...init,
-      body: JSON.stringify(pythonReqBody)
-    };
-
-    if (isStream) {
-      const originalRes = await originalFetch(input, newInit);
-      if (!originalRes.ok || !originalRes.body) {
-        return originalRes;
-      }
-
-      const textEncoder = new TextEncoder();
-      const textDecoder = new TextDecoder();
-      const reader = originalRes.body.getReader();
-      let buffer = '';
-      let finalResultData = null;
-
-      const customStream = new ReadableStream({
-        async start(controller) {
-          try {
-            while (true) {
-              const { done, value } = await reader.read();
-              if (done) break;
-              buffer += textDecoder.decode(value, { stream: true });
-              const lines = buffer.split('\n');
-              buffer = lines.pop();
-
-              for (const line of lines) {
-                const trimmed = line.trim();
-                if (!trimmed || trimmed.startsWith(':')) {
-                  controller.enqueue(textEncoder.encode(line + '\n'));
-                  continue;
-                }
-                if (trimmed.startsWith('data: ')) {
-                  try {
-                    const data = JSON.parse(trimmed.slice(6));
-                    if (data.type === 'progress') {
-                      controller.enqueue(textEncoder.encode(line + '\n'));
-                    } else if (data.type === 'result') {
-                      finalResultData = data.data;
-                    } else {
-                      controller.enqueue(textEncoder.encode(line + '\n'));
-                    }
-                  } catch (_) {
-                    controller.enqueue(textEncoder.encode(line + '\n'));
-                  }
-                } else {
-                  controller.enqueue(textEncoder.encode(line + '\n'));
-                }
-              }
-            }
-
-            // Python search complete. If candidates exist, evaluate with Gemini Vision!
-            if (finalResultData && Array.isArray(finalResultData.candidates) && finalResultData.candidates.length > 0) {
-              controller.enqueue(textEncoder.encode(`data: ${JSON.stringify({
-                type: 'progress',
-                source: 'Gemini Vision',
-                message: `Comparing cover art with Gemini Vision against ${finalResultData.candidates.length} candidate(s)...`
-              })}\n\n`));
-
-              finalResultData = await evaluateWithGemini(finalResultData, reqBody, config, controller, textEncoder);
-            }
-
-            if (finalResultData) {
-              controller.enqueue(textEncoder.encode(`data: ${JSON.stringify({
-                type: 'result',
-                data: finalResultData
-              })}\n\n`));
-            }
-
-            controller.close();
-          } catch (streamErr) {
-            controller.error(streamErr);
-          }
-        }
-      });
-
-      return new Response(customStream, {
-        status: originalRes.status,
-        statusText: originalRes.statusText,
-        headers: originalRes.headers
-      });
-    } else {
-      // Non-streaming /api/tag-file fallback
-      const originalRes = await originalFetch(input, newInit);
-      if (!originalRes.ok) {
-        return originalRes;
-      }
-
-      let resData = await originalRes.json();
-      if (resData && Array.isArray(resData.candidates) && resData.candidates.length > 0) {
-        resData = await evaluateWithGemini(resData, reqBody, config, null, null);
-      }
-
-      return new Response(JSON.stringify(resData), {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' }
-      });
-    }
-  };
-
-  logger('INFO', 'EXT_COVER', '✓ Gemini Vision transparent cover matcher hooked into Tag Comics Now! scan.');
-}
 
 module.exports = { installTaggerHook, installGeminiTagger: installTaggerHook };
