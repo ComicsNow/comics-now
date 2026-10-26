@@ -271,7 +271,7 @@ async function runComicTagger(options = {}) {
     let skippedCount = 0;
     let failedCount = 0;
     const itemDurations = [];
-    const batchedDbUpdates = [];
+    const failedDbUpdates = [];
 
     const metadataStorage = getMetadataStorage();
     const lowerThreshold = getTaggerLowerThreshold();
@@ -363,7 +363,17 @@ async function runComicTagger(options = {}) {
           }
           const dbMeta = buildTaggedDbMeta(info, { title, series: ser, number: num, volume: vol, publisher: pub });
 
-          batchedDbUpdates.push([id, filePath, entry.name, pub, ser, 'metadata', 'successful', stats.mtimeMs, JSON.stringify(dbMeta)]);
+          await db.dbRun(
+            `INSERT INTO comics (id, path, name, publisher, series, libraryMode, tagStatus, updatedAt, metadata)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+             ON CONFLICT(id) DO UPDATE SET
+               tagStatus = excluded.tagStatus,
+               publisher = excluded.publisher,
+               series = excluded.series,
+               updatedAt = excluded.updatedAt,
+               metadata = COALESCE(excluded.metadata, comics.metadata)`,
+            [id, filePath, entry.name, pub, ser, 'metadata', 'successful', stats.mtimeMs, JSON.stringify(dbMeta)]
+          );
 
           skippedCount++;
           itemDurations.push(Date.now() - itemStart);
@@ -436,7 +446,7 @@ async function runComicTagger(options = {}) {
         }
         ctLog(`✗ Error calling tagger engine for ${entry.name}: ${err.message}`);
         failedCount++;
-        batchedDbUpdates.push([id, filePath, entry.name, existing?.publisher || 'Unknown Publisher', existing?.series || 'Unknown Series', 'metadata', 'failed', null, null]);
+        failedDbUpdates.push([id, filePath, entry.name, existing?.publisher || 'Unknown Publisher', existing?.series || 'Unknown Series', 'metadata', 'failed', null]);
         itemDurations.push(Date.now() - itemStart);
         continue;
       }
@@ -480,7 +490,17 @@ async function runComicTagger(options = {}) {
             dbMetaStr = JSON.stringify(dbMeta);
           } catch (e) {}
 
-          batchedDbUpdates.push([id, filePath, entry.name, pub, ser, 'metadata', tagStatus, newStats.mtimeMs, dbMetaStr]);
+          await db.dbRun(
+            `INSERT INTO comics (id, path, name, publisher, series, libraryMode, tagStatus, updatedAt, metadata)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+             ON CONFLICT(id) DO UPDATE SET
+               tagStatus = excluded.tagStatus,
+               publisher = excluded.publisher,
+               series = excluded.series,
+               updatedAt = excluded.updatedAt,
+               metadata = COALESCE(excluded.metadata, comics.metadata)`,
+            [id, filePath, entry.name, pub, ser, 'metadata', tagStatus, newStats.mtimeMs, dbMetaStr]
+          );
           if (isSuccessful) {
             taggedCount++;
             ctLog(`✓ SUCCESS → Auto-tagged: ${res.matched_title || entry.name} (${res.confidence || 100}% confidence)`);
@@ -601,7 +621,14 @@ async function runComicTagger(options = {}) {
           const isSuccessful = await checkFileSuccess(filePath);
           const tagStatus = isSuccessful ? 'successful' : 'failed';
           
-          batchedDbUpdates.push([id, filePath, entry.name, existing?.publisher || 'Unknown Publisher', existing?.series || 'Unknown Series', 'metadata', tagStatus, currentStats.mtimeMs, null]);
+          await db.dbRun(
+            `INSERT INTO comics (id, path, name, publisher, series, libraryMode, tagStatus, updatedAt)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+             ON CONFLICT(id) DO UPDATE SET
+               tagStatus = excluded.tagStatus,
+               updatedAt = excluded.updatedAt`,
+            [id, filePath, entry.name, existing?.publisher || 'Unknown Publisher', existing?.series || 'Unknown Series', 'metadata', tagStatus, currentStats.mtimeMs]
+          );
         } catch (err) {}
         ctLog(`➜ SKIPPED: ${res.reason || 'No match above threshold'} (${entry.name})`);
       }
@@ -609,26 +636,23 @@ async function runComicTagger(options = {}) {
       ctLog('');
     }
 
-    if (batchedDbUpdates.length > 0) {
+    if (failedDbUpdates.length > 0) {
       try {
         const stmt = db.db.prepare(
-          `INSERT INTO comics (id, path, name, publisher, series, libraryMode, tagStatus, updatedAt, metadata)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+          `INSERT INTO comics (id, path, name, publisher, series, libraryMode, tagStatus, updatedAt)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)
            ON CONFLICT(id) DO UPDATE SET
              tagStatus = excluded.tagStatus,
-             publisher = excluded.publisher,
-             series = excluded.series,
-             updatedAt = excluded.updatedAt,
-             metadata = COALESCE(excluded.metadata, comics.metadata)`
+             updatedAt = excluded.updatedAt`
         );
         const insertMany = db.db.transaction((updates) => {
           for (const update of updates) {
-            stmt.run(update[0], update[1], update[2], update[3], update[4], update[5], update[6], update[7], update[8] || null);
+            stmt.run(update[0], update[1], update[2], update[3], update[4], update[5], update[6], update[7]);
           }
         });
-        insertMany(batchedDbUpdates);
+        insertMany(failedDbUpdates);
       } catch (dbErr) {
-        ctLog(`✗ Failed to batch update records: ${dbErr.message}`);
+        ctLog(`✗ Failed to batch update failed records: ${dbErr.message}`);
       }
     }
 

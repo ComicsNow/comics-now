@@ -8,7 +8,6 @@ describe('runComicTagger - Skip & Tagging Logic', () => {
   const originalFetch = global.fetch;
   let dbGetSpy;
   let dbRunSpy;
-  let dbStmtSpy;
   let metaSpy;
 
   beforeEach(() => {
@@ -27,11 +26,6 @@ describe('runComicTagger - Skip & Tagging Logic', () => {
     });
     dbGetSpy = jest.spyOn(db, 'dbGet').mockResolvedValue(null);
     dbRunSpy = jest.spyOn(db, 'dbRun').mockResolvedValue();
-    dbStmtSpy = jest.fn();
-    db.db = {
-      prepare: jest.fn().mockReturnValue({ run: dbStmtSpy }),
-      transaction: jest.fn().mockImplementation((fn) => (items) => fn(items))
-    };
     metaSpy = jest.spyOn(metadataService, 'getComicInfoFromArchive').mockResolvedValue({});
   });
 
@@ -113,7 +107,10 @@ describe('runComicTagger - Skip & Tagging Logic', () => {
 
     // /api/tag-file SHOULD be called because file was modified
     expect(global.fetch).toHaveBeenCalledWith('http://127.0.0.1:5000/api/tag-file', expect.any(Object));
-    expect(dbStmtSpy).toHaveBeenCalledWith(expect.anything(), expect.anything(), expect.anything(), expect.anything(), expect.anything(), expect.anything(), 'successful', expect.anything(), expect.anything());
+    expect(dbRunSpy).toHaveBeenCalledWith(
+      expect.stringContaining('INSERT INTO comics'),
+      expect.arrayContaining(['successful'])
+    );
   });
 
   test('skips calling external APIs if archive file on disk already contains complete metadata', async () => {
@@ -141,7 +138,10 @@ describe('runComicTagger - Skip & Tagging Logic', () => {
       expect.stringContaining('/api/tag-file'),
       expect.any(Object)
     );
-    expect(dbStmtSpy).toHaveBeenCalledWith(expect.anything(), expect.anything(), expect.anything(), 'DC Comics', 'Superman', expect.anything(), 'successful', expect.anything(), expect.anything());
+    expect(dbRunSpy).toHaveBeenCalledWith(
+      expect.stringContaining('INSERT INTO comics'),
+      expect.arrayContaining(['Superman', 'DC Comics', 'successful'])
+    );
     const logs = getCtLogs().map(l => l.message);
     expect(logs.some(m => m.includes('Already contains complete metadata'))).toBe(true);
   });
@@ -604,6 +604,9 @@ describe('runComicTagger - Skip & Tagging Logic', () => {
       expect.stringContaining('/api/tag-file'),
       expect.any(Object)
     );
-    expect(dbStmtSpy).toHaveBeenCalledWith(expect.anything(), expect.anything(), expect.anything(), expect.anything(), expect.anything(), expect.anything(), 'successful', expect.anything(), expect.anything());
+    expect(dbRunSpy).toHaveBeenCalledWith(
+      expect.stringContaining('INSERT INTO comics'),
+      expect.arrayContaining(['successful'])
+    );
   });
 });
