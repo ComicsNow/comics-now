@@ -111,6 +111,36 @@ describe('Compliance & Config Endpoints', () => {
     );
   });
 
+  test('POST /api/v1/gemini/config preserves existing config properties when writing config.json', async () => {
+    const initialConfig = {
+      baseUrl: 'http://localhost:3000',
+      authentication: { teamDomain: 'test.cloudflareaccess.com' },
+      geminiApiKey: '',
+      geminiTermsAccepted: false
+    };
+    fs.writeFileSync(testConfigPath, JSON.stringify(initialConfig), 'utf8');
+
+    const handler = getRouteHandler('POST', '/api/v1/gemini/config');
+    const req = {
+      body: {
+        geminiApiKey: 'AIzaSyTestKeyPreserve',
+        geminiTermsAccepted: true
+      }
+    };
+    const res = {
+      status: jest.fn().mockReturnThis(),
+      json: jest.fn()
+    };
+
+    await handler(req, res);
+
+    const savedConfig = JSON.parse(fs.readFileSync(testConfigPath, 'utf8'));
+    expect(savedConfig.baseUrl).toBe('http://localhost:3000');
+    expect(savedConfig.authentication).toEqual({ teamDomain: 'test.cloudflareaccess.com' });
+    expect(savedConfig.geminiApiKey).toBe('AIzaSyTestKeyPreserve');
+    expect(savedConfig.geminiTermsAccepted).toBe(true);
+  });
+
   test('GET /api/v1/gemini/config retrieves hasApiKey: true when stored in database', async () => {
     mockDbGet.mockImplementation(async (query) => {
       if (query.includes('geminiApiKey')) {
