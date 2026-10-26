@@ -260,7 +260,7 @@ module.exports = function attach(router, deps) {
         }
         const results = [];
         for (const target of targets) {
-          const resGlob = await deleteReadingListGlobally(target, { dbRun, dbGet, dbAll, log });
+          const resGlob = await deleteReadingListGlobally({ identifier: target, dbRun, dbGet, dbAll, log });
           results.push({ target, ...resGlob });
         }
         return res.json({ ok: true, globally: true, results });
@@ -1030,7 +1030,7 @@ module.exports = function attach(router, deps) {
   // Sync default reading lists to the current user's account
   router.post('/api/v1/reading-lists/sync-defaults', requireAuth, async (req, res) => {
     try {
-      const result = await syncDefaultReadingLists(req.user.userId, { dbRun, dbGet, dbAll, log });
+      const result = await syncDefaultReadingLists({ targetUserId: req.user.userId, dbRun, dbGet, dbAll, log });
       res.json({ ok: true, ...result });
     } catch (error) {
       res.status(500).json({
@@ -1046,7 +1046,7 @@ module.exports = function attach(router, deps) {
         return res.status(403).json({ message: 'Forbidden: Admin access required' });
       }
       const { overwrite = false, prune = false } = req.body || {};
-      const result = await syncDefaultReadingListsToAllUsers({ dbRun, dbGet, dbAll, log }, { overwrite, prune });
+      const result = await syncDefaultReadingListsToAllUsers({ dbRun, dbGet, dbAll, log, overwrite, prune });
       res.json({ ok: true, ...result });
     } catch (error) {
       res.status(500).json({
@@ -1066,7 +1066,7 @@ module.exports = function attach(router, deps) {
       if (!identifier) {
         return res.status(400).json({ message: 'List name or listId is required' });
       }
-      const result = await deleteReadingListGlobally(identifier, { dbRun, dbGet, dbAll, log });
+      const result = await deleteReadingListGlobally({ identifier, dbRun, dbGet, dbAll, log });
       res.json({ ok: true, ...result });
     } catch (error) {
       res.status(500).json({
