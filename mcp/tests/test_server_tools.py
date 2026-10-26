@@ -277,6 +277,40 @@ class TestMcpTools(unittest.TestCase):
         self.assertEqual(res["data"]["dailyUsed"], 9)
         self.assertEqual(mock_req.call_count, 3)
 
+    @patch("uvicorn.run")
+    @patch.dict("os.environ", {"MCP_TRANSPORT": "sse", "MCP_PORT": "3018"})
+    def test_http_app_has_no_hardcoded_oauth_discovery(self, mock_uvicorn_run):
+        import asyncio
+
+        server.main()
+        self.assertTrue(mock_uvicorn_run.called)
+        asgi_app = mock_uvicorn_run.call_args[0][0]
+
+        messages = []
+
+        async def receive():
+            return {"type": "http.request", "body": b"", "more_body": False}
+
+        async def send(msg):
+            messages.append(msg)
+
+        scope = {
+            "type": "http",
+            "asgi": {"version": "3.0"},
+            "http_version": "1.1",
+            "method": "GET",
+            "scheme": "http",
+            "path": "/.well-known/oauth-protected-resource",
+            "raw_path": b"/.well-known/oauth-protected-resource",
+            "query_string": b"",
+            "headers": [],
+        }
+
+        asyncio.run(asgi_app(scope, receive, send))
+        body = b"".join(m.get("body", b"") for m in messages if m.get("type") == "http.response.body")
+        self.assertNotIn(b"authorization_servers", body)
+        self.assertNotIn(b"authorization_endpoint", body)
+
 
 if __name__ == "__main__":
     unittest.main()
