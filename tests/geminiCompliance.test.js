@@ -111,6 +111,35 @@ describe('Compliance & Config Endpoints', () => {
     );
   });
 
+  test('POST /api/v1/gemini/config validates geminiCoverDailyCap bounds and types', async () => {
+    const handler = getRouteHandler('POST', '/api/v1/gemini/config');
+
+    // Test invalid non-numeric string
+    let res = { status: jest.fn().mockReturnThis(), json: jest.fn() };
+    await handler({ body: { geminiTermsAccepted: true, geminiCoverDailyCap: 'invalid' } }, res);
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ error: expect.stringContaining('geminiCoverDailyCap') }));
+
+    // Test invalid negative cap
+    res = { status: jest.fn().mockReturnThis(), json: jest.fn() };
+    await handler({ body: { geminiTermsAccepted: true, geminiCoverDailyCap: -50 } }, res);
+    expect(res.status).toHaveBeenCalledWith(400);
+
+    // Test invalid 0 cap
+    res = { status: jest.fn().mockReturnThis(), json: jest.fn() };
+    await handler({ body: { geminiTermsAccepted: true, geminiCoverDailyCap: 0 } }, res);
+    expect(res.status).toHaveBeenCalledWith(400);
+
+    // Test valid integer cap
+    res = { status: jest.fn().mockReturnThis(), json: jest.fn() };
+    await handler({ body: { geminiTermsAccepted: true, geminiCoverDailyCap: 500 } }, res);
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ ok: true }));
+    expect(mockDbRun).toHaveBeenCalledWith(
+      expect.stringContaining('geminiCoverDailyCap'),
+      expect.any(Array)
+    );
+  });
+
   test('GET /api/v1/gemini/config retrieves hasApiKey: true when stored in database', async () => {
     mockDbGet.mockImplementation(async (query) => {
       if (query.includes('geminiApiKey')) {
