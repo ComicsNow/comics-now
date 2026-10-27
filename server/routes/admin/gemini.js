@@ -99,7 +99,10 @@ module.exports = function attach(router, deps) {
         configGetterKey = getGeminiApiKey();
       } catch (_) {}
 
-      const apiKey = (process.env.NODE_ENV === 'test' ? '' : process.env.GEMINI_API_KEY) || dbApiKey || cfg.geminiApiKey || config.geminiApiKey || configGetterKey || '';
+      const cryptoVault = require('../../utils/crypto-vault');
+      const plainDbApiKey = cryptoVault.decrypt(dbApiKey);
+      const plainCfgApiKey = cryptoVault.decrypt(cfg.geminiApiKey);
+      const apiKey = (process.env.NODE_ENV === 'test' ? '' : process.env.GEMINI_API_KEY) || plainDbApiKey || plainCfgApiKey || config.geminiApiKey || configGetterKey || '';
 
       const { getOrResetDailyUsage } = require('../../services/gemini-quota');
       const quotaCount = await getOrResetDailyUsage({ dbGet, dbRun });
@@ -112,6 +115,7 @@ module.exports = function attach(router, deps) {
       res.json({
         enabled: isEnabled,
         hasApiKey: !!apiKey,
+        apiKeyPreview: cryptoVault.mask(apiKey),
         termsAccepted: termsAccepted,
         model: activeModel,
         dailyCap: dailyCapVal,
@@ -238,15 +242,19 @@ module.exports = function attach(router, deps) {
       }
 
       if (geminiApiKey !== undefined) {
+        const cryptoVault = require('../../utils/crypto-vault');
         const key = String(geminiApiKey).trim();
-        cfg.geminiApiKey = key;
-        config.geminiApiKey = key;
-        try {
-          const { setGeminiApiKey } = require('../../config');
-          setGeminiApiKey(key, true);
-        } catch (_) {}
-        if (typeof dbRun === 'function') {
-          await dbRun("INSERT INTO settings (key, value) VALUES ('geminiApiKey', ?) ON CONFLICT(key) DO UPDATE SET value = ?", [JSON.stringify(key), JSON.stringify(key)]);
+        if (!cryptoVault.isMasked(key)) {
+          const encKey = cryptoVault.encrypt(key);
+          cfg.geminiApiKey = encKey;
+          config.geminiApiKey = encKey;
+          try {
+            const { setGeminiApiKey } = require('../../config');
+            setGeminiApiKey(encKey, true);
+          } catch (_) {}
+          if (typeof dbRun === 'function') {
+            await dbRun("INSERT INTO settings (key, value) VALUES ('geminiApiKey', ?) ON CONFLICT(key) DO UPDATE SET value = ?", [JSON.stringify(encKey), JSON.stringify(encKey)]);
+          }
         }
       }
       if (geminiModel !== undefined) {

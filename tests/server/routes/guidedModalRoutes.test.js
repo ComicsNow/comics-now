@@ -105,7 +105,7 @@ describe('Admin Guided View Routes - Modal Settings and Credit Endpoints', () =>
 
     expect(deps.saveSetting).toHaveBeenCalledWith('guided.useModal', true);
     expect(deps.saveSetting).toHaveBeenCalledWith('guided.modalTokenId', 'ak-test-token');
-    expect(deps.saveSetting).toHaveBeenCalledWith('guided.modalTokenSecret', 'as-test-secret');
+    expect(deps.saveSetting).toHaveBeenCalledWith('guided.modalTokenSecret', expect.stringMatching(/^enc:v1:/));
     expect(deps.saveSetting).toHaveBeenCalledWith('guided.modalEnvironment', 'production');
     expect(deps.saveSetting).toHaveBeenCalledWith('guided.concurrency', 2);
     expect(res.json).toHaveBeenCalledWith(expect.objectContaining({

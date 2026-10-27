@@ -177,7 +177,9 @@ async function processComic(comic, options = {}) {
   if (settings.useModal) {
     try {
       guidedLog('INFO', `   [Modal] Attempting GPU detection via Modal...`);
-      const secret = await getSetting(SETTINGS_KEYS.modalTokenSecret, '');
+      const cryptoVault = require('../utils/crypto-vault');
+      const rawSecret = await getSetting(SETTINGS_KEYS.modalTokenSecret, '');
+      const secret = cryptoVault.decrypt(rawSecret);
       if (typeof modalDetector.ensureEnvironmentReady === 'function') {
         await modalDetector.ensureEnvironmentReady({
           modalTokenId: settings.modalTokenId,

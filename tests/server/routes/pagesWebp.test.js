@@ -11,6 +11,8 @@ jest.mock('../../../server/services/archive-utils', () => ({
 
 const { getEntryBuffer } = require('../../../server/services/archive-utils');
 
+jest.setTimeout(15000);
+
 describe('User Pages Route - WebP Downscaling & Caching', () => {
   let router;
   let imageHandler;

@@ -32,6 +32,7 @@ Most digital comic servers were built a decade ago as basic file browsers. **Com
 * 📁 **Configurable File & Folder Organization**: Flexible 4-tab management panel with customizable token naming rules and folder hierarchy templates, with live preview and safe, type-to-confirm batch execution for entire libraries.
 * 🔌 **AI Model Context Protocol (MCP)**: Native Python MCP server exposing 60+ tools allowing Claude, Cursor, and Gemini to curate reading lists, tag comics directly from web URLs (`tag_comic_from_url`), inspect cover art, trigger guided view detection, reorganize directories, and query your collection with natural language.
 * 🛡️ **Cloudflare Zero Trust Ready**: Zero open ports needed. Full integration with Cloudflare Access JWT authentication, granular user permissions (down to publisher and series), and admin impersonation.
+* 🔐 **Enterprise-Grade Secrets Vault (AES-256-GCM)**: All third-party API keys (ComicVine, Gemini, Google Books), scraper logins (Metron, GCD), and cloud GPU tokens (Modal) are automatically encrypted at rest using envelope encryption with an auto-generated 256-bit key (`data/.app_secret`) or container secrets (`COMICS_SECRET_KEY` / `COMICS_SECRET_KEY_FILE`). Sensitive values are masked in the UI to prevent shoulder-surfing and log leakage.
 * 📂 **Metadata Mode & Folder Mode**: Organize your library by metadata tags (Publisher → Series → Issue) or mirror your physical directory tree directly.
 * 💻 **Client-Side Local Reader**: Drag and drop local CBZ/CBR files directly into the browser to read instantly with WebAssembly—no file upload required.
 * 📖 **E-Ink & Color E-Reader Modes**: Purpose-built anti-ghosting display modes for e-paper devices. **Monochrome** applies grayscale + contrast for black-and-white screens; **Color** boosts saturation for color e-paper. Kindle, Kobo, Onyx Boox, and PocketBook are auto-detected, and the choice persists per device.
@@ -132,7 +133,7 @@ cp config.example.json data/config.json
 
 The template clearly indicates which settings are required before startup versus which can be configured via the web interface:
 - **`[BOOT]` Settings** (`port`, `baseUrl`, `trustProxy`, `authentication`): Required before the server starts because routing, ports, and security initialize at boot.
-- **`[UI]` Settings** (`libraries`, API keys, Gemini settings, tagger thresholds, scan intervals): Can be left with defaults or blank and configured anytime directly in the web UI. Changes made in the UI are automatically saved back to `data/config.json`.
+- **`[UI]` Settings** (`libraries`, API keys, Gemini settings, tagger thresholds, scan intervals): Can be left with defaults or blank and configured anytime directly in the web UI. Changes made in the UI are automatically saved back to `data/config.json`. All API keys, passwords, and external tokens are automatically encrypted at rest using AES-256-GCM.
 
 #### Key Settings at a Glance:
 | Category | Setting | Recommended Value | Description |
@@ -142,7 +143,7 @@ The template clearly indicates which settings are required before startup versus
 | `[BOOT]` | `authentication` | `{ "enabled": false, ... }` | Set to `true` with `adminEmail` if using Cloudflare Zero Trust. |
 | `[UI]` | `comicsLocation` | `"/path/to/inbox"` | Ingestion directory where Tag Comics Now! scans for untagged CBZ files. |
 | `[UI]` | `libraries` | `[{"path": "...", "hierarchyMode": "metadata"}]` | Organized collections. Choose `"metadata"` or `"folder"`. |
-| `[UI]` | `geminiApiKey` | `"AIzaSy..."` | Optional Google Gemini API key for AI visual cover matching and OCR. |
+| `[UI]` | `geminiApiKey` | `"AIzaSy..."` | Optional Google Gemini API key for AI visual cover matching (encrypted at rest). |
 
 *(For full schema tables, Cloudflare Zero Trust setup, and in-depth UI vs. file configuration guides, see the [Wiki Configuration Reference](docs/WIKI.md#configuration-reference-configjson).)*
 
@@ -156,6 +157,7 @@ Looking for detailed setup guides, configuration tables, or workflow deep dives?
 
 ### Manual Highlights:
 - [Cloudflare Zero Trust & LAN Admin Configuration](docs/WIKI.md#3-cloudflare-zero-trust--authentication)
+- [AES-256-GCM Secrets Encryption & Master Keys](docs/WIKI.md#7-app-secrets--envelope-encryption-aes-256-gcm)
 - [Granular Permissions & User Impersonation](docs/WIKI.md#4-user--administrator-management)
 - [Metadata Mode vs. Folder Mode](docs/WIKI.md#5-libraries-folder-structures--scanning)
 - [Sidecar vs. Database vs. Archive Write-Back](docs/WIKI.md#6-supported-formats-auto-conversion--metadata-storage)

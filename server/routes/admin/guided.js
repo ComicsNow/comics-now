@@ -1,3 +1,5 @@
+const cryptoVault = require('../../utils/crypto-vault');
+
 module.exports = function attach(router, deps) {
   const {
     guidedReader,
@@ -45,8 +47,8 @@ module.exports = function attach(router, deps) {
       if (body.modalTokenId !== undefined) {
         await saveSetting(guidedReader.SETTINGS_KEYS.modalTokenId, String(body.modalTokenId).trim());
       }
-      if (body.modalTokenSecret !== undefined && String(body.modalTokenSecret).trim() !== '') {
-        await saveSetting(guidedReader.SETTINGS_KEYS.modalTokenSecret, String(body.modalTokenSecret).trim());
+      if (body.modalTokenSecret !== undefined && String(body.modalTokenSecret).trim() !== '' && !cryptoVault.isMasked(body.modalTokenSecret)) {
+        await saveSetting(guidedReader.SETTINGS_KEYS.modalTokenSecret, cryptoVault.encrypt(String(body.modalTokenSecret).trim()));
       }
       if (body.modalEnvironment !== undefined) {
         await saveSetting(guidedReader.SETTINGS_KEYS.modalEnvironment, String(body.modalEnvironment).trim());
@@ -74,6 +76,7 @@ module.exports = function attach(router, deps) {
       if (deps.dbGet) {
         const row = await deps.dbGet('SELECT value FROM settings WHERE key = ?', [guidedReader.SETTINGS_KEYS.modalTokenSecret]);
         try { modalTokenSecret = row ? JSON.parse(row.value) : ''; } catch { modalTokenSecret = row?.value || ''; }
+        modalTokenSecret = cryptoVault.decrypt(modalTokenSecret);
       }
 
       const result = await detector.checkCredits({
@@ -96,6 +99,7 @@ module.exports = function attach(router, deps) {
       if (deps.dbGet) {
         const row = await deps.dbGet('SELECT value FROM settings WHERE key = ?', [guidedReader.SETTINGS_KEYS.modalTokenSecret]);
         try { modalTokenSecret = row ? JSON.parse(row.value) : ''; } catch { modalTokenSecret = row?.value || ''; }
+        modalTokenSecret = cryptoVault.decrypt(modalTokenSecret);
       }
 
       const result = await detector.checkEnvironment({
@@ -119,10 +123,11 @@ module.exports = function attach(router, deps) {
       const modalEnvironment = body.modalEnvironment !== undefined ? body.modalEnvironment : settings.modalEnvironment;
 
       let modalTokenSecret = body.modalTokenSecret;
-      if ((modalTokenSecret === undefined || modalTokenSecret === '') && deps.dbGet) {
+      if ((modalTokenSecret === undefined || modalTokenSecret === '' || cryptoVault.isMasked(modalTokenSecret)) && deps.dbGet) {
         const row = await deps.dbGet('SELECT value FROM settings WHERE key = ?', [guidedReader.SETTINGS_KEYS.modalTokenSecret]);
         try { modalTokenSecret = row ? JSON.parse(row.value) : ''; } catch { modalTokenSecret = row?.value || ''; }
       }
+      modalTokenSecret = cryptoVault.decrypt(modalTokenSecret);
 
       const result = await detector.setupEnvironment({
         modalTokenId,
@@ -145,10 +150,11 @@ module.exports = function attach(router, deps) {
       const modalEnvironment = body.modalEnvironment !== undefined ? body.modalEnvironment : settings.modalEnvironment;
 
       let modalTokenSecret = body.modalTokenSecret;
-      if ((modalTokenSecret === undefined || modalTokenSecret === '') && deps.dbGet) {
+      if ((modalTokenSecret === undefined || modalTokenSecret === '' || cryptoVault.isMasked(modalTokenSecret)) && deps.dbGet) {
         const row = await deps.dbGet('SELECT value FROM settings WHERE key = ?', [guidedReader.SETTINGS_KEYS.modalTokenSecret]);
         try { modalTokenSecret = row ? JSON.parse(row.value) : ''; } catch { modalTokenSecret = row?.value || ''; }
       }
+      modalTokenSecret = cryptoVault.decrypt(modalTokenSecret);
 
       const result = await detector.checkCredits({
         modalTokenId,

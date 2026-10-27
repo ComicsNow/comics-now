@@ -71,5 +71,9 @@ mcp/.venv/
 scripts/modal/tests/fixtures/*.cbz
 scripts/modal/tests/fixtures/*.cbr
 
+# Ensure no comics are stored in logos
+logos/**/*.cbz
+logos/**/*.cbr
+
 bench_test_dir/
 bench_test_dir2/
