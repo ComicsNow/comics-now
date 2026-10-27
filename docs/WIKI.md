@@ -12,6 +12,10 @@ For the complete REST endpoint reference — every route under `/api/v1` with pa
    - [Docker (Recommended)](#docker-recommended)
    - [Docker Compose](#docker-compose)
    - [Bare Metal Installation](#bare-metal-installation)
+   - [Configuration Reference (`config.json`)](#configuration-reference-configjson)
+     - [What Can vs. Cannot Be Updated in the UI](#what-can-vs-cannot-be-updated-in-the-ui)
+     - [Updating Settings Inside the Web UI](#updating-settings-inside-the-web-ui)
+     - [Updating Settings Outside the Web UI](#updating-settings-outside-the-web-ui)
 3. [Cloudflare Zero Trust & Authentication](#3-cloudflare-zero-trust--authentication)
    - [How Cloudflare Access Works](#how-cloudflare-access-works)
    - [Configuring Environment Variables](#configuring-environment-variables)
@@ -174,6 +178,183 @@ If running natively on Linux (Ubuntu, Debian, Raspberry Pi OS):
    ```bash
    npm start
    ```
+
+### Configuration Reference (`config.json`)
+
+Comics Now! stores its persistent configuration in `data/config.json` (or wherever `$DATA_DIR` is mounted). A clean, ready-to-copy template is provided in the repository root as [`config.example.json`](../config.example.json).
+
+#### Hierarchy & Precedence
+Settings are resolved in the following order:
+1. **Environment Variables**: Overrides any file configuration (e.g., `PORT`, `BASE_URL`, `COMICS_LOCATION`, `TRUST_PROXY`).
+2. **`data/config.json`**: Persistent server-side settings on disk.
+3. **Built-in Defaults**: Hardcoded fallback values in `server/config.js`.
+
+> [!IMPORTANT]
+> The configuration file must be valid, RFC 8259-compliant JSON. **Do not include JavaScript comments (`//` or `/* */`)** in `data/config.json`. If a JSON syntax error occurs during boot, Comics Now! logs an error and falls back to safe built-in defaults.
+
+#### Complete Parameter Reference
+
+##### 1. Server & Network
+| Key | Type | Default | Description |
+|---|---|---|---|
+| `port` | `number` | `3000` | HTTP listening port for the web server. |
+| `baseUrl` | `string` | `"/"` | Path prefix where Comics Now! is served. Use `"/"` for root domain hosting, or a subpath like `"/comics"` if reverse-proxying behind a prefix. |
+| `trustProxy` | `boolean` \| `number` | `false` | Enable when running behind reverse proxies or tunnels (e.g. `1` or `true` for Cloudflare, Nginx, or Traefik) so client IP addresses and protocols are resolved accurately. |
+| `cors.enabled` | `boolean` | `true` | Enables or disables Cross-Origin Resource Sharing. |
+| `cors.allowedOrigins` | `array` | `[...]` | List of allowed origin URLs permitted to make cross-origin requests. |
+
+##### 2. Libraries & Ingestion
+| Key | Type | Default | Description |
+|---|---|---|---|
+| `libraries` | `array` | `[]` | List of library objects: `[{"path": "/comics/organized", "hierarchyMode": "metadata"}]`. |
+| `libraries[].path` | `string` | — | Absolute filesystem directory containing comic files. |
+| `libraries[].hierarchyMode` | `string` | `"metadata"` | `"metadata"` organizes the UI by Publisher and Series extracted from ComicInfo.xml. `"folder"` mirrors the physical folder hierarchy on disk. |
+| `comicsLocation` | `string` | `"/comics"` | Ingestion/inbox workspace where Tag Comics Now! scans for untagged or newly downloaded CBZ files. |
+| `scanIntervalMinutes` | `number` | `5` | Frequency (in minutes) of background filesystem scans to discover new comics. |
+| `allowed_formats` | `string` | `"cbz"` | Permitted archive formats. Automatic conversion converts PDF and CBR to CBZ. |
+| `metadata_storage` | `string` | `"archive"` | Where comic metadata is stored: `"sidecar"` (writes external `.ComicInfo.xml` files alongside the comic), `"archive"` (embeds `ComicInfo.xml` directly inside the `.cbz` zip archive), or `"database"` (stored in SQLite only). |
+
+##### 3. Tag Comics Now! & Metadata Services
+| Key | Type | Default | Description |
+|---|---|---|---|
+| `taggerMode` | `string` | `"new"` | Tagger subsystem architecture. `"new"` runs the embedded Python tagger service. |
+| `taggerServiceUrl` | `string` | `"http://127.0.0.1:5000"` | Local URL endpoint of the Python tagger service. |
+| `taggerLowerThreshold` | `number` | `0.80` | Minimum confidence score (0.0 to 1.0) required to present an issue match candidate. |
+| `taggerUpperThreshold` | `number` | `0.90` | High-confidence threshold (0.0 to 1.0) for automated acceptance. |
+| `taggerEnabledSources` | `array` | `[...]` | Metadata scraper sources enabled for queries (`src-comicvine`, `src-metron`, `src-gcd`, `src-lcg`, `src-goodreads`, `src-blackwells`, `src-waterstones`, `src-googlebooks`, `src-amazon`, `src-forbiddenplanet`). |
+| `ctScheduleMinutes` | `number` | `60` | Scheduled interval for background tagger processing jobs. |
+
+##### 4. Third-Party Scraper Accounts & API Keys
+| Key | Type | Default | Description |
+|---|---|---|---|
+| `comicVineApiKey` | `string` | `""` | ComicVine API key for scraping issues, characters, and volume metadata. |
+| `googleBooksApiKey` | `string` | `""` | Google Books API key for ISBN, graphic novel, and TPB matching. |
+| `metronUser` | `string` | `""` | Metron comic database username. |
+| `metronPassword` | `string` | `""` | Metron comic database account password. |
+| `gcdUser` | `string` | `""` | Grand Comics Database (GCD) login email/username. |
+| `gcdPassword` | `string` | `""` | Grand Comics Database (GCD) password. |
+
+##### 5. Google Gemini AI Cover Matching & OCR
+| Key | Type | Default | Description |
+|---|---|---|---|
+| `geminiApiKey` | `string` | `""` | Google Gemini API key used for visual cover recognition, text extraction, and metadata synthesis. |
+| `geminiModel` | `string` | `"gemini-3.5-flash-lite"` | Gemini model used for multimodal cover recognition. |
+| `geminiCoverMatchEnabled` | `boolean` | `true` | Toggles visual cover matching when textual title/issue scraping fails. |
+| `geminiCoverDailyCap` | `number` | `450` | Maximum Gemini cover API requests allowed per 24 hours to prevent unexpected API costs. |
+| `geminiTermsAccepted` | `boolean` | `false` | Must be set to `true` to acknowledge and activate Gemini features. |
+
+##### 6. Authentication & Cloudflare Zero Trust
+| Key | Type | Default | Description |
+|---|---|---|---|
+| `authentication.enabled` | `boolean` | `false` | When `true`, enforces authentication headers via Cloudflare Access JWT. |
+| `authentication.adminEmail` | `string` | `""` | Primary administrator email. Requests with this email receive unrestricted administrative privileges. |
+| `authentication.userEmail` | `string` | `""` | Default user email for regular access. |
+| `authentication.cloudflare.teamDomain` | `string` | `""` | Cloudflare Access team domain (e.g. `your-team.cloudflareaccess.com`). |
+| `authentication.cloudflare.audience` | `string` | `""` | Application Audience (AUD) tag generated in Cloudflare Zero Trust. |
+| `authentication.trustedIPs` | `array` | `[]` | List of local IP addresses or wildcards (e.g. `["127.0.0.1", "::1", "192.168.1.*"]`) that bypass authentication and are granted local admin rights. |
+
+---
+
+#### What Can vs. Cannot Be Updated in the UI
+
+To keep server startup safe and predictable, Comics Now! divides configuration parameters into two groups:
+
+| Category | Settings | Can Be Configured in UI? | Why / When to Update |
+|---|---|:---:|---|
+| **Boot Only (`[BOOT]`)** | `baseUrl`<br>`port`<br>`trustProxy`<br>`authentication` (`enabled`, `adminEmail`, `cloudflare`)<br>`cors` | ❌ **No** | **Server Initialization**: Express router paths, listening ports, reverse proxy headers, and authentication security middlewares are assembled on server boot before any web requests can be handled. Must be set in `config.json` or via environment variables before launch. |
+| **UI Configurable (`[UI]`)** | `libraries`<br>`comicsLocation`<br>`metadata_storage`<br>`scanIntervalMinutes`<br>`allowed_formats`<br>`comicVineApiKey`<br>`googleBooksApiKey`<br>`metronUser` / `metronPassword`<br>`gcdUser` / `gcdPassword`<br>`geminiApiKey` / `geminiModel`<br>`geminiCoverMatchEnabled`<br>`geminiCoverDailyCap`<br>`geminiTermsAccepted`<br>`taggerLowerThreshold`<br>`taggerUpperThreshold`<br>`taggerEnabledSources`<br>`ctScheduleMinutes`<br>`namingRules`<br>`folderRules`<br>User Accounts & Permissions | ✅ **Yes** | **Runtime Operation**: Can be set anytime directly in the web browser. The server automatically updates memory state, synchronizes the SQLite database, and persists the changes back to `data/config.json`. No server restart required! |
+
+---
+
+#### Updating Settings Inside the Web UI
+
+Administrators can configure all runtime settings directly in the browser:
+
+1. **Managing Libraries & Paths**:
+   - Click the **Settings (gear icon)** in the header.
+   - Under **Libraries**, enter the absolute directory path of your comic collection.
+   - Choose the hierarchy mode:
+     - **Metadata Mode**: Groups issues by Publisher and Series parsed from internal `ComicInfo.xml`.
+     - **Folder Mode**: Reflects the physical directory tree on disk.
+   - Click **Add Library**. Comics Now! validates the path and begins background indexing.
+2. **Scan Intervals & Storage Strategy**:
+   - In **Settings → General**, adjust the **Scan Interval** (minutes) for background filesystem discovery.
+   - Select **Metadata Storage Mode**:
+     - `sidecar`: Writes an external `.ComicInfo.xml` beside each comic archive (ideal for read-only archives).
+     - `archive`: Writes metadata directly inside the `.cbz` archive.
+     - `db`: Saves metadata strictly in the local SQLite database.
+   - Set **Allowed Formats** (`cbz`, `cbr`, or `both`).
+3. **Scraper Credentials & API Keys**:
+   - Open **Tag Comics Now!** from the navigation bar.
+   - Switch to the **Settings & Sources** tab.
+   - Enter your **ComicVine API Key**, **Google Books API Key**, **Metron** username/password, and **GCD** account credentials.
+   - Toggle individual scraper source checkboxes on or off based on your preferences.
+   - Set your **Inbox Directory** (`comicsLocation`) where incoming untagged issues land.
+   - Adjust **Lower Threshold** (minimum score to suggest a match) and **Upper Threshold** (score for automated acceptance).
+4. **Google Gemini AI Cover Matching & OCR**:
+   - Open **Tag Comics Now! → Gemini** tab.
+   - Enter your **Gemini API Key** and choose your model (e.g. `gemini-3.5-flash-lite`).
+   - Toggle **Visual Cover Matching** on to enable multimodal AI identification for covers with missing or obscure filenames.
+   - Set the **Daily Request Cap** (e.g. `450`) to safeguard against unexpected API expenses.
+   - Check the **Terms of Service** acceptance checkbox and click **Save Settings**.
+5. **Organization & Auto-Renaming Rules**:
+   - In **Tag Comics Now!**, visit **Naming Rules** and **Folder Rules**.
+   - Enable/disable tokens (Series, Volume, Year, Issue Number, Publisher) and test formatting with the live preview tool.
+
+> [!NOTE]
+> When you save settings anywhere in the UI, Comics Now! updates its active runtime and automatically writes the new values to `data/config.json` via [`saveConfigToDisk()`](file:///opt/comics-now/server/config.js#L163-L185).
+
+---
+
+#### Updating Settings Outside the Web UI
+
+Use file-based or environment variable configuration when performing automated deployments (Docker, Kubernetes, Ansible), setting up boot-only settings, or recovering from lockouts.
+
+##### Method A: Editing `data/config.json`
+1. Stop the service (optional but recommended when changing ports or base paths):
+   ```bash
+   sudo systemctl stop comics-now.service
+   # Or for Docker:
+   docker compose down
+   ```
+2. Open `data/config.json` in your preferred editor (`nano`, `vim`, or VS Code):
+   ```bash
+   nano data/config.json
+   ```
+3. Update your required keys. Ensure the file remains strictly valid JSON:
+   - Use double quotes `"` around property names and strings.
+   - Do **not** include JavaScript comments (`//` or `/* */`).
+4. Save the file and restart the service:
+   ```bash
+   sudo systemctl start comics-now.service
+   # Or for Docker:
+   docker compose up -d
+   ```
+
+##### Method B: Using Environment Variables
+Environment variables take top precedence and override values stored in `data/config.json`. This is ideal for containerized or 12-factor application deployments:
+
+| Environment Variable | Equivalent `config.json` Key | Example Value |
+|---|---|---|
+| `PORT` | `port` | `3000` |
+| `BASE_URL` | `baseUrl` | `/` or `/comics` |
+| `TRUST_PROXY` | `trustProxy` | `1` or `true` |
+| `COMICS_LOCATION` | `comicsLocation` | `/media/comics/inbox` |
+| `SCAN_INTERVAL_MINUTES` | `scanIntervalMinutes` | `10` |
+| `ALLOWED_FORMATS` | `allowed_formats` | `cbz` |
+| `METADATA_STORAGE` | `metadata_storage` | `sidecar` |
+| `COMICVINE_API_KEY` | `comicVineApiKey` | `66b29fe5...` |
+| `GOOGLE_BOOKS_API_KEY` | `googleBooksApiKey` | `AIzaSy...` |
+| `METRON_USER` | `metronUser` | `username` |
+| `METRON_PASSWORD` | `metronPassword` | `password` |
+| `GEMINI_API_KEY` | `geminiApiKey` | `AIzaSy...` |
+| `GEMINI_MODEL` | `geminiModel` | `gemini-3.5-flash-lite` |
+| `GEMINI_COVER_DAILY_CAP` | `geminiCoverDailyCap` | `500` |
+| `TAGGER_SERVICE_URL` | `taggerServiceUrl` | `http://127.0.0.1:5000` |
+| `TAGGER_LOWER_THRESHOLD` | `taggerLowerThreshold` | `0.75` |
+| `TAGGER_UPPER_THRESHOLD` | `taggerUpperThreshold` | `0.90` |
+| `CORS_ENABLED` | `cors.enabled` | `true` |
+| `CORS_ALLOWED_ORIGINS` | `cors.allowedOrigins` | `https://example.com,http://localhost:3000` |
 
 ---
 

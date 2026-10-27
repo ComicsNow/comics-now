@@ -1,27 +1,10 @@
 {
+  "_notice": "Settings marked [BOOT] must be set here before starting the app. Settings marked [UI] can be left empty and configured directly in the Web UI, which auto-saves back to this file.",
+
+  "// [BOOT] 1. Server, Network & Reverse Proxy": "Required before starting Comics Now",
   "port": 3000,
-  "baseUrl": "/comics",
-  "taggerMode": "new", // "new" for embedded Python tagger service
-  "taggerServiceUrl": "http://localhost:5000",
-  "taggerEngine": "gemini",
-  "taggerTextEngine": "google-books",
-
-  /* 
-     comicsLocation: The "workspace" directory where Tag Comics Now! looks for 
-     new, untagged CBZ files to process.
-  */
-  "comicsLocation": "/path/to/comics/processing-inbox",
-
-  /*
-     libraries: The organized collections you want to browse in the UI.
-     Each library can have a different 'hierarchyMode':
-     - "metadata": Groups by Publisher/Series using internal ComicInfo.xml.
-     - "folder": Mirrors the physical folder structure on disk.
-  */
-  "libraries": [
-    { "path": "/path/to/comics/organized-collection", "hierarchyMode": "metadata" },
-    { "path": "/path/to/comics/raw-unsorted-scans", "hierarchyMode": "folder" }
-  ],
+  "baseUrl": "/",
+  "trustProxy": 1,
   "cors": {
     "enabled": true,
     "allowedOrigins": [
@@ -33,12 +16,64 @@
   "authentication": {
     "enabled": false,
     "adminEmail": "admin@example.com",
+    "userEmail": "user@example.com",
     "cloudflare": {
       "teamDomain": "yourteam.cloudflareaccess.com",
       "audience": "your-application-audience-tag-from-cloudflare"
     },
     "trustedIPs": [
+      "127.0.0.1",
+      "::1",
       "192.168.1.*"
     ]
-  }
+  },
+
+  "// [UI] 2. Storage & Ingestion": "Can be configured in Web UI -> Settings",
+  "comicsLocation": "/path/to/comics/processing-inbox",
+  "libraries": [
+    {
+      "path": "/path/to/comics/organized-collection",
+      "hierarchyMode": "metadata"
+    },
+    {
+      "path": "/path/to/comics/raw-unsorted-scans",
+      "hierarchyMode": "folder"
+    }
+  ],
+  "scanIntervalMinutes": 5,
+  "allowed_formats": "cbz",
+  "metadata_storage": "sidecar",
+
+  "// [UI] 3. Scrapers & Credentials": "Can be entered in Web UI -> Tag Comics Now! -> Settings",
+  "comicVineApiKey": "",
+  "googleBooksApiKey": "",
+  "metronUser": "",
+  "metronPassword": "",
+  "gcdUser": "",
+  "gcdPassword": "",
+
+  "// [UI] 4. Google Gemini AI": "Can be entered in Web UI -> Tag Comics Now! -> Gemini",
+  "geminiApiKey": "",
+  "geminiModel": "gemini-3.5-flash-lite",
+  "geminiCoverMatchEnabled": true,
+  "geminiCoverDailyCap": 450,
+  "geminiTermsAccepted": false,
+
+  "// [UI] 5. Tag Comics Now! Subsystem": "Can be tuned in Web UI -> Tag Comics Now!",
+  "taggerMode": "new",
+  "taggerServiceUrl": "http://127.0.0.1:5000",
+  "taggerLowerThreshold": 0.8,
+  "taggerUpperThreshold": 0.9,
+  "taggerEnabledSources": [
+    "src-comicvine",
+    "src-metron",
+    "src-gcd",
+    "src-lcg",
+    "src-goodreads",
+    "src-blackwells",
+    "src-waterstones",
+    "src-googlebooks",
+    "src-amazon",
+    "src-forbiddenplanet"
+  ]
 }
