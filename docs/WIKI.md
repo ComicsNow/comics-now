@@ -13,6 +13,7 @@ For the complete REST endpoint reference — every route under `/api/v1` with pa
    - [Docker Compose](#docker-compose)
    - [Bare Metal Installation](#bare-metal-installation)
    - [Configuration Reference (`config.json`)](#configuration-reference-configjson)
+     - [App Secrets & Envelope Encryption (AES-256-GCM)](#7-app-secrets--envelope-encryption-aes-256-gcm)
      - [What Can vs. Cannot Be Updated in the UI](#what-can-vs-cannot-be-updated-in-the-ui)
      - [Updating Settings Inside the Web UI](#updating-settings-inside-the-web-ui)
      - [Updating Settings Outside the Web UI](#updating-settings-outside-the-web-ui)
@@ -253,6 +254,31 @@ Settings are resolved in the following order:
 | `authentication.cloudflare.audience` | `string` | `""` | Application Audience (AUD) tag generated in Cloudflare Zero Trust. |
 | `authentication.trustedIPs` | `array` | `[]` | List of local IP addresses or wildcards (e.g. `["127.0.0.1", "::1", "192.168.1.*"]`) that bypass authentication and are granted local admin rights. |
 
+##### 7. App Secrets & Envelope Encryption (AES-256-GCM)
+All third-party credentials (API keys, scraper passwords, AI tokens, cloud GPU secrets) entered in Comics Now! are automatically encrypted at rest using industry-standard **AES-256-GCM envelope encryption**.
+
+| Master Key Source | Precedence | Description |
+|---|---|---|
+| `COMICS_SECRET_KEY` | 1 (Highest) | Passphrase or master key passed via environment variable (hashed with SHA-256 to derive a 256-bit AES key). Ideal for Docker or systemd environments. |
+| `COMICS_SECRET_KEY_FILE` | 2 | Path to a secret file containing the master key (e.g. Docker Secret `/run/secrets/comics_secret_key` or Kubernetes secret volume). |
+| `data/.app_secret` | 3 (Default) | Automatically generated 256-bit cryptographic key created with strict `0600` Linux file permissions on first boot. Persisted in the `data/` volume and ignored by git. |
+| `COMICS_SECRET_KEY_PATH` | (Custom path) | Custom file path override for `.app_secret` if non-default storage is required. |
+
+###### Protected Secrets:
+The following secrets are transparently encrypted in SQLite (`settings` table) with the tagged format `enc:v1:<iv>:<tag>:<ciphertext>`:
+- `comicVineApiKey`
+- `googleBooksApiKey`
+- `metronPassword`
+- `gcdPassword`
+- `geminiApiKey`
+- `guided.modalTokenSecret` (Modal GPU Cloud secret)
+- `impersonation_secret` (Admin impersonation token)
+
+###### Features:
+- **Zero-Downtime Migration**: On startup, Comics Now! checks for unencrypted plaintext credentials from older versions and automatically encrypts them in place.
+- **Safe Passthrough**: If a credential is unencrypted, the decryptor transparently passes it through without failing or corrupting data.
+- **UI Masking**: Web interfaces receive masked placeholders (`••••••••••••<last4>`) to prevent shoulder-surfing and network log exposure. If a form is saved without modifying the masked value, the existing encrypted secret is preserved intact.
+
 ---
 
 #### What Can vs. Cannot Be Updated in the UI
@@ -355,6 +381,9 @@ Environment variables take top precedence and override values stored in `data/co
 | `TAGGER_UPPER_THRESHOLD` | `taggerUpperThreshold` | `0.90` |
 | `CORS_ENABLED` | `cors.enabled` | `true` |
 | `CORS_ALLOWED_ORIGINS` | `cors.allowedOrigins` | `https://example.com,http://localhost:3000` |
+| `COMICS_SECRET_KEY` | Master Key (Passphrase) | `your-secret-master-passphrase` |
+| `COMICS_SECRET_KEY_FILE` | Master Key (Secret File) | `/run/secrets/comics_secret_key` |
+| `COMICS_SECRET_KEY_PATH` | Key File Path Override | `/opt/comics-now/data/.app_secret` |
 
 ---
 

@@ -187,16 +187,20 @@ module.exports = function attach(router, deps) {
 
       const effectiveStorage = metadataStorage === 'sidecar' ? 'sidecar' : 'archive';
 
-
       deps.setScanIntervalMinutes(minutes);
-      deps.setComicVineApiKey(sanitizedApiKey);
       deps.setAllowedFormats(allowedFormats);
       deps.setMetadataStorage(effectiveStorage);
 
       await saveSetting('scanInterval', minutes);
-      await saveSetting('comicVineApiKey', sanitizedApiKey);
       await saveSetting('allowed_formats', allowedFormats);
       await saveSetting('metadata_storage', effectiveStorage);
+
+      const cryptoVault = require('../../utils/crypto-vault');
+      if (apiKey !== undefined && !cryptoVault.isMasked(apiKey)) {
+        const encApiKey = cryptoVault.encrypt(sanitizedApiKey);
+        deps.setComicVineApiKey(encApiKey);
+        await saveSetting('comicVineApiKey', encApiKey);
+      }
 
       scheduleNextScan();
       res.json({ ok: true });

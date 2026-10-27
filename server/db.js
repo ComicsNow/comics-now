@@ -363,6 +363,21 @@ async function initializeDatabase() {
         log('WARN', 'DB', `Creator role disambiguation migration error: ${e.message}`);
       }
     }
+
+    // Secrets encryption migration v1: Encrypts any legacy plaintext credentials at rest using AES-256-GCM
+    const secretsMigrationFlag = await dbGet("SELECT value FROM settings WHERE key = 'migration_secrets_encryption_v1'");
+    if (!secretsMigrationFlag) {
+      try {
+        const { migratePlaintextSecrets } = require('./services/secrets-migrator');
+        const stats = await migratePlaintextSecrets({ all: dbAll, run: dbRun });
+        await dbRun("INSERT OR REPLACE INTO settings (key, value) VALUES ('migration_secrets_encryption_v1', '1')");
+        if (stats.migratedCount > 0) {
+          log('INFO', 'DB', `Encrypted ${stats.migratedCount} legacy plaintext secret(s) at rest with AES-256-GCM`);
+        }
+      } catch (e) {
+        log('WARN', 'DB', `Secrets encryption migration error: ${e.message}`);
+      }
+    }
   } catch (err) {
     await dbRun('ROLLBACK').catch(() => {});
     log('ERROR', 'DB', `Database initialization failed: ${err.message}`);

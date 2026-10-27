@@ -2,6 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const { CONFIG_FILE } = require('./constants');
 const { log } = require('./logger');
+const cryptoVault = require('./utils/crypto-vault');
 
 const DEFAULT_CONFIG = {
   port: 3000,
@@ -287,7 +288,7 @@ function setScanIntervalMinutes(minutes, skipSave = false) {
 }
 
 function getComicVineApiKey() {
-  return config.comicVineApiKey || '';
+  return cryptoVault.decrypt(config.comicVineApiKey) || '';
 }
 
 function setComicVineApiKey(key, skipSave = false) {
@@ -440,7 +441,7 @@ function setMetronUser(val, skipSave = false) {
 }
 
 function getMetronPassword() {
-  return config.metronPassword || '';
+  return cryptoVault.decrypt(config.metronPassword) || '';
 }
 
 function setMetronPassword(val, skipSave = false) {
@@ -458,7 +459,7 @@ function setGcdUser(val, skipSave = false) {
 }
 
 function getGcdPassword() {
-  return config.gcdPassword || '';
+  return cryptoVault.decrypt(config.gcdPassword) || '';
 }
 
 function setGcdPassword(val, skipSave = false) {
@@ -467,7 +468,7 @@ function setGcdPassword(val, skipSave = false) {
 }
 
 function getGoogleBooksApiKey() {
-  return config.googleBooksApiKey || '';
+  return cryptoVault.decrypt(config.googleBooksApiKey) || '';
 }
 
 function setGoogleBooksApiKey(key, skipSave = false) {
@@ -505,7 +506,7 @@ function setFolderRules(rules, skipSave = false) {
 }
 
 function getGeminiApiKey() {
-  return config.geminiApiKey || '';
+  return cryptoVault.decrypt(config.geminiApiKey) || '';
 }
 
 function setGeminiApiKey(key, skipSave = false) {

@@ -163,8 +163,8 @@ describe('Tag Comics Now! tagger service port route behaviour', () => {
       await postScheduleHandler(req, res);
 
       expect(res.status).not.toHaveBeenCalled();
-      expect(deps.setGoogleBooksApiKey).toHaveBeenCalledWith('gb-key');
-      expect(deps.saveSetting).toHaveBeenCalledWith('googleBooksApiKey', 'gb-key');
+      expect(deps.setGoogleBooksApiKey).toHaveBeenCalledWith(expect.stringMatching(/^enc:v1:/));
+      expect(deps.saveSetting).toHaveBeenCalledWith('googleBooksApiKey', expect.stringMatching(/^enc:v1:/));
       expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ ok: true }));
     });
 

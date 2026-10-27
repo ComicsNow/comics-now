@@ -1,4 +1,5 @@
 const fs = require('fs');
+const cryptoVault = require('../../utils/crypto-vault');
 
 const VALID_SCAN_MODES = ['default', 'unmatched', 'existing-xml', 'force'];
 
@@ -107,8 +108,10 @@ module.exports = function attach(router, deps) {
       hasMetronPass: !!(getMetronPassword && getMetronPassword()),
       gcdUser: getGcdUser ? getGcdUser() : '',
       hasGcdPass: !!(getGcdPassword && getGcdPassword()),
-      comicVineApiKey: getComicVineApiKey ? getComicVineApiKey() : '',
-      googleBooksApiKey: getGoogleBooksApiKey ? getGoogleBooksApiKey() : ''
+      hasComicVineKey: !!(getComicVineApiKey && getComicVineApiKey()),
+      comicVineApiKey: cryptoVault.mask(getComicVineApiKey ? getComicVineApiKey() : ''),
+      hasGoogleBooksKey: !!(getGoogleBooksApiKey && getGoogleBooksApiKey()),
+      googleBooksApiKey: cryptoVault.mask(getGoogleBooksApiKey ? getGoogleBooksApiKey() : '')
     });
   });
 
@@ -195,9 +198,10 @@ module.exports = function attach(router, deps) {
         await saveSetting('metronUser', metronUser);
       }
 
-      if (metronPassword !== undefined && setMetronPassword && metronPassword.trim()) {
-        setMetronPassword(metronPassword);
-        await saveSetting('metronPassword', metronPassword);
+      if (metronPassword !== undefined && setMetronPassword && metronPassword.trim() && !cryptoVault.isMasked(metronPassword)) {
+        const encMetron = cryptoVault.encrypt(metronPassword.trim());
+        setMetronPassword(encMetron);
+        await saveSetting('metronPassword', encMetron);
       }
 
       if (gcdUser !== undefined && setGcdUser) {
@@ -205,19 +209,22 @@ module.exports = function attach(router, deps) {
         await saveSetting('gcdUser', gcdUser);
       }
 
-      if (gcdPassword !== undefined && setGcdPassword && gcdPassword.trim()) {
-        setGcdPassword(gcdPassword);
-        await saveSetting('gcdPassword', gcdPassword);
+      if (gcdPassword !== undefined && setGcdPassword && gcdPassword.trim() && !cryptoVault.isMasked(gcdPassword)) {
+        const encGcd = cryptoVault.encrypt(gcdPassword.trim());
+        setGcdPassword(encGcd);
+        await saveSetting('gcdPassword', encGcd);
       }
 
-      if (comicVineApiKey !== undefined && setComicVineApiKey) {
-        setComicVineApiKey(comicVineApiKey);
-        await saveSetting('comicVineApiKey', comicVineApiKey);
+      if (comicVineApiKey !== undefined && setComicVineApiKey && !cryptoVault.isMasked(comicVineApiKey)) {
+        const encCv = cryptoVault.encrypt(typeof comicVineApiKey === 'string' ? comicVineApiKey.trim() : '');
+        setComicVineApiKey(encCv);
+        await saveSetting('comicVineApiKey', encCv);
       }
 
-      if (googleBooksApiKey !== undefined && setGoogleBooksApiKey) {
-        setGoogleBooksApiKey(googleBooksApiKey);
-        await saveSetting('googleBooksApiKey', googleBooksApiKey);
+      if (googleBooksApiKey !== undefined && setGoogleBooksApiKey && !cryptoVault.isMasked(googleBooksApiKey)) {
+        const encGb = cryptoVault.encrypt(typeof googleBooksApiKey === 'string' ? googleBooksApiKey.trim() : '');
+        setGoogleBooksApiKey(encGb);
+        await saveSetting('googleBooksApiKey', encGb);
       }
 
       const currentUrl = getTaggerServiceUrl ? getTaggerServiceUrl() : 'http://127.0.0.1:5000';

@@ -222,11 +222,11 @@ describe('Admin Settings Routes', () => {
       expect(deps.validateScanInterval).toHaveBeenCalledWith(10);
       expect(deps.validateApiKey).toHaveBeenCalledWith('test-api-key');
       expect(deps.setScanIntervalMinutes).toHaveBeenCalledWith(10);
-      expect(deps.setComicVineApiKey).toHaveBeenCalledWith('test-api-key');
+      expect(deps.setComicVineApiKey).toHaveBeenCalledWith(expect.stringMatching(/^enc:v1:/));
       expect(deps.setAllowedFormats).toHaveBeenCalledWith('cbz');
       expect(deps.setMetadataStorage).toHaveBeenCalledWith('sidecar');
       expect(deps.saveSetting).toHaveBeenCalledWith('scanInterval', 10);
-      expect(deps.saveSetting).toHaveBeenCalledWith('comicVineApiKey', 'test-api-key');
+      expect(deps.saveSetting).toHaveBeenCalledWith('comicVineApiKey', expect.stringMatching(/^enc:v1:/));
       expect(deps.saveSetting).toHaveBeenCalledWith('allowed_formats', 'cbz');
       expect(deps.saveSetting).toHaveBeenCalledWith('metadata_storage', 'sidecar');
       expect(deps.scheduleNextScan).toHaveBeenCalled();

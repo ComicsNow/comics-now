@@ -1,5 +1,5 @@
 {
-  "_notice": "Settings marked [BOOT] must be set here before starting the app. Settings marked [UI] can be left empty and configured directly in the Web UI, which auto-saves back to this file.",
+  "_notice": "Settings marked [BOOT] must be set here before starting the app. Settings marked [UI] can be left empty and configured directly in the Web UI, which auto-saves back to this file. All API keys, passwords, and tokens are automatically encrypted at rest with AES-256-GCM via data/.app_secret (or COMICS_SECRET_KEY / COMICS_SECRET_KEY_FILE).",
 
   "// [BOOT] 1. Server, Network & Reverse Proxy": "Required before starting Comics Now",
   "port": 3000,
@@ -44,7 +44,7 @@
   "allowed_formats": "cbz",
   "metadata_storage": "sidecar",
 
-  "// [UI] 3. Scrapers & Credentials": "Can be entered in Web UI -> Tag Comics Now! -> Settings",
+  "// [UI] 3. Scrapers & Credentials": "Can be entered in Web UI -> Tag Comics Now! -> Settings (Encrypted at rest)",
   "comicVineApiKey": "",
   "googleBooksApiKey": "",
   "metronUser": "",
