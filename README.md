@@ -118,6 +118,36 @@ docker compose up -d
 
 ---
 
+### Option 3: Configuration Quick Start (`config.json`)
+
+Comics Now! reads its persistent server and library settings from `data/config.json`. A complete, valid template organized into **`[BOOT]`** and **`[UI]`** sections is provided in [`config.example.json`](config.example.json):
+
+```bash
+# 1. Ensure the data directory exists
+mkdir -p data
+
+# 2. Copy the template into place
+cp config.example.json data/config.json
+```
+
+The template clearly indicates which settings are required before startup versus which can be configured via the web interface:
+- **`[BOOT]` Settings** (`port`, `baseUrl`, `trustProxy`, `authentication`): Required before the server starts because routing, ports, and security initialize at boot.
+- **`[UI]` Settings** (`libraries`, API keys, Gemini settings, tagger thresholds, scan intervals): Can be left with defaults or blank and configured anytime directly in the web UI. Changes made in the UI are automatically saved back to `data/config.json`.
+
+#### Key Settings at a Glance:
+| Category | Setting | Recommended Value | Description |
+|---|---|---|---|
+| `[BOOT]` | `baseUrl` | `"/"` | Root domain path (`"/"`), or subpath prefix (e.g. `"/comics"`) if behind a reverse proxy. |
+| `[BOOT]` | `trustProxy` | `1` | Enable when running behind Cloudflare Tunnel, Nginx, Traefik, or Caddy. |
+| `[BOOT]` | `authentication` | `{ "enabled": false, ... }` | Set to `true` with `adminEmail` if using Cloudflare Zero Trust. |
+| `[UI]` | `comicsLocation` | `"/path/to/inbox"` | Ingestion directory where Tag Comics Now! scans for untagged CBZ files. |
+| `[UI]` | `libraries` | `[{"path": "...", "hierarchyMode": "metadata"}]` | Organized collections. Choose `"metadata"` or `"folder"`. |
+| `[UI]` | `geminiApiKey` | `"AIzaSy..."` | Optional Google Gemini API key for AI visual cover matching and OCR. |
+
+*(For full schema tables, Cloudflare Zero Trust setup, and in-depth UI vs. file configuration guides, see the [Wiki Configuration Reference](docs/WIKI.md#configuration-reference-configjson).)*
+
+---
+
 ## 📖 Complete Documentation & Wiki
 
 Looking for detailed setup guides, configuration tables, or workflow deep dives? Check out our comprehensive documentation manual:
