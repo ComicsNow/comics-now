@@ -100,12 +100,12 @@ def _extract_volume_metadata(item):
     return meta
 
 
-def search_googlebooks_multi(query, api_key=None, limit=5):
+def search_googlebooks_multi(query, api_key=None, limit=20):
     """Search Google Books for multiple matching volume candidates."""
     if not query or not query.strip():
         return []
 
-    cache_key = f"{query.strip()}_{api_key or 'nokey'}"
+    cache_key = f"{query.strip()}_{api_key or 'nokey'}_{limit}"
     cached = tagger_cache.get_query("googlebooks", cache_key)
     if cached is not None:
         return cached
@@ -115,7 +115,7 @@ def search_googlebooks_multi(query, api_key=None, limit=5):
 
     params = {
         "q": query,
-        "maxResults": min(max(1, limit), 10),
+        "maxResults": min(max(1, limit), 20),
         "printType": "books"
     }
     if api_key:

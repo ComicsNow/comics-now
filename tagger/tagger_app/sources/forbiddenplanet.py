@@ -158,7 +158,7 @@ def parse_forbiddenplanet_product_soup(soup, url):
     return metadata
 
 
-def search_forbiddenplanet_multi(query, limit=2):
+def search_forbiddenplanet_multi(query, limit=10):
     """Search Forbidden Planet for comic / graphic novel products and parse detail pages."""
     cached = tagger_cache.get_query("forbiddenplanet", query)
     if cached is not None:

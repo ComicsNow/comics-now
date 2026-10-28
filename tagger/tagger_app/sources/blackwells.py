@@ -118,7 +118,7 @@ def parse_blackwells_product_soup(soup, url):
     return metadata
 
 
-def search_blackwells_multi(query, limit=2):
+def search_blackwells_multi(query, limit=10):
     cached = tagger_cache.get_query("blackwells", query)
     if cached is not None:
         return cached

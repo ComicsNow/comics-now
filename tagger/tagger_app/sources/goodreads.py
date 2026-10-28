@@ -141,7 +141,7 @@ def search_goodreads_multi(query):
             if href and href not in product_paths:
                 product_paths.append(href)
 
-        product_paths = product_paths[:2]
+        product_paths = product_paths[:10]
         print(f"[*] Goodreads found {len(product_paths)} book URLs to fetch.")
 
         for path in product_paths:

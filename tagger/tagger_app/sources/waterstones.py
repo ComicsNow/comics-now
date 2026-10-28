@@ -133,7 +133,7 @@ def parse_waterstones_product_soup(soup, url):
     return metadata
 
 
-def search_waterstones_multi(query, limit=2):
+def search_waterstones_multi(query, limit=10):
     cached = tagger_cache.get_query("waterstones", query)
     if cached is not None:
         return cached

@@ -166,7 +166,7 @@ def search_lcg_multi(query):
         scraper = cloudscraper.create_scraper()
         search_q = f"site:leagueofcomicgeeks.com/comic/ {query}"
         domain_limiter.wait_for_domain("duckduckgo.com")
-        ddg_results = list(DDGS().text(search_q, max_results=5))
+        ddg_results = list(DDGS().text(search_q, max_results=20))
         for r in ddg_results:
             url = r.get("href", "")
             if "leagueofcomicgeeks.com/comic/" not in url:

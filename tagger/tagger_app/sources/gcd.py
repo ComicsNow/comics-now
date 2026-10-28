@@ -97,7 +97,7 @@ def find_fallback_cover(series, number=None, description=None, comicvine_api_key
     return None
 
 
-def search_gcd_multi(query, gcd_user=None, gcd_pass=None, comicvine_api_key=None, metron_user=None, metron_pass=None):
+def search_gcd_multi(query, gcd_user=None, gcd_pass=None, comicvine_api_key=None, metron_user=None, metron_pass=None, limit=20):
     import os
     try:
         from tagger_app.scheduler.state import scheduler_config
@@ -149,9 +149,13 @@ def search_gcd_multi(query, gcd_user=None, gcd_pass=None, comicvine_api_key=None
         r = requests.get(url, auth=auth, headers={"Accept": "application/json", "User-Agent": "comic-tagger-bench/1.0"}, timeout=10)
         if r.status_code == 200:
             results = r.json().get("results", [])
-            for s in results[:3]:
+            for s in results:
+                if len(out) >= limit:
+                    break
                 series_genre = s.get('genre') or ''
-                for iss_url in s.get("active_issues", [])[:3]:
+                for iss_url in s.get("active_issues", []):
+                    if len(out) >= limit:
+                        break
                     if not iss_url:
                         continue
                     from urllib.parse import urlparse
