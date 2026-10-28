@@ -446,31 +446,27 @@ module.exports = function attach(router, deps) {
           continue;
         }
 
-        // Optimization: batch fetch totalPages with JOIN to eliminate N+1 SELECT queries across bulk list items
-        const items = await dbAll(
-          `SELECT rli.comicId, COALESCE(c.totalPages, 0) as totalPages
+        const readParam = read ? 1 : 0;
+
+        const info = await dbRun(
+          `INSERT INTO user_comic_status (userId, comicId, lastReadPage, totalPages, updatedAt)
+           SELECT
+             ?,
+             rli.comicId,
+             CASE WHEN ? = 1 THEN (CASE WHEN c.totalPages > 0 THEN c.totalPages - 1 ELSE 1 END) ELSE 0 END,
+             COALESCE(c.totalPages, 0),
+             ?
            FROM reading_list_items rli
            LEFT JOIN comics c ON rli.comicId = c.id
-           WHERE rli.listId = ?`,
-          [listId]
+           WHERE rli.listId = ?
+           ON CONFLICT(userId, comicId) DO UPDATE SET
+             lastReadPage = excluded.lastReadPage,
+             totalPages = excluded.totalPages,
+             updatedAt = excluded.updatedAt`,
+          [req.user.userId, readParam, now, listId]
         );
 
-        for (const item of items) {
-          const totalPages = item.totalPages || 0;
-          const lastReadPage = read ? (totalPages > 0 ? totalPages - 1 : 1) : 0;
-
-          await dbRun(
-            `INSERT INTO user_comic_status (userId, comicId, lastReadPage, totalPages, updatedAt)
-             VALUES (?, ?, ?, ?, ?)
-             ON CONFLICT(userId, comicId) DO UPDATE SET
-               lastReadPage = excluded.lastReadPage,
-               totalPages = excluded.totalPages,
-               updatedAt = excluded.updatedAt`,
-            [req.user.userId, item.comicId, lastReadPage, totalPages, now]
-          );
-        }
-
-        results.push({ listId, ok: true, comicsUpdated: items.length });
+        results.push({ listId, ok: true, comicsUpdated: info.changes });
       }
 
       res.json({ ok: true, results });
@@ -897,33 +893,27 @@ module.exports = function attach(router, deps) {
         return res.status(404).json({ message: 'Reading list not found' });
       }
 
-      // Get all comics and totalPages in this list via a single JOIN
-      // Optimization: batch fetch totalPages with JOIN to eliminate N+1 SELECT queries
-      const items = await dbAll(
-        `SELECT rli.comicId, COALESCE(c.totalPages, 0) as totalPages
+      const now = Date.now();
+      const readParam = read ? 1 : 0;
+
+      // Update status for all comics in this list via a single INSERT ... SELECT query
+      await dbRun(
+        `INSERT INTO user_comic_status (userId, comicId, lastReadPage, totalPages, updatedAt)
+         SELECT
+           ?,
+           rli.comicId,
+           CASE WHEN ? = 1 THEN (CASE WHEN c.totalPages > 0 THEN c.totalPages - 1 ELSE 1 END) ELSE 0 END,
+           COALESCE(c.totalPages, 0),
+           ?
          FROM reading_list_items rli
          LEFT JOIN comics c ON rli.comicId = c.id
-         WHERE rli.listId = ?`,
-        [req.params.id]
+         WHERE rli.listId = ?
+         ON CONFLICT(userId, comicId) DO UPDATE SET
+           lastReadPage = excluded.lastReadPage,
+           totalPages = excluded.totalPages,
+           updatedAt = excluded.updatedAt`,
+        [req.user.userId, readParam, now, req.params.id]
       );
-
-      const now = Date.now();
-
-      // Update status for each comic
-      for (const item of items) {
-        const totalPages = item.totalPages || 0;
-        const lastReadPage = read ? (totalPages > 0 ? totalPages - 1 : 1) : 0;
-
-        await dbRun(
-          `INSERT INTO user_comic_status (userId, comicId, lastReadPage, totalPages, updatedAt)
-           VALUES (?, ?, ?, ?, ?)
-           ON CONFLICT(userId, comicId) DO UPDATE SET
-             lastReadPage = excluded.lastReadPage,
-             totalPages = excluded.totalPages,
-             updatedAt = excluded.updatedAt`,
-          [req.user.userId, item.comicId, lastReadPage, totalPages, now]
-        );
-      }
 
       res.json({ ok: true });
     } catch (error) {
