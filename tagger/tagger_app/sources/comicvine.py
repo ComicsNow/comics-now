@@ -72,7 +72,7 @@ def _parse_search_issue_match(match, api_key=None):
     }
 
 
-def search_comicvine_multi(query, api_key, limit=5):
+def search_comicvine_multi(query, api_key, limit=20):
     """
     Searches ComicVine for issues matching the search query,
     returns a list of formatted metadata dictionaries using caching.
@@ -120,7 +120,7 @@ def search_comicvine_multi(query, api_key, limit=5):
     return candidates
 
 
-def search_comicvine_volumes(query, api_key, limit=5):
+def search_comicvine_volumes(query, api_key, limit=20):
     """
     Searches ComicVine for *volumes* (series / collected editions) matching the query.
     """

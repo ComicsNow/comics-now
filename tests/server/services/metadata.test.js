@@ -166,6 +166,28 @@ describe('Metadata Service - Real Integration Tests (No Mock filesystem)', () =>
       expect(buildComicInfoXml({})).toBeNull();
       expect(buildComicInfoXml({ InvalidTag: 'value' })).toBeNull();
     });
+
+    it('should preserve Title when options.preserveTitle is true even if matching series', () => {
+      const xml = buildComicInfoXml({
+        Title: 'Batman #45',
+        Series: 'Batman',
+        Number: '45',
+        Publisher: 'DC Comics'
+      }, { preserveTitle: true });
+      expect(xml).toContain('<Title>Batman #45</Title>');
+      expect(xml).toContain('<Series>Batman</Series>');
+    });
+
+    it('should preserve Title when options.preserveTitle is true even for standalone volume labels (e.g. Animal and vol 1)', () => {
+      const xml = buildComicInfoXml({
+        Title: 'vol 1',
+        Series: 'Animal',
+        Number: '1',
+        Publisher: 'DC Comics'
+      }, { preserveTitle: true });
+      expect(xml).toContain('<Title>vol 1</Title>');
+      expect(xml).toContain('<Series>Animal</Series>');
+    });
   });
 
   describe('getComicInfoFromArchive', () => {

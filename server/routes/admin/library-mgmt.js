@@ -174,7 +174,7 @@ module.exports = function attach(router, deps) {
       }
 
       try {
-        await saveMetadataToComic(cbzPath, metadata);
+        await saveMetadataToComic(cbzPath, metadata, { preserveTitle: true });
         log('INFO', 'META', `📂 ComicInfo.xml written back into ${path.basename(cbzPath)}`);
         try {
           const stats = await fs.promises.stat(cbzPath);

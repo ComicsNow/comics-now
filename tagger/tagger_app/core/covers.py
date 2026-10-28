@@ -87,9 +87,8 @@ def _compute_phash(img, hash_size=16):
     try:
         import imagehash
         return imagehash.phash(img, hash_size=hash_size)
-    except ImportError:
+    except Exception:
         import numpy as np
-        import scipy.fftpack
         from PIL import Image
 
         class _FallbackHash:
@@ -101,7 +100,19 @@ def _compute_phash(img, hash_size=16):
         img_size = hash_size * 4
         gray = img.convert("L").resize((img_size, img_size), Image.LANCZOS)
         pixels = np.asarray(gray, dtype=np.float64)
-        dct = scipy.fftpack.dct(scipy.fftpack.dct(pixels, axis=0), axis=1)
+
+        try:
+            import scipy.fftpack
+            dct = scipy.fftpack.dct(scipy.fftpack.dct(pixels, axis=0), axis=1)
+        except Exception:
+            # Pure NumPy 2D DCT fallback (immune to external C-extension or binary version skew)
+            n = np.arange(img_size)
+            k = np.arange(img_size)[:, None]
+            M = np.cos(np.pi * k * (2 * n + 1) / (2 * img_size))
+            M[0] *= 1 / np.sqrt(2)
+            M *= np.sqrt(2 / img_size)
+            dct = M @ pixels @ M.T
+
         dctlowfreq = dct[:hash_size, :hash_size]
         med = np.median(dctlowfreq)
         return _FallbackHash(dctlowfreq > med)

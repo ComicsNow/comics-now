@@ -24,11 +24,11 @@ def split_series_number(query):
     return (query.strip(), None)
 
 
-def search_metron_multi(query, user, pwd, year=None):
+def search_metron_multi(query, user, pwd, year=None, limit=20):
     if not user or not pwd:
         return []
 
-    cache_key = f"{query}|{year}" if year else query
+    cache_key = f"{query}|{year}|{limit}" if year else f"{query}|{limit}"
     cached = tagger_cache.get_query("metron", cache_key)
     if cached is not None:
         return cached
@@ -45,7 +45,7 @@ def search_metron_multi(query, user, pwd, year=None):
             params["cover_year"] = str(year)
         res = list(m.issues_list(params=params))
         out = []
-        for item in res[:5]:
+        for item in res[:limit]:
             cached_full = tagger_cache.get_entity("metron_issue", item.id)
             if cached_full is not None:
                 out.append(cached_full)

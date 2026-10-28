@@ -100,4 +100,44 @@ describe('Frontend Metadata Display - Canonical Key Deduplication', () => {
     expect(form.querySelector('[name="cover_date"]')).toBeNull();
     expect(form.querySelector('[name="publish_date"]')).toBeNull();
   });
+
+  it('does not strip or remove Title when manually updating or rendering metadata even if Title matches series', () => {
+    loadClientScript(path.join(__dirname, '../public/js/metadata.js'), sandbox);
+
+    const manualData = {
+      Title: 'Batman #45',
+      Series: 'Batman',
+      Number: '45',
+      Publisher: 'DC Comics'
+    };
+
+    sandbox.window.currentMetadata = manualData;
+    sandbox.window.renderMetadataDisplay(manualData, true, { preserveTitle: true });
+
+    const form = document.getElementById('metadata-form');
+    const titleInput = form.querySelector('[name="Title"]');
+    expect(titleInput).not.toBeNull();
+    expect(titleInput.value).toBe('Batman #45');
+    expect(manualData.Title).toBe('Batman #45');
+  });
+
+  it('preserves generic volume/issue titles like "vol 1" when editing series like "Animal"', () => {
+    loadClientScript(path.join(__dirname, '../public/js/metadata.js'), sandbox);
+
+    const animalData = {
+      Title: 'vol 1',
+      Series: 'Animal',
+      Number: '1',
+      Publisher: 'DC Comics'
+    };
+
+    sandbox.window.currentMetadata = animalData;
+    sandbox.window.renderMetadataDisplay(animalData, true, { preserveTitle: true });
+
+    const form = document.getElementById('metadata-form');
+    const titleInput = form.querySelector('[name="Title"]');
+    expect(titleInput).not.toBeNull();
+    expect(titleInput.value).toBe('vol 1');
+    expect(animalData.Title).toBe('vol 1');
+  });
 });

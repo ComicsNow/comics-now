@@ -548,7 +548,7 @@ function cleanGenreAndTags(val) {
  * @param {Object} metadata
  * @returns {Object} Sanitized metadata (modified in-place and returned)
  */
-function sanitizeMetadata(metadata) {
+function sanitizeMetadata(metadata, options = {}) {
   if (!metadata || typeof metadata !== 'object') return metadata;
 
   // 1. Strip format/edition words like TPB, HC, Hardcover, Softcover, Graphic Novel, etc. from Series and Title
@@ -587,7 +587,8 @@ function sanitizeMetadata(metadata) {
   }
 
   // 3. Check isTitleSameAsSeries(Title, Series): if Title is the same as Series (or if Title is just Series + Issue Number, or if Title is empty/generic issue number like "#1" or "Issue 1"), clear Title (Title = '')
-  if (metadata.Title && (isTitleSameAsSeries(metadata.Title, metadata.Series) || (!metadata.Series && isTitleSameAsSeries(metadata.Title, '')))) {
+  // Exception: Never strip Title if preserveTitle is enabled (e.g. manual user edit)
+  if (!options.preserveTitle && metadata.Title && (isTitleSameAsSeries(metadata.Title, metadata.Series) || (!metadata.Series && isTitleSameAsSeries(metadata.Title, '')))) {
     metadata.Title = '';
   }
 
@@ -796,7 +797,7 @@ function resolveCreatorRoles(obj, seriesArtists = []) {
  * @param {object} metadataObj 
  * @returns {string|null} XML string or null if no valid metadata
  */
-function buildComicInfoXml(metadataObj) {
+function buildComicInfoXml(metadataObj, options = {}) {
   const safeObj = {};
 
   for (const [key, val] of Object.entries(metadataObj || {})) {
@@ -851,7 +852,8 @@ function buildComicInfoXml(metadataObj) {
   }
 
   // Rule: If Title is the same as Series (even with issue numbers, #3, 3, volume, or format tags), do NOT add Title and keep Series
-  if (safeObj.Title && (isTitleSameAsSeries(safeObj.Title, safeObj.Series) || (!safeObj.Series && isTitleSameAsSeries(safeObj.Title, '')))) {
+  // Exception: Never strip Title if preserveTitle is enabled (e.g. manual user edit)
+  if (!options.preserveTitle && safeObj.Title && (isTitleSameAsSeries(safeObj.Title, safeObj.Series) || (!safeObj.Series && isTitleSameAsSeries(safeObj.Title, '')))) {
     delete safeObj.Title;
   }
 
@@ -1018,7 +1020,7 @@ async function writeComicInfoToCbz(cbzPath, metadataXml) {
   }
 }
 
-async function saveMetadataToComic(comicPath, metadataObj) {
+async function saveMetadataToComic(comicPath, metadataObj, options = {}) {
   const storageMode = getMetadataStorage();
   const ext = path.extname(comicPath).toLowerCase();
 
@@ -1030,7 +1032,7 @@ async function saveMetadataToComic(comicPath, metadataObj) {
   try {
     log('INFO', 'META', `Writing ComicInfo.xml for ${path.basename(comicPath)}`);
 
-    const metadataXml = buildComicInfoXml(trimObjectStrings(metadataObj));
+    const metadataXml = buildComicInfoXml(trimObjectStrings(metadataObj), options);
     if (!metadataXml) {
       log('INFO', 'META', `No valid metadata for ${path.basename(comicPath)}; skipping save.`);
       return;

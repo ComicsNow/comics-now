@@ -299,7 +299,7 @@ def parse_amazon_product_soup(soup, url):
     return metadata
 
 
-def search_amazon_multi(query, limit=2):
+def search_amazon_multi(query, limit=10):
     """Search Amazon Books for volume candidates with anti-bot headers & rate limits."""
     if not query or not query.strip():
         return []

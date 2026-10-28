@@ -46,7 +46,7 @@ async function loadMetadata() {
       if (!response.ok) throw new Error('Metadata not found.');
       global.currentMetadata = await response.json();
     }
-    renderMetadataDisplay(global.currentMetadata, true); // true = clear and render fresh
+    renderMetadataDisplay(global.currentMetadata, true, { preserveTitle: true }); // true = clear and render fresh, preserving manual titles
   } catch (error) {
     global.metadataForm.innerHTML = `<p class="text-red-400 text-center">${global.escapeHtml(error.message)}</p>`;
   }
@@ -303,7 +303,7 @@ function cleanGenreAndTags(val) {
  * @param {Object} metadata
  * @returns {Object} Sanitized metadata (modified in-place and returned)
  */
-function sanitizeMetadata(metadata) {
+function sanitizeMetadata(metadata, options = {}) {
   if (!metadata || typeof metadata !== 'object') return metadata;
 
   // 1. Strip format/edition words like TPB, HC, Hardcover, Softcover, Graphic Novel, etc. from Series and Title
@@ -342,7 +342,8 @@ function sanitizeMetadata(metadata) {
   }
 
   // 3. Check isTitleSameAsSeries(Title, Series): if Title is the same as Series (or if Title is just Series + Issue Number, or if Title is empty/generic issue number like "#1" or "Issue 1"), clear Title (Title = '')
-  if (metadata.Title && (isTitleSameAsSeries(metadata.Title, metadata.Series) || (!metadata.Series && isTitleSameAsSeries(metadata.Title, '')))) {
+  // Exception: Never strip Title if preserveTitle is enabled (e.g. manual user edit or form display)
+  if (!options.preserveTitle && metadata.Title && (isTitleSameAsSeries(metadata.Title, metadata.Series) || (!metadata.Series && isTitleSameAsSeries(metadata.Title, '')))) {
     metadata.Title = '';
   }
 
@@ -562,12 +563,14 @@ function createUrlTaggerBox() {
   return container;
 }
 
-function renderMetadataDisplay(metadata, clearForm = true) {
+function renderMetadataDisplay(metadata, clearForm = true, options = {}) {
+  const isCurrentComicMeta = (global.currentMetadata && metadata === global.currentMetadata) || Boolean(options && options.preserveTitle);
+  const opts = { ...options, preserveTitle: Boolean(isCurrentComicMeta) };
   if (metadata && typeof metadata === 'object') {
-    sanitizeMetadata(metadata);
+    sanitizeMetadata(metadata, opts);
   }
   if (global.currentMetadata && typeof global.currentMetadata === 'object' && global.currentMetadata !== metadata) {
-    sanitizeMetadata(global.currentMetadata);
+    sanitizeMetadata(global.currentMetadata, { ...options, preserveTitle: true });
   }
 
   if (clearForm) {

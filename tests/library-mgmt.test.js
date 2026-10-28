@@ -230,4 +230,43 @@ describe('Admin Library Management - Metadata Migration', () => {
       ])
     );
   });
+
+  it('should call saveMetadataToComic with preserveTitle: true when saving in metadata mode', async () => {
+    let saveInfoHandler;
+    router.post.mockImplementation((path, ...args) => {
+      if (path === '/api/v1/comics/info') {
+        saveInfoHandler = args[args.length - 1];
+      }
+    });
+
+    attachLibraryMgmtRoutes(router, deps);
+
+    deps.dbGet.mockResolvedValue({ libraryMode: 'metadata' });
+    jest.spyOn(fs, 'existsSync').mockReturnValue(true);
+    const mockStat = jest.spyOn(fs.promises, 'stat').mockResolvedValue({ mtimeMs: 123456 });
+
+    const b64Path = Buffer.from('/comics/Batman 45.cbz').toString('base64');
+    const req = {
+      query: { path: b64Path },
+      body: {
+        Title: 'Batman #45',
+        Series: 'Batman',
+        Number: '45',
+        Publisher: 'DC Comics'
+      }
+    };
+    const res = {
+      json: jest.fn(),
+      status: jest.fn().mockReturnThis()
+    };
+
+    await saveInfoHandler(req, res);
+
+    expect(deps.saveMetadataToComic).toHaveBeenCalledWith(
+      '/comics/Batman 45.cbz',
+      expect.objectContaining({ Title: 'Batman #45' }),
+      expect.objectContaining({ preserveTitle: true })
+    );
+    mockStat.mockRestore();
+  });
 });

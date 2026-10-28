@@ -350,6 +350,10 @@ metadataForm?.addEventListener('submit', async (e) => {
 
   for (const [key, value] of formData.entries()) {
     state.currentMetadata[key] = value;
+    if (key === 'Title') {
+      delete state.currentMetadata.title;
+      delete state.currentMetadata.issue_title;
+    }
   }
 
   try {

@@ -64,7 +64,7 @@ module.exports = function attach(router, deps) {
         throw new Error('Comic file missing on disk');
       }
       const ext = path.extname(comic.path).toLowerCase();
-      const xml = metadata.buildComicInfoXml(fields);
+      const xml = metadata.buildComicInfoXml(fields, { preserveTitle: true });
       if (!xml) throw new Error('No valid ComicInfo fields to write');
       if (storage === 'sidecar') {
         const sidecarPath = path.join(path.dirname(comic.path), path.basename(comic.path, ext) + '.ComicInfo.xml');

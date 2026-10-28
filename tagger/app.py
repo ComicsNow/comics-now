@@ -9,6 +9,14 @@ import datetime
 import json
 import hashlib
 from concurrent.futures import ThreadPoolExecutor, as_completed
+
+try:
+    import urllib3.contrib
+    if not hasattr(urllib3.contrib, 'appengine'):
+        urllib3.contrib.appengine = None
+except Exception:
+    pass
+
 from flask import Flask, render_template, request, jsonify, send_file, Response
 from werkzeug.utils import secure_filename
 
