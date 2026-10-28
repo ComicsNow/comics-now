@@ -292,8 +292,10 @@ async function matchCoverToCandidates({
   model = 'gemini-3.5-flash-lite',
   throttleMs = DEFAULT_THROTTLE_MS
 }) {
+  const cryptoVault = require('../utils/crypto-vault');
+  const effectiveApiKey = (cryptoVault.decrypt(apiKey) || apiKey || '').trim();
   const activeModel = (model || '').trim() || 'gemini-3.5-flash-lite';
-  if (!apiKey) {
+  if (!effectiveApiKey) {
     return {
       bestIndex: -1,
       confidence: 0,
@@ -356,7 +358,7 @@ async function matchCoverToCandidates({
   await waitThrottle(throttleMs);
 
   // 5. POST to Gemini generateContent (activeModel; default gemini-3.5-flash-lite)
-  const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(activeModel)}:generateContent?key=${encodeURIComponent(apiKey)}`;
+  const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(activeModel)}:generateContent?key=${encodeURIComponent(effectiveApiKey)}`;
 
   try {
     const res = await fetch(endpoint, {

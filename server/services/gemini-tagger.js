@@ -76,11 +76,14 @@ function installTaggerHook(ctx) {
       } catch (_) {}
     }
 
-    if (!config.apiKey && ctx.db && typeof ctx.db.dbGet === 'function') {
+    if ((!config.apiKey || config.apiKey.startsWith('enc:v1:')) && ctx.db && typeof ctx.db.dbGet === 'function') {
       try {
         const keyRow = await ctx.db.dbGet("SELECT value FROM settings WHERE key = 'geminiApiKey'");
         if (keyRow?.value) {
-          try { config.apiKey = JSON.parse(keyRow.value); } catch { config.apiKey = keyRow.value; }
+          let rawVal = keyRow.value;
+          try { rawVal = JSON.parse(rawVal); } catch { rawVal = keyRow.value; }
+          const cryptoVault = require('../utils/crypto-vault');
+          config.apiKey = (cryptoVault.decrypt(rawVal) || rawVal || '').trim();
           if (ctx.config) ctx.config.geminiApiKey = config.apiKey;
         }
       } catch (_) {}
@@ -237,7 +240,9 @@ function getConfig(ctx) {
       : (fileConfig.geminiCoverMatchEnabled !== undefined ? !!fileConfig.geminiCoverMatchEnabled : true);
 
     const termsAccepted = fileConfig.geminiTermsAccepted === true;
-    const apiKey = process.env.GEMINI_API_KEY || fileConfig.geminiApiKey || ctx.config?.geminiApiKey || configGetterKey || '';
+    const cryptoVault = require('../utils/crypto-vault');
+    const rawApiKey = process.env.GEMINI_API_KEY || configGetterKey || fileConfig.geminiApiKey || ctx.config?.geminiApiKey || '';
+    const apiKey = (cryptoVault.decrypt(rawApiKey) || rawApiKey || '').trim();
     const model = (fileConfig.geminiModel || ctx.config?.geminiModel || process.env.GEMINI_MODEL || 'gemini-3.5-flash-lite').trim();
     const dailyCap = parseInt(process.env.GEMINI_COVER_DAILY_CAP || fileConfig.geminiCoverDailyCap || '450', 10);
     const taggerServiceUrl = fileConfig.taggerServiceUrl || ctx.config?.taggerServiceUrl || 'http://127.0.0.1:5000';

@@ -129,7 +129,9 @@ module.exports = function attach(router, deps) {
   async function handleGetModels(req, res) {
     try {
       const cfg = await readConfig();
-      const apiKey = (req.query.apiKey || cfg.geminiApiKey || config.geminiApiKey || (process.env.NODE_ENV === 'test' ? '' : process.env.GEMINI_API_KEY) || '').trim();
+      const cryptoVault = require('../../utils/crypto-vault');
+      const rawKey = req.query.apiKey || cfg.geminiApiKey || config.geminiApiKey || (process.env.NODE_ENV === 'test' ? '' : process.env.GEMINI_API_KEY) || '';
+      const apiKey = (cryptoVault.decrypt(rawKey) || rawKey || '').trim();
 
       const fallbackModels = [
         { id: 'gemini-3.5-flash-lite', displayName: 'Gemini 3.5 Flash-Lite (Recommended Default)' },

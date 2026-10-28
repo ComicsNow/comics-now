@@ -294,5 +294,51 @@ describe('Gemini Vision Cover Arbiter', () => {
       expect(await fetchImageAsBase64('http://10.0.0.1/')).toBeNull();
       expect(await fetchImageAsBase64('http://172.16.0.1/')).toBeNull();
     });
+
+    test('automatically decrypts encrypted enc:v1: API key before calling Gemini endpoint', async () => {
+      const cryptoVault = require('../server/utils/crypto-vault');
+      const plainKey = 'AIzaSyMockKeyForTestingOnly00123';
+      const encKey = cryptoVault.encrypt(plainKey);
+
+      global.fetch = jest.fn().mockImplementation((url) => {
+        if (url.includes('generativelanguage.googleapis.com')) {
+          expect(url).toContain(`key=${plainKey}`);
+          expect(url).not.toContain('enc%3Av1');
+          return Promise.resolve({
+            ok: true,
+            json: () => Promise.resolve({
+              candidates: [
+                {
+                  content: {
+                    parts: [
+                      {
+                        text: JSON.stringify({
+                          bestIndex: 0,
+                          confidence: 0.95,
+                          reason: 'Match'
+                        })
+                      }
+                    ]
+                  }
+                }
+              ]
+            })
+          });
+        }
+        return Promise.resolve({
+          ok: true,
+          headers: new Map([['content-type', 'image/jpeg']]),
+          arrayBuffer: () => Promise.resolve(new ArrayBuffer(8))
+        });
+      });
+
+      const result = await matchCoverToCandidates({
+        localCoverPath: mockLocalPath,
+        candidates: [{ title: 'Test Comic', coverUrl: 'http://example.com/cover.jpg' }],
+        apiKey: encKey
+      });
+
+      expect(result.bestIndex).toBe(0);
+    });
   });
 });
