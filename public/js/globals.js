@@ -326,28 +326,6 @@ export function sanitizeComicTitle(rawTitle) {
   return clean || rawTitle.trim();
 }
 
-function isTitleRedundantWithSeries(title, series) {
-  if (!title) return true;
-  const t = String(title).trim().toLowerCase();
-  if (!t) return true;
-  // If title is just a number, issue, or volume tag (e.g. "#1", "01", "Issue 1", "Vol. 1")
-  if (/^(?:(?:#|(?:issue|no\.?|vol(?:ume)?\.?|pt\.?|part|book|bk\.?)\s*#?)\s*\d*|\d+)\s*$/i.test(t)) {
-    return true;
-  }
-  if (!series) return false;
-  const s = String(series).trim().toLowerCase();
-  if (!s) return false;
-  if (t === s) return true;
-  // Check if title starts with series name and remainder is only issue / volume / year
-  if (t.startsWith(s)) {
-    const rem = t.slice(s.length).replace(/[:\s\-_–—#()]+/g, ' ').trim();
-    if (!rem || /^(?:(?:issue|no|vol|volume|pt|part|book|bk)\s*)?\d+(?:\s*(?:of|\/)\s*\d+)?(?:\s*\d{4})?$/i.test(rem)) {
-      return true;
-    }
-  }
-  return false;
-}
-
 export function buildComicDisplayInfo(comic = {}) {
   let metadata = comic.metadata || {};
   if (typeof metadata === 'string') {
@@ -393,8 +371,12 @@ export function buildComicDisplayInfo(comic = {}) {
     const trimmedTitle = toTrimmedString(rawStoryTitle);
     const isFilename = /\.(cbz|cbr|cb7|cbt|zip|rar|tar|pdf)$/i.test(trimmedTitle) ||
                        (comic.name && trimmedTitle.toLowerCase() === toTrimmedString(comic.name).toLowerCase());
-    const isRedundant = isTitleRedundantWithSeries(trimmedTitle, seriesName) ||
-                        trimmedTitle.toLowerCase() === displayTitle.toLowerCase();
+    const sLower = (seriesName || '').toLowerCase().trim();
+    const tLower = trimmedTitle.toLowerCase().trim();
+    const dLower = displayTitle.toLowerCase().trim();
+    const isRedundant = tLower === sLower ||
+                        tLower === dLower ||
+                        (Boolean(sLower) && tLower.startsWith(sLower) && /^(?:[:\s\-_–—#()]+|\s*(?:issue|no|vol|volume|pt|part|book|bk)\s*\d*|\d+)+$/i.test(tLower.slice(sLower.length)));
 
     if (trimmedTitle && !isFilename && !isRedundant) {
       subtitle = trimmedTitle;
