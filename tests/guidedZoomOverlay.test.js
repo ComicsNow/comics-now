@@ -61,6 +61,7 @@ describe('Guided View Zoom & Overlay Scaling', () => {
       script.runInContext(sandbox);
     }
 
+    loadFile('../public/js/viewer/guided/data.js');
     loadFile('../public/js/viewer/guided/overlay.js');
   });
 
@@ -215,6 +216,43 @@ describe('Guided View Zoom & Overlay Scaling', () => {
     expect(overlay).toBeTruthy();
     const zIndex = parseInt(overlay.style.zIndex, 10);
     expect(zIndex).toBeGreaterThanOrEqual(100);
+  });
+
+  test('G) Non-rectangular panel polygon applies CSS clip-path: polygon(...) and resets cleanly', () => {
+    // Set up page data with a diagonal triangle panel polygon in natural 1000x1500 coords
+    state.currentComic = { id: 'c-poly', mangaMode: false };
+    state.getViewerPages = () => ['01.jpg'];
+    state.currentPageIndex = 0;
+    const diagBox = [100, 150, 800, 600];
+    const diagPoly = [[100, 150], [900, 150], [100, 750]];
+    state.GuidedView.cache.set('c-poly', {
+      pages: {
+        '01.jpg': {
+          panels: [diagBox],
+          bubbles: [],
+          sequence: [diagBox],
+          polygons: {
+            '100,150,800,600': diagPoly
+          }
+        }
+      }
+    });
+
+    expect(state.GuidedView.currentPagePolygonForBox(diagBox)).toEqual(diagPoly);
+
+    state.GuidedView.applyBubbleOverlay(diagBox, true);
+    const innerImg = document.getElementById('bubble-magnifier-img');
+    expect(innerImg.style.clipPath).toBe('polygon(10% 10%, 90% 10%, 10% 50%)');
+
+    // Switching to a standard rectangular box clears clip-path
+    state.GuidedView.applyBubbleOverlay([50, 50, 200, 100], false);
+    expect(innerImg.style.clipPath).toBe('');
+
+    // Sequential Manga transform also applies and clears polygon clip-path
+    state.GuidedView.applyTransform(diagBox, true);
+    expect(img.style.clipPath).toBe('polygon(10% 10%, 90% 10%, 10% 50%)');
+    state.GuidedView.applyTransform(null, true);
+    expect(img.style.clipPath).toBe('');
   });
 });
 

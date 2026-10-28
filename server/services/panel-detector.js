@@ -137,6 +137,95 @@ function nms(boxes, iouThresh) {
   return kept;
 }
 
+function rdpSimplify(points, epsilon) {
+  if (!Array.isArray(points) || points.length <= 3) return points;
+  let maxDist = 0;
+  let index = 0;
+  const start = points[0];
+  const end = points[points.length - 1];
+  const dx = end[0] - start[0];
+  const dy = end[1] - start[1];
+  const lenSq = dx * dx + dy * dy;
+
+  for (let i = 1; i < points.length - 1; i++) {
+    const p = points[i];
+    let dist;
+    if (lenSq === 0) {
+      dist = Math.hypot(p[0] - start[0], p[1] - start[1]);
+    } else {
+      const t = Math.max(0, Math.min(1, ((p[0] - start[0]) * dx + (p[1] - start[1]) * dy) / lenSq));
+      const projX = start[0] + t * dx;
+      const projY = start[1] + t * dy;
+      dist = Math.hypot(p[0] - projX, p[1] - projY);
+    }
+    if (dist > maxDist) {
+      index = i;
+      maxDist = dist;
+    }
+  }
+
+  if (maxDist > epsilon) {
+    const left = rdpSimplify(points.slice(0, index + 1), epsilon);
+    const right = rdpSimplify(points.slice(index), epsilon);
+    return [...left.slice(0, -1), ...right];
+  }
+  return [start, end];
+}
+
+function extractPolygonFromProtoMask(coeffs, protoData, protoDims, box, transform) {
+  if (!coeffs || !protoData || !Array.isArray(protoDims) || protoDims.length < 4) return null;
+  const numProtos = protoDims[1];
+  const protoH = protoDims[2];
+  const protoW = protoDims[3];
+  const { scaleX, scaleY, padX = 0, padY = 0, width, height } = transform;
+
+  const inX1 = (box.x + padX) / scaleX;
+  const inY1 = (box.y + padY) / scaleY;
+  const inX2 = (box.x + box.w + padX) / scaleX;
+  const inY2 = (box.y + box.h + padY) / scaleY;
+
+  const px1 = Math.max(0, Math.floor(inX1 * (protoW / INPUT_SIZE)));
+  const py1 = Math.max(0, Math.floor(inY1 * (protoH / INPUT_SIZE)));
+  const px2 = Math.min(protoW - 1, Math.ceil(inX2 * (protoW / INPUT_SIZE)));
+  const py2 = Math.min(protoH - 1, Math.ceil(inY2 * (protoH / INPUT_SIZE)));
+
+  if (px2 <= px1 || py2 <= py1) return null;
+
+  const leftEdge = [];
+  const rightEdge = [];
+  const planeSize = protoH * protoW;
+
+  for (let py = py1; py <= py2; py++) {
+    let rowMinX = -1;
+    let rowMaxX = -1;
+    const rowOffset = py * protoW;
+    for (let px = px1; px <= px2; px++) {
+      let logit = 0;
+      const idx = rowOffset + px;
+      for (let c = 0; c < numProtos; c++) {
+        logit += coeffs[c] * protoData[c * planeSize + idx];
+      }
+      if (logit > 0) {
+        if (rowMinX === -1) rowMinX = px;
+        rowMaxX = px;
+      }
+    }
+    if (rowMinX !== -1) {
+      const toOrigX = (px) => Math.max(0, Math.min(width, Math.round(((px + 0.5) * (INPUT_SIZE / protoW)) * scaleX - padX)));
+      const toOrigY = (pyVal) => Math.max(0, Math.min(height, Math.round(((pyVal + 0.5) * (INPUT_SIZE / protoH)) * scaleY - padY)));
+      const oy = toOrigY(py);
+      leftEdge.push([toOrigX(rowMinX), oy]);
+      rightEdge.push([toOrigX(rowMaxX), oy]);
+    }
+  }
+
+  if (leftEdge.length < 2) return null;
+  const rawContour = [...leftEdge, ...rightEdge.reverse()];
+  const epsilon = Math.max(3, Math.hypot(box.w, box.h) * 0.025);
+  const simplified = rdpSimplify(rawContour, epsilon);
+  return simplified.length >= 3 ? simplified : rawContour.slice(0, 4);
+}
+
 async function detectPanels(buffer, typeOrIsManga, confThreshold = null, filterCls = null) {
   try {
     const type = typeof typeOrIsManga === 'boolean' ? (typeOrIsManga ? 'manga' : 'western') : typeOrIsManga;
@@ -161,6 +250,7 @@ async function detectPanels(buffer, typeOrIsManga, confThreshold = null, filterC
     const tensor = new ort.Tensor('float32', float32Data, [1, 3, INPUT_SIZE, INPUT_SIZE]);
     const results = await session.run({ images: tensor });
     const output = results.output0;
+    const protoOutput = results.output1 || null;
     const data = output.data;
     const dims = output.dims;
 
@@ -176,9 +266,11 @@ async function detectPanels(buffer, typeOrIsManga, confThreshold = null, filterC
     let boxes = [];
     const threshold = confThreshold || (type === 'western' ? DEFAULTS.WESTERN_CONF : DEFAULTS.CONF_THRESHOLD);
 
-    if (dims[1] === 300 && dims[2] === 6) {
+    if (dims[1] === 300 && (dims[2] === 6 || dims[2] === 38)) {
+      const stride = dims[2];
+      const hasMask = stride === 38 && protoOutput;
       for (let i = 0; i < 300; i++) {
-        const o = i * 6;
+        const o = i * stride;
         const conf = data[o + 4];
         const cls = data[o + 5];
         if (conf <= threshold) continue;
@@ -189,10 +281,16 @@ async function detectPanels(buffer, typeOrIsManga, confThreshold = null, filterC
         const x2 = (data[o + 2] * scaleX) - padX;
         const y2 = (data[o + 3] * scaleY) - padY;
         const w = x2 - x1, h = y2 - y1;
-        if (w > 10 && h > 10) boxes.push({ x: x1, y: y1, w, h, conf });
+        if (w > 10 && h > 10) {
+          const coeffs = hasMask ? data.subarray(o + 6, o + 38) : null;
+          boxes.push({ x: x1, y: y1, w, h, conf, coeffs });
+        }
       }
-    } else if (dims[1] === 5 && dims[2] === 8400) {
+    } else if ((dims[1] === 5 || dims[1] >= 37) && dims[2] === 8400) {
       const N = 8400;
+      const totalCh = dims[1];
+      const hasMask = totalCh >= 37 && protoOutput;
+      const maskStartCh = totalCh - 32;
       const xData = data.subarray(0, N), yData = data.subarray(N, 2 * N);
       const wData = data.subarray(2 * N, 3 * N), hData = data.subarray(3 * N, 4 * N);
       const confData = data.subarray(4 * N, 5 * N);
@@ -200,7 +298,14 @@ async function detectPanels(buffer, typeOrIsManga, confThreshold = null, filterC
         if (confData[i] <= threshold) continue;
         const w = wData[i] * scaleX, h = hData[i] * scaleY;
         const cx = xData[i] * scaleX - padX, cy = yData[i] * scaleY - padY;
-        boxes.push({ x: cx - w/2, y: cy - h/2, w, h, conf: confData[i] });
+        let coeffs = null;
+        if (hasMask) {
+          coeffs = new Float32Array(32);
+          for (let c = 0; c < 32; c++) {
+            coeffs[c] = data[(maskStartCh + c) * N + i];
+          }
+        }
+        boxes.push({ x: cx - w/2, y: cy - h/2, w, h, conf: confData[i], coeffs });
       }
     }
 
@@ -213,33 +318,222 @@ async function detectPanels(buffer, typeOrIsManga, confThreshold = null, filterC
     }
 
     if (boxes.length === 0) return [[0, 0, meta.width, meta.height]];
-    return boxes.map(b => [Math.round(b.x), Math.round(b.y), Math.round(b.w), Math.round(b.h)]);
+    return boxes.map(b => {
+      const arr = [Math.round(b.x), Math.round(b.y), Math.round(b.w), Math.round(b.h)];
+      if (b.coeffs && protoOutput) {
+        const poly = extractPolygonFromProtoMask(
+          b.coeffs,
+          protoOutput.data,
+          protoOutput.dims,
+          b,
+          { scaleX, scaleY, padX, padY, width: meta.width, height: meta.height }
+        );
+        if (poly && poly.length >= 3) {
+          arr.polygon = poly;
+        }
+      }
+      return arr;
+    });
   } catch (err) {
     console.error('detectPanels error:', err);
     throw err;
   }
 }
 
-function sortReadingOrder(items, type) {
-  if (!items || items.length === 0) return items;
-  const boxes = items.map(p => Array.isArray(p) ? { x: p[0], y: p[1], w: p[2], h: p[3], raw: p } : { ...p, raw: p });
-  
+const XY_CUT_OVERLAP_RATIO = 0.08;
+
+function computePolygonCentroid(poly) {
+  if (!Array.isArray(poly) || poly.length < 3) return null;
+  let sx = 0, sy = 0;
+  for (let i = 0; i < poly.length; i++) {
+    sx += Number(poly[i][0]) || 0;
+    sy += Number(poly[i][1]) || 0;
+  }
+  return { cx: sx / poly.length, cy: sy / poly.length };
+}
+
+function normalizeBoxItem(item, index) {
+  const poly = (item && Array.isArray(item.polygon) && item.polygon.length >= 3)
+    ? item.polygon
+    : (item && item.raw && Array.isArray(item.raw.polygon) && item.raw.polygon.length >= 3 ? item.raw.polygon : null);
+  const centroid = computePolygonCentroid(poly);
+
+  if (Array.isArray(item)) {
+    return {
+      x: Number(item[0]) || 0,
+      y: Number(item[1]) || 0,
+      w: Number(item[2]) || 0,
+      h: Number(item[3]) || 0,
+      polyX: centroid ? centroid.cx : null,
+      polyY: centroid ? centroid.cy : null,
+      raw: item,
+      index
+    };
+  }
+  if (item && typeof item === 'object') {
+    if (typeof item.x === 'number' && typeof item.y === 'number') {
+      return {
+        x: item.x,
+        y: item.y,
+        w: Number(item.w) || 0,
+        h: Number(item.h) || 0,
+        polyX: centroid ? centroid.cx : null,
+        polyY: centroid ? centroid.cy : null,
+        raw: item,
+        index
+      };
+    }
+    if (Array.isArray(item.raw)) {
+      return {
+        x: Number(item.raw[0]) || 0,
+        y: Number(item.raw[1]) || 0,
+        w: Number(item.raw[2]) || 0,
+        h: Number(item.raw[3]) || 0,
+        polyX: centroid ? centroid.cx : null,
+        polyY: centroid ? centroid.cy : null,
+        raw: item,
+        index
+      };
+    }
+    if (item[0] !== undefined && item[1] !== undefined) {
+      return {
+        x: Number(item[0]) || 0,
+        y: Number(item[1]) || 0,
+        w: Number(item[2]) || 0,
+        h: Number(item[3]) || 0,
+        polyX: centroid ? centroid.cx : null,
+        polyY: centroid ? centroid.cy : null,
+        raw: item,
+        index
+      };
+    }
+  }
+  return { x: 0, y: 0, w: 0, h: 0, polyX: null, polyY: null, raw: item, index };
+}
+
+function findBestAxisCut(boxes, axis, overlapRatio = 0) {
+  const n = boxes.length;
+  if (n <= 1) return null;
+
+  const isY = axis === 'y';
+  const sorted = [...boxes].sort((a, b) => {
+    const startDiff = isY ? (a.y - b.y) : (a.x - b.x);
+    if (startDiff !== 0) return startDiff;
+    const endDiff = isY ? ((a.y + a.h) - (b.y + b.h)) : ((a.x + a.w) - (b.x + b.w));
+    if (endDiff !== 0) return endDiff;
+    return a.index - b.index;
+  });
+
+  const prefixMaxEnd = new Array(n);
+  let maxEnd = -Infinity;
+  for (let i = 0; i < n; i++) {
+    const end = isY ? (sorted[i].y + sorted[i].h) : (sorted[i].x + sorted[i].w);
+    if (end > maxEnd) maxEnd = end;
+    prefixMaxEnd[i] = maxEnd;
+  }
+
+  const minCoord = isY ? sorted[0].y : sorted[0].x;
+  const maxCoord = prefixMaxEnd[n - 1];
+
+  let bestIdx = -1;
+  let bestGap = -Infinity;
+
+  for (let i = 0; i < n - 1; i++) {
+    const nextStart = isY ? sorted[i + 1].y : sorted[i + 1].x;
+    const prevEnd = prefixMaxEnd[i];
+    const gap = nextStart - prevEnd;
+
+    let minAllowedGap = 0;
+    if (overlapRatio > 0) {
+      const firstSpan = Math.max(1, prevEnd - minCoord);
+      const secondSpan = Math.max(1, maxCoord - nextStart);
+      minAllowedGap = -Math.min(firstSpan, secondSpan) * overlapRatio;
+    }
+
+    if (gap >= minAllowedGap && gap > bestGap) {
+      bestGap = gap;
+      bestIdx = i;
+    }
+  }
+
+  if (bestIdx === -1) return null;
+  return {
+    first: sorted.slice(0, bestIdx + 1),
+    second: sorted.slice(bestIdx + 1)
+  };
+}
+
+function fallbackLinearSort(boxes, type) {
+  const copy = [...boxes];
   if (type === 'manga') {
-    // v2.1 Weighted Sort logic
-    boxes.sort((a, b) => {
-      const scoreA = (a.y * 1.5) - (a.x + a.w);
-      const scoreB = (b.y * 1.5) - (b.x + b.w);
-      return scoreA - scoreB;
+    copy.sort((a, b) => {
+      const ay = a.polyY !== null ? a.polyY : a.y;
+      const by = b.polyY !== null ? b.polyY : b.y;
+      const axRight = a.polyX !== null ? a.polyX : (a.x + a.w);
+      const bxRight = b.polyX !== null ? b.polyX : (b.x + b.w);
+      const scoreA = (ay * 1.5) - axRight;
+      const scoreB = (by * 1.5) - bxRight;
+      return scoreA !== scoreB ? scoreA - scoreB : a.index - b.index;
     });
   } else {
-    // Western Z-pattern
-    boxes.sort((a, b) => {
-      const scoreA = (a.y * 5.0) + a.x;
-      const scoreB = (b.y * 5.0) + b.x;
-      return scoreA - scoreB;
+    copy.sort((a, b) => {
+      const ay = a.polyY !== null ? a.polyY : a.y;
+      const by = b.polyY !== null ? b.polyY : b.y;
+      const ax = a.polyX !== null ? a.polyX : a.x;
+      const bx = b.polyX !== null ? b.polyX : b.x;
+      const scoreA = (ay * 5.0) + ax;
+      const scoreB = (by * 5.0) + bx;
+      return scoreA !== scoreB ? scoreA - scoreB : a.index - b.index;
     });
   }
-  return boxes.map(b => b.raw);
+  return copy;
+}
+
+function xyCutPartition(boxes, type) {
+  if (boxes.length <= 1) return boxes;
+
+  // 1. Clean Horizontal Cut (top-to-bottom tier separation)
+  const cleanY = findBestAxisCut(boxes, 'y', 0);
+  if (cleanY) {
+    return [
+      ...xyCutPartition(cleanY.first, type),
+      ...xyCutPartition(cleanY.second, type)
+    ];
+  }
+
+  // 2. Clean Vertical Cut (column separation: LTR for western, RTL for manga)
+  const cleanX = findBestAxisCut(boxes, 'x', 0);
+  if (cleanX) {
+    return type === 'manga'
+      ? [...xyCutPartition(cleanX.second, type), ...xyCutPartition(cleanX.first, type)]
+      : [...xyCutPartition(cleanX.first, type), ...xyCutPartition(cleanX.second, type)];
+  }
+
+  // 3. Overlap-tolerant Horizontal Cut (handles slight YOLO bounding-box bleed)
+  const tolY = findBestAxisCut(boxes, 'y', XY_CUT_OVERLAP_RATIO);
+  if (tolY) {
+    return [
+      ...xyCutPartition(tolY.first, type),
+      ...xyCutPartition(tolY.second, type)
+    ];
+  }
+
+  // 4. Overlap-tolerant Vertical Cut
+  const tolX = findBestAxisCut(boxes, 'x', XY_CUT_OVERLAP_RATIO);
+  if (tolX) {
+    return type === 'manga'
+      ? [...xyCutPartition(tolX.second, type), ...xyCutPartition(tolX.first, type)]
+      : [...xyCutPartition(tolX.first, type), ...xyCutPartition(tolX.second, type)];
+  }
+
+  // 5. Fallback for non-separable overlapping/inset clusters
+  return fallbackLinearSort(boxes, type);
+}
+
+function sortReadingOrder(items, type) {
+  if (!items || items.length <= 1) return items;
+  const boxes = items.map((p, i) => normalizeBoxItem(p, i));
+  return xyCutPartition(boxes, type).map(b => b.raw);
 }
 
 function intersectionOverArea(boxA, boxB) {
@@ -391,33 +685,9 @@ function isBubbleInPanel(bubble, panel) {
 
 function buildHybridWesternSequence(panels, bubbles) {
   if (!bubbles || bubbles.length === 0) return [];
-  if (!panels || panels.length === 0) return sortReadingOrder(bubbles, 'western');
-  const assigned = new Set(), objects = [];
-  const sortedPanels = sortReadingOrder(panels, 'western');
-
-  for (const panel of sortedPanels) {
-    const children = [];
-    for (let i = 0; i < bubbles.length; i++) {
-      if (!assigned.has(i) && (isBubbleInPanel(bubbles[i], panel) || intersectionOverArea(bubbles[i], panel) >= 0.8)) {
-        children.push(bubbles[i]);
-        assigned.add(i);
-      }
-    }
-    objects.push({ ...panel, isPanel: true, bubbles: sortReadingOrder(children, 'western'), raw: panel });
-  }
-
-  const orphans = [];
-  for (let i = 0; i < bubbles.length; i++) {
-    if (!assigned.has(i)) orphans.push({ ...bubbles[i], isBubble: true, raw: bubbles[i] });
-  }
-  
-  const finalSorted = sortReadingOrder([...objects, ...orphans], 'western');
-  const seq = [];
-  for (const obj of finalSorted) {
-    if (obj.isPanel) seq.push(...obj.bubbles);
-    else seq.push(obj.raw || obj);
-  }
-  return seq;
+  // For Western comics, dialogue guided-view follows speech bubbles directly in their
+  // natural reading order without routing or scrambling through panels.
+  return sortReadingOrder(bubbles, 'western');
 }
 
 function withTimeout(promise, ms, message) {
@@ -452,7 +722,17 @@ async function processComic(id, comicPath, type, opts = {}) {
       const panels = sortReadingOrder(rawPanels, type);
       const bubbles = await detectBubbles(buffer, type);
       let sequence = (type === 'manga') ? buildMangaSequence(rawPanels, bubbles) : buildHybridWesternSequence(panels, bubbles);
-      result.pages[pageName] = { panels, bubbles, sequence: sequence.length > 0 ? sequence : panels };
+      const polygons = {};
+      for (const p of panels) {
+        if (Array.isArray(p.polygon) && p.polygon.length >= 3) {
+          polygons[`${p[0]},${p[1]},${p[2]},${p[3]}`] = p.polygon;
+        }
+      }
+      const pageEntry = { panels, bubbles, sequence: sequence.length > 0 ? sequence : panels };
+      if (Object.keys(polygons).length > 0) {
+        pageEntry.polygons = polygons;
+      }
+      result.pages[pageName] = pageEntry;
       totalPanels += panels.length;
       pagesProcessed++;
     } catch (err) {
@@ -464,4 +744,13 @@ async function processComic(id, comicPath, type, opts = {}) {
   return { panels: totalPanels, pagesProcessed, pageCount: pages.length, outputPath: path.join(GUIDED_VIEW_DIR, id + '.json') };
 }
 
-module.exports = { processComic, extractPageBuffer, listPages, GUIDED_VIEW_DIR };
+module.exports = {
+  processComic,
+  extractPageBuffer,
+  listPages,
+  GUIDED_VIEW_DIR,
+  sortReadingOrder,
+  buildMangaSequence,
+  buildHybridWesternSequence,
+  extractPolygonFromProtoMask
+};
