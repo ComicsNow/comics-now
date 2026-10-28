@@ -107,4 +107,48 @@ describe('Comic Cards & Viewer Display Titles Rule', () => {
     expect(info.displayTitle).toBe('Nightwing #100');
     expect(info.subtitle).toBe('The Battle for Bludhaven');
   });
+
+  test('Shows volume and part titles on Line 2 (subtitle) without suppressing them as redundant', () => {
+    const comicVol1 = {
+      id: 'comic-vol-1',
+      name: '01 Animal Castle [Ablaze] (2022) #142.cbz',
+      series: 'Animal Castle',
+      metadata: {
+        Series: 'Animal Castle',
+        Number: '1',
+        Title: 'Vol 1'
+      }
+    };
+    const info1 = buildComicDisplayInfo(comicVol1);
+    expect(info1.displayTitle).toBe('Animal Castle #1');
+    expect(info1.subtitle).toBe('Vol 1');
+
+    const comicVol2 = {
+      id: 'comic-vol-2',
+      name: '01 Animal Castle - Vol. 2 [Ablaze] (2023).cbz',
+      series: 'Animal Castle',
+      metadata: {
+        Series: 'Animal Castle',
+        Number: '2',
+        Title: 'Vol 2'
+      }
+    };
+    const info2 = buildComicDisplayInfo(comicVol2);
+    expect(info2.displayTitle).toBe('Animal Castle #2');
+    expect(info2.subtitle).toBe('Vol 2');
+
+    const comicPart = {
+      id: 'comic-part-1',
+      name: '01 Animal - Part 1 [Europe Comics] (2020) #53.cbz',
+      series: 'Animal',
+      metadata: {
+        Series: 'Animal',
+        Number: '1',
+        Title: 'Part 1'
+      }
+    };
+    const infoPart = buildComicDisplayInfo(comicPart);
+    expect(infoPart.displayTitle).toBe('Animal #1');
+    expect(infoPart.subtitle).toBe('Part 1');
+  });
 });
