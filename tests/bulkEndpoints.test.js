@@ -283,13 +283,10 @@ describe('Bulk Endpoints Tests', () => {
 
       deps.dbGet.mockImplementation(async (sql, params) => {
         if (sql.includes('FROM reading_lists')) return { id: params[0] };
-        if (sql.includes('FROM comics')) return { totalPages: 20 };
         return null;
       });
-      deps.dbAll.mockResolvedValue([
-        { comicId: 'c1' },
-        { comicId: 'c2' }
-      ]);
+
+      deps.dbRun.mockResolvedValue({ changes: 2 });
 
       const req = {
         user: { userId: 'user-123', role: 'user' },
