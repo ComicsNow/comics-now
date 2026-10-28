@@ -31,11 +31,15 @@ async function getSecret(dbGet, dbRun) {
   if (cachedSecret) return cachedSecret;
   const row = await dbGet('SELECT value FROM settings WHERE key = ?', [SECRET_KEY]);
   if (row && row.value) {
-    cachedSecret = row.value;
+    let rawVal = row.value;
+    try { rawVal = JSON.parse(rawVal); } catch (_) {}
+    const cryptoVault = require('../utils/crypto-vault');
+    cachedSecret = (cryptoVault.decrypt(rawVal) || rawVal || '').trim();
     return cachedSecret;
   }
   const secret = crypto.randomBytes(32).toString('hex');
-  await dbRun('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)', [SECRET_KEY, secret]);
+  const cryptoVault = require('../utils/crypto-vault');
+  await dbRun('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)', [SECRET_KEY, cryptoVault.encrypt(secret)]);
   cachedSecret = secret;
   return cachedSecret;
 }

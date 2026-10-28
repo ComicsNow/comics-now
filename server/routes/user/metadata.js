@@ -338,25 +338,31 @@ module.exports = function attach(router, deps) {
         return res.status(400).json({ message: 'Query is required' });
       }
 
-      const { getConfig } = require('../../config');
+      const { getConfig, getGoogleBooksApiKey, getMetronPassword, getGcdPassword } = require('../../config');
+      const cryptoVault = require('../../utils/crypto-vault');
       const config = getConfig();
       const sidecarUrl = config.taggerServiceUrl || 'http://localhost:5000';
       const requestBody = { source, query };
-      const cvApiKey = (typeof getComicVineApiKey === 'function' ? getComicVineApiKey() : null) || config.comicVineApiKey || process.env.COMICVINE_API_KEY || '';
+      const rawCvApiKey = (typeof getComicVineApiKey === 'function' ? getComicVineApiKey() : null) || config.comicVineApiKey || process.env.COMICVINE_API_KEY || '';
+      const cvApiKey = (cryptoVault.decrypt(rawCvApiKey) || rawCvApiKey || '').trim();
       if ((source === 'all' || source === 'comicvine' || source === 'gcd') && cvApiKey) {
         requestBody.comicvine_api_key = cvApiKey;
       }
-      if (config.googleBooksApiKey) {
-        requestBody.google_books_api_key = config.googleBooksApiKey;
+      const rawGbApiKey = (typeof getGoogleBooksApiKey === 'function' ? getGoogleBooksApiKey() : null) || config.googleBooksApiKey || process.env.GOOGLE_BOOKS_API_KEY || '';
+      const gbApiKey = (cryptoVault.decrypt(rawGbApiKey) || rawGbApiKey || '').trim();
+      if (gbApiKey) {
+        requestBody.google_books_api_key = gbApiKey;
       }
       const metronUser = config.metronUser || (typeof config.getMetronUser === 'function' ? config.getMetronUser() : '') || process.env.METRON_USER || '';
-      const metronPass = config.metronPassword || config.metronPass || (typeof config.getMetronPassword === 'function' ? config.getMetronPassword() : '') || process.env.METRON_PASSWORD || process.env.METRON_PASS || '';
+      const rawMetronPass = (typeof getMetronPassword === 'function' ? getMetronPassword() : null) || config.metronPassword || config.metronPass || process.env.METRON_PASSWORD || process.env.METRON_PASS || '';
+      const metronPass = (cryptoVault.decrypt(rawMetronPass) || rawMetronPass || '').trim();
       if ((source === 'all' || source === 'metron' || source === 'gcd') && metronUser && metronPass) {
         requestBody.metron_user = metronUser;
         requestBody.metron_pass = metronPass;
       }
       const gcdUser = config.gcdUser || (typeof config.getGcdUser === 'function' ? config.getGcdUser() : '') || process.env.GCD_USER || '';
-      const gcdPass = config.gcdPassword || config.gcdPass || (typeof config.getGcdPassword === 'function' ? config.getGcdPassword() : '') || process.env.GCD_PASSWORD || process.env.GCD_PASS || '';
+      const rawGcdPass = (typeof getGcdPassword === 'function' ? getGcdPassword() : null) || config.gcdPassword || config.gcdPass || process.env.GCD_PASSWORD || process.env.GCD_PASS || '';
+      const gcdPass = (cryptoVault.decrypt(rawGcdPass) || rawGcdPass || '').trim();
       if ((source === 'all' || source === 'gcd') && gcdUser && gcdPass) {
         requestBody.gcd_user = gcdUser;
         requestBody.gcd_pass = gcdPass;
@@ -454,12 +460,15 @@ module.exports = function attach(router, deps) {
   }
 
   async function resolveFallbackCoverImage(series, issueNumber, queryContext, reqTargetUrl = '', description = '') {
-    const { getConfig } = require('../../config');
+    const { getConfig, getMetronPassword } = require('../../config');
+    const cryptoVault = require('../../utils/crypto-vault');
     const config = getConfig();
     const sidecarUrl = config.taggerServiceUrl || 'http://localhost:5000';
-    const cvApiKey = (typeof getComicVineApiKey === 'function' ? getComicVineApiKey() : null) || config.comicVineApiKey || process.env.COMICVINE_API_KEY || '';
+    const rawCvApiKey = (typeof getComicVineApiKey === 'function' ? getComicVineApiKey() : null) || config.comicVineApiKey || process.env.COMICVINE_API_KEY || '';
+    const cvApiKey = (cryptoVault.decrypt(rawCvApiKey) || rawCvApiKey || '').trim();
     const metronUser = config.metronUser || (typeof config.getMetronUser === 'function' ? config.getMetronUser() : '') || process.env.METRON_USER || '';
-    const metronPass = config.metronPassword || config.metronPass || (typeof config.getMetronPassword === 'function' ? config.getMetronPassword() : '') || process.env.METRON_PASSWORD || process.env.METRON_PASS || '';
+    const rawMetronPass = (typeof getMetronPassword === 'function' ? getMetronPassword() : null) || config.metronPassword || config.metronPass || process.env.METRON_PASSWORD || process.env.METRON_PASS || '';
+    const metronPass = (cryptoVault.decrypt(rawMetronPass) || rawMetronPass || '').trim();
 
     let sName = (series || '').trim();
     let issNum = (issueNumber || '').trim();

@@ -96,4 +96,37 @@ describe('Full Secrets Migration & Integration Suite', () => {
     expect(cryptoVault.mask(settingsDb.get('comicVineApiKey'))).toBe('••••••••••••5678');
     expect(cryptoVault.mask(settingsDb.get('geminiApiKey'))).toBe('••••••••••••ly12');
   });
+
+  test('config getters transparently decrypt all encrypted secrets without leaking enc:v1: ciphertext', () => {
+    const config = require('../server/config');
+    const plainSecrets = {
+      comicVineApiKey: 'mockComicVineApiKey0123456789abcdef5678',
+      geminiApiKey: 'AIzaSyMockGeminiKeyForUnitTestingOnly12',
+      metronPassword: 'mock-metron-password-sequence-999',
+      gcdPassword: 'mock-gcd-password-mutable-888',
+      googleBooksApiKey: 'AIzaSyMockGoogleBooksKeyForTesting0034'
+    };
+
+    config.setComicVineApiKey(cryptoVault.encrypt(plainSecrets.comicVineApiKey), true);
+    config.setGeminiApiKey(cryptoVault.encrypt(plainSecrets.geminiApiKey), true);
+    config.setMetronPassword(cryptoVault.encrypt(plainSecrets.metronPassword), true);
+    config.setGcdPassword(cryptoVault.encrypt(plainSecrets.gcdPassword), true);
+    config.setGoogleBooksApiKey(cryptoVault.encrypt(plainSecrets.googleBooksApiKey), true);
+
+    expect(config.getComicVineApiKey()).toBe(plainSecrets.comicVineApiKey);
+    expect(config.getGeminiApiKey()).toBe(plainSecrets.geminiApiKey);
+    expect(config.getMetronPassword()).toBe(plainSecrets.metronPassword);
+    expect(config.getGcdPassword()).toBe(plainSecrets.gcdPassword);
+    expect(config.getGoogleBooksApiKey()).toBe(plainSecrets.googleBooksApiKey);
+
+    for (const getter of [
+      config.getComicVineApiKey,
+      config.getGeminiApiKey,
+      config.getMetronPassword,
+      config.getGcdPassword,
+      config.getGoogleBooksApiKey
+    ]) {
+      expect(getter().startsWith('enc:v1:')).toBe(false);
+    }
+  });
 });
