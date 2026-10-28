@@ -289,17 +289,27 @@ module.exports = function attach(router, deps) {
       let comics = [];
       if (comicFiles.length > 0) {
         const paths = comicFiles.map(f => f.path);
-        const placeholders = paths.map(() => '?').join(',');
         
         const prefMaps = await getReadingPrefMaps(userId);
 
-        const dbComics = await dbAll(`
-          SELECT c.id, c.name, c.path, c.thumbnailPath, c.publisher, c.series, c.totalPages as dbTotalPages,
-                 ucs.lastReadPage, ucs.totalPages as userTotalPages
-          FROM comics c
-          LEFT JOIN user_comic_status ucs ON c.id = ucs.comicId AND ucs.userId = ?
-          WHERE c.path IN (${placeholders})
-        `, [userId, ...paths]);
+        // ⚡ Bolt: Chunk SQLite batched queries to prevent "too many SQL variables"
+        // error when loading directories with >999 comic files.
+        const dbComics = [];
+        const chunkSize = 500;
+        for (let i = 0; i < paths.length; i += chunkSize) {
+          const chunk = paths.slice(i, i + chunkSize);
+          const placeholders = chunk.map(() => '?').join(',');
+
+          const chunkComics = await dbAll(`
+            SELECT c.id, c.name, c.path, c.thumbnailPath, c.publisher, c.series, c.totalPages as dbTotalPages,
+                   ucs.lastReadPage, ucs.totalPages as userTotalPages
+            FROM comics c
+            LEFT JOIN user_comic_status ucs ON c.id = ucs.comicId AND ucs.userId = ?
+            WHERE c.path IN (${placeholders})
+          `, [userId, ...chunk]);
+
+          dbComics.push(...chunkComics);
+        }
 
         const dbComicsMap = new Map();
         dbComics.forEach(c => dbComicsMap.set(c.path, c));
