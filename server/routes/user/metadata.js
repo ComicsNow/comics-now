@@ -1009,6 +1009,7 @@ module.exports = function attach(router, deps) {
 
       // Check Gemini API key
       const { getConfig } = require('../../config');
+      const cryptoVault = require('../../utils/crypto-vault');
       const config = getConfig();
       let geminiApiKey = (process.env.NODE_ENV === 'test' ? '' : process.env.GEMINI_API_KEY) || config.geminiApiKey || '';
       let geminiModel = config.geminiModel || 'gemini-3.5-flash-lite';
@@ -1027,6 +1028,8 @@ module.exports = function attach(router, deps) {
       } catch (err) {
         // Fallback to config / env
       }
+
+      geminiApiKey = (cryptoVault.decrypt(geminiApiKey) || geminiApiKey || '').trim();
 
       if (!geminiApiKey) {
         return res.status(400).json({
@@ -1173,6 +1176,7 @@ module.exports = function attach(router, deps) {
 
       // Check Gemini API key
       const { getConfig } = require('../../config');
+      const cryptoVault = require('../../utils/crypto-vault');
       const config = getConfig();
       let geminiApiKey = (process.env.NODE_ENV === 'test' ? '' : process.env.GEMINI_API_KEY) || config.geminiApiKey || '';
       let geminiModel = config.geminiModel || 'gemini-3.5-flash-lite';
@@ -1189,6 +1193,8 @@ module.exports = function attach(router, deps) {
           }
         }
       } catch (_) {}
+
+      geminiApiKey = (cryptoVault.decrypt(geminiApiKey) || geminiApiKey || '').trim();
 
       if (!geminiApiKey) {
         return res.status(400).json({
