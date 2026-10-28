@@ -19,6 +19,19 @@ db.pragma('foreign_keys = ON');
 db.pragma('cache_size = -64000');
 db.pragma('mmap_size = 268435456');
 db.pragma('temp_store = MEMORY');
+db.pragma('journal_size_limit = 16777216');
+
+// Periodically run an online checkpoint every hour to keep WAL size small on disk
+const walCheckpointTimer = setInterval(() => {
+  try {
+    db.pragma('wal_checkpoint(TRUNCATE)');
+  } catch (err) {
+    log('ERROR', 'DB', `Automated WAL checkpoint failed: ${err.message}`);
+  }
+}, 60 * 60 * 1000);
+if (walCheckpointTimer && typeof walCheckpointTimer.unref === 'function') {
+  walCheckpointTimer.unref();
+}
 
 const statementCache = new Map();
 const MAX_CACHED_STATEMENTS = 250;
@@ -253,6 +266,7 @@ async function initializeDatabase() {
     await dbRun(`CREATE INDEX IF NOT EXISTS idx_user_library_access_lookup ON user_library_access(userId, accessType)`);
     await dbRun(`CREATE INDEX IF NOT EXISTS idx_comics_publisher ON comics(publisher)`);
     await dbRun(`CREATE INDEX IF NOT EXISTS idx_comics_series ON comics(series)`);
+    await dbRun(`CREATE INDEX IF NOT EXISTS idx_comics_name ON comics(name COLLATE NOCASE)`);
     await dbRun(`CREATE INDEX IF NOT EXISTS idx_comics_updatedAt ON comics(updatedAt)`);
     await dbRun(`CREATE INDEX IF NOT EXISTS idx_comics_publisher_series ON comics(publisher, series)`);
     await dbRun(`CREATE INDEX IF NOT EXISTS idx_reading_list_items_comic ON reading_list_items(comicId)`);

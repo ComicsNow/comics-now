@@ -99,6 +99,7 @@ describe('Database Initialization & Schema Integrity', () => {
       'idx_user_library_access_lookup',
       'idx_comics_publisher',
       'idx_comics_series',
+      'idx_comics_name',
       'idx_comics_updatedAt',
       'idx_reading_list_items_comic',
       'idx_reading_list_items_list_sort',
@@ -118,6 +119,7 @@ describe('Database Initialization & Schema Integrity', () => {
     const tempStore = dbInstance.pragma('temp_store', { simple: true });
     const cacheSize = dbInstance.pragma('cache_size', { simple: true });
     const mmap = dbInstance.pragma('mmap_size', { simple: true });
+    const journalSizeLimit = dbInstance.pragma('journal_size_limit', { simple: true });
 
     // temp_store should be MEMORY (2)
     expect(tempStore).toBe(2);
@@ -125,6 +127,8 @@ describe('Database Initialization & Schema Integrity', () => {
     expect(cacheSize).toBeLessThanOrEqual(-32000);
     // mmap_size should be at least 64MB (67108864)
     expect(mmap).toBeGreaterThanOrEqual(67108864);
+    // journal_size_limit should be 16MB (16777216)
+    expect(journalSizeLimit).toBe(16777216);
   });
 
   test('initializeDatabase is idempotent and safe to run repeatedly', async () => {
