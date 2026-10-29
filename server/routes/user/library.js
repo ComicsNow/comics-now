@@ -93,25 +93,17 @@ module.exports = function attach(router, deps) {
         return res.json([]);
       }
 
-      // 1. Optimize: Filter in database using LIKE
+      // 1. Optimize: Filter and fetch user progress in database using LIKE and LEFT JOIN
       const searchPattern = `%${q}%`;
       const rows = await dbAll(
-        'SELECT * FROM comics WHERE (name LIKE ? OR series LIKE ? OR publisher LIKE ? OR metadata LIKE ?)',
-        [searchPattern, searchPattern, searchPattern, searchPattern]
+        `SELECT c.*, ucs.lastReadPage as userLastReadPage, ucs.totalPages as userTotalPages
+         FROM comics c
+         LEFT JOIN user_comic_status ucs ON c.id = ucs.comicId AND ucs.userId = ?
+         WHERE (c.name LIKE ? OR c.series LIKE ? OR c.publisher LIKE ? OR c.metadata LIKE ?)`,
+        [userId, searchPattern, searchPattern, searchPattern, searchPattern]
       );
 
-      // 2. Load per-user progress once
-      const userProgress = await dbAll(
-        'SELECT comicId, lastReadPage, totalPages FROM user_comic_status WHERE userId = ?',
-        [userId]
-      );
-
-      const progressMap = {};
-      for (const p of userProgress) {
-        progressMap[p.comicId] = { lastReadPage: p.lastReadPage, totalPages: p.totalPages };
-      }
-
-      // 3. Load user reading preferences using helper
+      // 2. Load user reading preferences using helper
       const prefMaps = await getReadingPrefMaps(userId);
       const directories = getComicsDirectories();
 
@@ -146,8 +138,6 @@ module.exports = function attach(router, deps) {
         // Resolve reading modes using hierarchical helper
         const { mangaMode, continuousMode } = resolveReadingModes({ comicId: r.id, series: r.series, publisher: r.publisher, comicPath: r.path, prefMaps, comicsRoots: directories });
 
-        const userProg = progressMap[r.id] || {};
-
         const absoluteRootDir = directories.find(d => r.path.startsWith(d));
         const rootDirKey = getLibraryIdFromPath(absoluteRootDir) || 'Library';
 
@@ -160,8 +150,8 @@ module.exports = function attach(router, deps) {
           path: redactedPath,
           thumbnailPath: r.thumbnailPath,
           progress: { 
-            lastReadPage: userProg.lastReadPage !== undefined ? userProg.lastReadPage : (r.lastReadPage || 0), 
-            totalPages: userProg.totalPages !== undefined ? userProg.totalPages : (r.totalPages || 0)
+            lastReadPage: r.userLastReadPage !== null ? r.userLastReadPage : (r.lastReadPage || 0),
+            totalPages: r.userTotalPages !== null ? r.userTotalPages : (r.totalPages || 0)
           },
           metadata: meta,
           series: r.series,
