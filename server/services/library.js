@@ -16,20 +16,14 @@ async function buildLibrary(userId = 'default-user') {
   const userRole = user?.role || 'user';
 
   // Get all comics and their per-user progress/status
-  const rows = await dbAll('SELECT * FROM comics');
-  log('INFO', 'SERVER', `Build library for UI with ${rows.length} rows for user ${userId} (role: ${userRole})`);
-
-  // Get per-user progress for all comics in one query
-  const userProgress = await dbAll(
-    'SELECT comicId, lastReadPage, totalPages FROM user_comic_status WHERE userId = ?',
+  // Optimization: Fetch comics and user progress in a single query
+  const rows = await dbAll(
+    `SELECT c.*, ucs.lastReadPage as userLastReadPage, ucs.totalPages as userTotalPages
+     FROM comics c
+     LEFT JOIN user_comic_status ucs ON c.id = ucs.comicId AND ucs.userId = ?`,
     [userId]
   );
-
-  // Create maps for quick lookup
-  const progressMap = {};
-  for (const p of userProgress) {
-    progressMap[p.comicId] = { lastReadPage: p.lastReadPage, totalPages: p.totalPages };
-  }
+  log('INFO', 'SERVER', `Build library for UI with ${rows.length} rows for user ${userId} (role: ${userRole})`);
 
   // Load all reading preferences for this user
   const { getReadingPrefMaps, resolveReadingModes, checkComicAccess } = require('../db');
@@ -120,7 +114,10 @@ async function buildLibrary(userId = 'default-user') {
     };
 
     // Use per-user progress if available, otherwise default to 0
-    const progress = progressMap[r.id] || { lastReadPage: 0, totalPages: r.totalPages || 0 };
+    const progress = {
+      lastReadPage: r.userLastReadPage !== null ? r.userLastReadPage : (r.lastReadPage || 0),
+      totalPages: r.userTotalPages !== null ? r.userTotalPages : (r.totalPages || 0)
+    };
 
     // Apply hierarchical reading modes preferences
     const { mangaMode, continuousMode } = resolveReadingModes({ comicId: r.id, series: r.series, publisher: r.publisher, comicPath: r.path, prefMaps, comicsRoots: directories });
