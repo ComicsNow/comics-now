@@ -1289,7 +1289,35 @@ def main() -> None:
     port_str = os.environ.get("MCP_PORT")
     disable_dns_rebinding = os.environ.get("MCP_DISABLE_DNS_REBINDING", "0") == "1"
 
-    if transport in ("sse", "streamable-http") and port_str:
+    if transport == "sse" and port_str:
+        import uvicorn
+        from starlette.applications import Starlette
+        from starlette.middleware.cors import CORSMiddleware
+        from starlette.routing import Mount
+
+        mcp.settings.host = host
+        mcp.settings.port = int(port_str)
+        mcp.settings.transport_security = TransportSecuritySettings(
+            enable_dns_rebinding_protection=not disable_dns_rebinding
+        )
+        base_app = mcp.sse_app()
+        starlette_app = Starlette(
+            routes=[
+                Mount("/comics-mcp", app=base_app),
+                Mount("", app=base_app),
+            ],
+            lifespan=base_app.router.lifespan_context,
+        )
+        starlette_app.add_middleware(
+            CORSMiddleware,
+            allow_origins=["*"],
+            allow_credentials=True,
+            allow_methods=["*"],
+            allow_headers=["*"],
+        )
+
+        uvicorn.run(starlette_app, host=host, port=int(port_str))
+    elif transport == "streamable-http" and port_str:
         import uvicorn
         from starlette.applications import Starlette
         from starlette.middleware.cors import CORSMiddleware

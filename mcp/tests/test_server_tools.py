@@ -311,6 +311,23 @@ class TestMcpTools(unittest.TestCase):
         self.assertNotIn(b"authorization_servers", body)
         self.assertNotIn(b"authorization_endpoint", body)
 
+    @patch("uvicorn.run")
+    @patch.dict("os.environ", {"MCP_TRANSPORT": "sse", "MCP_PORT": "3018", "MCP_DISABLE_DNS_REBINDING": "1"})
+    def test_sse_transport_initializes_sse_app_and_serves_endpoint(self, mock_uvicorn_run):
+        from starlette.testclient import TestClient
+
+        server.main()
+        self.assertTrue(mock_uvicorn_run.called)
+        asgi_app = mock_uvicorn_run.call_args[0][0]
+        client = TestClient(asgi_app)
+        with client.stream("GET", "/sse") as response:
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(response.headers.get("content-type"), "text/event-stream; charset=utf-8")
+            raw = next(response.iter_raw()).decode("utf-8")
+            self.assertIn("event: endpoint", raw)
+            self.assertIn("/messages/?session_id=", raw)
+
+
 
 if __name__ == "__main__":
     unittest.main()
