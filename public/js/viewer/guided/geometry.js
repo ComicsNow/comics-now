@@ -75,12 +75,66 @@ export function classifyMangaPage() {
   return classifyMangaBoxes(state.GuidedView.currentPageRawBoxes(), explicit);
 }
 
+// Finds the best matching bubble index for a click point (nx, ny) in natural coordinates.
+// Expands the clickable hit target around small bubbles so they can be easily tapped.
+export function findBubbleAtPoint(bubbles, nx, ny, options = {}) {
+  if (!Array.isArray(bubbles) || bubbles.length === 0) return -1;
+
+  const img = (typeof document !== 'undefined') ? document.getElementById('fullscreen-image') : null;
+  let scaleX = 1;
+  let scaleY = 1;
+  if (img && img.naturalWidth && img.clientWidth) {
+    scaleX = img.naturalWidth / img.clientWidth;
+    scaleY = img.naturalHeight / img.clientHeight;
+  }
+  
+  // Custom or adaptive hit padding: target ~32px screen padding horizontally and ~36px vertically
+  const hitPadX = options.hitPadX !== undefined ? options.hitPadX : Math.max(30, Math.round(32 * scaleX));
+  const hitPadY = options.hitPadY !== undefined ? options.hitPadY : Math.max(30, Math.round(36 * scaleY));
+
+  let bestExactIdx = -1;
+  let minExactArea = Infinity;
+
+  let bestPaddedIdx = -1;
+  let minPaddedDist = Infinity;
+
+  for (let i = 0; i < bubbles.length; i++) {
+    const b = bubbles[i];
+    const [bx, by, bw, bh] = Array.isArray(b) ? b : [b.x, b.y, b.w, b.h];
+
+    // 1. Check exact hit inside bubble
+    if (nx >= bx && nx <= bx + bw && ny >= by && ny <= by + bh) {
+      const area = bw * bh;
+      if (area < minExactArea) {
+        minExactArea = area;
+        bestExactIdx = i;
+      }
+      continue;
+    }
+
+    // 2. Check expanded margin hit
+    const dx = Math.max(0, bx - nx, nx - (bx + bw));
+    const dy = Math.max(0, by - ny, ny - (by + bh));
+    if (dx <= hitPadX && dy <= hitPadY) {
+      const dist = Math.hypot(dx / hitPadX, dy / hitPadY);
+      if (dist < minPaddedDist) {
+        minPaddedDist = dist;
+        bestPaddedIdx = i;
+      }
+    }
+  }
+
+  return bestExactIdx !== -1 ? bestExactIdx : bestPaddedIdx;
+}
+
 state.GuidedView.intersectionOverArea = intersectionOverArea;
 state.GuidedView.classifyMangaBoxes = classifyMangaBoxes;
 state.GuidedView.classifyMangaPage = classifyMangaPage;
+state.GuidedView.findBubbleAtPoint = findBubbleAtPoint;
 
 if (typeof window !== 'undefined') {
   window.GuidedView.intersectionOverArea = intersectionOverArea;
   window.GuidedView.classifyMangaBoxes = classifyMangaBoxes;
   window.GuidedView.classifyMangaPage = classifyMangaPage;
+  window.GuidedView.findBubbleAtPoint = findBubbleAtPoint;
 }

@@ -1410,7 +1410,8 @@
         <button
           id="manga-guided-toggle-btn" 
           type="button"
-          class="pill-button bg-gray-700 hover:bg-gray-600 text-white transition-colors"
+          class="pill-button bg-gray-700 hover:bg-gray-600 text-white transition-colors hidden"
+          style="display: none !important;"
           aria-pressed="false"
           aria-label="Guided panel-by-panel reading"
           title="Guided panel-by-panel reading (requires processed comic)"
@@ -1421,11 +1422,12 @@
         <button
           id="western-guided-toggle-btn"
           type="button"
-          class="pill-button bg-gray-700 hover:bg-gray-600 text-white transition-colors"
+          class="pill-button bg-gray-700 hover:bg-gray-600 text-white transition-colors hidden"
+          style="display: none !important;"
           aria-pressed="false"
           aria-label="Guided View across comic dialogue"
           title="Guided View across comic dialogue"
-          
+          disabled
         >
           <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><use href="#icon-17"></use></svg>
         </button>

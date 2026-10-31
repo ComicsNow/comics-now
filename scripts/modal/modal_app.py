@@ -11,6 +11,7 @@ comics-now writes to metadata/guided_view/{id}.json.
 
 import io
 import modal
+import numpy as np
 
 app = modal.App("comics-guided-view")
 
@@ -97,11 +98,19 @@ def _intersection_over_area(a, b) -> float:
     return (wi * hi) / area if area > 0 else 0.0
 
 
-def _is_bubble_in_panel(bubble, panel) -> bool:
-    cx = bubble[0] + bubble[2] / 2
-    cy = bubble[1] + bubble[3] / 2
-    return (panel[0] <= cx <= panel[0]+panel[2]
-            and panel[1] <= cy <= panel[1]+panel[3])
+def _is_bubble_in_panel(bubble, panel, gutter_tolerance: int = 80) -> bool:
+    bx, by, bw, bh = bubble[:4]
+    px, py, pw, ph = panel[:4]
+    cx = bx + bw / 2
+    cy = by + bh / 2
+    if px <= cx <= px + pw and py <= cy <= py + ph:
+        return True
+    in_gutter_above = (by + bh >= py - 10) and (by <= py + 30) and (px <= cx <= px + pw)
+    if in_gutter_above:
+        return True
+    if (py - gutter_tolerance <= cy <= py + ph) and (px <= cx <= px + pw):
+        return True
+    return False
 
 
 XY_CUT_OVERLAP_RATIO = 0.08
@@ -307,101 +316,13 @@ def _prepare_page_tensors(img_bytes: bytes, comic_type: str = "manga", orig_w: i
 
 def _parse_output(data, dims, sx, sy, px, py, threshold, filter_cls=None) -> list:
     """Parse ONNX output into [x,y,w,h,conf] boxes. Handles both YOLOv8 output formats."""
-def _rdp_simplify(points: list, epsilon: float) -> list:
-    import math
-    if not points or len(points) <= 3:
-        return points
-    max_dist = 0.0
-    index = 0
-    start = points[0]
-    end = points[-1]
-    dx = end[0] - start[0]
-    dy = end[1] - start[1]
-    len_sq = dx * dx + dy * dy
-
-    for i in range(1, len(points) - 1):
-        p = points[i]
-        if len_sq == 0:
-            dist = math.hypot(p[0] - start[0], p[1] - start[1])
-        else:
-            t = max(0.0, min(1.0, ((p[0] - start[0]) * dx + (p[1] - start[1]) * dy) / len_sq))
-            proj_x = start[0] + t * dx
-            proj_y = start[1] + t * dy
-            dist = math.hypot(p[0] - proj_x, p[1] - proj_y)
-        if dist > max_dist:
-            index = i
-            max_dist = dist
-
-    if max_dist > epsilon:
-        left = _rdp_simplify(points[: index + 1], epsilon)
-        right = _rdp_simplify(points[index:], epsilon)
-        return left[:-1] + right
-    return [start, end]
-
-
-def _extract_polygon_from_proto(coeffs, proto_data, proto_dims, box, sx: float, sy: float, px: float, py: float, orig_w: int, orig_h: int):
-    import math
-    if coeffs is None or proto_data is None or len(proto_dims) < 4:
-        return None
-    num_protos = proto_dims[1]
-    proto_h = proto_dims[2]
-    proto_w = proto_dims[3]
-
-    in_x1 = (box[0] + px) / sx
-    in_y1 = (box[1] + py) / sy
-    in_x2 = (box[0] + box[2] + px) / sx
-    in_y2 = (box[1] + box[3] + py) / sy
-
-    px1 = max(0, int(math.floor(in_x1 * (proto_w / INPUT_SIZE))))
-    py1 = max(0, int(math.floor(in_y1 * (proto_h / INPUT_SIZE))))
-    px2 = min(proto_w - 1, int(math.ceil(in_x2 * (proto_w / INPUT_SIZE))))
-    py2 = min(proto_h - 1, int(math.ceil(in_y2 * (proto_h / INPUT_SIZE))))
-
-    if px2 <= px1 or py2 <= py1:
-        return None
-
-    left_edge = []
-    right_edge = []
-    plane_size = proto_h * proto_w
-
-    for py_i in range(py1, py2 + 1):
-        row_min_x = -1
-        row_max_x = -1
-        row_offset = py_i * proto_w
-        for px_i in range(px1, px2 + 1):
-            idx = row_offset + px_i
-            logit = 0.0
-            for c in range(num_protos):
-                logit += float(coeffs[c]) * float(proto_data[c * plane_size + idx])
-            if logit > 0.0:
-                if row_min_x == -1:
-                    row_min_x = px_i
-                row_max_x = px_i
-        if row_min_x != -1:
-            oy = max(0, min(orig_h, round(((py_i + 0.5) * (INPUT_SIZE / proto_h)) * sy - py)))
-            ox_min = max(0, min(orig_w, round(((row_min_x + 0.5) * (INPUT_SIZE / proto_w)) * sx - px)))
-            ox_max = max(0, min(orig_w, round(((row_max_x + 0.5) * (INPUT_SIZE / proto_w)) * sx - px)))
-            left_edge.append([ox_min, oy])
-            right_edge.append([ox_max, oy])
-
-    if len(left_edge) < 2:
-        return None
-    raw_contour = left_edge + list(reversed(right_edge))
-    epsilon = max(3.0, math.hypot(box[2], box[3]) * 0.025)
-    simplified = _rdp_simplify(raw_contour, epsilon)
-    return simplified if len(simplified) >= 3 else raw_contour[:4]
-
-
-def _parse_output(data, dims, sx, sy, px, py, threshold, filter_cls=None, has_proto=False) -> list:
-    """Parse ONNX output into [x,y,w,h,conf,(coeffs)] boxes. Handles both YOLOv8/v11 bbox and seg formats."""
     boxes = []
-    if len(dims) >= 3 and dims[1] == 300 and dims[2] in (6, 38):
-        stride = dims[2]
-        with_mask = (stride == 38 and has_proto)
-        for i in range(300):
-            o = i * stride
+    if len(dims) >= 3 and dims[2] == 6:
+        # Format: [1, N, 6] → [x1,y1,x2,y2,conf,cls]
+        for i in range(dims[1]):
+            o = i * 6
             conf = float(data[o+4])
-            cls  = int(data[o+5])
+            cls  = int(round(data[o+5]))
             if conf <= threshold:
                 continue
             if filter_cls is not None and cls != filter_cls:
@@ -410,13 +331,10 @@ def _parse_output(data, dims, sx, sy, px, py, threshold, filter_cls=None, has_pr
             x2 = data[o+2]*sx - px; y2 = data[o+3]*sy - py
             w, h = x2-x1, y2-y1
             if w > 10 and h > 10:
-                coeffs = list(data[o+6:o+38]) if with_mask else None
-                boxes.append([x1, y1, w, h, conf, coeffs])
+                boxes.append([x1, y1, w, h, conf])
     elif len(dims) >= 3 and dims[1] >= 5 and dims[2] == 8400:
+        # Format: [1, C, 8400] → rows are cx,cy,w,h,conf[,cls…]
         N = 8400
-        total_ch = dims[1]
-        with_mask = (total_ch >= 37 and has_proto)
-        mask_start_ch = total_ch - 32
         xd = data[:N]; yd = data[N:2*N]
         wd = data[2*N:3*N]; hd = data[3*N:4*N]
         cd = data[4*N:5*N]
@@ -425,14 +343,12 @@ def _parse_output(data, dims, sx, sy, px, py, threshold, filter_cls=None, has_pr
                 continue
             w = wd[i]*sx; h = hd[i]*sy
             cx = xd[i]*sx - px; cy = yd[i]*sy - py
-            coeffs = [float(data[(mask_start_ch + c) * N + i]) for c in range(32)] if with_mask else None
-            boxes.append([cx-w/2, cy-h/2, w, h, float(cd[i]), coeffs])
+            boxes.append([cx-w/2, cy-h/2, w, h, float(cd[i])])
     return boxes
 
 
 def _detect_panels(img_bytes: bytes = None, comic_type: str = "manga",
-                   conf_threshold=None, filter_cls=None, prepared: dict = None,
-                   return_polygons: bool = False):
+                   conf_threshold=None, filter_cls=None, prepared: dict = None) -> list:
     if prepared is not None:
         tensor, sx, sy, px, py = prepared["contain"] if comic_type == "manga" else prepared["panel"]
         orig_w = prepared["orig_w"]
@@ -447,16 +363,14 @@ def _detect_panels(img_bytes: bytes = None, comic_type: str = "manga",
 
     # Western falls back to manga model (no western.onnx in this library)
     sess = _get_session("manga")
-    outputs = sess.run(None, {sess.get_inputs()[0].name: tensor})
-    out = outputs[0]
-    proto_out = outputs[1] if len(outputs) > 1 else None
+    out = sess.run(None, {sess.get_inputs()[0].name: tensor})[0]
     data = out.flatten()
 
     threshold = conf_threshold or (CONF_WESTERN if comic_type == "western" else CONF_MANGA)
-    boxes = _parse_output(data, out.shape, sx, sy, px, py, threshold, filter_cls, has_proto=(proto_out is not None))
+    boxes = _parse_output(data, out.shape, sx, sy, px, py, threshold, filter_cls)
     boxes = _nms(boxes, IOU_NMS)
 
-    if comic_type == "manga":
+    if comic_type == "manga" and filter_cls != 1:
         boxes = _include_below_text(boxes, gray, orig_h, orig_w, cur_h, cur_w)
 
     if len(boxes) > 1:
@@ -464,48 +378,120 @@ def _detect_panels(img_bytes: bytes = None, comic_type: str = "manga",
         boxes = [b for b in boxes if (b[2]*b[3]) / page_area < 0.98]
 
     if not boxes:
-        return ([[0, 0, orig_w, orig_h]], {}) if return_polygons else [[0, 0, orig_w, orig_h]]
+        return [] if filter_cls == 1 else [[0, 0, orig_w, orig_h]]
+    return [[round(b[0]), round(b[1]), round(b[2]), round(b[3])] for b in boxes]
 
-    rounded_boxes = []
-    polygons = {}
-    proto_flat = proto_out.flatten() if proto_out is not None else None
-    proto_shape = proto_out.shape if proto_out is not None else None
 
-    for b in boxes:
-        rb = [round(b[0]), round(b[1]), round(b[2]), round(b[3])]
-        rounded_boxes.append(rb)
-        coeffs = b[5] if len(b) > 5 else None
-        if coeffs is not None and proto_flat is not None:
-            poly = _extract_polygon_from_proto(coeffs, proto_flat, proto_shape, b, sx, sy, px, py, orig_w, orig_h)
-            if poly and len(poly) >= 3:
-                polygons[f"{rb[0]},{rb[1]},{rb[2]},{rb[3]}"] = poly
+def _tighten_bubble_to_text(gray: np.ndarray, box: list, orig_w: int, orig_h: int, cur_w: int = None, cur_h: int = None) -> list:
+    if cur_w is None:
+        cur_w = orig_w
+    if cur_h is None:
+        cur_h = orig_h
 
-    if return_polygons:
-        return rounded_boxes, polygons
-    return rounded_boxes
+    bx, by, bw, bh = box
+    sx = cur_w / orig_w if orig_w > 0 else 1.0
+    sy = cur_h / orig_h if orig_h > 0 else 1.0
+    cbx = max(0, min(cur_w - 1, int(round(bx * sx))))
+    cby = max(0, min(cur_h - 1, int(round(by * sy))))
+    cbw = min(cur_w - cbx, int(round(bw * sx)))
+    cbh = min(cur_h - cby, int(round(bh * sy)))
+    if cbw < 15 or cbh < 15:
+        return box
+
+    patch = gray[cby : cby + cbh, cbx : cbx + cbw]
+    h, w = patch.shape
+    mean_val = float(np.mean(patch))
+    is_light = mean_val >= 130
+    thresh = (mean_val - 35) if is_light else (mean_val + 35)
+    dark = (patch < thresh) if is_light else (patch > thresh)
+
+    margin_x = max(3, int(w * 0.10))
+    margin_y = max(3, int(h * 0.10))
+    inner = dark.copy()
+    inner[:margin_y, :] = False
+    inner[-margin_y:, :] = False
+    inner[:, :margin_x] = False
+    inner[:, -margin_x:] = False
+
+    row_sum = np.sum(inner, axis=1)
+    col_sum = np.sum(inner, axis=0)
+    for y in range(h):
+        if row_sum[y] > 0.45 * w:
+            inner[y, :] = False
+    for x in range(w):
+        if col_sum[x] > 0.45 * h:
+            inner[:, x] = False
+
+    ys, xs = np.where(inner)
+    if len(xs) < 15:
+        iw = int(round(bw * 0.80))
+        ih = int(round(bh * 0.70))
+        ix = int(round(bx + (bw - iw) / 2))
+        iy = int(round(by + (bh - ih) / 2))
+        return [ix, iy, iw, ih]
+
+    pad_x = 10
+    pad_y = 8
+    t_min_x = xs.min()
+    t_max_x = xs.max()
+    t_min_y = ys.min()
+    t_max_y = ys.max()
+
+    rx = max(0, int(round((cbx + t_min_x - pad_x) / sx)))
+    ry = max(0, int(round((cby + t_min_y - pad_y) / sy)))
+    rw = min(orig_w - rx, int(round(((t_max_x - t_min_x) + 2 * pad_x) / sx)))
+    rh = min(orig_h - ry, int(round(((t_max_y - t_min_y) + 2 * pad_y) / sy)))
+    return [rx, ry, rw, rh]
 
 
 def _detect_bubbles(img_bytes: bytes = None, comic_type: str = "western", prepared: dict = None) -> list:
+    if comic_type == "manga":
+        thresh = 0.1
+        raw = _detect_panels(
+            img_bytes=img_bytes,
+            comic_type="manga",
+            conf_threshold=thresh,
+            filter_cls=1,
+            prepared=prepared
+        )
+        return _sort_boxes(raw, "manga")
+
+    # Western: use speech_bubble_detector.onnx, then tighten boxes to dialogue text
     if prepared is not None:
         tensor, sx, sy, px, py = prepared["contain"]
+        gray = prepared["gray"]
+        orig_w = prepared["orig_w"]
+        orig_h = prepared["orig_h"]
+        cur_w = prepared.get("cur_w", orig_w)
+        cur_h = prepared.get("cur_h", orig_h)
     else:
-        tensor, sx, sy, px, py, *_ = _preprocess(img_bytes, "contain")
+        tensor, sx, sy, px, py, orig_w, orig_h, gray = _preprocess(img_bytes, "contain")
+        cur_w, cur_h = orig_w, orig_h
+
     sess = _get_session("bubble")
     out = sess.run(None, {sess.get_inputs()[0].name: tensor})[0].flatten()
     N = 8400
-    xd=out[:N]; yd=out[N:2*N]; wd=out[2*N:3*N]; hd=out[3*N:4*N]
-    c0=out[4*N:5*N]; c1=out[5*N:6*N]
+    xd = out[:N]; yd = out[N:2*N]; wd = out[2*N:3*N]; hd = out[3*N:4*N]
+    c0 = out[4*N:5*N]
     boxes = []
     for i in range(N):
-        conf = max(float(c0[i]), float(c1[i]))
-        if conf <= CONF_BUBBLE:
+        conf = float(c0[i])
+        if conf <= 0.25:
             continue
-        w = wd[i]*sx*1.1; h = hd[i]*sy*1.1
-        cx = xd[i]*sx - px; cy = yd[i]*sy - py
-        boxes.append([cx-w/2, cy-h/2, w, h, conf])
+        w = wd[i] * sx
+        h = hd[i] * sy
+        cx = xd[i] * sx - px
+        cy = yd[i] * sy - py
+        boxes.append([cx - w/2, cy - h/2, w, h, conf])
+
     kept = _nms(boxes, 0.4)
     raw = [[round(b[0]), round(b[1]), round(b[2]), round(b[3])] for b in kept]
-    return _sort_boxes(raw, comic_type)
+
+    # Tighten each balloon box to its inner dialogue text
+    tightened = []
+    for b in raw:
+        tightened.append(_tighten_bubble_to_text(gray, b, orig_w, orig_h, cur_w, cur_h))
+    return _sort_boxes(tightened, "western")
 
 
 def _build_manga_sequence(raw_panels: list, explicit_bubbles: list) -> list:
@@ -565,10 +551,37 @@ def _build_manga_sequence(raw_panels: list, explicit_bubbles: list) -> list:
 
 
 def _build_hybrid_western_sequence(panels: list, bubbles: list) -> list:
-    """For Western comics, dialogue follows speech bubbles directly in their natural reading order."""
+    """Port of buildHybridWesternSequence from panel-detector.js."""
     if not bubbles:
         return []
-    return _sort_boxes(bubbles, "western")
+    if not panels:
+        return _sort_boxes(bubbles, "western")
+    assigned, objects = set(), []
+    for panel in _sort_boxes(panels, "western"):
+        children = []
+        for i, bubble in enumerate(bubbles):
+            if i not in assigned and (
+                _is_bubble_in_panel(bubble, panel)
+                or _intersection_over_area(bubble, panel) >= 0.35
+            ):
+                children.append(bubble)
+                assigned.add(i)
+        objects.append({"is_panel": True, "raw": panel, "box": panel,
+                         "bubbles": _sort_boxes(children, "western")})
+    orphans = [{"is_panel": False, "raw": b, "box": b} for i, b in enumerate(bubbles) if i not in assigned]
+    all_flow = objects + orphans
+    if len(all_flow) > 1:
+        indexed = [(i, item["box"]) for i, item in enumerate(all_flow)]
+        sorted_indexed = _xy_cut_partition(indexed, "western")
+        all_flow = [all_flow[i] for i, _ in sorted_indexed]
+
+    seq = []
+    for obj in all_flow:
+        if obj["is_panel"]:
+            seq.extend(obj["bubbles"])
+        else:
+            seq.append(obj["raw"])
+    return seq
 
 
 # ── Modal function ────────────────────────────────────────────────────────────
@@ -597,10 +610,10 @@ def detect_pages_batch(pages: list, comic_type: str) -> dict:
         try:
             # Mirror processComic in panel-detector.js exactly
             prepared = _prepare_page_tensors(img_bytes, comic_type, orig_w=orig_w, orig_h=orig_h)
-            raw_panels, polygons = (
-                _detect_panels(comic_type="manga", conf_threshold=0.1, prepared=prepared, return_polygons=True)
+            raw_panels = (
+                _detect_panels(comic_type="manga", conf_threshold=0.1, filter_cls=0, prepared=prepared)
                 if comic_type == "manga"
-                else _detect_panels(comic_type="manga", conf_threshold=0.5, filter_cls=0, prepared=prepared, return_polygons=True)
+                else _detect_panels(comic_type="western", conf_threshold=0.5, filter_cls=0, prepared=prepared)
             )
             panels  = _sort_boxes(raw_panels, comic_type)
             bubbles = _detect_bubbles(comic_type=comic_type, prepared=prepared)
@@ -609,14 +622,11 @@ def detect_pages_batch(pages: list, comic_type: str) -> dict:
                 if comic_type == "manga"
                 else _build_hybrid_western_sequence(panels, bubbles)
             )
-            page_entry = {
+            results[page_name] = {
                 "panels":   panels,
                 "bubbles":  bubbles,
                 "sequence": sequence if sequence else panels,
             }
-            if polygons:
-                page_entry["polygons"] = polygons
-            results[page_name] = page_entry
         except Exception as exc:
             import sys, traceback
             print(f"[Modal] Error processing {page_name}: {exc}", file=sys.stderr)

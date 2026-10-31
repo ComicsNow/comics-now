@@ -1,3 +1,4 @@
+const path = require('path');
 const { dbRun, dbGet } = require('../server/db');
 const guidedReader = require('../server/services/guided-reader');
 const panelDetector = require('../server/services/panel-detector');
@@ -11,7 +12,7 @@ describe('Guided Reader Resilience and Timeout Handling', () => {
     await dbRun(
       `INSERT INTO comics (id, name, path, guidedViewStatus)
        VALUES (?, ?, ?, ?)`,
-      [testComicId, 'Test Resilience Comic.cbz', '/media/test/resilience.cbz', 'pending']
+      [testComicId, 'Test Resilience Comic.cbz', path.join(__dirname, 'fixtures/resilience.cbz'), 'pending']
     );
   });
 

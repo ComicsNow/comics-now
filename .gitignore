@@ -67,13 +67,15 @@ venv/
 mcp/.venv
 mcp/.venv/
 
-# Modal test fixtures (binary archives)
-scripts/modal/tests/fixtures/*.cbz
-scripts/modal/tests/fixtures/*.cbr
-
 # Ensure no comics are stored in logos
 logos/**/*.cbz
 logos/**/*.cbr
 
 bench_test_dir/
 bench_test_dir2/
+
+# Modal & Colab tests, fixtures, notebooks, and scripts (contain copyrighted comic pages)
+scripts/modal/tests/
+scripts/colab/
+*speaker_attribution*
+*paligemma*

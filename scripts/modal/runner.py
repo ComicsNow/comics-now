@@ -31,7 +31,11 @@ except ImportError:
         @staticmethod
         def write(msg): print(msg)
 
-from modal_app import app, detect_pages_batch
+import modal
+try:
+    detect_pages_batch = modal.Function.from_name("comics-guided-view", "detect_pages_batch")
+except Exception:
+    from modal_app import app, detect_pages_batch
 
 # ── paths ─────────────────────────────────────────────────────────────────────
 DB_PATH     = "/opt/comics-now/comics-now.db"
