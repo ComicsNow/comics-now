@@ -181,8 +181,9 @@ const global = new Proxy(typeof window !== 'undefined' ? window : globalThis, {
   }
 
   function showFullscreenControls(autoHide = false) {
-    const isMangaPanelZoom = global.GuidedView?.getActiveModeName?.() === 'manga-panel-zoom';
-    if (global.isFullImageMode || isMangaPanelZoom) autoHide = false;
+    const activeMode = global.GuidedView?.getActiveModeName?.();
+    const isInteractiveZoom = activeMode === 'manga-panel-zoom' || activeMode === 'western-speech-zoom' || activeMode === 'manga-speech-zoom';
+    if (global.isFullImageMode || isInteractiveZoom) autoHide = false;
     const controls = global.fullscreenControls;
     const closeBtn = global.fullscreenCloseBtn;
     const title = global.fullscreenTitle;
@@ -219,8 +220,9 @@ const global = new Proxy(typeof window !== 'undefined' ? window : globalThis, {
   }
 
   function hideFullscreenControls() {
-    const isMangaPanelZoom = global.GuidedView?.getActiveModeName?.() === 'manga-panel-zoom';
-    if (global.isFullImageMode || isMangaPanelZoom) return;
+    const activeMode = global.GuidedView?.getActiveModeName?.();
+    const isInteractiveZoom = activeMode === 'manga-panel-zoom' || activeMode === 'western-speech-zoom' || activeMode === 'manga-speech-zoom';
+    if (global.isFullImageMode || isInteractiveZoom) return;
     const controls = global.fullscreenControls;
     if (!controls) return;
 

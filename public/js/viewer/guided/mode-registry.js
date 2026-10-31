@@ -33,6 +33,8 @@ export const ModeRegistry = {
 
   async enable(name, { persist = true } = {}) {
     if (transitioning) return false;
+    // Automated guided views (guided / bubble) are currently hidden per user request
+    if (name === 'guided' || name === 'bubble') return false;
     const mode = modes.get(name);
     if (!mode) return false;
     if (activeModeName === name) return true;

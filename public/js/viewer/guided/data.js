@@ -42,10 +42,9 @@ export function currentPagePanels() {
   const pageData = data.pages[fname];
   if (Array.isArray(pageData)) return pageData;
   if (pageData) {
-    // Prioritize granular sequence as the authoritative reading flow
+    // Prioritize granular sequence if available
     if (Array.isArray(pageData.sequence) && pageData.sequence.length > 0) return pageData.sequence;
     if (Array.isArray(pageData.panels)) return pageData.panels;
-    if (Array.isArray(pageData.bubbles)) return pageData.bubbles;
   }
   return [];
 }
@@ -63,8 +62,6 @@ export function currentPageBubbles() {
   
   const pageData = data.pages[fname];
   if (!pageData) return [];
-  // For Western comics, sequence IS the authoritative dialogue sequence.
-  // Never navigate through raw/un-sequenced bubbles.
   if (!isMangaComic() && Array.isArray(pageData.sequence) && pageData.sequence.length > 0) {
     return pageData.sequence;
   }
@@ -127,41 +124,19 @@ export function mangaPageBubbles() {
   return out;
 }
 
-export function currentPagePolygonForBox(box) {
-  if (!box) return null;
-  if (Array.isArray(box.polygon) && box.polygon.length >= 3) {
-    return box.polygon;
-  }
-  const comic = state.currentComic || (typeof window !== 'undefined' ? window.currentComic : null);
-  if (!comic) return null;
-  const data = cache.get(comic.id);
-  if (!data || !data.pages) return null;
-  const getPages = state.getViewerPages || (typeof window !== 'undefined' ? window.getViewerPages : null);
-  const pages = getPages?.() || [];
-  const pageIndex = (state.currentPageIndex !== undefined && state.currentPageIndex !== null)
-    ? state.currentPageIndex
-    : (typeof window !== 'undefined' ? window.currentPageIndex : 0);
-  const fname = pages[pageIndex];
-  if (!fname) return null;
-  const pageData = data.pages[fname];
-  if (!pageData || !pageData.polygons || typeof pageData.polygons !== 'object') return null;
-  const coords = Array.isArray(box) ? box : [box[0], box[1], box[2], box[3]];
-  const key = `${coords[0]},${coords[1]},${coords[2]},${coords[3]}`;
-  const poly = pageData.polygons[key];
-  return (Array.isArray(poly) && poly.length >= 3) ? poly : null;
-}
+export const currentPageRawPanels = currentPageRawBoxes;
 
 // Assign to state.GuidedView and window.GuidedView
 Object.assign(state.GuidedView, {
   cache,
   loadGuidedView,
   currentPagePanels,
+  currentPageRawPanels,
   currentPageBubbles,
   currentPageRawBoxes,
   isMangaComic,
   mangaExplicitBubbles,
   mangaPageBubbles,
-  currentPagePolygonForBox,
   api
 });
 
@@ -170,12 +145,12 @@ if (typeof window !== 'undefined') {
     cache,
     loadGuidedView,
     currentPagePanels,
+    currentPageRawPanels,
     currentPageBubbles,
     currentPageRawBoxes,
     isMangaComic,
     mangaExplicitBubbles,
     mangaPageBubbles,
-    currentPagePolygonForBox,
     api
   });
 }

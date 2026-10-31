@@ -1,13 +1,15 @@
+const path = require('path');
 const panelDetector = require('../server/services/panel-detector');
 const modalDetector = require('../server/services/modal-detector');
 const guidedReader = require('../server/services/guided-reader');
 const { dbRun, dbGet } = require('../server/db');
 
 describe('Guided Reader Modal GPU Integration and Fallback', () => {
+  const mockOutputPath = path.resolve(__dirname, '../metadata/guided_view/test-modal-comic-123.json');
   const testComic = {
     id: 'test-modal-comic-123',
     name: 'Action Comics #1.cbz',
-    path: '/media/test/Action Comics #1.cbz',
+    path: path.join(__dirname, 'fixtures/Action Comics #1.cbz'),
     type: 'western'
   };
 
@@ -40,13 +42,13 @@ describe('Guided Reader Modal GPU Integration and Fallback', () => {
       panels: 12,
       pagesProcessed: 5,
       pageCount: 5,
-      outputPath: '/opt/comics-now/metadata/guided_view/test-modal-comic-123.json'
+      outputPath: mockOutputPath
     });
     const spyModal = jest.spyOn(modalDetector, 'processComic').mockResolvedValueOnce({
       panels: 12,
       pagesProcessed: 5,
       pageCount: 5,
-      outputPath: '/opt/comics-now/metadata/guided_view/test-modal-comic-123.json'
+      outputPath: mockOutputPath
     });
 
     const result = await guidedReader.processComic(testComic);
@@ -66,13 +68,13 @@ describe('Guided Reader Modal GPU Integration and Fallback', () => {
       panels: 10,
       pagesProcessed: 5,
       pageCount: 5,
-      outputPath: '/opt/comics-now/metadata/guided_view/test-modal-comic-123.json'
+      outputPath: mockOutputPath
     });
     const spyModal = jest.spyOn(modalDetector, 'processComic').mockResolvedValueOnce({
       panels: 18,
       pagesProcessed: 5,
       pageCount: 5,
-      outputPath: '/opt/comics-now/metadata/guided_view/test-modal-comic-123.json'
+      outputPath: mockOutputPath
     });
 
     const result = await guidedReader.processComic(testComic);
@@ -95,7 +97,7 @@ describe('Guided Reader Modal GPU Integration and Fallback', () => {
       panels: 15,
       pagesProcessed: 5,
       pageCount: 5,
-      outputPath: '/opt/comics-now/metadata/guided_view/test-modal-comic-123.json'
+      outputPath: mockOutputPath
     });
 
     const result = await guidedReader.processComic(testComic);
@@ -119,7 +121,7 @@ describe('Guided Reader Modal GPU Integration and Fallback', () => {
       panels: 20,
       pagesProcessed: 5,
       pageCount: 5,
-      outputPath: '/opt/comics-now/metadata/guided_view/test-modal-comic-123.json'
+      outputPath: mockOutputPath
     });
 
     const result = await guidedReader.processComic(testComic);

@@ -1,3 +1,4 @@
+const path = require('path');
 const guidedReader = require('../server/services/guided-reader');
 const modalDetector = require('../server/services/modal-detector');
 const panelDetector = require('../server/services/panel-detector');
@@ -48,16 +49,16 @@ describe('Guided Reader Parallel Processing and Dynamic Concurrency', () => {
         panels: 10,
         pagesProcessed: 5,
         pageCount: 5,
-        outputPath: `/opt/comics-now/metadata/guided_view/${id}.json`
+        outputPath: path.resolve(__dirname, `../metadata/guided_view/${id}.json`)
       };
     });
 
     const spyModal = jest.spyOn(modalDetector, 'processComic').mockImplementation(mockModalProcess);
 
     const testQueue = [
-      { id: 'comic-p1', name: 'Comic 1.cbz', path: '/test/comic1.cbz', type: 'western' },
-      { id: 'comic-p2', name: 'Comic 2.cbz', path: '/test/comic2.cbz', type: 'western' },
-      { id: 'comic-p3', name: 'Comic 3.cbz', path: '/test/comic3.cbz', type: 'western' }
+      { id: 'comic-p1', name: 'Comic 1.cbz', path: path.join(__dirname, 'fixtures/comic1.cbz'), type: 'western' },
+      { id: 'comic-p2', name: 'Comic 2.cbz', path: path.join(__dirname, 'fixtures/comic2.cbz'), type: 'western' },
+      { id: 'comic-p3', name: 'Comic 3.cbz', path: path.join(__dirname, 'fixtures/comic3.cbz'), type: 'western' }
     ];
 
     guidedReader.setQueueForTest(testQueue);
@@ -85,15 +86,15 @@ describe('Guided Reader Parallel Processing and Dynamic Concurrency', () => {
         panels: 10,
         pagesProcessed: 5,
         pageCount: 5,
-        outputPath: `/opt/comics-now/metadata/guided_view/${id}.json`
+        outputPath: path.resolve(__dirname, `../metadata/guided_view/${id}.json`)
       };
     });
 
     const spyCpu = jest.spyOn(panelDetector, 'processComic').mockImplementation(mockCpuProcess);
 
     const testQueue = [
-      { id: 'comic-cpu-1', name: 'Comic 1.cbz', path: '/test/comic1.cbz', type: 'western' },
-      { id: 'comic-cpu-2', name: 'Comic 2.cbz', path: '/test/comic2.cbz', type: 'western' }
+      { id: 'comic-cpu-1', name: 'Comic 1.cbz', path: path.join(__dirname, 'fixtures/comic1.cbz'), type: 'western' },
+      { id: 'comic-cpu-2', name: 'Comic 2.cbz', path: path.join(__dirname, 'fixtures/comic2.cbz'), type: 'western' }
     ];
 
     guidedReader.setQueueForTest(testQueue);
@@ -120,13 +121,13 @@ describe('Guided Reader Parallel Processing and Dynamic Concurrency', () => {
         panels: 10,
         pagesProcessed: 5,
         pageCount: 5,
-        outputPath: `/opt/comics-now/metadata/guided_view/${id}.json`
+        outputPath: path.resolve(__dirname, `../metadata/guided_view/${id}.json`)
       };
     });
 
     const testQueue = [
-      { id: 'comic-wait-1', name: 'Comic Wait 1.cbz', path: '/test/comic1.cbz', type: 'western' },
-      { id: 'comic-quick-2', name: 'Comic Quick 2.cbz', path: '/test/comic2.cbz', type: 'western' }
+      { id: 'comic-wait-1', name: 'Comic Wait 1.cbz', path: path.join(__dirname, 'fixtures/comic1.cbz'), type: 'western' },
+      { id: 'comic-quick-2', name: 'Comic Quick 2.cbz', path: path.join(__dirname, 'fixtures/comic2.cbz'), type: 'western' }
     ];
 
     guidedReader.setQueueForTest(testQueue);

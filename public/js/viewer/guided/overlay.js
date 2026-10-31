@@ -19,31 +19,6 @@ const SQUARE_ICON_HTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" hei
 function getStage() { return document.getElementById('fullscreen-viewer'); }
 function getImg() { return document.getElementById('fullscreen-image'); }
 
-function formatPct(val) {
-  const rounded = Math.round(val * 100) / 100;
-  return `${rounded}%`;
-}
-
-export function buildPolygonClipPath(targetBox, naturalWidth, naturalHeight) {
-  if (!targetBox || !naturalWidth || !naturalHeight) return '';
-  const getPoly = state.GuidedView?.currentPagePolygonForBox
-    || (typeof window !== 'undefined' ? window.GuidedView?.currentPagePolygonForBox : null);
-  const poly = Array.isArray(targetBox.polygon) && targetBox.polygon.length >= 3
-    ? targetBox.polygon
-    : (typeof getPoly === 'function' ? getPoly(targetBox) : null);
-  if (!Array.isArray(poly) || poly.length < 3) return '';
-
-  const pts = poly
-    .filter(pt => Array.isArray(pt) && pt.length >= 2)
-    .map(([x, y]) => {
-      const xp = Math.max(0, Math.min(100, (Number(x) / naturalWidth) * 100));
-      const yp = Math.max(0, Math.min(100, (Number(y) / naturalHeight) * 100));
-      return `${formatPct(xp)} ${formatPct(yp)}`;
-    });
-
-  return pts.length >= 3 ? `polygon(${pts.join(', ')})` : '';
-}
-
 /**
  * Updates the main image transform for Manga/Sequential pan-zoom.
  * If targetBox is null, resets to "Full-page view" (contain) if isManga is true,
@@ -64,7 +39,6 @@ export function applyTransform(targetBox, isManga) {
   if (!stageW || !stageH) return;
 
   if (!targetBox) {
-    img.style.clipPath = '';
     if (isManga) {
       // Full-page view: contain the whole image inside the stage, centered.
       const s = Math.min(stageW / img.naturalWidth, stageH / img.naturalHeight);
@@ -107,7 +81,6 @@ export function applyTransform(targetBox, isManga) {
   const cy = py + ph / 2;
   const tx = stageW / 2 - cx * s;
   const ty = stageH / 2 - cy * s;
-  img.style.clipPath = buildPolygonClipPath(targetBox, img.naturalWidth, img.naturalHeight);
   img.style.transform = `translate(${tx}px, ${ty}px) scale(${s})`;
 }
 
@@ -300,7 +273,6 @@ export function applyBubbleOverlay(targetBox, isPanelZoom) {
   innerImg.style.height = `${img.naturalHeight}px`;
   innerImg.style.left = '0px';
   innerImg.style.top = '0px';
-  innerImg.style.clipPath = buildPolygonClipPath(targetBox, img.naturalWidth, img.naturalHeight);
   innerImg.style.transition = isManual ? 'none' : 'transform 600ms cubic-bezier(0.22, 1, 0.36, 1)';
   innerImg.style.transform = `translate(${Math.round(innerTx)}px, ${Math.round(innerTy)}px) scale(${innerScale})`;
 }
@@ -317,7 +289,6 @@ export function applyClasses(needsGuidedLayout) {
     } else {
       // FULL RESET: When disabling, clear all Guided-specific transforms and styles
       img.style.transform = '';
-      img.style.clipPath = '';
       const isLandscape = state.isLandscapeOrientation || window.isLandscapeOrientation;
       if (isLandscape) {
         img.classList.add('orientation-landscape');
@@ -388,7 +359,6 @@ export function updateMangaSpeechZoomUI(active) {
 
 // Attach to state.GuidedView and window.GuidedView
 Object.assign(state.GuidedView, {
-  buildPolygonClipPath,
   applyTransform,
   applyBubbleOverlay,
   applyClasses,
@@ -402,7 +372,6 @@ Object.assign(state.GuidedView, {
 
 if (typeof window !== 'undefined') {
   Object.assign(window.GuidedView, {
-    buildPolygonClipPath,
     applyTransform,
     applyBubbleOverlay,
     applyClasses,

@@ -62,22 +62,15 @@ export async function refreshGuidedToggle() {
 
   const data = state.GuidedView.cache.get(comic.id);
 
+  // Automated guided view buttons are hidden per user request (panel zoom and bubble zoom remain)
   if (btn) {
-    const hasPanels = data && data.pages && Object.values(data.pages).some(p => {
-      if (Array.isArray(p)) return p.length > 0;
-      return p && p.panels && p.panels.length > 0;
-    });
-    const ready = isManga && processed && hasPanels && !isContinuous && !isFullImage && !isLandscape;
-    btn.style.display = ready ? 'flex' : 'none';
-    btn.disabled = !ready;
+    btn.style.display = 'none';
+    btn.disabled = true;
   }
 
   if (westernBtn) {
-    const hasBubbles = data && data.pages && Object.values(data.pages).some(p => p && p.bubbles && p.bubbles.length > 0);
-    const hasSequence = data && data.pages && Object.values(data.pages).some(p => p && p.sequence && p.sequence.length > 0);
-    const bubbleReady = !isManga && processed && (hasBubbles || hasSequence) && !isContinuous && !isFullImage && !isLandscape;
-    westernBtn.style.display = bubbleReady ? 'flex' : 'none';
-    westernBtn.disabled = !bubbleReady;
+    westernBtn.style.display = 'none';
+    westernBtn.disabled = true;
   }
 
   if (westernSpeechBtn) {
@@ -149,14 +142,18 @@ export async function refreshGuidedToggle() {
     }
   } catch (e) { /* ignore */ }
 
+  // Automated guided views (guided / bubble) are currently hidden per user request;
+  // user-initiated panel zoom and bubble zoom remain fully active.
+  if (preferredMode === 'guided' || preferredMode === 'bubble') {
+    preferredMode = null;
+  }
+
   // Normalize preferredMode to match comic mangaMode
   if (preferredMode) {
     if (isManga) {
-      if (preferredMode === 'bubble') preferredMode = 'guided';
-      else if (preferredMode === 'western-speech-zoom') preferredMode = 'manga-speech-zoom';
+      if (preferredMode === 'western-speech-zoom') preferredMode = 'manga-speech-zoom';
     } else {
-      if (preferredMode === 'guided' || preferredMode === 'manga-panel-zoom') preferredMode = 'bubble';
-      else if (preferredMode === 'manga-speech-zoom') preferredMode = 'western-speech-zoom';
+      if (preferredMode === 'manga-speech-zoom') preferredMode = 'western-speech-zoom';
     }
   }
 
@@ -166,10 +163,14 @@ export async function refreshGuidedToggle() {
   }
 
   // Sync comic object flags with preferredMode
-  comic.guidedMode = preferredMode === 'guided';
-  comic.bubbleMode = preferredMode === 'bubble';
+  comic.guidedMode = false;
+  comic.bubbleMode = false;
   comic.hotZoomMode = preferredMode === 'western-speech-zoom' || preferredMode === 'manga-panel-zoom';
   comic.mangaBubbleHotMode = preferredMode === 'manga-speech-zoom';
+
+  if (activeModeName === 'guided' || activeModeName === 'bubble') {
+    registry.disable(activeModeName, { persist: false });
+  }
 
   if (!isContinuous && !isFullImage && !isLandscape && processed) {
     if (isManga && preferredMode === 'guided' && activeModeName !== 'guided') {
