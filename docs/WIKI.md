@@ -99,7 +99,7 @@ For the complete REST endpoint reference — every route under `/api/v1` with pa
 **Comics Now!** is a high-performance web platform engineered specifically for digital comic book collectors, enthusiasts, and shared family/community servers.
 
 Unlike traditional media servers retrofitted for comic books, Comics Now! was built from the ground up for comics:
-- **Neural Guided View**: Automatically analyzes comic pages using pre-trained deep learning vision models (`western.onnx` and `manga.onnx`) to detect panels and dialogue bubbles for cinematic, panel-by-panel reading.
+- **Interactive Panel & Bubble Zoom**: Automatically analyzes comic pages using pre-trained deep learning vision models (`western.onnx` and `manga.onnx`) or cloud GPUs to detect panels and dialogue bubbles for fluid tap-to-zoom reading.
 - **True Cross-Device Sync**: Preserves reading progress per-comic and per-user, seamlessly synchronizing state between your desktop, tablet, and mobile devices.
 - **Offline Progressive Web App (PWA)**: Installable directly onto iOS, iPadOS, Android, Windows, and macOS, with a background downloads queue that stores comic issues locally in IndexedDB for internet-free reading.
 - **Granular Multi-User Security**: Full role-based access control with folder/publisher/series-level permissions, Cloudflare Zero Trust authentication, and admin impersonation.
@@ -577,6 +577,11 @@ Comics Now! features an AI-driven panel detection pipeline:
   - `manga.onnx`: Optimized for Japanese manga layouts (right-to-left).
 - Analyzes page contrast, borders, and margins to compute exact panel coordinates (`[x, y, width, height]`) and speech bubble regions.
 
+> [!NOTE]
+> **Automated Guided View Buttons Removed**: The continuous automated guided view toggle buttons (which walked through panels sequentially on autopilot) have been removed from the reader interface, as automated sequential traversal was not good enough across complex, artistic comic layouts, non-linear page flows, and dynamic splash pages.
+>
+> **Interactive Panel Zoom & Bubble Zoom Remain Active**: Precision interactive zoom remains fully supported and active! Readers can tap directly on any detected panel (**Panel Zoom**) to zoom into it with smooth animation, or tap speech balloons to focus with high magnification (**Bubble Zoom**). In Manga mode, dedicated toolbar buttons provide on-demand Bubble Zoom and dual Panel Zoom controls with direct dialogue bubble priority and adaptive touch hit tolerance.
+
 ### Modal Serverless GPU Acceleration (Cloud GPU Speedup)
 While local CPU detection runs smoothly on modern desktop processors, analyzing hundreds of pages with deep learning neural networks can take 30–60 seconds per issue on low-power servers, NAS hardware, or a Raspberry Pi.
 
@@ -644,16 +649,16 @@ In **Settings → Guided View**, Comics Now! displays a real-time status card sh
 Switch between reading modes instantly in the reader overlay:
 1. **Standard Mode**: Single page view with left/right page flipping.
 2. **Continuous Mode**: Infinite vertical scroll down all pages (ideal for webtoons and mobile phones).
-3. **Manga Mode**: Right-to-left reading flow with reversed navigation touches and keyboard arrows.
-4. **Guided View**: Zooms and pans into each individual panel sequentially with smooth animations.
-5. **Bubble Zoom**: Focuses dynamically on dialogue balloons for easy reading on small phone screens.
+3. **Manga Mode**: Right-to-left reading flow with reversed navigation touches, dedicated Bubble Zoom button, and dual Panel Zoom button.
+4. **Interactive Panel Zoom**: Tap directly on any detected panel to zoom in smoothly. *(Note: Automated guided view sequence buttons have been removed as automated stepping was not good enough across diverse page layouts; interactive tap-to-zoom is the recommended experience).*
+5. **Bubble Zoom**: Focuses dynamically on dialogue balloons for easy reading on small phone screens, with adaptive hit tolerance and direct tap priority.
 6. **Hot Zoom**: Automatic pan-and-scan focusing on active narrative areas.
 
 ### Display & Viewport Controls
 - **Fit to Height**: Scales page height to 100% viewport height.
 - **Fit to Width**: Scales page width to 100% viewport width.
 - **Orientation Lock**: Portrait, Landscape, or Auto Dual-Page Spread.
-- **Full Page Overview**: Double-tap in Guided View to view the full page before stepping to the next page's panels.
+- **Full Page Overview**: Double-tap in zoom mode to return to full page overview.
 - **E-Ink Anti-Ghosting Mode**: Toggle in the fullscreen toolbar cycles **Off → Monochrome → Color**, saved per device (Kindle, Kobo, Onyx Boox, and PocketBook are auto-detected on first visit). **Monochrome** applies a grayscale + contrast filter for black-and-white e-readers; **Color** boosts saturation for color e-paper displays. Both modes disable animations and flash the screen black on each page turn to prevent ghosting.
 - **Cinema Pan (Spreads)**: In Fullscreen, wide double-page spreads pan across automatically when they overflow the screen, starting once per displayed page (a re-render never restarts a pan you've stopped; navigating away and back re-arms it). A **Cinema Pan Spread** badge indicates the spread — tap it to toggle panning manually; spreads that already fit the screen don't pan.
 

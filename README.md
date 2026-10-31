@@ -21,7 +21,7 @@
 
 Most digital comic servers were built a decade ago as basic file browsers. **Comics Now!** re-imagines your comic library as a modern, intelligent web application designed for desktops, tablets, and phones:
 
-* 🧠 **Smart Guided View & Modal Cloud GPU Acceleration**: Automatically detects panels and dialogue bubbles using deep learning neural networks (`manga.onnx` and speech bubble detectors) for an immersive panel-by-panel reading experience. Features instant cloud GPU acceleration via **Modal** (~1–2s per batch on NVIDIA T4s), incremental scoping, auto-detection on library scan, and visual authoring via **[GVE Now!](https://github.com/ComicsNow/gve-now-editor)**.
+* 🧠 **Interactive Panel & Bubble Zoom (Guided View)**: Powered by deep learning neural networks (`manga.onnx` and speech bubble detectors) with instant cloud GPU acceleration via **Modal** (~1–2s per batch on NVIDIA T4s), incremental scoping, and visual authoring via **[GVE Now!](https://github.com/ComicsNow/gve-now-editor)**. *(Note: Automated guided view sequence buttons have been removed as automated stepping is not reliable enough across diverse comic layouts; interactive **Panel Zoom** and **Bubble Zoom** with adaptive touch tolerance remain fully active for precision on-demand zoom.)*
 * 🔀 **Interactive Continuity DAG View**: Visualize complex multi-series crossover timelines as interactive Directed Acyclic Graphs with curved Bézier flow lines, fluid pinch-to-zoom/pan navigation, 1-click node reading, and a 3-way view switcher (**Grid `⊞`**, **List `☰`**, and **DAG `🔀`**).
 * 🖼️ **Fullscreen Page Preview Grid, Filmstrip & Scrubber**: Navigate issues visually with a dynamic, lazy-loaded page preview grid, a bottom precision page scrubber, and a horizontal touch-scrollable thumbnail filmstrip. Full-resolution WebP on-the-fly transcoding backed by an LRU disk cache cuts bandwidth while keeping 1:1 pixel coordinates for panel zoom.
 * 🔄 **True Cross-Device Sync**: Pick up right where you left off. Reading progress syncs in real-time between your phone, tablet, and PC.
@@ -163,7 +163,7 @@ Looking for detailed setup guides, configuration tables, or workflow deep dives?
 - [Sidecar vs. Database vs. Archive Write-Back](docs/WIKI.md#6-supported-formats-auto-conversion--metadata-storage)
 - [Multi-Source Tagging, GCD & Auto-Renaming Engine](docs/WIKI.md#7-the-tagging-engine--file-organization)
 - [Grand Comics Database (GCD) & Cover Cascade](docs/WIKI.md#grand-comics-database-gcd--cover-cascade)
-- [Smart Guided View & Reading Modes (Continuous, Manga, Bubble Zoom, E-Ink)](docs/WIKI.md#8-smart-guided-view--reading-modes)
+- [Smart Guided View & Reading Modes (Panel Zoom, Bubble Zoom, Continuous, Manga, E-Ink)](docs/WIKI.md#8-smart-guided-view--reading-modes)
 - [Modal Serverless GPU Acceleration & $30 Free Tier Cap](docs/WIKI.md#modal-serverless-gpu-acceleration-cloud-gpu-speedup)
 - [Fullscreen Thumbnail Filmstrip & Scrubber](docs/WIKI.md#fullscreen-thumbnail-filmstrip--scrubber)
 - [Authoring & Editing Guided View with GVE Now!](docs/WIKI.md#authoring--editing-guided-view-with-gve-now)
