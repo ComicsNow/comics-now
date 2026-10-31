@@ -1,33 +1,29 @@
-# Comics Now! v2.4.2 Release Notes
+# Comics Now! v2.5.0 Release Notes
 
-Welcome to **Comics Now! v2.4.2** — a performance and infrastructure patch release that optimizes core database queries for library browsing and search, while standardizing MCP server transport.
+Welcome to **Comics Now! v2.5.0** — a feature release introducing precision interactive zoom, dual Manga/Western speech bubble prioritization, and enhanced guided view panel detection.
 
 ---
 
 ## 🌟 Highlights
 
-### 1. Database Query Optimization with LEFT JOIN
-* **Consolidated Queries**: In `server/services/library.js` (`buildLibrary`) and `server/routes/user/library.js` (`/api/v1/search`), comic retrieval and user reading progress (`user_comic_status`) are now fetched in a single unified SQL query using a `LEFT JOIN`.
-* **Zero Memory Bloat**: Eliminates the previous pattern of pulling the user's entire reading history into Node.js memory and iterating over dictionary maps.
-* **Instant Search Filtering**: For search requests, SQLite filters matching comic records first and only joins user progress for matching rows via the composite primary key index `(userId, comicId)`.
-* **Data Parity**: Seamless fallback behavior and full cross-device reading progress sync compatibility are completely preserved.
+### 1. Interactive Tap-to-Zoom & Precision Bubble Detection
+* **Dual Zoom Modes for Manga**: Added a dedicated Bubble Zoom button alongside the adaptive Panel Zoom button. Tapping directly on dialogue bubbles prioritizes magnifying the speech bubble for effortless reading, with graceful fallback to panel zoom when tapping outside bubbles.
+* **Hit-Detection Tolerance**: Implemented adaptive geometric hit tolerance around speech bubbles (`findBubbleAtPoint` in `geometry.js`) to ensure accurate bubble selection on touchscreens and high-DPI displays.
+* **Streamlined Viewer Controls**: Replaced continuous automated guided view toggles with responsive, on-demand interactive tap-to-zoom controls in the reader toolbar.
 
-### 2. Standardized MCP Server SSE Transport
-* **Comics MCP Service**: Added native support for Server-Sent Events (SSE) transport in `comics_mcp` running on port 3018, standardizing streaming transports across companion MCP servers.
+### 2. Guided View & Panel Detection Enhancements
+* **Modal GPU Pipeline Refinement**: Enhanced `modal_app.py` with gutter caption tolerance (80px), text ink tightening, and recursive gutter splitting for superior panel segmentation without clipping dialogue or captions.
+* **Lightweight Local ONNX Detection**: Restored the optimized 9.8MB ONNX manga model and streamlined CPU panel detector (`panel-detector.js`, `overlay.js`) for fast local sidecar processing.
 
 ---
 
 ## 📦 Changelog
 
-### Performance & Database
-- `perf(db)`: optimize library and search database queries with LEFT JOIN (#131)
-
-### Infrastructure & MCP
-- `feat(mcp)`: support sse transport for comics-mcp
+### Features
+- `feat(guided)`: refine interactive zoom modes, expand bubble tap area, and streamline local panel detector
 
 ---
 
 ## 🧪 Verification & Test Results
-- **Node.js / Jest**: **124 of 124 test suites passed** (1,007 of 1,007 tests passed).
-- **Python / MCP**: **30 of 30 tests passed**.
+- **Node.js / Jest**: **125 of 125 test suites passed** (1,019 of 1,019 tests passed).
 - **Data Safety**: 100% compliant with Comics Now Rules 1 & 2. Zero deletions or modifications to user reading progress, reading lists, or comic files.
