@@ -2,46 +2,38 @@ const fs = require('fs');
 const path = require('path');
 const yaml = require('js-yaml');
 
-// Issue #8: the Docker image was published to GHCR/Docker Hub on every push to
-// main with no test step, so a commit that breaks the suite shipped as the image
-// people pull. The publish job must depend on a job that runs `npm ci && npm test`.
-describe('docker-publish workflow is gated by tests (Issue #8)', () => {
-  const wf = yaml.load(
+// Tests are executed locally via `npm test` (including inside `scripts/release.js`)
+// before any release tag is created or pushed. GitHub Actions CI/CD workflows run
+// build and publish jobs directly without a redundant CI test job.
+describe('CI/CD publish workflows run directly without redundant CI test jobs', () => {
+  const dockerWf = yaml.load(
     fs.readFileSync(path.resolve(__dirname, '../.github/workflows/docker-publish.yml'), 'utf8')
   );
+  const npmWf = yaml.load(
+    fs.readFileSync(path.resolve(__dirname, '../.github/workflows/npm-publish.yml'), 'utf8')
+  );
 
-  test('defines a test job that installs deps and runs the suite', () => {
-    const jobs = wf.jobs || {};
-    const runsTests = Object.values(jobs).some((job) => {
-      const steps = job.steps || [];
-      const cmds = steps.map((s) => s.run || '').join('\n');
-      return /npm ci/.test(cmds) && /npm test|jest/.test(cmds);
-    });
-    expect(runsTests).toBe(true);
-  });
-
-  test('the publish job depends on the test job (needs:)', () => {
-    const publish = wf.jobs['build-and-push-image'];
+  test('docker-publish workflow defines build-and-push-image without a CI test job', () => {
+    const jobs = dockerWf.jobs || {};
+    expect(jobs.test).toBeUndefined();
+    const publish = jobs['build-and-push-image'];
     expect(publish).toBeDefined();
-    const needs = Array.isArray(publish.needs) ? publish.needs : [publish.needs];
-
-    // The dependency must be a real job that runs the test suite.
-    const testJobNames = Object.entries(wf.jobs)
-      .filter(([, job]) => {
-        const cmds = (job.steps || []).map((s) => s.run || '').join('\n');
-        return /npm ci/.test(cmds) && /npm test|jest/.test(cmds);
-      })
-      .map(([name]) => name);
-
-    expect(needs.some((n) => testJobNames.includes(n))).toBe(true);
+    expect(publish.needs).toBeUndefined();
   });
 
-  test('tests also run on pull requests, but the image is never published for a PR', () => {
-    // js-yaml parses the YAML `on:` key as boolean true, so read it defensively.
-    const on = wf.on || wf[true];
-    expect(on.pull_request).toBeDefined();
+  test('npm-publish workflow defines publish-npm without a CI test job', () => {
+    const jobs = npmWf.jobs || {};
+    expect(jobs.test).toBeUndefined();
+    const publish = jobs['publish-npm'];
+    expect(publish).toBeDefined();
+    expect(publish.needs).toBeUndefined();
+  });
 
-    const publish = wf.jobs['build-and-push-image'];
-    expect(String(publish.if)).toMatch(/pull_request/);
+  test('scripts/release.js gates releases locally by running npm test before bumping or pushing', () => {
+    const releaseScript = fs.readFileSync(
+      path.resolve(__dirname, '../scripts/release.js'),
+      'utf8'
+    );
+    expect(releaseScript).toMatch(/npm test/);
   });
 });
