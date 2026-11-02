@@ -63,12 +63,13 @@ export const MangaPanelZoomMode = {
   handleImageClick(nx, ny) {
     if (!active) return false;
 
-    // 1. Check speech bubbles first with expanded hit area (clicking a speech bubble zooms the speech bubble)
+    // 1. Check speech bubbles with strict exact bounds (hitPad = 0) so expanded margins
+    // do not steal taps from the surrounding manga panel artwork.
     const bubbles = (typeof state.GuidedView.mangaPageBubbles === 'function')
       ? state.GuidedView.mangaPageBubbles()
       : [];
     const findBubble = state.GuidedView.findBubbleAtPoint || (typeof window !== 'undefined' && window.GuidedView?.findBubbleAtPoint);
-    let bestBubbleIdx = (typeof findBubble === 'function') ? findBubble(bubbles, nx, ny) : -1;
+    let bestBubbleIdx = (typeof findBubble === 'function') ? findBubble(bubbles, nx, ny, { hitPadX: 0, hitPadY: 0 }) : -1;
     if (bestBubbleIdx === -1 && typeof findBubble !== 'function') {
       let minBubbleArea = Infinity;
       for (let i = 0; i < bubbles.length; i++) {

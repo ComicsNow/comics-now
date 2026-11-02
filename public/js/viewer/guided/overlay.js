@@ -171,11 +171,25 @@ export function applyBubbleOverlay(targetBox, isPanelZoom) {
     pw = targetBox[2] !== undefined ? targetBox[2] : targetBox['2'];
     ph = targetBox[3] !== undefined ? targetBox[3] : targetBox['3'];
   }
-  const cx = px + pw / 2;
-  const cy = py + ph / 2;
 
   const registry = state.GuidedView.ModeRegistry;
   const isManual = !!registry.getManualOverrideBox();
+  const comic = state.currentComic || (typeof window !== 'undefined' && window.currentComic);
+  const isManga = !!(comic && comic.mangaMode);
+
+  // Western speech bubbles: expand the source box outward by 4% horizontally and 3% vertically
+  // so dialogue edges, italics, quotes, and punctuation are never shaved by tight AI detector boxes.
+  if (!isPanelZoom && !isManual && !isManga && pw > 0 && ph > 0) {
+    const expandX = pw * 0.04;
+    const expandY = ph * 0.03;
+    px = Math.max(0, px - expandX);
+    py = Math.max(0, py - expandY);
+    pw = pw + expandX * 2;
+    ph = ph + expandY * 2;
+  }
+
+  const cx = px + pw / 2;
+  const cy = py + ph / 2;
 
   const stageW = stage.clientWidth;
   const stageH = stage.clientHeight;

@@ -219,6 +219,7 @@ async function runWorker() {
   if (state.isRunning) return;
   state.isRunning = true;
   state.isCancelled = false;
+  state.cancelCurrent = false;
   state.startedAt = Date.now();
   state.lastError = null;
 
@@ -271,7 +272,7 @@ async function runWorker() {
             [comic.id]
           );
           const result = await processComic(comic, {
-            isCancelled: () => state.isCancelled || state.cancelCurrent || activeItem.isCancelled
+            isCancelled: () => state.isCancelled || activeItem.isCancelled
           });
           if (!result || (result.panels === 0 && (result.pageCount > 0 || result.pagesProcessed > 0))) {
             throw new Error('Detection completed with 0 panels');
@@ -282,7 +283,7 @@ async function runWorker() {
           );
           guidedLog('INFO', `   ✓ Completed (${result.panels} panels)`);
         } catch (err) {
-          if (state.isCancelled || state.cancelCurrent || activeItem.isCancelled) {
+          if (state.isCancelled || activeItem.isCancelled) {
             await dbRun(
               `UPDATE comics SET guidedViewStatus = 'pending', guidedViewError = NULL WHERE id = ?`,
               [comic.id]
@@ -298,6 +299,7 @@ async function runWorker() {
         } finally {
           state.activeComics.delete(comic.id);
           if (state.activeComics.size === 0) {
+            state.cancelCurrent = false;
             state.current = null;
           } else {
             const nextActive = state.activeComics.values().next().value;
@@ -340,6 +342,8 @@ async function runWorker() {
     guidedLog('ERROR', `Worker crashed: ${state.lastError}`);
   } finally {
     state.isRunning = false;
+    state.isCancelled = false;
+    state.cancelCurrent = false;
     state.current = null;
     state.activeComics.clear();
     state.activeWorkers = [];
@@ -353,6 +357,8 @@ async function runWorker() {
 }
 
 async function startRun() {
+  state.isCancelled = false;
+  state.cancelCurrent = false;
   const newItems = await buildQueue();
   // Filter out items already in queue
   const existingIds = new Set(state.queue.map(c => c.id));
@@ -388,6 +394,9 @@ async function startRunForScope(type, target, options = {}) {
     guidedLog('ERROR', `Invalid scope: type=${type} target=${target}`);
     return false;
   }
+
+  state.isCancelled = false;
+  state.cancelCurrent = false;
 
   const scope = { type, target, statuses: getScopeStatuses(!!options.force) };
   const newItems = await buildQueue(scope);

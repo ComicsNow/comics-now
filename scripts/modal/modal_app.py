@@ -13,6 +13,8 @@ comics-now writes to metadata/guided_view/{id}.json.
 import io
 import modal
 import numpy as np
+from PIL import Image, ImageFile
+ImageFile.LOAD_TRUNCATED_IMAGES = True
 
 app = modal.App("comics-guided-view")
 

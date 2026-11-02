@@ -89,3 +89,49 @@ test('cancelAll drops the entire queue in one call and stops', async () => {
   st = await guided.getStatus();
   expect(st.isRunning).toBe(false);
 });
+
+test('cancelCurrent resets cancellation state so subsequent comics in the queue are not marked cancelled', async () => {
+  deferreds.length = 0;
+  const cancelFns = [];
+  panelDetector.processComic.mockImplementation((comicId, comicPath, type, options) => {
+    cancelFns.push(options?.isCancelled);
+    let reject, resolve;
+    const p = new Promise((res, rej) => { resolve = res; reject = rej; });
+    deferreds.push({ resolve, reject });
+    return p;
+  });
+
+  seedComics(2);
+  await guided.startRun();
+  await flush();
+
+  expect(deferreds.length).toBe(1);
+  guided.cancelCurrent();
+  expect(cancelFns[0]()).toBe(true);
+
+  deferreds[0].reject(new Error('Cancelled'));
+  await flush();
+
+  expect(deferreds.length).toBe(2);
+  expect(cancelFns[1]()).toBe(false);
+
+  deferreds[1].resolve({ panels: 5, pagesProcessed: 1, pageCount: 1 });
+  await flush();
+});
+
+test('startRun clears residual cancellation latch from previous runs', async () => {
+  guided.cancelAll();
+  expect(await guided.getStatus()).toMatchObject({ isRunning: false });
+
+  let isCancelledInNewRun = null;
+  panelDetector.processComic.mockImplementation((comicId, comicPath, type, options) => {
+    isCancelledInNewRun = typeof options?.isCancelled === 'function' ? options.isCancelled() : false;
+    return Promise.resolve({ panels: 10, pagesProcessed: 1, pageCount: 1 });
+  });
+
+  seedComics(1);
+  await guided.startRun();
+  await flush();
+
+  expect(isCancelledInNewRun).toBe(false);
+});

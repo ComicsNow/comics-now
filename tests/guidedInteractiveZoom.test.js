@@ -314,11 +314,12 @@ describe('Interactive Guided Zoom Modes', () => {
       mode.handleImageClick(120, 120);
       expect(mode.getRenderState().targetBox).toBeNull();
 
-      // Click in expanded bubble hit area (e.g. 20px above) prioritizes bubble zoom over panel zoom
+      // In manga-panel-zoom (Option 1): clicking outside the bubble boundary (e.g. 20px above at 120, 80)
+      // zooms the PANEL, not the bubble! Only an exact tap inside the bubble zooms the bubble.
       mode.handleImageClick(120, 80);
       renderState = mode.getRenderState();
-      expect(renderState.isPanelZoom).toBe(false);
-      expect(renderState.targetBox).toEqual([100, 100, 150, 60]);
+      expect(renderState.isPanelZoom).toBe(true);
+      expect(renderState.targetBox).toEqual([50, 50, 400, 300]);
       mode.handleImageClick(120, 80); // unzoom
 
       // Click panel outside bubble -> zooms panel

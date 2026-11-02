@@ -22,6 +22,27 @@ export function handleImageClick(e) {
 
   if (!activeMode && !manualOverrideBox) return;
 
+  // Clicking directly on the zoom overlay itself (or its inner image) closes/dismisses
+  // the zoom rather than hitting whatever panel or bubble is hidden behind it.
+  const isOverlayClick = e.target && typeof e.target.closest === 'function' && e.target.closest('#bubble-magnifier-overlay');
+  if (isOverlayClick) {
+    e.preventDefault?.();
+    e.stopPropagation?.();
+    if (manualOverrideBox) {
+      registry.setManualOverrideBox(null);
+    }
+    if (activeMode && typeof activeMode.handleImageClick === 'function') {
+      activeMode.handleImageClick(-9999, -9999);
+    }
+    if (typeof state.GuidedView.refreshRender === 'function') {
+      state.GuidedView.refreshRender();
+    }
+    if (typeof state.triggerEinkFlash === 'function') {
+      state.triggerEinkFlash();
+    }
+    return;
+  }
+
   if (manualOverrideBox) {
     const now = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
     if (now - lastDblZoomAt < 500) { e.preventDefault(); e.stopPropagation(); return; }

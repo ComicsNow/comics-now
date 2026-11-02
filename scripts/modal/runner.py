@@ -19,7 +19,8 @@ try:
 except ImportError:
     rarfile = None
 
-from PIL import Image
+from PIL import Image, ImageFile
+ImageFile.LOAD_TRUNCATED_IMAGES = True
 
 try:
     from tqdm import tqdm
@@ -83,9 +84,24 @@ def list_pages(comic_path: str) -> list[str]:
     return pages
 
 
+def _read_entry_safe(arch, name: str) -> bytes:
+    try:
+        return arch.read(name)
+    except Exception as exc:
+        if "Bad CRC-32" in str(exc) and hasattr(arch, "getinfo"):
+            info = arch.getinfo(name)
+            saved_crc = getattr(info, "CRC", None)
+            try:
+                info.CRC = None
+                return arch.read(info)
+            finally:
+                info.CRC = saved_crc
+        raise
+
+
 def read_pages(comic_path: str, page_names: list[str]) -> dict[str, bytes]:
     with open_archive(comic_path) as arch:
-        return {name: arch.read(name) for name in page_names}
+        return {name: _read_entry_safe(arch, name) for name in page_names}
 
 
 def prepare_page_webp(raw_bytes: bytes, max_side: int = 1280, quality: int = 80) -> tuple[bytes, int, int]:

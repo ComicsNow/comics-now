@@ -216,5 +216,23 @@ describe('Guided View Zoom & Overlay Scaling', () => {
     const zIndex = parseInt(overlay.style.zIndex, 10);
     expect(zIndex).toBeGreaterThanOrEqual(100);
   });
+
+  test('G) Western speech bubbles have a 4% safety margin applied outward so edge letters are not clipped', () => {
+    // Western comic (mangaMode false)
+    state.currentComic = { id: 'w1', mangaMode: false };
+    const targetBox = [100, 100, 200, 100];
+    state.GuidedView.applyBubbleOverlay(targetBox, false);
+
+    const overlay = document.getElementById('bubble-magnifier-overlay');
+    const overlayW = parseFloat(overlay.style.width);
+    const innerImg = document.getElementById('bubble-magnifier-img');
+    const transform = innerImg.style.transform;
+    const scaleMatch = transform.match(/scale\(([^)]+)\)/);
+    const scale = parseFloat(scaleMatch[1]);
+
+    // Expected expanded width = 200 * 1.08 = 216
+    // Overlay width = round(216 * scale + 40)
+    expect(overlayW).toBe(Math.round(216 * scale + 40));
+  });
 });
 
