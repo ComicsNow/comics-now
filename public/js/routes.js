@@ -207,50 +207,54 @@ function registerRoutes() {
     });
 
     global.router.addRoute('/comic/:id', (params, query) => {
-      if (typeof global.getComicById === 'function' && typeof global.openComicViewer === 'function') {
-        const result = global.getComicById(params.id, true);
-        const folderPath = query.get('folderPath');
-        const readingListId = query.get('readingListId');
-        const readingListName = query.get('readingListName');
-        if (result) {
-          // Recover context if missing (e.g. on refresh)
-          if (result.rootFolder) global.currentRootFolder = result.rootFolder;
-          if (result.publisher) global.currentPublisher = result.publisher;
-          if (result.series) global.currentSeries = result.series;
-          if (folderPath) global.currentFolderPath = decodeURIComponent(folderPath);
-          
-          const options = {};
-          if (readingListId) options.readingListId = readingListId;
-          if (readingListName) options.readingListName = decodeURIComponent(readingListName);
+      const getComic = global.getComicById || (typeof window !== 'undefined' ? window.getComicById : null) || state.getComicById;
+      const openViewer = global.openComicViewer || (typeof window !== 'undefined' ? window.openComicViewer : null) || state.openComicViewer;
+      if (typeof openViewer !== 'function') return;
 
-          global.openComicViewer(result.comic, options);
-        }
+      const result = typeof getComic === 'function' ? getComic(params.id, true) : null;
+      const folderPath = query.get('folderPath');
+      const readingListId = query.get('readingListId');
+      const readingListName = query.get('readingListName');
+      if (result) {
+        // Recover context if missing (e.g. on refresh)
+        if (result.rootFolder) global.currentRootFolder = result.rootFolder;
+        if (result.publisher) global.currentPublisher = result.publisher;
+        if (result.series) global.currentSeries = result.series;
+        if (folderPath) global.currentFolderPath = decodeURIComponent(folderPath);
+        
+        const options = {};
+        if (readingListId) options.readingListId = readingListId;
+        if (readingListName) options.readingListName = decodeURIComponent(readingListName);
+
+        openViewer(result.comic, options);
       }
     });
 
     global.router.addRoute('/comic/:id/page/:pageNumber', (params, query) => {
-      if (typeof global.getComicById === 'function' && typeof global.openComicViewer === 'function') {
-        const result = global.getComicById(params.id, true);
-        const folderPath = query.get('folderPath');
-        const readingListId = query.get('readingListId');
-        const readingListName = query.get('readingListName');
-        if (result) {
-          // Recover context if missing
-          if (result.rootFolder) global.currentRootFolder = result.rootFolder;
-          if (result.publisher) global.currentPublisher = result.publisher;
-          if (result.series) global.currentSeries = result.series;
-          if (folderPath) global.currentFolderPath = decodeURIComponent(folderPath);
+      const getComic = global.getComicById || (typeof window !== 'undefined' ? window.getComicById : null) || state.getComicById;
+      const openViewer = global.openComicViewer || (typeof window !== 'undefined' ? window.openComicViewer : null) || state.openComicViewer;
+      if (typeof openViewer !== 'function') return;
 
-          const options = {};
-          if (readingListId) options.readingListId = readingListId;
-          if (readingListName) options.readingListName = decodeURIComponent(readingListName);
+      const result = typeof getComic === 'function' ? getComic(params.id, true) : null;
+      const folderPath = query.get('folderPath');
+      const readingListId = query.get('readingListId');
+      const readingListName = query.get('readingListName');
+      if (result) {
+        // Recover context if missing
+        if (result.rootFolder) global.currentRootFolder = result.rootFolder;
+        if (result.publisher) global.currentPublisher = result.publisher;
+        if (result.series) global.currentSeries = result.series;
+        if (folderPath) global.currentFolderPath = decodeURIComponent(folderPath);
 
-          global.openComicViewer(result.comic, options);
-          const pageNum = parseInt(params.pageNumber, 10);
-          setTimeout(() => {
-            if (typeof global.turnToPage === 'function') global.turnToPage(pageNum - 1); 
-          }, 300);
-        }
+        const options = {};
+        if (readingListId) options.readingListId = readingListId;
+        if (readingListName) options.readingListName = decodeURIComponent(readingListName);
+
+        openViewer(result.comic, options);
+        const pageNum = parseInt(params.pageNumber, 10);
+        setTimeout(() => {
+          if (typeof global.turnToPage === 'function') global.turnToPage(pageNum - 1); 
+        }, 300);
       }
     });
   }

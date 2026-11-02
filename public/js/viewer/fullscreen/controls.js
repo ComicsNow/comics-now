@@ -55,17 +55,16 @@ export function syncFullscreenTitle() {
 }
 
 export function showFullscreenControls(autoHide = false) {
-  const activeMode = global.GuidedView?.getActiveModeName?.();
-  const isInteractiveZoom = activeMode === 'manga-panel-zoom' || activeMode === 'western-speech-zoom' || activeMode === 'manga-speech-zoom';
-  if (global.isFullImageMode || isInteractiveZoom) autoHide = false;
-  const controls = global.fullscreenControls;
-  const closeBtn = global.fullscreenCloseBtn;
-  const title = global.fullscreenTitle;
+  if (global.isFullImageMode) autoHide = false;
+  const controls = global.fullscreenControls || document.getElementById('fullscreen-controls');
+  const closeBtn = global.fullscreenCloseBtn || document.getElementById('fullscreen-close-btn');
+  const title = global.fullscreenTitle || document.getElementById('fullscreen-title');
   if (!controls) return;
 
   controls.classList.remove('hidden');
-  if (global.fullscreenViewer) {
-    global.fullscreenViewer.classList.add('has-controls-open');
+  const viewer = global.fullscreenViewer || document.getElementById('fullscreen-viewer');
+  if (viewer) {
+    viewer.classList.add('has-controls-open');
   }
   if (closeBtn) closeBtn.classList.remove('hidden');
   if (title) {
@@ -79,12 +78,10 @@ export function showFullscreenControls(autoHide = false) {
     clearTimeout(fullscreenControlsTimeoutId);
     fullscreenControlsTimeoutId = setTimeout(() => {
       if (global.isFilmstripOpen?.()) return;
-      if (global.fullscreenControls) {
-        global.fullscreenControls.classList.add('hidden');
-      }
-      if (global.fullscreenViewer) {
-        global.fullscreenViewer.classList.remove('has-controls-open');
-      }
+      const c = global.fullscreenControls || document.getElementById('fullscreen-controls');
+      if (c) c.classList.add('hidden');
+      const v = global.fullscreenViewer || document.getElementById('fullscreen-viewer');
+      if (v) v.classList.remove('has-controls-open');
       // Title and top-right close button remain permanently visible in fullscreen mode
       const sc = document.getElementById('fullscreen-scrubber-container');
       if (sc) sc.classList.add('hidden');
@@ -94,15 +91,14 @@ export function showFullscreenControls(autoHide = false) {
 }
 
 export function hideFullscreenControls() {
-  const activeMode = global.GuidedView?.getActiveModeName?.();
-  const isInteractiveZoom = activeMode === 'manga-panel-zoom' || activeMode === 'western-speech-zoom' || activeMode === 'manga-speech-zoom';
-  if (global.isFullImageMode || isInteractiveZoom) return;
-  const controls = global.fullscreenControls;
+  if (global.isFullImageMode) return;
+  const controls = global.fullscreenControls || document.getElementById('fullscreen-controls');
   if (!controls) return;
 
   controls.classList.add('hidden');
-  if (global.fullscreenViewer) {
-    global.fullscreenViewer.classList.remove('has-controls-open');
+  const viewer = global.fullscreenViewer || document.getElementById('fullscreen-viewer');
+  if (viewer) {
+    viewer.classList.remove('has-controls-open');
   }
   // Title and top-right close button remain permanently visible in fullscreen mode
   const scrubber = document.getElementById('fullscreen-scrubber-container');

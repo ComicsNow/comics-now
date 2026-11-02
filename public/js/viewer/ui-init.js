@@ -180,7 +180,12 @@ const global = typeof canonicalGlobal !== 'undefined' ? canonicalGlobal : new Pr
       fullscreenViewer._bgClickAttached = true;
       fullscreenViewer.addEventListener('click', (event) => {
         if (event.target !== fullscreenViewer) return;
-        global.showFullscreenControls?.(true);
+        const controls = global.fullscreenControls || document.getElementById('fullscreen-controls');
+        if (controls && !controls.classList.contains('hidden')) {
+          global.hideFullscreenControls?.();
+        } else {
+          global.showFullscreenControls?.(true);
+        }
       });
     }
 

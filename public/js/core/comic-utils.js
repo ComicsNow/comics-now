@@ -7,11 +7,12 @@
 import { toTrimmedString, getRelativePath } from './dom-utils.js';
 
 export function getComicById(id, includeContext = false) {
-  const currentState = (typeof state !== 'undefined' ? state : (typeof window !== 'undefined' ? window.state : null));
-  if (!currentState || !currentState.library) return null;
+  const currentState = (typeof state !== 'undefined' ? state : (typeof window !== 'undefined' ? (window.state || window) : null));
+  const library = currentState?.library || (typeof window !== 'undefined' ? window.library : null);
+  if (!library) return null;
 
-  for (const rootPath of Object.keys(currentState.library)) {
-    const root = currentState.library[rootPath];
+  for (const rootPath of Object.keys(library)) {
+    const root = library[rootPath];
     if (!root || !root.publishers) continue;
     for (const pubName of Object.keys(root.publishers)) {
       const pub = root.publishers[pubName];
@@ -19,7 +20,7 @@ export function getComicById(id, includeContext = false) {
       for (const seriesName of Object.keys(pub.series)) {
         const seriesComics = pub.series[seriesName];
         if (!Array.isArray(seriesComics)) continue;
-        const found = seriesComics.find(c => c.id == id);
+        const found = seriesComics.find(c => String(c.id) === String(id) || c.id == id);
         if (found) {
           if (includeContext) {
             return {
@@ -38,7 +39,7 @@ export function getComicById(id, includeContext = false) {
 }
 
 export function turnToPage(index) {
-  const currentState = (typeof state !== 'undefined' ? state : (typeof window !== 'undefined' ? window.state : null));
+  const currentState = (typeof state !== 'undefined' ? state : (typeof window !== 'undefined' ? (window.state || window) : null));
   if (currentState) {
     currentState.currentPageIndex = index;
     if (typeof currentState.renderPage === 'function') {
@@ -163,7 +164,7 @@ export function applyDisplayInfoToLibrary(libraryData) {
 }
 
 export function getPathForCurrentView() {
-  const currentState = (typeof state !== 'undefined' ? state : (typeof window !== 'undefined' ? window.state : null)) || {};
+  const currentState = (typeof state !== 'undefined' ? state : (typeof window !== 'undefined' ? (window.state || window) : null)) || {};
   if (currentState.currentView === 'root') return '/';
   if (currentState.currentView === 'search') {
     return `/search?q=${encodeURIComponent(currentState.lastSearchQuery || '')}&field=${encodeURIComponent(currentState.lastSearchField || 'all')}`;
@@ -189,7 +190,7 @@ export function getPathForCurrentView() {
 }
 
 export function showView(targetView) {
-  const currentState = (typeof state !== 'undefined' ? state : (typeof window !== 'undefined' ? window.state : null)) || {};
+  const currentState = (typeof state !== 'undefined' ? state : (typeof window !== 'undefined' ? (window.state || window) : null)) || {};
 
   if (!currentState._isNavigatingFromRouter && currentState.router && !currentState._isAppInitializing && targetView) {
     let path = null;

@@ -222,6 +222,8 @@ if (typeof renderIcon !== 'undefined') globalsObj.renderIcon = renderIcon;
 Object.assign(state, globalsObj);
 if (typeof window !== 'undefined') {
   Object.assign(window, globalsObj);
+  window.state = state;
+  window.global = global;
   window.API_BASE_URL = state.API_BASE_URL;
   window.seriesSortOrder = state.seriesSortOrder;
   window.__COMICS_STORE__ = store;

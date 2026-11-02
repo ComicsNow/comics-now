@@ -42,7 +42,10 @@ const safeHtml = (typeof html !== 'undefined' && typeof html === 'function' && h
 async function openComicViewer(comic, options = {}) {
   const isLocal = !!(comic.handle || comic.file || (comic.id && String(comic.id).startsWith('device-')));
 
-  if (typeof window !== 'undefined' && !window._isNavigatingFromRouter && window.router && !isLocal) {
+  const isNavigating = !!((typeof window !== 'undefined' && window._isNavigatingFromRouter) ||
+                          (typeof global !== 'undefined' && global._isNavigatingFromRouter) ||
+                          (typeof state !== 'undefined' && state._isNavigatingFromRouter));
+  if (typeof window !== 'undefined' && !isNavigating && window.router && !isLocal) {
      let navPath = `/comic/${comic.id}`;
      const params = new URLSearchParams();
      if (global.currentFolderPath) {
@@ -233,7 +236,10 @@ async function openComicViewer(comic, options = {}) {
       console.error('[OFFLINE] No local pages found while offline');
     } else {
       try {
-        const response = await fetch(`${global.API_BASE_URL}/api/v1/comics/pages?path=${encodeURIComponent(global.encodePath(comic.path))}`);
+        const encodeFn = (typeof global !== 'undefined' && typeof global.encodePath === 'function')
+          ? global.encodePath
+          : ((typeof window !== 'undefined' && typeof window.encodePath === 'function') ? window.encodePath : (p => btoa(encodeURIComponent(p))));
+        const response = await fetch(`${global.API_BASE_URL}/api/v1/comics/pages?path=${encodeURIComponent(encodeFn(comic.path))}`);
         let data = null;
         try {
           data = await response.json();

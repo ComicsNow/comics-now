@@ -109,8 +109,13 @@ class AppRouter {
         });
         
         global._isNavigatingFromRouter = true;
-        route.callback(params, url.searchParams);
-        global._isNavigatingFromRouter = false;
+        if (typeof window !== 'undefined') window._isNavigatingFromRouter = true;
+        try {
+          route.callback(params, url.searchParams);
+        } finally {
+          global._isNavigatingFromRouter = false;
+          if (typeof window !== 'undefined') window._isNavigatingFromRouter = false;
+        }
         return;
       }
     }

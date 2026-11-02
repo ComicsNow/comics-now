@@ -1,8 +1,8 @@
 import { state } from '../../globals.js';
 
 let lastDblZoomAt = 0;
-const DOUBLE_TAP_MS = 300;
-const DOUBLE_TAP_MOVE_TOLERANCE = 30;
+const DOUBLE_TAP_MS = 380;
+const DOUBLE_TAP_MOVE_TOLERANCE = 48;
 let lastTapAt = 0, lastTapX = 0, lastTapY = 0;
 
 function getImg() { return document.getElementById('fullscreen-image'); }
@@ -12,9 +12,31 @@ function getStage() { return document.getElementById('fullscreen-viewer'); }
  * Delegates clicks to the active mode if applicable.
  */
 export function handleImageClick(e) {
-  // The page-preview grid is a modal on top of the viewer — never let a guided
-  // mode swallow its clicks.
-  if (e.target && typeof e.target.closest === 'function' && e.target.closest('#comic-page-grid-overlay')) return;
+  // Never intercept clicks on modals or controls
+  if (e.target && typeof e.target.closest === 'function') {
+    if (e.target.closest('#comic-page-grid-overlay, #fullscreen-controls, #fullscreen-title, #fullscreen-close-btn, #fullscreen-scrubber-container, #reader-scrubber-preview, #reader-thumbnail-filmstrip, button, input, a, select')) {
+      return;
+    }
+  }
+
+  const now = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+  const getExternalDblAt = state.getLastDoubleTapAt || (typeof window !== 'undefined' ? window.getLastDoubleTapAt : null);
+  const effectiveLastDblAt = Math.max(lastDblZoomAt, typeof getExternalDblAt === 'function' ? getExternalDblAt() : 0);
+  if (now - effectiveLastDblAt < 500) {
+    e.preventDefault?.();
+    e.stopPropagation?.();
+    return;
+  }
+
+  const controls = document.getElementById('fullscreen-controls') || state.fullscreenControls;
+  const isControlsOpen = controls && !controls.classList.contains('hidden');
+  if (isControlsOpen) {
+    const hideControls = state.hideFullscreenControls || window.hideFullscreenControls;
+    hideControls?.();
+    e.preventDefault?.();
+    e.stopPropagation?.();
+    return;
+  }
 
   const registry = state.GuidedView.ModeRegistry;
   const activeMode = registry.getActiveMode();
@@ -28,6 +50,7 @@ export function handleImageClick(e) {
   if (isOverlayClick) {
     e.preventDefault?.();
     e.stopPropagation?.();
+    state.lastManualOverrideDismissAt = now;
     if (manualOverrideBox) {
       registry.setManualOverrideBox(null);
     }
@@ -44,9 +67,9 @@ export function handleImageClick(e) {
   }
 
   if (manualOverrideBox) {
-    const now = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
-    if (now - lastDblZoomAt < 500) { e.preventDefault(); e.stopPropagation(); return; }
-    e.preventDefault(); e.stopPropagation();
+    e.preventDefault();
+    e.stopPropagation();
+    state.lastManualOverrideDismissAt = now;
     registry.setManualOverrideBox(null);
     if (typeof state.GuidedView.refreshRender === 'function') {
       state.GuidedView.refreshRender();
@@ -61,17 +84,43 @@ export function handleImageClick(e) {
   if (!img || !img.naturalWidth) return;
 
   const rect = img.getBoundingClientRect();
-  const outsideImage = e.clientX < rect.left || e.clientX > rect.right || e.clientY < rect.top || e.clientY > rect.bottom;
-  if (outsideImage) {
-    const showControls = state.showFullscreenControls || window.showFullscreenControls;
-    showControls?.(true);
+  let renderedLeft = rect.left;
+  let renderedTop = rect.top;
+  let renderedW = rect.width;
+  let renderedH = rect.height;
+  if (img.naturalWidth > 0 && img.naturalHeight > 0 && rect.width > 0 && rect.height > 0) {
+    const imgRatio = img.naturalWidth / img.naturalHeight;
+    const boxRatio = rect.width / rect.height;
+    if (boxRatio > imgRatio + 0.01) {
+      renderedH = rect.height;
+      renderedW = rect.height * imgRatio;
+      renderedLeft = rect.left + (rect.width - renderedW) / 2;
+    } else if (boxRatio < imgRatio - 0.01) {
+      renderedW = rect.width;
+      renderedH = rect.width / imgRatio;
+      renderedTop = rect.top + (rect.height - renderedH) / 2;
+    }
+  }
+
+  const isAboveOrBelow = e.clientY < renderedTop || e.clientY > (renderedTop + renderedH);
+  const isSideHotspot = !!(e.target && typeof e.target.closest === 'function' && e.target.closest('#fullscreen-nav-left, #fullscreen-nav-right'));
+  if (isSideHotspot && !isAboveOrBelow) {
     return;
   }
 
-  const rx = e.clientX - rect.left;
-  const ry = e.clientY - rect.top;
-  const nx = rx * (img.naturalWidth / rect.width);
-  const ny = ry * (img.naturalHeight / rect.height);
+  const outsideImage = isAboveOrBelow || e.clientX < renderedLeft || e.clientX > (renderedLeft + renderedW);
+  if (outsideImage) {
+    const showControls = state.showFullscreenControls || window.showFullscreenControls;
+    showControls?.(true);
+    e.preventDefault?.();
+    e.stopPropagation?.();
+    return;
+  }
+
+  const rx = e.clientX - renderedLeft;
+  const ry = e.clientY - renderedTop;
+  const nx = rx * (img.naturalWidth / renderedW);
+  const ny = ry * (img.naturalHeight / renderedH);
 
   if (activeMode && activeMode.handleImageClick) {
     const handled = activeMode.handleImageClick(nx, ny);
@@ -83,11 +132,15 @@ export function handleImageClick(e) {
       }
     } else {
       // Not handled by the mode -> show menu
+      e.preventDefault?.();
+      e.stopPropagation?.();
       const showControls = state.showFullscreenControls || window.showFullscreenControls;
       showControls?.(true);
     }
   } else {
     // No active mode or no click handler -> show menu
+    e.preventDefault?.();
+    e.stopPropagation?.();
     const showControls = state.showFullscreenControls || window.showFullscreenControls;
     showControls?.(true);
   }
@@ -112,6 +165,8 @@ export function handleDoubleClickZoom(event) {
   lastDblZoomAt = now;
   const cancelSideNav = state.cancelPendingSideNav || window.cancelPendingSideNav;
   if (typeof cancelSideNav === 'function') cancelSideNav();
+  const hideControls = state.hideFullscreenControls || window.hideFullscreenControls;
+  hideControls?.();
   const isPointerEvt = event && (event.type === 'pointerup' || event.type === 'pointerdown');
 
   const manualOverrideBox = registry.getManualOverrideBox();
@@ -178,8 +233,6 @@ function init() {
       else if (typeof window.GuidedView.isAnyGuidedActive === 'function' && window.GuidedView.isAnyGuidedActive()) e.preventDefault();
     });
   }
-  document.addEventListener('pointerup', handlePointerUpForDblTap, { capture: true });
-  document.addEventListener('dblclick', handleDoubleClickZoom, { capture: true });
 }
 
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);

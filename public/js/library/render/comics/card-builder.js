@@ -192,7 +192,10 @@ export function createComicCard(comic) {
       if (interactiveButton) return;
     }
     if (target.closest(".download-btn") || target.closest(".status-toggle-btn")) return;
-    if (typeof window.openComicViewer === "function") window.openComicViewer(comic);
+    const openFn = (typeof window !== 'undefined' && window.openComicViewer) ||
+                   (typeof state !== 'undefined' && state.openComicViewer) ||
+                   (typeof global !== 'undefined' && global.openComicViewer);
+    if (typeof openFn === 'function') openFn(comic);
   });
   card.classList.add('cursor-pointer');
 
