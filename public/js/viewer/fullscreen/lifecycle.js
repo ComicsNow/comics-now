@@ -202,6 +202,7 @@ export function initFullscreenNavigation() {
   }
 
   setupControlsAutohide(global.fullscreenControls);
+  setupControlsAutohide(document.getElementById('fullscreen-scrubber-container'));
 }
 
 global.openFullscreen = openFullscreen;

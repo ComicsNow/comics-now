@@ -114,16 +114,26 @@ export function renderStagingTray() {
 
   tray.classList.remove('hidden');
 
+  const geminiDisabled = typeof window !== 'undefined' && window._geminiState && window._geminiState._loaded && window._geminiState.enabled === false;
+
   if (synthBtn) {
     synthBtn.disabled = count < 2;
+    const btnSpan = synthBtn.querySelector('span');
+    if (btnSpan) {
+      btnSpan.textContent = geminiDisabled ? 'Synthesize Sources' : 'Synthesize with Gemini Flash';
+    }
   }
 
   if (hintEl) {
     if (count >= 2) {
-      hintEl.textContent = `Ready to synthesize! Click above to reconcile metadata across ${count} sources with Gemini Flash.`;
+      hintEl.textContent = geminiDisabled
+        ? `Ready to synthesize! Click above to merge the best metadata fields across ${count} staged sources.`
+        : `Ready to synthesize! Click above to reconcile metadata across ${count} sources with Gemini Flash.`;
       hintEl.className = 'text-[11px] text-purple-300 font-medium mb-2';
     } else {
-      hintEl.textContent = 'Stage at least 1 more source to synthesize with Gemini Flash, or click any search result to apply directly.';
+      hintEl.textContent = geminiDisabled
+        ? 'Stage at least 1 more source to merge metadata across sources, or click any search result to apply directly.'
+        : 'Stage at least 1 more source to synthesize with Gemini Flash, or click any search result to apply directly.';
       hintEl.className = 'text-[11px] text-gray-400 mb-2';
     }
   }
@@ -166,8 +176,10 @@ export function renderStagingTray() {
 export async function synthesizeStagedSources() {
   if (!cvState.stagedSources || cvState.stagedSources.length < 2) return;
 
-  const synthBtn = document.getElementById('synthesize-staged-sources-btn');
   const statusDiv = document.getElementById('search-status') || document.getElementById('cv-status');
+  const geminiDisabled = typeof window !== 'undefined' && window._geminiState && window._geminiState._loaded && window._geminiState.enabled === false;
+
+  const synthBtn = document.getElementById('synthesize-staged-sources-btn');
   const originalBtnHtml = synthBtn ? synthBtn.innerHTML : '';
 
   if (synthBtn) {
@@ -179,7 +191,9 @@ export async function synthesizeStagedSources() {
   }
 
   if (statusDiv) {
-    statusDiv.textContent = `Synthesizing metadata across ${cvState.stagedSources.length} sources with Gemini Flash...`;
+    statusDiv.textContent = geminiDisabled
+      ? `Synthesizing metadata across ${cvState.stagedSources.length} sources...`
+      : `Synthesizing metadata across ${cvState.stagedSources.length} sources with Gemini Flash...`;
   }
 
   const apiBaseUrl = (state && state.API_BASE_URL) || (typeof window !== 'undefined' ? window.API_BASE_URL : '') || '';
@@ -234,8 +248,17 @@ export async function synthesizeStagedSources() {
         metaForm.scrollIntoView({ behavior: 'smooth' });
       }
 
+      const usedDeterministic = data.mode === 'deterministic' || geminiDisabled;
       if (statusDiv) {
-        statusDiv.textContent = `✓ Successfully synthesized metadata across ${resolvedSources.length} sources with Gemini Flash!`;
+        statusDiv.className = 'text-sm text-green-400 font-medium mt-2';
+        statusDiv.textContent = usedDeterministic
+          ? `✓ Successfully synthesized metadata across ${resolvedSources.length} sources — click Save Changes to save!`
+          : `✓ Successfully synthesized metadata across ${resolvedSources.length} sources with Gemini Flash!`;
+      }
+      const saveStatusDiv = document.getElementById('save-status');
+      if (saveStatusDiv) {
+        saveStatusDiv.className = 'text-sm text-green-400 font-medium mb-2';
+        saveStatusDiv.textContent = `✓ Synthesized metadata across ${resolvedSources.length} sources (unsaved — click Save Changes below).`;
       }
     }
   } catch (err) {

@@ -63,9 +63,29 @@ function initReaderScrubber() {
     updateScrubberPreviewThumb(targetPage - 1);
   }
 
-  slider.addEventListener('input', () => {
+  function beginScrubbing() {
     isScrubbing = true;
+    if (state) state.isScrubbing = true;
     clearTimeout(scrubberHideTimeout);
+    const clearFn = state?.clearControlsTimeout || (typeof window !== 'undefined' ? window.clearControlsTimeout : null);
+    if (typeof clearFn === 'function') clearFn();
+  }
+
+  function endScrubbing(hideDelay = 400) {
+    isScrubbing = false;
+    if (state) state.isScrubbing = false;
+    scrubberHideTimeout = setTimeout(() => {
+      if (!isScrubbing && preview) preview.classList.add('hidden');
+    }, hideDelay);
+    const showControlsFn = state?.showFullscreenControls || (typeof window !== 'undefined' ? window.showFullscreenControls : null);
+    const controls = state?.fullscreenControls || document.getElementById('fullscreen-controls');
+    if (typeof showControlsFn === 'function' && controls && !controls.classList.contains('hidden')) {
+      showControlsFn(true);
+    }
+  }
+
+  slider.addEventListener('input', () => {
+    beginScrubbing();
     const val = parseInt(slider.value, 10) || 1;
     const max = parseInt(slider.max, 10) || 1;
     const pct = max > 1 ? (val - 1) / (max - 1) : 0;
@@ -77,32 +97,35 @@ function initReaderScrubber() {
   });
 
   slider.addEventListener('change', async () => {
-    isScrubbing = false;
     const val = parseInt(slider.value, 10) || 1;
+    endScrubbing(350);
     await goToPage(val - 1);
-    scrubberHideTimeout = setTimeout(() => {
-      if (!isScrubbing && preview) preview.classList.add('hidden');
-    }, 350);
   });
 
   slider.addEventListener('pointerdown', () => {
-    isScrubbing = true;
-    clearTimeout(scrubberHideTimeout);
+    beginScrubbing();
   });
+
+  slider.addEventListener('touchstart', () => {
+    beginScrubbing();
+  }, { passive: true });
 
   slider.addEventListener('pointerup', () => {
-    isScrubbing = false;
-    scrubberHideTimeout = setTimeout(() => {
-      if (!isScrubbing && preview) preview.classList.add('hidden');
-    }, 400);
+    endScrubbing(400);
   });
 
+  slider.addEventListener('touchend', () => {
+    endScrubbing(400);
+  }, { passive: true });
+
   slider.addEventListener('pointercancel', () => {
-    isScrubbing = false;
+    endScrubbing(0);
     if (preview) preview.classList.add('hidden');
   });
 
   slider.addEventListener('pointermove', (e) => {
+    const clearFn = state?.clearControlsTimeout || (typeof window !== 'undefined' ? window.clearControlsTimeout : null);
+    if (typeof clearFn === 'function') clearFn();
     if (isScrubbing) return;
     const rect = (typeof slider.getBoundingClientRect === 'function')
       ? slider.getBoundingClientRect()

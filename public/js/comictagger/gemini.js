@@ -12,6 +12,7 @@ const global = typeof canonicalGlobal !== 'undefined' ? canonicalGlobal : new Pr
 const clear = typeof clearElement === 'function' ? clearElement : (el) => { if (el) { if (typeof el.replaceChildren === 'function') el.replaceChildren(); else el.innerHTML = ''; } };
 
 export const geminiState = {
+  _loaded: false,
   termsAccepted: false,
   hasApiKey: false,
   enabled: false,
@@ -161,6 +162,7 @@ export function initGeminiComplianceModal() {
       });
 
       if (res.ok) {
+        geminiState._loaded = true;
         geminiState.termsAccepted = true;
         geminiState.hasApiKey = true;
         geminiState.enabled = true;
@@ -222,6 +224,33 @@ export function initGeminiComplianceModal() {
     });
   }
 
+  // Immediate persistence when toggling Enable Gemini checkbox
+  const ctEnabledToggle = document.getElementById('ct-gemini-enabled-toggle');
+  if (ctEnabledToggle && !ctEnabledToggle.dataset.bound) {
+    ctEnabledToggle.dataset.bound = 'true';
+    ctEnabledToggle.addEventListener('change', async function() {
+      const isEnabled = !!ctEnabledToggle.checked;
+      const keyVal = ctKeyInput ? ctKeyInput.value.trim() : '';
+      if (isEnabled && !geminiState.termsAccepted && (keyVal || geminiState.hasApiKey)) {
+        openGeminiComplianceModal(keyVal);
+        return;
+      }
+      geminiState._loaded = true;
+      geminiState.enabled = isEnabled;
+      try {
+        const payload = { geminiCoverMatchEnabled: isEnabled };
+        if (geminiState.termsAccepted) {
+          payload.geminiTermsAccepted = true;
+        }
+        await fetch(`${global.API_BASE_URL || ''}/api/v1/gemini/config`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+      } catch (_) {}
+    });
+  }
+
   // Dedicated Save Gemini Settings Button
   const geminiSaveBtn = document.getElementById('ct-gemini-save-btn');
   if (geminiSaveBtn && !geminiSaveBtn.dataset.bound) {
@@ -246,7 +275,7 @@ export function initGeminiComplianceModal() {
       try {
         const payload = {
           geminiCoverMatchEnabled: isEnabled,
-          geminiTermsAccepted: true,
+          geminiTermsAccepted: isEnabled ? true : !!state.termsAccepted,
           geminiModel: selectedModel,
           geminiCoverDailyCap: dailyCap
         };
@@ -259,7 +288,8 @@ export function initGeminiComplianceModal() {
         });
 
         if (res.ok) {
-          state.termsAccepted = true;
+          state._loaded = true;
+          if (isEnabled) state.termsAccepted = true;
           if (keyVal) state.hasApiKey = true;
           state.enabled = isEnabled;
           state.model = selectedModel;

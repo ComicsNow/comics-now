@@ -81,6 +81,7 @@ export async function fetchCtSettings() {
       const geminiRes = await fetch(`${global.API_BASE_URL}/api/v1/gemini/config?_t=${Date.now()}`);
       if (geminiRes.ok) {
         const geminiData = await geminiRes.json();
+        geminiState._loaded = true;
         geminiState.termsAccepted = !!geminiData.termsAccepted;
         geminiState.hasApiKey = !!geminiData.hasApiKey;
         geminiState.enabled = geminiData.enabled !== false;
@@ -200,15 +201,19 @@ export async function saveCtSettings() {
       })
     });
     if (res.ok) {
-      if (state.termsAccepted) {
+      if (state.termsAccepted || !geminiEnabled) {
+        state._loaded = true;
+        state.enabled = geminiEnabled;
         const geminiPayload = {
-          geminiCoverMatchEnabled: geminiEnabled,
-          geminiTermsAccepted: true
+          geminiCoverMatchEnabled: geminiEnabled
         };
-        if (geminiVal) {
+        if (state.termsAccepted) {
+          geminiPayload.geminiTermsAccepted = true;
+        }
+        if (geminiVal && geminiEnabled) {
           geminiPayload.geminiApiKey = geminiVal;
         }
-        fetch(`${global.API_BASE_URL}/api/v1/gemini/config`, {
+        await fetch(`${global.API_BASE_URL}/api/v1/gemini/config`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(geminiPayload)

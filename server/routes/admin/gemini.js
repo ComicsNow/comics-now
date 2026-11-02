@@ -23,12 +23,14 @@ const {
 
 module.exports = function attach(router, deps) {
   const {
-    config = {},
+    config: rawConfig = {},
+    getConfig,
     dbGet,
     dbRun,
     log = () => {},
     saveConfigToDisk
   } = deps;
+  const config = typeof getConfig === 'function' ? (getConfig() || rawConfig) : rawConfig;
 
   const defaultConfigFile = CONFIG_FILE || path.join(__dirname, '../../../config.json');
   const configPath = deps.paths?.CONFIG_FILE || defaultConfigFile;
@@ -215,7 +217,7 @@ module.exports = function attach(router, deps) {
         geminiTermsAccepted
       } = req.body || {};
 
-      const cfg = readConfig();
+      const cfg = await readConfig();
       const alreadyAccepted = await checkTermsAccepted();
 
       if (geminiTermsAccepted === true || alreadyAccepted) {

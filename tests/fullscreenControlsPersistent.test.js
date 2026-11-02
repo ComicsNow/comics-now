@@ -20,7 +20,17 @@ describe('Fullscreen persistent header controls & clean display title', () => {
         <div id="fullscreen-info-bar" class="fullscreen-info-bar"></div>
         <div id="fullscreen-controls" class="fullscreen-controls hidden"></div>
         <img id="fullscreen-image" src="test.jpg" />
-        <div id="fullscreen-scrubber-container" class="hidden"></div>
+        <div id="fullscreen-scrubber-container" class="hidden">
+          <span id="fullscreen-scrubber-current-page">1</span>
+          <div id="fullscreen-scrubber-track-fill"></div>
+          <input type="range" id="fullscreen-scrubber-slider" min="1" max="20" value="1" />
+          <span id="fullscreen-scrubber-total-pages">20</span>
+        </div>
+        <div id="reader-scrubber-preview" class="hidden">
+          <img id="reader-scrubber-preview-img" />
+          <span id="reader-scrubber-preview-page-text"></span>
+          <span id="reader-scrubber-preview-spread" class="hidden"></span>
+        </div>
       </div>
     `;
 
@@ -65,8 +75,11 @@ describe('Fullscreen persistent header controls & clean display title', () => {
       new vm.Script(cleanContent).runInContext(sandbox);
     }
 
+    sandbox.getThumbnailUrl = jest.fn().mockResolvedValue('thumb.jpg');
+    sandbox.goToPage = jest.fn().mockResolvedValue(undefined);
     loadFile('../public/js/viewer/fullscreen/controls.js');
     loadFile('../public/js/viewer/fullscreen/lifecycle.js');
+    loadFile('../public/js/viewer/previews/scrubber.js');
   });
 
   test('hideFullscreenControls leaves title and top-right close button visible', () => {
@@ -170,5 +183,49 @@ describe('Fullscreen persistent header controls & clean display title', () => {
 
     expect(overlayZ).toBeGreaterThan(titleZ);
     expect(overlayZ).toBeGreaterThan(closeBtnZ);
+  });
+
+  test('scrubber bar (#fullscreen-scrubber-container) does not disappear while dragging/scrubbing the circle thumb even past the 3000ms autohide timeout', async () => {
+    jest.useFakeTimers();
+    try {
+      const scrubberContainer = document.getElementById('fullscreen-scrubber-container');
+      const slider = document.getElementById('fullscreen-scrubber-slider');
+      const controls = document.getElementById('fullscreen-controls');
+
+      sandbox.initFullscreenNavigation();
+      sandbox.initReaderScrubber();
+
+      // Open fullscreen controls with autoHide = true (starts 3000ms timer)
+      sandbox.showFullscreenControls(true);
+      expect(scrubberContainer.classList.contains('hidden')).toBe(false);
+      expect(controls.classList.contains('hidden')).toBe(false);
+
+      // User starts dragging the scrubber circle thumb
+      slider.dispatchEvent(new Event('pointerdown', { bubbles: true }));
+      slider.value = '8';
+      slider.dispatchEvent(new Event('input', { bubbles: true }));
+
+      // Even if pointer leaves the scrubber bar while dragging, and 5000ms (> 3000ms timeout) elapses:
+      scrubberContainer.dispatchEvent(new Event('pointerleave', { bubbles: true }));
+      jest.advanceTimersByTime(5000);
+
+      // Scrubber and controls MUST remain visible while scrubbing!
+      expect(scrubberContainer.classList.contains('hidden')).toBe(false);
+      expect(controls.classList.contains('hidden')).toBe(false);
+
+      // User releases the thumb to finish scrubbing
+      slider.dispatchEvent(new Event('pointerup', { bubbles: true }));
+      slider.dispatchEvent(new Event('change', { bubbles: true }));
+
+      // Before the 3000ms post-scrub timeout finishes, it is still visible
+      jest.advanceTimersByTime(1000);
+      expect(scrubberContainer.classList.contains('hidden')).toBe(false);
+
+      // After the full 3000ms post-scrub inactivity timeout elapses, it auto-hides normally
+      jest.advanceTimersByTime(2500);
+      expect(scrubberContainer.classList.contains('hidden')).toBe(true);
+    } finally {
+      jest.useRealTimers();
+    }
   });
 });

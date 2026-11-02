@@ -90,12 +90,14 @@ async function loadConfigFromDisk() {
     }
     
     delete parsed.comicsDirectories;
-    config = { ...DEFAULT_CONFIG, ...parsed };
+    Object.keys(config).forEach(k => delete config[k]);
+    Object.assign(config, DEFAULT_CONFIG, parsed);
     config.libraries = sanitizeDirectories(config.libraries);
     applyEnvOverrides(config);
   } catch (e) {
     log('ERROR', 'SERVER', `Bad config.json; using defaults. ${e.message}`);
-    config = { ...DEFAULT_CONFIG };
+    Object.keys(config).forEach(k => delete config[k]);
+    Object.assign(config, DEFAULT_CONFIG);
     applyEnvOverrides(config);
   }
 

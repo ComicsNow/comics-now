@@ -158,39 +158,19 @@ export function renderResultsList() {
       });
     }
 
-    const staged = isSourceStaged(result);
-    const stageBtn = document.createElement('button');
-    stageBtn.type = 'button';
-    stageBtn._sourceItem = result;
-    stageBtn.className = `stage-source-btn shrink-0 ml-2 px-2.5 py-1 text-xs font-semibold rounded-lg transition-all cursor-pointer flex items-center gap-1 ${
-      staged
-        ? 'bg-purple-600/30 text-purple-300 border border-purple-500/50 shadow-xs'
-        : 'bg-gray-800 text-gray-300 hover:bg-gray-700 hover:text-white border border-gray-600'
-    }`;
-    stageBtn.innerHTML = staged
-      ? `<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg><span>✓ Staged</span>`
-      : `<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg><span>+ Stage</span>`;
-
-    stageBtn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      toggleStageSource(result);
-    });
-    baseRow.appendChild(stageBtn);
+    baseRow.appendChild(createStageBtn(result, false));
 
     baseRow.addEventListener('click', () => {
       if (result.fullMetadata) {
         sanitizeMetadata(result.fullMetadata);
         renderMetadataDisplay(result.fullMetadata, true);
         state.metadataHasUnsavedChanges = true;
-        const metaForm = document.getElementById('metadata-form-container') || document.getElementById('metadata-form');
-        if (metaForm) {
-          metaForm.scrollIntoView({ behavior: 'smooth' });
-        }
+        notifyMetadataApplied(displayName, li);
       } else {
         if (isIssue) {
-          applyIssueMetadataFromSearch(result.id);
+          applyIssueMetadataFromSearch(result.id, displayName, li);
         } else {
-          applyMetadataFromSearch(result.id);
+          applyMetadataFromSearch(result.id, displayName, li);
         }
       }
     });
@@ -252,26 +232,8 @@ export function renderResultsList() {
                   }
 
                   const issueItem = { ...issue, source: 'comicvine', type: 'issue' };
-                  const issueStaged = isSourceStaged(issueItem);
-                  const issueStageBtn = document.createElement('button');
-                  issueStageBtn.type = 'button';
-                  issueStageBtn._sourceItem = issueItem;
-                  issueStageBtn.className = `stage-source-btn shrink-0 ml-2 px-2 py-0.5 text-xs font-semibold rounded-lg transition-all cursor-pointer flex items-center gap-1 ${
-                    issueStaged
-                      ? 'bg-purple-600/30 text-purple-300 border border-purple-500/50 shadow-xs'
-                      : 'bg-gray-800 text-gray-300 hover:bg-gray-700 hover:text-white border border-gray-600'
-                  }`;
-                  issueStageBtn.innerHTML = issueStaged
-                    ? `<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg><span>✓ Staged</span>`
-                    : `<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg><span>+ Stage</span>`;
-
-                  issueStageBtn.addEventListener('click', (ev) => {
-                    ev.stopPropagation();
-                    toggleStageSource(issueItem);
-                  });
-                  issueLi.appendChild(issueStageBtn);
-
-                  issueLi.addEventListener('click', () => applyIssueMetadataFromSearch(issue.id));
+                  issueLi.appendChild(createStageBtn(issueItem, true));
+                  issueLi.addEventListener('click', () => applyIssueMetadataFromSearch(issue.id, issueDisplayName, issueLi));
                   issueList.appendChild(issueLi);
                 }
               } else {
@@ -308,13 +270,66 @@ export function renderResultsList() {
   renderStagingTray();
 }
 
-export async function applyMetadataFromSearch(volumeId) {
+function createStageBtn(item, compact = false) {
+  const staged = isSourceStaged(item);
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn._sourceItem = item;
+  const pad = compact ? 'px-2 py-0.5' : 'px-2.5 py-1';
+  btn.className = `stage-source-btn shrink-0 ml-2 ${pad} text-xs font-semibold rounded-lg transition-all cursor-pointer flex items-center gap-1 ${
+    staged ? 'bg-purple-600/30 text-purple-300 border border-purple-500/50 shadow-xs' : 'bg-gray-800 text-gray-300 hover:bg-gray-700 hover:text-white border border-gray-600'
+  }`;
+  btn.innerHTML = staged
+    ? `<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg><span>✓ Staged</span>`
+    : `<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg><span>+ Stage</span>`;
+  btn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    toggleStageSource(item);
+  });
+  return btn;
+}
+
+function notifyMetadataApplied(label, selectedEl) {
+  const name = label || 'selected result';
+  const resultsUl = document.getElementById('search-results') || document.getElementById('cv-results');
+  if (resultsUl) {
+    resultsUl.querySelectorAll('.selected-search-result').forEach(el => {
+      el.classList.remove('selected-search-result', 'ring-2', 'ring-green-500');
+      el.querySelector('.applied-result-badge')?.remove();
+    });
+  }
+  if (selectedEl) {
+    selectedEl.classList.add('selected-search-result', 'ring-2', 'ring-green-500');
+    const titleEl = selectedEl.querySelector('.font-bold');
+    if (titleEl && !titleEl.querySelector('.applied-result-badge')) {
+      const badge = document.createElement('span');
+      badge.className = 'applied-result-badge ml-2 text-[10px] px-2 py-0.5 rounded-full bg-green-600 text-white font-semibold';
+      badge.textContent = '✓ Applied';
+      titleEl.appendChild(badge);
+    }
+  }
+  const searchStatusDiv = document.getElementById('search-status') || document.getElementById('cv-status');
+  if (searchStatusDiv) {
+    searchStatusDiv.className = 'text-sm text-green-400 font-medium mt-2';
+    searchStatusDiv.textContent = `✓ Applied metadata from "${name}" — click Save Changes to save.`;
+  }
+  const saveStatusDiv = document.getElementById('save-status');
+  if (saveStatusDiv) {
+    saveStatusDiv.className = 'text-sm text-green-400 font-medium mb-2';
+    saveStatusDiv.textContent = `✓ Loaded metadata from "${name}" (unsaved — click Save Changes below).`;
+  }
+  const metaForm = document.getElementById('metadata-form-container') || document.getElementById('metadata-form');
+  if (metaForm && typeof metaForm.scrollIntoView === 'function') {
+    metaForm.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+}
+
+export async function applyMetadataFromSearch(volumeId, label = '', selectedEl = null) {
   const comic = state.currentComic || window.currentComic;
   const isLocal = comic && (comic.handle || comic.file || (comic.id && String(comic.id).startsWith('device-')));
   if (isLocal || (comic && comic.libraryMode === 'folder')) return;
 
   const searchStatusDiv = document.getElementById('search-status') || document.getElementById('cv-status');
-  const prevStatus = searchStatusDiv ? searchStatusDiv.textContent : '';
   if (searchStatusDiv) searchStatusDiv.textContent = 'Fetching details...';
   try {
     const response = await fetch(`${state.API_BASE_URL || ''}/api/v1/comicvine/volume/${volumeId}`);
@@ -323,19 +338,19 @@ export async function applyMetadataFromSearch(volumeId) {
     sanitizeMetadata(detailedMetadata);
     renderMetadataDisplay(detailedMetadata, true);
     state.metadataHasUnsavedChanges = true;
-    if (searchStatusDiv) searchStatusDiv.textContent = prevStatus;
+    const displayLabel = label || detailedMetadata.Series || detailedMetadata.Title || `Volume #${volumeId}`;
+    notifyMetadataApplied(displayLabel, selectedEl);
   } catch (error) {
     if (searchStatusDiv) searchStatusDiv.textContent = `Error: ${error.message}`;
   }
 }
 
-export async function applyIssueMetadataFromSearch(issueId) {
+export async function applyIssueMetadataFromSearch(issueId, label = '', selectedEl = null) {
   const comic = state.currentComic || window.currentComic;
   const isLocal = comic && (comic.handle || comic.file || (comic.id && String(comic.id).startsWith('device-')));
   if (isLocal || (comic && comic.libraryMode === 'folder')) return;
 
   const searchStatusDiv = document.getElementById('search-status') || document.getElementById('cv-status');
-  const prevStatus = searchStatusDiv ? searchStatusDiv.textContent : '';
   if (searchStatusDiv) searchStatusDiv.textContent = 'Fetching issue details...';
   try {
     const response = await fetch(`${state.API_BASE_URL || ''}/api/v1/comicvine/issue/${issueId}`);
@@ -344,7 +359,8 @@ export async function applyIssueMetadataFromSearch(issueId) {
     sanitizeMetadata(detailedMetadata);
     renderMetadataDisplay(detailedMetadata, true);
     state.metadataHasUnsavedChanges = true;
-    if (searchStatusDiv) searchStatusDiv.textContent = prevStatus;
+    const displayLabel = label || detailedMetadata.Title || detailedMetadata.Series || `Issue #${issueId}`;
+    notifyMetadataApplied(displayLabel, selectedEl);
   } catch (error) {
     if (searchStatusDiv) searchStatusDiv.textContent = `Error: ${error.message}`;
   }

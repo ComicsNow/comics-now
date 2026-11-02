@@ -27,6 +27,10 @@ const {
   createSaveMetadataToComic
 } = require('./metadata/archive');
 
+const {
+  synthesizeMetadataDeterministic
+} = require('./metadata/merger');
+
 const saveMetadataToComic = createSaveMetadataToComic(() => module.exports.writeComicInfoToCbz);
 
 module.exports = {
@@ -46,5 +50,6 @@ module.exports = {
   splitVolumeSeriesAndTitle,
   isTitleSameAsSeries,
   sanitizeMetadata,
-  resolveCreatorRoles
+  resolveCreatorRoles,
+  synthesizeMetadataDeterministic
 };

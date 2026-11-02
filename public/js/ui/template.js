@@ -90,11 +90,14 @@ export function render(container, templateOrString) {
     clearElement(container);
     return;
   }
-  const htmlString = templateOrString instanceof TemplateResult
-    ? templateOrString.toHTML()
-    : (templateOrString && typeof templateOrString === 'object' && templateOrString.__isRawHtml
-        ? templateOrString.html
-        : String(templateOrString));
+  const toHtmlItem = (item) => {
+    if (item === null || item === undefined) return '';
+    if (Array.isArray(item)) return item.map(toHtmlItem).join('');
+    if (item instanceof TemplateResult) return item.toHTML();
+    if (typeof item === 'object' && typeof item.toHTML === 'function') return item.toHTML();
+    if (typeof item === 'object' && item.__isRawHtml) return String(item.html ?? '');
+    return String(item);
+  };
 
-  container.innerHTML = htmlString;
+  container.innerHTML = toHtmlItem(templateOrString);
 }

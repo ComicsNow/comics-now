@@ -161,8 +161,13 @@ if (metadataForm) {
 // Capturing-phase global click interceptor
 document.addEventListener('click', (e) => {
   if (state.metadataHasUnsavedChanges) {
-    // Allow internal clicks within the metadata panel, tab clicks, and form saves to pass through
-    if (e.target.closest('#metadata-content') || e.target.closest('#metadata-tab') || e.target.closest('button[type="submit"]')) {
+    // Allow internal clicks within the metadata panel, tab clicks, cover preview modal, and form saves to pass through
+    if (
+      e.target.closest('#metadata-content') ||
+      e.target.closest('#metadata-tab') ||
+      e.target.closest('#cover-preview-modal') ||
+      e.target.closest('button[type="submit"]')
+    ) {
       return;
     }
 

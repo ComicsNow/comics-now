@@ -54,7 +54,7 @@ describe('Tag Comics Now! Review & Cancellation Integration Tests', () => {
       attachComicTaggerRoutes(router, deps);
     });
 
-    test('GET /api/v1/tag-comics-now/pending returns pending match details even when scan is not running', () => {
+    test('GET /api/v1/tag-comics-now/pending returns pending match details even when scan is not running and omits previewBuffer', () => {
       const req = {};
       const res = { json: jest.fn() };
 
@@ -67,6 +67,8 @@ describe('Tag Comics Now! Review & Cancellation Integration Tests', () => {
           isRunning: false
         })
       );
+      const jsonArg = res.json.mock.calls[0][0];
+      expect(jsonArg.previewBuffer).toBeUndefined();
     });
 
     test('GET /api/v1/tag-comics-now/pending-details omits bulky previewBuffer from JSON payload', async () => {

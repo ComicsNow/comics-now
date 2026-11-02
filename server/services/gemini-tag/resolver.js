@@ -3,7 +3,7 @@ const path = require('path');
 const crypto = require('crypto');
 const cryptoVault = require('../../utils/crypto-vault');
 const { CONFIG_FILE } = require('../../constants');
-const { getGeminiApiKey } = require('../../config');
+const { getGeminiApiKey, getGeminiCoverMatchEnabled } = require('../../config');
 const { incrementDailyUsage } = require('../gemini-quota');
 const { generateThumbnail } = require('../library-pages');
 
@@ -25,9 +25,16 @@ function getConfig(ctx) {
     configGetterKey = getGeminiApiKey();
   } catch (_) {}
 
-  const enabled = process.env.GEMINI_COVER_MATCH_ENABLED !== undefined
-    ? (process.env.GEMINI_COVER_MATCH_ENABLED === 'true' || process.env.GEMINI_COVER_MATCH_ENABLED === '1')
-    : (fileConfig.geminiCoverMatchEnabled !== undefined ? !!fileConfig.geminiCoverMatchEnabled : true);
+  let enabled = true;
+  if (process.env.GEMINI_COVER_MATCH_ENABLED !== undefined) {
+    enabled = (process.env.GEMINI_COVER_MATCH_ENABLED === 'true' || process.env.GEMINI_COVER_MATCH_ENABLED === '1');
+  } else if (ctx && ctx.config && ctx.config.geminiCoverMatchEnabled !== undefined) {
+    enabled = !!ctx.config.geminiCoverMatchEnabled;
+  } else if (fileConfig.geminiCoverMatchEnabled !== undefined) {
+    enabled = !!fileConfig.geminiCoverMatchEnabled;
+  } else if (typeof getGeminiCoverMatchEnabled === 'function') {
+    try { enabled = !!getGeminiCoverMatchEnabled(); } catch (_) {}
+  }
 
   const termsAccepted = fileConfig.geminiTermsAccepted === true;
   const rawApiKey = process.env.GEMINI_API_KEY || configGetterKey || fileConfig.geminiApiKey || ctx.config?.geminiApiKey || '';

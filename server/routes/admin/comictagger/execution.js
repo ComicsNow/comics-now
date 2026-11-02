@@ -95,8 +95,9 @@ module.exports = function attachExecutionRoutes(router, deps) {
   router.get('/api/v1/tag-comics-now/pending', (req, res) => {
     const pending = getPendingMatch();
     const running = isTaggerRunning ? isTaggerRunning() : false;
+    const { previewBuffer, waitingLogId, ...safePending } = pending || {};
     res.json({
-      ...(pending || {}),
+      ...safePending,
       waitingForResponse: !!(pending && pending.waitingForResponse),
       isRunning: running
     });

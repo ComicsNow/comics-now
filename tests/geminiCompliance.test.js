@@ -229,4 +229,101 @@ describe('Compliance & Config Endpoints', () => {
       global.fetch = originalFetch;
     }
   });
+
+  test('POST /api/v1/gemini/config awaits readConfig() and persists geminiCoverMatchEnabled: false without losing existing config keys', async () => {
+    fs.writeFileSync(testConfigPath, JSON.stringify({
+      comicsLocation: '/custom/comics',
+      geminiApiKey: 'AIzaSyExistingKey',
+      geminiCoverMatchEnabled: true,
+      geminiTermsAccepted: true
+    }), 'utf8');
+
+    const handler = getRouteHandler('POST', '/api/v1/gemini/config');
+    const req = {
+      body: {
+        geminiCoverMatchEnabled: false
+      }
+    };
+    const res = {
+      status: jest.fn().mockReturnThis(),
+      json: jest.fn()
+    };
+
+    await handler(req, res);
+
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ ok: true }));
+    const savedDiskConfig = JSON.parse(fs.readFileSync(testConfigPath, 'utf8'));
+    expect(savedDiskConfig.comicsLocation).toBe('/custom/comics');
+    expect(savedDiskConfig.geminiCoverMatchEnabled).toBe(false);
+    expect(testConfig.geminiCoverMatchEnabled).toBe(false);
+  });
+
+  test('config store setGeminiCoverMatchEnabled mutates active config object after loadConfigFromDisk()', async () => {
+    const configStore = require('../server/config/store');
+    await configStore.loadConfigFromDisk();
+    configStore.setGeminiCoverMatchEnabled(false, true);
+    expect(configStore.getConfig().geminiCoverMatchEnabled).toBe(false);
+    expect(configStore.getGeminiCoverMatchEnabled()).toBe(false);
+  });
+
+  test('Frontend: unchecking #ct-gemini-enabled-toggle immediately persists geminiCoverMatchEnabled: false to /api/v1/gemini/config', async () => {
+    const path = require('path');
+    const vm = require('vm');
+    const { JSDOM } = require('jsdom');
+
+    const dom = new JSDOM(`<!DOCTYPE html><html><body>
+      <div id="gemini-compliance-modal" class="hidden">
+        <input id="gemini-modal-key-input" />
+        <input type="checkbox" id="gemini-modal-agree-cb" />
+        <button id="gemini-modal-save-btn"></button>
+        <button id="gemini-modal-disagree-btn"></button>
+      </div>
+      <input type="checkbox" id="ct-gemini-enabled-toggle" checked />
+      <input type="password" id="ct-gemini-key-input" />
+      <button id="ct-gemini-key-toggle"></button>
+      <select id="ct-gemini-model-select"><option value="gemini-3.5-flash-lite">3.5</option></select>
+      <input type="number" id="ct-gemini-daily-cap" value="450" />
+      <button id="ct-gemini-save-btn"></button>
+    </body></html>`);
+
+    const fetchMock = jest.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ ok: true, enabled: true, termsAccepted: true, hasApiKey: true })
+    });
+
+    const sandbox = {
+      window: dom.window,
+      document: dom.window.document,
+      fetch: fetchMock,
+      console,
+      setTimeout,
+      clearTimeout,
+      state: { API_BASE_URL: '' }
+    };
+
+    const geminiJs = fs.readFileSync(path.join(__dirname, '../public/js/comictagger/gemini.js'), 'utf8')
+      .replace(/^\s*import\s+[\s\S]*?from\s+['"][^'"]+['"];?\s*$/gm, '')
+      .replace(/\bexport\s+/g, '');
+
+    vm.createContext(sandbox);
+    new vm.Script(geminiJs).runInContext(sandbox);
+    sandbox.initGeminiComplianceModal();
+
+    fetchMock.mockClear();
+
+    const toggle = dom.window.document.getElementById('ct-gemini-enabled-toggle');
+    toggle.checked = false;
+    toggle.dispatchEvent(new dom.window.Event('change'));
+
+    await new Promise(r => setTimeout(r, 20));
+
+    expect(sandbox.window._geminiState.enabled).toBe(false);
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining('/api/v1/gemini/config'),
+      expect.objectContaining({
+        method: 'POST',
+        body: expect.stringContaining('"geminiCoverMatchEnabled":false')
+      })
+    );
+  });
 });

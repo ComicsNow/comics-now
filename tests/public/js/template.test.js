@@ -213,6 +213,21 @@ describe('Declarative Tagged Template Engine (Phase 1)', () => {
       const { html, render } = sandbox;
       expect(() => render(null, html`<p>test</p>`)).not.toThrow();
     });
+
+    it('renders an array of TemplateResults without inserting commas between items', () => {
+      const { html, render } = sandbox;
+      const container = { innerHTML: '' };
+      const rows = [
+        html`<div class="log-entry">Log 1</div>`,
+        html`<div class="log-entry">Log 2</div>`
+      ];
+
+      render(container, rows);
+      expect(container.innerHTML).toBe(
+        '<div class="log-entry">Log 1</div><div class="log-entry">Log 2</div>'
+      );
+      expect(container.innerHTML).not.toContain('</div>,<div');
+    });
   });
 
   describe('icons helper', () => {

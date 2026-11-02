@@ -72,12 +72,15 @@ export function showFullscreenControls(autoHide = false) {
     title.classList.remove('hidden');
   }
   const scrubber = document.getElementById('fullscreen-scrubber-container');
-  if (scrubber) scrubber.classList.remove('hidden');
+  if (scrubber) {
+    scrubber.classList.remove('hidden');
+    setupControlsAutohide(scrubber);
+  }
 
   if (autoHide) {
     clearTimeout(fullscreenControlsTimeoutId);
     fullscreenControlsTimeoutId = setTimeout(() => {
-      if (global.isFilmstripOpen?.()) return;
+      if (global.isFilmstripOpen?.() || global.isScrubbing) return;
       const c = global.fullscreenControls || document.getElementById('fullscreen-controls');
       if (c) c.classList.add('hidden');
       const v = global.fullscreenViewer || document.getElementById('fullscreen-viewer');
@@ -91,7 +94,7 @@ export function showFullscreenControls(autoHide = false) {
 }
 
 export function hideFullscreenControls() {
-  if (global.isFullImageMode) return;
+  if (global.isFullImageMode || global.isScrubbing) return;
   const controls = global.fullscreenControls || document.getElementById('fullscreen-controls');
   if (!controls) return;
 
@@ -117,7 +120,9 @@ export function setupControlsAutohide(controls) {
     }
   };
   const resumeAutohide = () => {
-    if (controls && !controls.classList.contains('hidden')) {
+    if (global.isScrubbing) return;
+    const c = global.fullscreenControls || document.getElementById('fullscreen-controls');
+    if (c && !c.classList.contains('hidden')) {
       showFullscreenControls(true);
     }
   };
@@ -136,6 +141,7 @@ export function clearControlsTimeout() {
 
 global.showFullscreenControls = showFullscreenControls;
 global.hideFullscreenControls = hideFullscreenControls;
+global.clearControlsTimeout = clearControlsTimeout;
 global.syncFullscreenTitle = syncFullscreenTitle;
 global.getCleanComicTitle = getCleanComicTitle;
 global.FULLSCREEN_CONTROLS_AUTOHIDE_DELAY = FULLSCREEN_CONTROLS_AUTOHIDE_DELAY;

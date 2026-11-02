@@ -60,6 +60,11 @@ function createUrlTaggerBox() {
   const status = container.querySelector('#tag-url-status');
 
   btn.addEventListener('click', async () => {
+    if (typeof window !== 'undefined' && window._geminiState && window._geminiState._loaded && window._geminiState.enabled === false) {
+      status.className = 'text-[11px] mt-1 text-red-400 block';
+      status.textContent = '❌ Gemini is disabled in settings. Enable Gemini in Tag Comics Now! -> Gemini AI to use web URL extraction.';
+      return;
+    }
     const url = input.value.trim();
     if (!url || !url.startsWith('http')) {
       status.className = 'text-[11px] mt-1 text-red-400 block';
@@ -124,6 +129,7 @@ function createUrlTaggerBox() {
 }
 
 async function loadMetadata() {
+  if (state) state.metadataHasUnsavedChanges = false;
   const isAdmin = global.syncManager && global.syncManager.userRole === 'admin';
   if (!isAdmin) return;
 

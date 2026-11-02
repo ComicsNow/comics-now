@@ -21,7 +21,7 @@ const { evaluateWithGemini } = require('./gemini-tag/evaluator');
 let isHookInstalled = false;
 
 function installTaggerHook(ctx) {
-  if (isHookInstalled) return;
+  if (isHookInstalled && globalThis.fetch && globalThis.fetch._isGeminiTaggerHook) return;
   isHookInstalled = true;
 
   const originalFetch = globalThis.fetch;
@@ -52,6 +52,18 @@ function installTaggerHook(ctx) {
     }
 
     const config = getConfig(ctx);
+
+    if (ctx.db && typeof ctx.db.dbGet === 'function') {
+      try {
+        const enabledRow = await ctx.db.dbGet("SELECT value FROM settings WHERE key = 'geminiCoverMatchEnabled'");
+        if (enabledRow && enabledRow.value !== undefined && enabledRow.value !== null) {
+          let parsedEnabled = enabledRow.value;
+          try { parsedEnabled = JSON.parse(enabledRow.value); } catch { parsedEnabled = enabledRow.value; }
+          config.enabled = parsedEnabled !== false && parsedEnabled !== 'false' && parsedEnabled !== 0 && parsedEnabled !== '0';
+          if (ctx.config) ctx.config.geminiCoverMatchEnabled = config.enabled;
+        }
+      } catch (_) {}
+    }
 
     if (!config.termsAccepted && ctx.db && typeof ctx.db.dbGet === 'function') {
       try {
@@ -195,6 +207,7 @@ function installTaggerHook(ctx) {
     }
   };
 
+  globalThis.fetch._isGeminiTaggerHook = true;
   logger('INFO', 'EXT_COVER', '✓ Gemini Vision transparent cover matcher hooked into Tag Comics Now! scan.');
 }
 

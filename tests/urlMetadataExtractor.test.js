@@ -274,6 +274,30 @@ describe('URL Metadata Extractor Service & Route (TDD)', () => {
       );
     });
 
+    test('returns 400 and does not call Gemini or increment quota when geminiCoverMatchEnabled is false', async () => {
+      const urlExtractorService = require('../server/services/url-metadata-extractor');
+      const geminiQuota = require('../server/services/gemini-quota');
+      const extractSpy = jest.spyOn(urlExtractorService, 'extractMetadataFromUrl');
+      const incrementSpy = jest.spyOn(geminiQuota, 'incrementDailyUsage');
+
+      deps.dbGet.mockImplementation(async (sql) => {
+        if (sql.includes("key = 'geminiApiKey'")) return { value: JSON.stringify('test-gemini-key') };
+        if (sql.includes("key = 'geminiCoverMatchEnabled'")) return { value: 'false' };
+        return null;
+      });
+
+      const req = { body: { url: 'https://example.com/comic/1' }, user: { userId: 'default-user', role: 'admin' } };
+      const res = { status: jest.fn().mockReturnThis(), json: jest.fn() };
+
+      await extractHandler(req, res);
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(res.json).toHaveBeenCalledWith(
+        expect.objectContaining({ message: expect.stringMatching(/gemini is disabled/i) })
+      );
+      expect(extractSpy).not.toHaveBeenCalled();
+      expect(incrementSpy).not.toHaveBeenCalled();
+    });
+
     test('returns 200 with extracted metadata on successful extraction and increments quota count', async () => {
       const urlExtractorService = require('../server/services/url-metadata-extractor');
       const geminiQuota = require('../server/services/gemini-quota');

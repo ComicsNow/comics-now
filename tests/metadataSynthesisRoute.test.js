@@ -71,17 +71,40 @@ describe('User Metadata Routes - POST /api/v1/metadata/synthesize', () => {
     );
   });
 
-  it('rejects with 400 if Gemini API key is not configured', async () => {
+  it('synthesizes deterministically without calling Gemini when Gemini API key is not configured', async () => {
     attachMetadataRoutes(router, deps);
 
     // Mock dbGet to return no geminiApiKey
     deps.dbGet.mockResolvedValue(null);
+    deps.dbAll.mockResolvedValue([{ publisher: 'DC Comics' }]);
 
     const req = {
       body: {
         sources: [
-          { source: 'comicvine', title: 'Batman #1' },
-          { source: 'metron', title: 'Batman (2011) #1' }
+          {
+            source: 'comicvine',
+            title: 'Batman #1',
+            fullMetadata: {
+              Series: 'Batman',
+              Number: '1',
+              Publisher: 'DC Comics',
+              Writer: 'Scott Snyder',
+              Summary: 'Short summary.'
+            }
+          },
+          {
+            source: 'metron',
+            title: 'Batman (2011) #1',
+            fullMetadata: {
+              Series: 'Batman',
+              Title: 'The Court of Owls',
+              Number: '1',
+              Penciller: 'Greg Capullo',
+              Colorist: 'FCO Plascencia',
+              Characters: 'Bruce Wayne, Dick Grayson',
+              Summary: 'Batman investigates a brutal murder in Gotham City that points to an ancient conspiracy known as the Court of Owls.'
+            }
+          }
         ]
       },
       user: { userId: 'default-user', role: 'admin' }
@@ -92,10 +115,88 @@ describe('User Metadata Routes - POST /api/v1/metadata/synthesize', () => {
     };
 
     await synthesizeHandler(req, res);
-    expect(res.status).toHaveBeenCalledWith(400);
+    expect(geminiMetadataService.synthesizeMetadataWithGemini).not.toHaveBeenCalled();
     expect(res.json).toHaveBeenCalledWith(
       expect.objectContaining({
-        message: expect.stringMatching(/gemini api key is not configured/i)
+        success: true,
+        mode: 'deterministic',
+        metadata: expect.objectContaining({
+          Series: 'Batman',
+          Title: 'The Court of Owls',
+          Number: '1',
+          Publisher: 'DC Comics',
+          Writer: 'Scott Snyder',
+          Penciller: 'Greg Capullo',
+          Colorist: 'FCO Plascencia',
+          Characters: 'Bruce Wayne, Dick Grayson'
+        })
+      })
+    );
+  });
+
+  it('synthesizes deterministically across staged sources and does not call Gemini when geminiCoverMatchEnabled is false in settings', async () => {
+    attachMetadataRoutes(router, deps);
+
+    deps.dbGet.mockImplementation(async (sql) => {
+      if (sql.includes('geminiApiKey')) return { value: JSON.stringify('test-gemini-key') };
+      if (sql.includes('geminiCoverMatchEnabled')) return { value: 'false' };
+      return null;
+    });
+    deps.dbAll.mockResolvedValue([{ publisher: 'DC Comics' }]);
+
+    const req = {
+      body: {
+        sources: [
+          {
+            source: 'comicvine',
+            name: 'Absolute Batman #1',
+            fullMetadata: {
+              Series: 'Absolute Batman',
+              Number: '1',
+              Publisher: 'DC',
+              Writer: 'Scott Snyder',
+              CoverDate: '2024-10-09',
+              Characters: 'Batman'
+            }
+          },
+          {
+            source: 'lcg',
+            name: 'Absolute Batman #1',
+            fullMetadata: {
+              Series: 'Absolute Batman',
+              Title: 'The Zoo',
+              Number: '1',
+              Penciller: 'Nick Dragotta',
+              Colorist: 'Frank Martin',
+              Characters: 'Alfred Pennyworth, Black Mask',
+              Summary: 'Without the mansion, without the money, without the butler... what is left is the Absolute Dark Knight!'
+            }
+          }
+        ]
+      },
+      user: { userId: 'default-user', role: 'admin' }
+    };
+    const res = {
+      status: jest.fn().mockReturnThis(),
+      json: jest.fn()
+    };
+
+    await synthesizeHandler(req, res);
+    expect(geminiMetadataService.synthesizeMetadataWithGemini).not.toHaveBeenCalled();
+    expect(res.json).toHaveBeenCalledWith(
+      expect.objectContaining({
+        success: true,
+        mode: 'deterministic',
+        metadata: expect.objectContaining({
+          Series: 'Absolute Batman',
+          Title: 'The Zoo',
+          Number: '1',
+          Publisher: 'DC Comics',
+          Writer: 'Scott Snyder',
+          Penciller: 'Nick Dragotta',
+          Colorist: 'Frank Martin',
+          Characters: 'Batman, Alfred Pennyworth, Black Mask'
+        })
       })
     );
   });

@@ -7,6 +7,7 @@ const cryptoVault = require('../../../utils/crypto-vault');
 const { getConfig } = require('../../../config');
 const geminiQuota = require('../../../services/gemini-quota');
 const geminiMetadata = require('../../../services/gemini-metadata');
+const { synthesizeMetadataDeterministic } = require('../../../services/metadata/merger');
 const urlExtractor = require('../../../services/url-metadata-extractor');
 
 function attachComicInfoRoutes(router, deps) {
@@ -19,6 +20,40 @@ function attachComicInfoRoutes(router, deps) {
 
   if (typeof router.post !== 'function') return;
 
+  async function resolveGeminiConfig() {
+    const config = getConfig() || {};
+    let enabled = config.geminiCoverMatchEnabled !== false;
+    let geminiApiKey = (process.env.NODE_ENV === 'test' ? '' : process.env.GEMINI_API_KEY) || config.geminiApiKey || '';
+    let geminiModel = config.geminiModel || 'gemini-3.5-flash-lite';
+    let dailyCap = parseInt(config.geminiCoverDailyCap || '450', 10);
+
+    try {
+      if (typeof dbGet === 'function') {
+        const keyRow = await dbGet("SELECT value FROM settings WHERE key = 'geminiApiKey'");
+        if (keyRow?.value) {
+          try { geminiApiKey = JSON.parse(keyRow.value); } catch { geminiApiKey = keyRow.value; }
+        }
+        const enabledRow = await dbGet("SELECT value FROM settings WHERE key = 'geminiCoverMatchEnabled'");
+        if (enabledRow && enabledRow.value !== undefined && enabledRow.value !== null) {
+          let rawEnabled = enabledRow.value;
+          try { rawEnabled = JSON.parse(enabledRow.value); } catch { rawEnabled = enabledRow.value; }
+          enabled = rawEnabled !== false && rawEnabled !== 'false' && rawEnabled !== 0 && rawEnabled !== '0';
+        }
+        const modelRow = await dbGet("SELECT value FROM settings WHERE key = 'geminiModel'");
+        if (modelRow?.value) {
+          try { geminiModel = JSON.parse(modelRow.value); } catch { geminiModel = modelRow.value; }
+        }
+        const capRow = await dbGet("SELECT value FROM settings WHERE key = 'geminiCoverDailyCap'");
+        if (capRow?.value) {
+          try { dailyCap = parseInt(JSON.parse(capRow.value), 10); } catch { dailyCap = parseInt(capRow.value, 10); }
+        }
+      }
+    } catch (_) {}
+
+    geminiApiKey = (cryptoVault.decrypt(geminiApiKey) || geminiApiKey || '').trim();
+    return { enabled, geminiApiKey, geminiModel, dailyCap };
+  }
+
   router.post('/api/v1/metadata/synthesize', async (req, res) => {
     try {
       const { sources, filename, existingMeta } = req.body || {};
@@ -29,50 +64,16 @@ function attachComicInfoRoutes(router, deps) {
         });
       }
 
-      // Check Gemini API key
-      const config = getConfig();
-      let geminiApiKey = (process.env.NODE_ENV === 'test' ? '' : process.env.GEMINI_API_KEY) || config.geminiApiKey || '';
-      let geminiModel = config.geminiModel || 'gemini-3.5-flash-lite';
+      const { enabled, geminiApiKey, geminiModel, dailyCap } = await resolveGeminiConfig();
+      const useGemini = Boolean(enabled && geminiApiKey);
 
-      try {
-        if (typeof dbGet === 'function') {
-          const keyRow = await dbGet("SELECT value FROM settings WHERE key = 'geminiApiKey'");
-          if (keyRow?.value) {
-            try { geminiApiKey = JSON.parse(keyRow.value); } catch { geminiApiKey = keyRow.value; }
-          }
-          const modelRow = await dbGet("SELECT value FROM settings WHERE key = 'geminiModel'");
-          if (modelRow?.value) {
-            try { geminiModel = JSON.parse(modelRow.value); } catch { geminiModel = modelRow.value; }
-          }
+      if (useGemini) {
+        const quotaResult = await geminiQuota.incrementDailyUsage({ dbGet, dbRun }, dailyCap);
+        if (!quotaResult.allowed) {
+          return res.status(429).json({
+            message: `Daily Gemini API request cap (${dailyCap}) reached. Requests will reset at midnight Pacific Time.`
+          });
         }
-      } catch (err) {
-        // Fallback to config / env
-      }
-
-      geminiApiKey = (cryptoVault.decrypt(geminiApiKey) || geminiApiKey || '').trim();
-
-      if (!geminiApiKey) {
-        return res.status(400).json({
-          message: 'Gemini API key is not configured. Please configure your API key in Settings.'
-        });
-      }
-
-      // Check and increment Gemini daily quota counter (tracked under Settings -> Tag Comics Now! -> Gemini AI)
-      let dailyCap = 450;
-      try {
-        if (typeof dbGet === 'function') {
-          const capRow = await dbGet("SELECT value FROM settings WHERE key = 'geminiCoverDailyCap'");
-          if (capRow?.value) {
-            try { dailyCap = parseInt(JSON.parse(capRow.value), 10); } catch { dailyCap = parseInt(capRow.value, 10); }
-          }
-        }
-      } catch (_) {}
-
-      const quotaResult = await geminiQuota.incrementDailyUsage({ dbGet, dbRun }, dailyCap);
-      if (!quotaResult.allowed) {
-        return res.status(429).json({
-          message: `Daily Gemini API request cap (${dailyCap}) reached. Requests will reset at midnight Pacific Time.`
-        });
       }
 
       // Publisher codex from library
@@ -91,7 +92,7 @@ function attachComicInfoRoutes(router, deps) {
         const series = meta.Series || meta.series || s.volumeName || s.series || '';
         const issue = meta.Number != null ? String(meta.Number) : (meta.number != null ? String(meta.number) : (meta.issue != null ? String(meta.issue) : (s.issueNumber != null ? String(s.issueNumber) : '')));
         const publisher = meta.Publisher || meta.publisher || s.publisher || '';
-        const coverDate = meta['Cover Date'] || meta.cover_date || meta.publish_date || s.coverDate || '';
+        const coverDate = meta['Cover Date'] || meta.CoverDate || meta.cover_date || meta.publish_date || s.coverDate || '';
         const description = meta.Summary || meta.summary || meta.description || s.summary || '';
 
         return {
@@ -133,15 +134,21 @@ function attachComicInfoRoutes(router, deps) {
         };
       });
 
-      const synthesized = await geminiMetadata.synthesizeMetadataWithGemini({
-        winningCandidate: formattedCandidates[0],
-        allCandidates: formattedCandidates,
-        filename: filename || 'Unknown Comic.cbz',
-        existingMeta: existingMeta || {},
-        publisherCodex,
-        apiKey: geminiApiKey,
-        model: geminiModel
-      });
+      const synthesized = useGemini
+        ? await geminiMetadata.synthesizeMetadataWithGemini({
+            winningCandidate: formattedCandidates[0],
+            allCandidates: formattedCandidates,
+            filename: filename || 'Unknown Comic.cbz',
+            existingMeta: existingMeta || {},
+            publisherCodex,
+            apiKey: geminiApiKey,
+            model: geminiModel
+          })
+        : synthesizeMetadataDeterministic({
+            allCandidates: formattedCandidates,
+            existingMeta: existingMeta || {},
+            publisherCodex
+          });
 
       // Return clean canonical ComicInfo metadata without redundant lowercase/snake_case duplicate keys
       const cleanCanonical = {};
@@ -168,6 +175,7 @@ function attachComicInfoRoutes(router, deps) {
 
       return res.json({
         success: true,
+        mode: useGemini ? 'gemini' : 'deterministic',
         metadata: cleanCanonical
       });
     } catch (e) {
@@ -191,42 +199,18 @@ function attachComicInfoRoutes(router, deps) {
         });
       }
 
-      // Check Gemini API key
-      const config = getConfig();
-      let geminiApiKey = (process.env.NODE_ENV === 'test' ? '' : process.env.GEMINI_API_KEY) || config.geminiApiKey || '';
-      let geminiModel = config.geminiModel || 'gemini-3.5-flash-lite';
-
-      try {
-        if (typeof dbGet === 'function') {
-          const keyRow = await dbGet("SELECT value FROM settings WHERE key = 'geminiApiKey'");
-          if (keyRow?.value) {
-            try { geminiApiKey = JSON.parse(keyRow.value); } catch { geminiApiKey = keyRow.value; }
-          }
-          const modelRow = await dbGet("SELECT value FROM settings WHERE key = 'geminiModel'");
-          if (modelRow?.value) {
-            try { geminiModel = JSON.parse(modelRow.value); } catch { geminiModel = modelRow.value; }
-          }
-        }
-      } catch (_) {}
-
-      geminiApiKey = (cryptoVault.decrypt(geminiApiKey) || geminiApiKey || '').trim();
+      const { enabled, geminiApiKey, geminiModel, dailyCap } = await resolveGeminiConfig();
+      if (!enabled) {
+        return res.status(400).json({
+          message: 'Gemini is disabled in settings. Enable Gemini in Tag Comics Now! -> Gemini AI to extract metadata from URL.'
+        });
+      }
 
       if (!geminiApiKey) {
         return res.status(400).json({
           message: 'Gemini API key is not configured. Please configure your API key in Settings.'
         });
       }
-
-      // Check and increment Gemini daily quota counter (tracked under Settings -> Tag Comics Now! -> Gemini AI)
-      let dailyCap = 450;
-      try {
-        if (typeof dbGet === 'function') {
-          const capRow = await dbGet("SELECT value FROM settings WHERE key = 'geminiCoverDailyCap'");
-          if (capRow?.value) {
-            try { dailyCap = parseInt(JSON.parse(capRow.value), 10); } catch { dailyCap = parseInt(capRow.value, 10); }
-          }
-        }
-      } catch (_) {}
 
       const quotaResult = await geminiQuota.incrementDailyUsage({ dbGet, dbRun }, dailyCap);
       if (!quotaResult.allowed) {
