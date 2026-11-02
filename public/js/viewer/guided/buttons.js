@@ -1,10 +1,5 @@
 import { state } from '../../globals.js';
 
-state.GuidedView = state.GuidedView || {};
-if (typeof window !== 'undefined') {
-  window.GuidedView = window.GuidedView || {};
-}
-
 export function bindToggleButton() {
   const registry = state.GuidedView.ModeRegistry;
 
@@ -70,6 +65,6 @@ export function bindToggleButton() {
 }
 
 state.GuidedView.bindToggleButton = bindToggleButton;
-if (typeof window !== 'undefined') {
+if (typeof window !== 'undefined' && window.GuidedView && window.GuidedView !== state.GuidedView) {
   window.GuidedView.bindToggleButton = bindToggleButton;
 }

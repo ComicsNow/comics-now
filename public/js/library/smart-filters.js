@@ -1,5 +1,8 @@
 import {
   state,
+  actions,
+  render,
+  clearElement,
   createLoadingMessage,
   createEmptyMessage,
   createErrorMessage,
@@ -9,6 +12,19 @@ import {
   smartListTitle,
   smartListView
 } from '../globals.js';
+
+const renderContent = typeof render === 'function' ? render : (el, content) => {
+  if (!el) return;
+  if (content && typeof content === 'object' && typeof content.toHTML === 'function') {
+    el.innerHTML = content.toHTML();
+  } else if (content && typeof content === 'object' && content.__isRawHtml) {
+    el.innerHTML = content.html;
+  } else {
+    el.innerHTML = String(content ?? '');
+  }
+};
+
+const actionsRef = (typeof actions !== 'undefined' && actions?.navigation) ? actions : (typeof globalThis !== 'undefined' ? globalThis.__COMICS_STORE__?.actions : null);
 
 export function setLatestButtonActive(isActive) {
   if (!latestAddedButton) return;
@@ -164,8 +180,12 @@ export function buildSmartListBreadcrumb(smartLabel) {
 }
 
 export function showLatestAddedSmartList() {
-  state.currentView = 'latest';
-  window.currentView = 'latest';
+  if (actionsRef?.navigation?.setView) {
+    actionsRef.navigation.setView('latest');
+  } else {
+    state.currentView = 'latest';
+  }
+  if (typeof window !== 'undefined') window.currentView = 'latest';
   
   const updateBreadcrumb = state.updateBreadcrumb || window.updateBreadcrumb;
   if (typeof updateBreadcrumb === 'function') {
@@ -179,8 +199,12 @@ export function showLatestAddedSmartList() {
 }
 
 export async function showDownloadedSmartList() {
-  state.currentView = 'downloaded';
-  window.currentView = 'downloaded';
+  if (actionsRef?.navigation?.setView) {
+    actionsRef.navigation.setView('downloaded');
+  } else {
+    state.currentView = 'downloaded';
+  }
+  if (typeof window !== 'undefined') window.currentView = 'downloaded';
 
   clearSmartFilterButtons();
   setDownloadedButtonActive(true);
@@ -201,7 +225,7 @@ export async function showDownloadedSmartList() {
   }
 
   if (smartListContainer) {
-    smartListContainer.innerHTML = createLoadingMessage('Loading downloaded comics...');
+    renderContent(smartListContainer, createLoadingMessage('Loading downloaded comics...'));
   }
 
   const SmartLists = state.LibrarySmartLists || window.LibrarySmartLists || {};
@@ -233,7 +257,7 @@ export function renderLatestSmartList() {
   const days = SmartLists.LATEST_ADDED_DAYS || 14;
 
   if (!Array.isArray(latestComics) || latestComics.length === 0) {
-    smartListContainer.innerHTML = createEmptyMessage(`No comics added in the last ${days} days.`);
+    renderContent(smartListContainer, createEmptyMessage(`No comics added in the last ${days} days.`));
     return;
   }
 
@@ -258,7 +282,7 @@ export function renderLatestSmartList() {
     } else if (activeFilter === 'unread') {
       message = `No unread comics from the last ${days} days.`;
     }
-    smartListContainer.innerHTML = createEmptyMessage(message);
+    renderContent(smartListContainer, createEmptyMessage(message));
     return;
   }
 
@@ -289,12 +313,12 @@ export function renderDownloadedSmartList() {
   }
 
   if (downloadedSmartListError) {
-    smartListContainer.innerHTML = createErrorMessage('Failed to load downloaded comics.');
+    renderContent(smartListContainer, createErrorMessage('Failed to load downloaded comics.'));
     return;
   }
 
   if (!Array.isArray(downloadedSmartListComics) || downloadedSmartListComics.length === 0) {
-    smartListContainer.innerHTML = createEmptyMessage('No comics downloaded for offline use.');
+    renderContent(smartListContainer, createEmptyMessage('No comics downloaded for offline use.'));
     return;
   }
 
@@ -319,7 +343,7 @@ export function renderDownloadedSmartList() {
     } else if (activeFilter === 'unread') {
       message = 'No unread downloaded comics.';
     }
-    smartListContainer.innerHTML = createEmptyMessage(message);
+    renderContent(smartListContainer, createEmptyMessage(message));
     return;
   }
 
@@ -330,8 +354,12 @@ export function renderDownloadedSmartList() {
 }
 
 export function showGuidedSmartList() {
-  state.currentView = 'guided';
-  window.currentView = 'guided';
+  if (actionsRef?.navigation?.setView) {
+    actionsRef.navigation.setView('guided');
+  } else {
+    state.currentView = 'guided';
+  }
+  if (typeof window !== 'undefined') window.currentView = 'guided';
   
   const updateBreadcrumb = state.updateBreadcrumb || window.updateBreadcrumb;
   if (typeof updateBreadcrumb === 'function') {
@@ -364,7 +392,7 @@ export function renderGuidedSmartList() {
   }
 
   if (!Array.isArray(guidedComics) || guidedComics.length === 0) {
-    smartListContainer.innerHTML = createEmptyMessage('No comics with completed guided reading.');
+    renderContent(smartListContainer, createEmptyMessage('No comics with completed guided reading.'));
     return;
   }
 
@@ -389,7 +417,7 @@ export function renderGuidedSmartList() {
     } else if (activeFilter === 'unread') {
       message = 'No unread guided comics.';
     }
-    smartListContainer.innerHTML = createEmptyMessage(message);
+    renderContent(smartListContainer, createEmptyMessage(message));
     return;
   }
 
@@ -400,8 +428,12 @@ export function renderGuidedSmartList() {
 }
 
 export function showMangaSmartList() {
-  state.currentView = 'manga';
-  window.currentView = 'manga';
+  if (actionsRef?.navigation?.setView) {
+    actionsRef.navigation.setView('manga');
+  } else {
+    state.currentView = 'manga';
+  }
+  if (typeof window !== 'undefined') window.currentView = 'manga';
   
   const isMangaDefault = !!(state.mangaModePreference === true || state.mangaModePreference == 1 || window.mangaModePreference === true || window.mangaModePreference == 1);
   const label = isMangaDefault ? 'Non-Manga' : 'Manga';
@@ -439,8 +471,11 @@ export function renderMangaSmartList() {
   }
 
   if (!Array.isArray(comics) || comics.length === 0) {
-    smartListContainer.innerHTML = createEmptyMessage(
-      isMangaDefault ? 'No non-manga comics in your library.' : 'No manga comics in your library.'
+    renderContent(
+      smartListContainer,
+      createEmptyMessage(
+        isMangaDefault ? 'No non-manga comics in your library.' : 'No manga comics in your library.'
+      )
     );
     return;
   }
@@ -467,7 +502,7 @@ export function renderMangaSmartList() {
     } else if (activeFilter === 'unread') {
       message = `No unread ${base} comics.`;
     }
-    smartListContainer.innerHTML = createEmptyMessage(message);
+    renderContent(smartListContainer, createEmptyMessage(message));
     return;
   }
 

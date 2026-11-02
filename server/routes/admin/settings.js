@@ -1,3 +1,8 @@
+const fs = require('fs');
+const path = require('path');
+const { THUMBNAILS_DIRECTORY, GUIDED_VIEW_DIR } = require('../../constants');
+const cryptoVault = require('../../utils/crypto-vault');
+
 /**
  * Admin Settings Routes
  * @param {object} router 
@@ -18,10 +23,6 @@ module.exports = function attach(router, deps) {
     dbRun,
     log
   } = deps;
-
-  const fs = require('fs');
-  const path = require('path');
-  const { THUMBNAILS_DIRECTORY, GUIDED_VIEW_DIR } = require('../../constants');
 
   // Which reference tables actually exist in this deployment's schema (cached).
   // Guards against "no such table" errors when a table isn't present.
@@ -195,7 +196,6 @@ module.exports = function attach(router, deps) {
       await saveSetting('allowed_formats', allowedFormats);
       await saveSetting('metadata_storage', effectiveStorage);
 
-      const cryptoVault = require('../../utils/crypto-vault');
       if (apiKey !== undefined && !cryptoVault.isMasked(apiKey)) {
         const encApiKey = cryptoVault.encrypt(sanitizedApiKey);
         deps.setComicVineApiKey(encApiKey);

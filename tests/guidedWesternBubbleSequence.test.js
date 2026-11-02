@@ -16,7 +16,8 @@ function createModuleSandbox() {
     currentRootFolder: null,
     activeSmartFilter: null,
     comicIdMap: new Map(),
-    mangaModePreference: false
+    mangaModePreference: false,
+    GuidedView: {}
   };
 
   const sandbox = {

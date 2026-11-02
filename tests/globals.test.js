@@ -9,7 +9,8 @@ describe('globals.js', () => {
   beforeAll(() => {
     const globalsPath = path.resolve(__dirname, '..', 'public', 'js', 'globals.js');
     let code = fs.readFileSync(globalsPath, 'utf8');
-    // Strip export keywords for vm execution
+    // Strip import and export keywords for vm execution
+    code = code.replace(/import\s+[\s\S]*?from\s+['"][^'"]+['"];?/g, '');
     code = code.replace(/export\s+(async\s+)?(function|const|let|var)\s+/g, '$1$2 ');
     code = code.replace(/export\s+\{[^}]*\};?/g, '');
 

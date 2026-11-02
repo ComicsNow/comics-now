@@ -48,16 +48,25 @@ describe('Fullscreen persistent header controls & clean display title', () => {
     };
     vm.createContext(sandbox);
 
-    const filePath = path.join(__dirname, '../public/js/viewer/fullscreen.js');
-    const code = fs.readFileSync(filePath, 'utf-8');
-    const cleanContent = code
-      .replace(/import\s+[\s\S]*?from\s+['"][^'"]+['"];?/g, '')
-      .replace(/export\s+async\s+function\s+/g, 'async function ')
-      .replace(/export\s+function\s+/g, 'function ')
-      .replace(/export\s+const\s+/g, 'const ')
-      .replace(/export\s+\{[\s\S]*?\};?/g, '')
-      .replace(/export\s+default\s+[^;]+;?/g, '');
-    new vm.Script(cleanContent).runInContext(sandbox);
+    function loadFile(relPath) {
+      const fullPath = path.resolve(__dirname, relPath);
+      const code = fs.readFileSync(fullPath, 'utf-8');
+      const cleanContent = code
+        .replace(/import\s+[\s\S]*?from\s+['"][^'"]+['"];?/g, '')
+        .replace(/export\s+[\s\S]*?\s+from\s+['"][^'"]+['"];?/g, '')
+        .replace(/export\s+const\s+/g, 'var ')
+        .replace(/export\s+let\s+/g, 'var ')
+        .replace(/export\s+async\s+function\s+/g, 'async function ')
+        .replace(/export\s+function\s+/g, 'function ')
+        .replace(/\bconst\s+/g, 'var ')
+        .replace(/\blet\s+/g, 'var ')
+        .replace(/export\s+\{[\s\S]*?\};?/g, '')
+        .replace(/export\s+default\s+[^;]+;?/g, '');
+      new vm.Script(cleanContent).runInContext(sandbox);
+    }
+
+    loadFile('../public/js/viewer/fullscreen/controls.js');
+    loadFile('../public/js/viewer/fullscreen/lifecycle.js');
   });
 
   test('hideFullscreenControls leaves title and top-right close button visible', () => {

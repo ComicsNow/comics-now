@@ -149,15 +149,22 @@ def search_gcd_multi(query, gcd_user=None, gcd_pass=None, comicvine_api_key=None
         r = requests.get(url, auth=auth, headers={"Accept": "application/json", "User-Agent": "comic-tagger-bench/1.0"}, timeout=10)
         if r.status_code == 200:
             results = r.json().get("results", [])
+            matching_series = 0
             for s in results:
-                if len(out) >= limit:
+                if len(out) >= limit or matching_series >= 2:
                     break
+                series_name = s.get('name') or s.get('series_name') or ''
+                if series_query and series_name and text_similarity(series_query, series_name) < 0.65:
+                    continue
+                matching_series += 1
                 series_genre = s.get('genre') or ''
+                issues_for_series = 0
                 for iss_url in s.get("active_issues", []):
-                    if len(out) >= limit:
+                    if len(out) >= limit or issues_for_series >= 4:
                         break
                     if not iss_url:
                         continue
+                    issues_for_series += 1
                     from urllib.parse import urlparse
                     parsed = urlparse(str(iss_url))
                     if parsed.scheme != "https" or parsed.netloc not in ("www.comics.org", "comics.org"):

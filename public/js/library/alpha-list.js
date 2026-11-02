@@ -1,4 +1,16 @@
-import { state, smartListContainer, smartListView, smartListTitle } from '../globals.js';
+import { state, smartListContainer, smartListView, smartListTitle, clearElement, render } from '../globals.js';
+
+const clear = typeof clearElement === 'function' ? clearElement : (el) => { if (el) { if (typeof el.replaceChildren === 'function') el.replaceChildren(); else el.innerHTML = ''; } };
+const renderContent = typeof render === 'function' ? render : (el, content) => {
+  if (!el) return;
+  if (content && typeof content === 'object' && typeof content.toHTML === 'function') {
+    el.innerHTML = content.toHTML();
+  } else if (content && typeof content === 'object' && content.__isRawHtml) {
+    el.innerHTML = content.html;
+  } else {
+    el.innerHTML = String(content ?? '');
+  }
+};
 
 export function renderAllComicsAsList() {
   const library = state.library || window.library;
@@ -73,9 +85,9 @@ export function renderAllComicsAsList() {
 
   if (comicsToRender.length === 0) {
     const createEmptyMessage = state.createEmptyMessage || window.createEmptyMessage;
-    smartListContainer.innerHTML = typeof createEmptyMessage === 'function' 
+    renderContent(smartListContainer, typeof createEmptyMessage === 'function' 
       ? createEmptyMessage('No comics found matching your filters.') 
-      : 'No comics found matching your filters.';
+      : 'No comics found matching your filters.');
     return;
   }
 
@@ -172,7 +184,7 @@ export function applyFilterAndRender() {
 }
 
 export function renderAlphaFilter(targetDiv, data, renderFn, type) {
-  targetDiv.innerHTML = '';
+  clear(targetDiv);
   if (!targetDiv.classList.contains('edge-index')) {
     targetDiv.classList.add('edge-index');
   }

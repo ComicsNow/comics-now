@@ -143,7 +143,6 @@ describe('Fullscreen auto-pan — real module behavior in jsdom', () => {
   const path = require('path');
   const vm = require('vm');
 
-  const MODULE_PATH = path.resolve(__dirname, '../public/js/viewer/fullscreen.js');
   const WIDE = { w: 6000, h: 2000 }; // ratio 3.0 on a 1200x900 viewer
   const OVERFLOW_X = 1500; // (6000/2000)*900 - 1200
 
@@ -167,11 +166,32 @@ describe('Fullscreen auto-pan — real module behavior in jsdom', () => {
     const sandbox = { window, document, state, console, setTimeout, clearTimeout };
     sandbox.globalThis = sandbox;
     vm.createContext(sandbox);
-    const source = fs
-      .readFileSync(MODULE_PATH, 'utf8')
-      .replace(/import\s+[\s\S]*?from\s+['"][^'"]+['"];?/g, '')
-      .replace(/export\s+\{[\s\S]*?\};?/g, '');
-    new vm.Script(source).runInContext(sandbox);
+
+    function loadFile(relPath) {
+      const fullPath = path.resolve(__dirname, relPath);
+      const code = fs.readFileSync(fullPath, 'utf8');
+      const cleanContent = code
+        .replace(/import\s+[\s\S]*?from\s+['"][^'"]+['"];?/g, '')
+        .replace(/export\s+[\s\S]*?\s+from\s+['"][^'"]+['"];?/g, '')
+        .replace(/export\s+const\s+/g, 'var ')
+        .replace(/export\s+let\s+/g, 'var ')
+        .replace(/export\s+async\s+function\s+/g, 'async function ')
+        .replace(/export\s+function\s+/g, 'function ')
+        .replace(/\bconst\s+/g, 'var ')
+        .replace(/\blet\s+/g, 'var ')
+        .replace(/export\s+\{[\s\S]*?\};?/g, '')
+        .replace(/export\s+default\s+[^;]+;?/g, '');
+      new vm.Script(cleanContent).runInContext(sandbox);
+    }
+
+    loadFile('../public/js/viewer/fullscreen/landscape-pan.js');
+    loadFile('../public/js/viewer/fullscreen/controls.js');
+    loadFile('../public/js/viewer/fullscreen/fit.js');
+    loadFile('../public/js/viewer/fullscreen/zoom.js');
+    loadFile('../public/js/viewer/fullscreen/pan.js');
+    loadFile('../public/js/viewer/fullscreen/cinema-pan.js');
+    loadFile('../public/js/viewer/fullscreen/gestures.js');
+    loadFile('../public/js/viewer/fullscreen/lifecycle.js');
 
     window.fullscreenViewer = viewer;
     window.fullscreenImage = image;

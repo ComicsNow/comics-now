@@ -38,16 +38,33 @@ jest.mock('../../../server/db', () => ({
 
 jest.mock('../../../server/services/modal-detector', () => ({}));
 
+jest.mock('../../../server/routes/public/auth', () => jest.fn());
+jest.mock('../../../server/routes/public/health', () => jest.fn());
+jest.mock('../../../server/routes/user/settings', () => jest.fn());
+jest.mock('../../../server/routes/user/devices', () => jest.fn());
+jest.mock('../../../server/routes/user/reading-lists', () => jest.fn());
+jest.mock('../../../server/routes/user/reading', () => jest.fn());
+jest.mock('../../../server/routes/user/progress', () => jest.fn());
+jest.mock('../../../server/routes/user/library', () => jest.fn());
+jest.mock('../../../server/routes/user/pages', () => jest.fn());
+jest.mock('../../../server/routes/user/metadata', () => jest.fn());
+jest.mock('../../../server/routes/admin/users', () => jest.fn());
+jest.mock('../../../server/routes/admin/comictagger', () => jest.fn());
+jest.mock('../../../server/routes/admin/guided', () => jest.fn());
+jest.mock('../../../server/routes/admin/settings', () => jest.fn());
+jest.mock('../../../server/routes/admin/library-mgmt', () => jest.fn());
+jest.mock('../../../server/routes/admin/rename', () => jest.fn());
+jest.mock('../../../server/routes/admin/mcp-tools', () => jest.fn());
+jest.mock('../../../server/routes/admin/user-stats', () => jest.fn());
+jest.mock('../../../server/routes/admin/gemini', () => jest.fn());
+jest.mock('../../../server/routes/admin/impersonate', () => jest.fn());
+
 const mockSubRouters = [
   './public/auth', './public/health',
   './user/settings', './user/devices', './user/reading-lists', './user/reading', './user/progress', './user/library', './user/pages', './user/metadata',
   './admin/users', './admin/comictagger', './admin/guided', './admin/settings', './admin/library-mgmt', './admin/rename', './admin/mcp-tools', './admin/user-stats', './admin/gemini',
   './admin/impersonate'
 ];
-
-mockSubRouters.forEach(route => {
-  jest.mock(`../../../server/routes/${route}`, () => jest.fn());
-});
 
 describe('createApiRouter', () => {
   let mockDeps;

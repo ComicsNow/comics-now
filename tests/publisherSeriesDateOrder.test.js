@@ -89,10 +89,11 @@ function createModuleSandbox() {
       })
       .replace(/import\s+\*\s+as\s+(\w+)\s+from\s+['"][^'"]+['"];?/g, 'var $1 = typeof $1 !== "undefined" ? $1 : {};')
       .replace(/import\s+(\w+)\s+from\s+['"][^'"]+['"];?/g, 'var $1 = typeof $1 !== "undefined" ? $1 : {};')
-      .replace(/export\s+const\s+/g, 'var ')
-      .replace(/export\s+let\s+/g, 'var ')
+      .replace(/\bconst\s+/g, 'var ')
+      .replace(/\blet\s+/g, 'var ')
       .replace(/export\s+function\s+/g, 'function ')
       .replace(/export\s+async\s+function\s+/g, 'async function ')
+      .replace(/export\s+[\s\S]*?\s+from\s+['"][^'"]+['"];?/g, '')
       .replace(/export\s+\{[\s\S]*?\};?/g, '')
       .replace(/export\s+default\s+[\s\S]*?;?/g, '');
     const script = new vm.Script(cleanContent);
@@ -123,6 +124,8 @@ describe('Publisher Series Published Date Ordering and Year Display', () => {
     `;
 
     env = createModuleSandbox();
+    env.loadFile('../public/js/library/render/series-sort.js');
+    env.loadFile('../public/js/library/render/series.js');
     env.loadFile('../public/js/library/render.js');
   });
 

@@ -1,5 +1,8 @@
 import {
   state,
+  clearElement,
+  render,
+  html,
   escapeHtml,
   safeDirName,
   getRelativePath,
@@ -14,6 +17,35 @@ import {
   comicListDiv
 } from '../globals.js';
 import { comicIdMap } from './data.js';
+
+const clear = typeof clearElement === 'function' ? clearElement : (el) => { if (el) { if (typeof el.replaceChildren === 'function') el.replaceChildren(); else el.innerHTML = ''; } };
+const renderContent = typeof render === 'function' ? render : (el, content) => {
+  if (!el) return;
+  if (content && typeof content === 'object' && typeof content.toHTML === 'function') {
+    el.innerHTML = content.toHTML();
+  } else if (content && typeof content === 'object' && content.__isRawHtml) {
+    el.innerHTML = content.html;
+  } else {
+    el.innerHTML = String(content ?? '');
+  }
+};
+const safeHtml = (typeof html !== 'undefined' && typeof html === 'function' && html.length > 0) ? html : (strings, ...values) => {
+  const formatVal = (v) => {
+    if (v === null || v === undefined) return '';
+    if (Array.isArray(v)) return v.map(formatVal).join('');
+    if (typeof v === 'object' && v.__isRawHtml) return v.html;
+    if (typeof v === 'object' && typeof v.toHTML === 'function') return v.toHTML();
+    return typeof escapeHtml === 'function' ? escapeHtml(v) : String(v);
+  };
+  let out = '';
+  for (let i = 0; i < strings.length; i++) {
+    out += strings[i];
+    if (i < values.length) {
+      out += formatVal(values[i]);
+    }
+  }
+  return { toHTML: () => out, html: out, __isRawHtml: true };
+};
 
 export async function rerenderSearchResults() {
   const lastSearchQuery = state.lastSearchQuery || window.lastSearchQuery;
@@ -79,7 +111,7 @@ export async function showSearchView(query, field, useCache = false) {
   }
 
   if (searchResultsContainer) {
-    searchResultsContainer.innerHTML = createLoadingMessage('Searching...');
+    renderContent(searchResultsContainer, createLoadingMessage('Searching...'));
   }
 
   if (!navigator.onLine) {
@@ -88,7 +120,7 @@ export async function showSearchView(query, field, useCache = false) {
     window.lastSearchResults = comics;
     if (comics.length === 0) {
       if (searchResultsContainer) {
-        searchResultsContainer.innerHTML = createEmptyMessage('No results found.');
+        renderContent(searchResultsContainer, createEmptyMessage('No results found.'));
       }
       return;
     }
@@ -105,7 +137,7 @@ export async function showSearchView(query, field, useCache = false) {
     
     if (comics.length === 0) {
       if (searchResultsContainer) {
-        searchResultsContainer.innerHTML = createEmptyMessage('No results found.');
+        renderContent(searchResultsContainer, createEmptyMessage('No results found.'));
       }
       return;
     }
@@ -114,14 +146,14 @@ export async function showSearchView(query, field, useCache = false) {
   } catch (error) {
     console.error('[search] Error:', error);
     if (searchResultsContainer) {
-      searchResultsContainer.innerHTML = '<div class="text-red-400">Search failed.</div>';
+      renderContent(searchResultsContainer, html`<div class="text-red-400">Search failed.</div>`);
     }
   }
 }
 
 export function renderSearchResultsAsFolders(comics) {
   if (!searchResultsContainer) return;
-  searchResultsContainer.innerHTML = '';
+  clear(searchResultsContainer);
   
   // Group comics by Publisher
   const publishers = {};
@@ -149,16 +181,16 @@ export function renderSearchResultsAsFolders(comics) {
     const seriesCount = Object.keys(series).length;
     const comicCount = pubComics.length;
 
-    card.innerHTML = `
+    renderContent(card, safeHtml`
       <div class="relative h-48 w-full bg-gray-700 rounded-lg overflow-hidden flex items-center justify-center p-4">
          <div class="text-4xl font-bold text-gray-500 opacity-20 select-none">${pubName.charAt(0).toUpperCase()}</div>
          <div class="absolute inset-0 flex items-center justify-center">
             <span class="text-gray-400 font-bold">${pubName}</span>
          </div>
       </div>
-      <h3 class="text-lg font-semibold mt-4 text-center text-white truncate w-full px-2">${escapeHtml(pubName)}</h3>
+      <h3 class="text-lg font-semibold mt-4 text-center text-white truncate w-full px-2">${pubName}</h3>
       <p class="mt-1 text-xs text-gray-400 text-center">${seriesCount} ${seriesCount === 1 ? 'Series' : 'Series'} (${comicCount} ${comicCount === 1 ? 'comic' : 'comics'})</p>
-    `;
+    `);
     
     card.addEventListener('click', () => {
       // For simplicity, just show the comics of this publisher in a flat list for now

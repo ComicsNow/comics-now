@@ -1,10 +1,12 @@
-import { state } from '../globals.js';
+import { state, clearElement } from '../globals.js';
+
+const clear = typeof clearElement === 'function' ? clearElement : (el) => { if (el) { if (typeof el.replaceChildren === 'function') el.replaceChildren(); else el.innerHTML = ''; } };
 
 export function updateBreadcrumb(segments) {
   const nav = document.getElementById('breadcrumb');
   if (!nav) return;
 
-  nav.innerHTML = '';
+  clear(nav);
 
   if (!segments || segments.length === 0) {
     nav.classList.add('hidden');

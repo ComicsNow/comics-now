@@ -9,9 +9,22 @@ import { getComicStatus } from '../library/status.js';
 import { toggleReadStatus } from '../progress.js';
 import { applyFilterAndRender } from '../library/alpha-list.js';
 import { updateComicInLibrary } from '../library/data.js';
+import { html, raw, render } from '../ui/template.js';
+import { MangaMode } from '../manga.js';
 
-// Dynamic access helpers for not-yet-converted modules (Phase 4/5)
-function getMangaMode() { return state.MangaMode || {}; }
+const renderMenuItemContent = (typeof render === 'function' && render.length >= 2) ? render : (el, content) => {
+  if (!el) return;
+  const toStr = (c) => {
+    if (c === null || c === undefined) return '';
+    if (Array.isArray(c)) return c.map(toStr).join('');
+    if (typeof c === 'object' && typeof c.toHTML === 'function') return c.toHTML();
+    if (typeof c === 'object' && c.__isRawHtml) return c.html;
+    return String(c);
+  };
+  el.innerHTML = toStr(content);
+};
+
+function getMangaMode() { return (typeof MangaMode !== 'undefined' ? MangaMode : null) || state.MangaMode || {}; }
 
 // ============================================================================
 // MENU ITEM FACTORIES
@@ -20,10 +33,11 @@ function getMangaMode() { return state.MangaMode || {}; }
 /**
  * Helper to create a menu item element
  */
-function createMenuItem(html, onClick, options = {}) {
+function createMenuItem(content, onClick, options = {}) {
   const item = document.createElement('div');
   item.className = 'comic-context-menu-item' + (options.className ? ` ${options.className}` : '');
-  item.innerHTML = html;
+  const rawContent = typeof raw === 'function' ? raw(content) : { __isRawHtml: true, html: String(content ?? '') };
+  renderMenuItemContent(item, rawContent);
   
   if (options.disabled) {
     item.style.cursor = 'default';
@@ -214,7 +228,7 @@ function createContinuousToggleItem(comics, labelPrefix = '') {
     if (comicsArray.length === 1 && state.currentComic && state.currentComic.id === comicsArray[0].id) {
       state.currentComic.continuousMode = newMode;
       if (newMode) {
-        const GuidedView = state.GuidedView || (typeof window !== 'undefined' && window.GuidedView);
+        const GuidedView = state.GuidedView || {};
         const registry = GuidedView?.ModeRegistry || state.GuidedView?.ModeRegistry;
         if (registry && typeof registry.disableAll === 'function') {
           registry.disableAll({ persist: true });

@@ -1,4 +1,5 @@
 const cryptoVault = require('../../utils/crypto-vault');
+const defaultModalDetector = require('../../services/modal-detector');
 
 module.exports = function attach(router, deps) {
   const {
@@ -69,7 +70,7 @@ module.exports = function attach(router, deps) {
 
   router.get('/api/v1/guided/modal-credits', async (req, res) => {
     try {
-      const detector = deps.modalDetector || (guidedReader && guidedReader.modalDetector) || require('../../services/modal-detector');
+      const detector = deps.modalDetector || (guidedReader && guidedReader.modalDetector) || defaultModalDetector;
       const settings = await guidedReader.getSettings();
 
       let modalTokenSecret = '';
@@ -92,7 +93,7 @@ module.exports = function attach(router, deps) {
 
   router.get('/api/v1/guided/modal-status', async (req, res) => {
     try {
-      const detector = deps.modalDetector || (guidedReader && guidedReader.modalDetector) || require('../../services/modal-detector');
+      const detector = deps.modalDetector || (guidedReader && guidedReader.modalDetector) || defaultModalDetector;
       const settings = await guidedReader.getSettings();
 
       let modalTokenSecret = '';
@@ -116,7 +117,7 @@ module.exports = function attach(router, deps) {
   router.post('/api/v1/guided/modal-setup', async (req, res) => {
     try {
       const body = req.body || {};
-      const detector = deps.modalDetector || (guidedReader && guidedReader.modalDetector) || require('../../services/modal-detector');
+      const detector = deps.modalDetector || (guidedReader && guidedReader.modalDetector) || defaultModalDetector;
       const settings = await guidedReader.getSettings();
 
       const modalTokenId = body.modalTokenId !== undefined ? body.modalTokenId : settings.modalTokenId;
@@ -143,7 +144,7 @@ module.exports = function attach(router, deps) {
   router.post('/api/v1/guided/modal-test', async (req, res) => {
     try {
       const body = req.body || {};
-      const detector = deps.modalDetector || (guidedReader && guidedReader.modalDetector) || require('../../services/modal-detector');
+      const detector = deps.modalDetector || (guidedReader && guidedReader.modalDetector) || defaultModalDetector;
       const settings = await guidedReader.getSettings();
 
       const modalTokenId = body.modalTokenId !== undefined ? body.modalTokenId : settings.modalTokenId;

@@ -1,6 +1,6 @@
 const fs = require('fs');
 const path = require('path');
-const { CONFIG_FILE } = require('./constants');
+const { CONFIG_FILE, DEFAULT_NAMING_RULES, DEFAULT_FOLDER_RULES } = require('./constants');
 const { log } = require('./logger');
 const cryptoVault = require('./utils/crypto-vault');
 
@@ -486,7 +486,6 @@ function setTaggerForceReprocess(val, skipSave = false) {
 }
 
 function getNamingRules() {
-  const { DEFAULT_NAMING_RULES } = require('./services/organization');
   return config.namingRules || DEFAULT_NAMING_RULES;
 }
 
@@ -496,7 +495,6 @@ function setNamingRules(rules, skipSave = false) {
 }
 
 function getFolderRules() {
-  const { DEFAULT_FOLDER_RULES } = require('./services/organization');
   return config.folderRules || DEFAULT_FOLDER_RULES;
 }
 

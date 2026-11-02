@@ -1,4 +1,36 @@
-import { state, escapeHtml } from '../globals.js';
+import { state, escapeHtml, clearElement } from '../globals.js';
+import { html, raw, render } from '../ui/template.js';
+
+const clear = typeof clearElement === 'function' ? clearElement : (el) => { if (el) { if (typeof el.replaceChildren === 'function') el.replaceChildren(); else el.innerHTML = ''; } };
+const renderContent = (typeof render === 'function' && render.length >= 2) ? render : (el, content) => {
+  if (!el) return;
+  const toStr = (c) => {
+    if (c === null || c === undefined) return '';
+    if (Array.isArray(c)) return c.map(toStr).join('');
+    if (typeof c === 'object' && typeof c.toHTML === 'function') return c.toHTML();
+    if (typeof c === 'object' && c.__isRawHtml) return c.html;
+    return String(c);
+  };
+  el.innerHTML = toStr(content);
+};
+const safeHtml = (typeof html !== 'undefined' && typeof html === 'function' && html.length > 0) ? html : (strings, ...values) => {
+  const formatVal = (v) => {
+    if (v === null || v === undefined) return '';
+    if (Array.isArray(v)) return v.map(formatVal).join('');
+    if (typeof v === 'object' && v.__isRawHtml) return v.html;
+    if (typeof v === 'object' && typeof v.toHTML === 'function') return v.toHTML();
+    return typeof escapeHtml === 'function' ? escapeHtml(v) : String(v);
+  };
+  let out = '';
+  for (let i = 0; i < strings.length; i++) {
+    out += strings[i];
+    if (i < values.length) {
+      out += formatVal(values[i]);
+    }
+  }
+  return { toHTML: () => out, html: out, __isRawHtml: true };
+};
+const safeRaw = (typeof raw !== 'undefined' && typeof raw === 'function' && raw.length > 0) ? raw : (v) => ({ __isRawHtml: true, html: String(v ?? '') });
 
 // --- USER LIBRARY ACCESS MANAGEMENT ---
 let currentAccessUser = null;
@@ -28,7 +60,7 @@ export async function showUserAccessView(userId, userEmail, userRole) {
   const accessView = document.createElement('div');
   accessView.id = 'user-access-view';
   accessView.className = 'bg-linear-to-r from-purple-900/30 to-blue-900/30 border-2 border-purple-700/50 rounded-xl p-6 shadow-lg transition-all duration-300';
-  accessView.innerHTML = `
+  renderContent(accessView, safeHtml`
     <div class="flex items-center justify-between mb-6">
       <div class="flex-1">
         <button id="back-to-users-btn" class="flex items-center text-gray-400 hover:text-white transition-colors mb-4 group">
@@ -45,7 +77,7 @@ export async function showUserAccessView(userId, userEmail, userRole) {
           </div>
           <div class="min-w-0 flex-1">
             <div class="user-access-title text-sm sm:text-base font-bold text-white break-all leading-snug">
-              Library Access for <span class="text-purple-300 break-all font-semibold">${escapeHtml(userEmail)}</span>
+              Library Access for <span class="text-purple-300 break-all font-semibold">${userEmail}</span>
             </div>
             <p class="text-xs sm:text-sm text-gray-400 truncate mt-0.5">Configure content permissions</p>
           </div>
@@ -138,7 +170,7 @@ export async function showUserAccessView(userId, userEmail, userRole) {
         </button>
       </div>
     </div>
-  `;
+  `);
 
   if (usersListDiv && usersListDiv.parentElement) {
     usersListDiv.parentElement.appendChild(accessView);
@@ -233,17 +265,17 @@ export async function loadLibraryTreeAndUserAccess(userId) {
   } catch (error) {
     statusDiv.textContent = `Error: ${error.message}`;
     statusDiv.className = 'text-sm text-red-400';
-    treeContainer.innerHTML = '<div class="text-center text-red-400 py-4">Failed to load library data</div>';
+    renderContent(treeContainer, safeHtml`<div class="text-center text-red-400 py-4">Failed to load library data</div>`);
   }
 }
 
 export function renderLibraryAccessTree(tree, accessMap, container) {
-  container.innerHTML = '';
+  clear(container);
 
   const rootFolders = Object.keys(tree).sort();
 
   if (rootFolders.length === 0) {
-    container.innerHTML = '<div class="text-center text-gray-400 py-4">No content found</div>';
+    renderContent(container, safeHtml`<div class="text-center text-gray-400 py-4">No content found</div>`);
     return;
   }
 
@@ -490,7 +522,7 @@ export function createTreeNode(type, value, nodeInfo, accessMap, parentNodeDiv, 
   if (hasChildren && !isLeaf) {
     const expandIcon = document.createElement('span');
     expandIcon.className = 'text-gray-400 transition-transform cursor-pointer shrink-0';
-    expandIcon.innerHTML = '▼';
+    expandIcon.textContent = '▼';
     header.appendChild(expandIcon);
 
     // Toggle expansion on header click (ignore clicks on checkboxes or their label pills)

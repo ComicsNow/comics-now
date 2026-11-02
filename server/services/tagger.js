@@ -18,13 +18,13 @@ const {
 } = require('../config');
 const db = require('../db');
 const { startTaggerWorker, isWorkerOnline } = require('./tagger-process');
+const { getComicPages, extractPageBuffer } = require('./library-pages');
+const { getMimeFromExt, createId } = require('../utils');
+const metadata = require('./metadata');
+const { scanLibrary, setTaggerRunningCheck } = require('./library-scan');
 
 function getScanLibrary() {
-  try {
-    return require('./library.js').scanLibrary;
-  } catch (e) {
-    return null;
-  }
+  return scanLibrary;
 }
 
 /**
@@ -36,7 +36,6 @@ function getScanLibrary() {
  */
 function buildTaggedDbMeta(info, overrides = {}) {
   const { title, series, number, volume, publisher } = overrides;
-  const { cleanDescription, cleanGenreAndTags } = require('./metadata');
   const m = {
     Title: title,
     Series: series,
@@ -51,9 +50,9 @@ function buildTaggedDbMeta(info, overrides = {}) {
     Letterer: info.Letterer || '',
     CoverArtist: info.CoverArtist || '',
     Editor: info.Editor || '',
-    Summary: cleanDescription(info.Summary || ''),
-    Genre: cleanGenreAndTags(info.Genre || ''),
-    Tags: cleanGenreAndTags(info.Tags || ''),
+    Summary: metadata.cleanDescription(info.Summary || ''),
+    Genre: metadata.cleanGenreAndTags(info.Genre || ''),
+    Tags: metadata.cleanGenreAndTags(info.Tags || ''),
     Characters: info.Characters || '',
     Teams: info.Teams || '',
     Locations: info.Locations || '',
@@ -72,8 +71,7 @@ function buildTaggedDbMeta(info, overrides = {}) {
 
 async function checkFileSuccess(filePath) {
   try {
-    const { getComicInfoFromArchive } = require('./metadata');
-    const info = await getComicInfoFromArchive(filePath);
+    const info = await metadata.getComicInfoFromArchive(filePath);
     const hasSeries = ((info.Series && info.Series.trim().length > 0) || (info.Title && info.Title.trim().length > 0));
     const hasPublisher = info.Publisher && info.Publisher.trim().length > 0;
     const hasDate = (info.Year || info.CoverDate || info.StoreDate || info['Cover Date'] || info['Store Date'] || '').toString().trim().length > 0;
@@ -299,7 +297,7 @@ async function runComicTagger(options = {}) {
       const itemStart = Date.now();
       const filePath = path.join(dir, entry.name);
       const isCbr = path.extname(entry.name).toLowerCase() === '.cbr';
-      const id = require('../utils').createId(filePath);
+      const id = createId(filePath);
 
       let stats;
       try {
@@ -336,15 +334,14 @@ async function runComicTagger(options = {}) {
       const isAlreadyComplete = await checkFileSuccess(filePath);
       if (!bypassCoreGates && isAlreadyComplete) {
         try {
-          const { getComicInfoFromArchive, normalizePublisher, cleanDescription, splitVolumeSeriesAndTitle, isTitleSameAsSeries } = require('./metadata');
-          const info = await getComicInfoFromArchive(filePath);
+          const info = await metadata.getComicInfoFromArchive(filePath);
           const rawPub = info.Publisher || existing?.publisher || 'Unknown Publisher';
-          const pub = normalizePublisher(rawPub, publisherCodex);
+          const pub = metadata.normalizePublisher(rawPub, publisherCodex);
           let ser = info.Series || existing?.series || 'Unknown Series';
           let title = info.Title || '';
           let num = info.Number || '';
           let vol = info.Volume || '';
-          const volSplit = splitVolumeSeriesAndTitle(ser, title);
+          const volSplit = metadata.splitVolumeSeriesAndTitle(ser, title);
           if (volSplit.series && volSplit.number) {
             ser = volSplit.series;
             title = volSplit.title;
@@ -358,7 +355,7 @@ async function runComicTagger(options = {}) {
           if (!num && vol) {
             num = vol;
           }
-          if (title && (isTitleSameAsSeries(title, ser) || (!ser && isTitleSameAsSeries(title, '')))) {
+          if (title && (metadata.isTitleSameAsSeries(title, ser) || (!ser && metadata.isTitleSameAsSeries(title, '')))) {
             title = '';
           }
           const dbMeta = buildTaggedDbMeta(info, { title, series: ser, number: num, volume: vol, publisher: pub });
@@ -457,19 +454,18 @@ async function runComicTagger(options = {}) {
           const tagStatus = isSuccessful ? 'successful' : 'failed';
           const newStats = await fs.promises.stat(filePath).catch(() => stats);
           
-          const { getComicInfoFromArchive, normalizePublisher, cleanDescription, splitVolumeSeriesAndTitle, isTitleSameAsSeries } = require('./metadata');
           let dbMetaStr = null;
           let rawPub = res.metadata?.publisher || existing?.publisher || 'Unknown Publisher';
-          let pub = normalizePublisher(rawPub, publisherCodex);
+          let pub = metadata.normalizePublisher(rawPub, publisherCodex);
           let ser = res.metadata?.series || res.metadata?.title || existing?.series || 'Unknown Series';
           try {
-            const info = await getComicInfoFromArchive(filePath);
-            pub = normalizePublisher(info.Publisher || pub, publisherCodex);
+            const info = await metadata.getComicInfoFromArchive(filePath);
+            pub = metadata.normalizePublisher(info.Publisher || pub, publisherCodex);
             ser = info.Series || ser;
             let title = info.Title || '';
             let num = info.Number || '';
             let vol = info.Volume || '';
-            const volSplit = splitVolumeSeriesAndTitle(ser, title);
+            const volSplit = metadata.splitVolumeSeriesAndTitle(ser, title);
             if (volSplit.series && volSplit.number) {
               ser = volSplit.series;
               title = volSplit.title;
@@ -483,7 +479,7 @@ async function runComicTagger(options = {}) {
             if (!num && vol) {
               num = vol;
             }
-            if (title && (isTitleSameAsSeries(title, ser) || (!ser && isTitleSameAsSeries(title, '')))) {
+            if (title && (metadata.isTitleSameAsSeries(title, ser) || (!ser && metadata.isTitleSameAsSeries(title, '')))) {
               title = '';
             }
             const dbMeta = buildTaggedDbMeta(info, { title, series: ser, number: num, volume: vol, publisher: pub });
@@ -573,13 +569,11 @@ async function runComicTagger(options = {}) {
         // Background extract and cache the preview image
         (async () => {
           try {
-            const library = require('./library.js');
-            const pages = await library.getComicPages(absolutePath);
+            const pages = await getComicPages(absolutePath);
             if (pages && pages.length > 0) {
               const firstPage = pages[0];
-              const buffer = await library.extractPageBuffer(absolutePath, firstPage);
+              const buffer = await extractPageBuffer(absolutePath, firstPage);
               if (buffer && pendingMatchState && pendingMatchState.filePath === absolutePath) {
-                const { getMimeFromExt } = require('../utils');
                 pendingMatchState.previewBuffer = buffer;
                 pendingMatchState.previewMime = getMimeFromExt(firstPage);
                 ctLog(`ⓘ Cached preview image for: ${entry.name}`);
@@ -731,8 +725,7 @@ async function applyUserSelection(selections) {
     const tagStatus = isSuccessful ? 'successful' : 'failed';
     const newStats = await fs.promises.stat(filePath).catch(() => ({ mtimeMs: Date.now() }));
     
-    const id = require('../utils').createId(filePath);
-    const { getComicInfoFromArchive, normalizePublisher, cleanDescription, isTitleSameAsSeries } = require('./metadata');
+    const id = createId(filePath);
     let publisherCodex = [];
     try {
       const pubRows = await db.dbAll("SELECT DISTINCT publisher FROM comics WHERE publisher IS NOT NULL AND publisher != '' AND publisher != 'Unknown Publisher'");
@@ -741,14 +734,14 @@ async function applyUserSelection(selections) {
 
     let dbMetaStr = null;
     let rawPub = match.publisher || 'Unknown Publisher';
-    let pub = normalizePublisher(rawPub, publisherCodex);
+    let pub = metadata.normalizePublisher(rawPub, publisherCodex);
     let ser = match.title || 'Unknown Series';
     try {
-      const info = await getComicInfoFromArchive(filePath);
-      pub = normalizePublisher(info.Publisher || pub, publisherCodex);
+      const info = await metadata.getComicInfoFromArchive(filePath);
+      pub = metadata.normalizePublisher(info.Publisher || pub, publisherCodex);
       ser = info.Series || ser;
       let title = info.Title || '';
-      if (title && (isTitleSameAsSeries(title, ser) || (!ser && isTitleSameAsSeries(title, '')))) {
+      if (title && (metadata.isTitleSameAsSeries(title, ser) || (!ser && metadata.isTitleSameAsSeries(title, '')))) {
         title = '';
       }
       const dbMeta = buildTaggedDbMeta(info, {
@@ -810,7 +803,7 @@ function skipCurrentMatch() {
   pendingMatchState = null;
   userChoiceResolver = null;
 
-  const id = require('../utils').createId(filePath);
+  const id = createId(filePath);
   return fs.promises.stat(filePath).catch(() => ({ mtimeMs: Date.now() })).then(currentStats => {
     return db.dbRun(
       `INSERT INTO comics (id, path, name, publisher, series, libraryMode, tagStatus, updatedAt)
@@ -923,6 +916,10 @@ function cancelComicTagger() {
 
 function isTaggerRunning() {
   return ctRunning;
+}
+
+if (typeof setTaggerRunningCheck === 'function') {
+  setTaggerRunningCheck(isTaggerRunning);
 }
 
 module.exports = {

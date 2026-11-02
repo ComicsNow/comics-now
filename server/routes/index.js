@@ -23,6 +23,30 @@ const {
   getReadingPrefMaps,
   resolveReadingModes
 } = require('../db');
+const modalDetector = require('../services/modal-detector');
+
+const attachAuthRoutes = require('./public/auth');
+const attachHealthRoutes = require('./public/health');
+
+const attachUserSettingsRoutes = require('./user/settings');
+const attachUserDevicesRoutes = require('./user/devices');
+const attachUserReadingListsRoutes = require('./user/reading-lists');
+const attachUserReadingRoutes = require('./user/reading');
+const attachUserProgressRoutes = require('./user/progress');
+const attachUserLibraryRoutes = require('./user/library');
+const attachUserPagesRoutes = require('./user/pages');
+const attachUserMetadataRoutes = require('./user/metadata');
+
+const attachAdminUsersRoutes = require('./admin/users');
+const attachAdminComictaggerRoutes = require('./admin/comictagger');
+const attachAdminGuidedRoutes = require('./admin/guided');
+const attachAdminSettingsRoutes = require('./admin/settings');
+const attachAdminLibraryMgmtRoutes = require('./admin/library-mgmt');
+const attachAdminRenameRoutes = require('./admin/rename');
+const attachAdminMcpToolsRoutes = require('./admin/mcp-tools');
+const attachAdminUserStatsRoutes = require('./admin/user-stats');
+const attachAdminGeminiRoutes = require('./admin/gemini');
+const attachAdminImpersonateRoutes = require('./admin/impersonate');
 
 function createExtendedDeps(deps) {
   const { log, getComicsDirectories, getPathFromLibraryId } = deps;
@@ -57,7 +81,7 @@ function createExtendedDeps(deps) {
     setReadingPreference,
     getReadingPrefMaps,
     resolveReadingModes,
-    modalDetector: require('../services/modal-detector')
+    modalDetector
   };
 }
 
@@ -90,44 +114,44 @@ function createAuthMiddlewares(deps) {
 
 function setupPublicRoutes(router, extendedDeps) {
   const publicRouter = express.Router();
-  require('./public/auth')(publicRouter, extendedDeps);
-  require('./public/health')(publicRouter, extendedDeps);
+  attachAuthRoutes(publicRouter, extendedDeps);
+  attachHealthRoutes(publicRouter, extendedDeps);
   router.use(publicRouter);
 }
 
 function setupUserRoutes(router, extendedDeps, requireUserAuth) {
   const userRouter = express.Router();
   userRouter.use(requireUserAuth);
-  require('./user/settings')(userRouter, extendedDeps);
-  require('./user/devices')(userRouter, extendedDeps);
-  require('./user/reading-lists')(userRouter, extendedDeps);
-  require('./user/reading')(userRouter, extendedDeps);
-  require('./user/progress')(userRouter, extendedDeps);
-  require('./user/library')(userRouter, extendedDeps);
-  require('./user/pages')(userRouter, extendedDeps);
-  require('./user/metadata')(userRouter, extendedDeps);
+  attachUserSettingsRoutes(userRouter, extendedDeps);
+  attachUserDevicesRoutes(userRouter, extendedDeps);
+  attachUserReadingListsRoutes(userRouter, extendedDeps);
+  attachUserReadingRoutes(userRouter, extendedDeps);
+  attachUserProgressRoutes(userRouter, extendedDeps);
+  attachUserLibraryRoutes(userRouter, extendedDeps);
+  attachUserPagesRoutes(userRouter, extendedDeps);
+  attachUserMetadataRoutes(userRouter, extendedDeps);
   router.use(userRouter);
 }
 
 function setupAdminRoutes(router, extendedDeps, requireAdminAuth) {
   const adminRouter = express.Router();
   adminRouter.use(requireAdminAuth);
-  require('./admin/users')(adminRouter, extendedDeps);
-  require('./admin/comictagger')(adminRouter, extendedDeps);
-  require('./admin/guided')(adminRouter, extendedDeps);
-  require('./admin/settings')(adminRouter, extendedDeps);
-  require('./admin/library-mgmt')(adminRouter, extendedDeps);
-  require('./admin/rename')(adminRouter, extendedDeps);
-  require('./admin/mcp-tools')(adminRouter, extendedDeps);
-  require('./admin/user-stats')(adminRouter, extendedDeps);
-  require('./admin/gemini')(adminRouter, extendedDeps);
+  attachAdminUsersRoutes(adminRouter, extendedDeps);
+  attachAdminComictaggerRoutes(adminRouter, extendedDeps);
+  attachAdminGuidedRoutes(adminRouter, extendedDeps);
+  attachAdminSettingsRoutes(adminRouter, extendedDeps);
+  attachAdminLibraryMgmtRoutes(adminRouter, extendedDeps);
+  attachAdminRenameRoutes(adminRouter, extendedDeps);
+  attachAdminMcpToolsRoutes(adminRouter, extendedDeps);
+  attachAdminUserStatsRoutes(adminRouter, extendedDeps);
+  attachAdminGeminiRoutes(adminRouter, extendedDeps);
   router.use(adminRouter);
 }
 
 function setupImpersonationRoutes(router, extendedDeps, requireRealAdminAuth) {
   const impersonationRouter = express.Router();
   impersonationRouter.use(requireRealAdminAuth);
-  require('./admin/impersonate')(impersonationRouter, extendedDeps);
+  attachAdminImpersonateRoutes(impersonationRouter, extendedDeps);
   router.use(impersonationRouter);
 }
 

@@ -1,5 +1,37 @@
 import { state, devicesStatusDiv, devicesListDiv, refreshDevicesBtn } from '../globals.js';
 import { escapeHtmlValue } from './shared.js';
+import { html, raw, render, clearElement } from '../ui/template.js';
+
+const clear = typeof clearElement === 'function' ? clearElement : (el) => { if (el) { if (typeof el.replaceChildren === 'function') el.replaceChildren(); else el.innerHTML = ''; } };
+const renderContent = (typeof render === 'function' && render.length >= 2) ? render : (el, content) => {
+  if (!el) return;
+  const toStr = (c) => {
+    if (c === null || c === undefined) return '';
+    if (Array.isArray(c)) return c.map(toStr).join('');
+    if (typeof c === 'object' && typeof c.toHTML === 'function') return c.toHTML();
+    if (typeof c === 'object' && c.__isRawHtml) return c.html;
+    return String(c);
+  };
+  el.innerHTML = toStr(content);
+};
+const safeHtml = (typeof html !== 'undefined' && typeof html === 'function' && html.length > 0) ? html : (strings, ...values) => {
+  const formatVal = (v) => {
+    if (v === null || v === undefined) return '';
+    if (Array.isArray(v)) return v.map(formatVal).join('');
+    if (typeof v === 'object' && v.__isRawHtml) return v.html;
+    if (typeof v === 'object' && typeof v.toHTML === 'function') return v.toHTML();
+    return typeof escapeHtmlValue === 'function' ? escapeHtmlValue(v) : String(v);
+  };
+  let out = '';
+  for (let i = 0; i < strings.length; i++) {
+    out += strings[i];
+    if (i < values.length) {
+      out += formatVal(values[i]);
+    }
+  }
+  return { toHTML: () => out, html: out, __isRawHtml: true };
+};
+const safeRaw = (typeof raw !== 'undefined' && typeof raw === 'function' && raw.length > 0) ? raw : (v) => ({ __isRawHtml: true, html: String(v ?? '') });
 
 // --- DEVICE MANAGEMENT ---
 let devicesStatusTimeout = null;
@@ -56,23 +88,23 @@ export function renderDeviceList(devices) {
   if (!devicesListDiv) return;
 
   if (!Array.isArray(devices) || devices.length === 0) {
-    devicesListDiv.innerHTML = '<div class="bg-gray-700 text-gray-300 p-4 rounded-lg">No registered devices found.</div>';
+    renderContent(devicesListDiv, safeHtml`<div class="bg-gray-700 text-gray-300 p-4 rounded-lg">No registered devices found.</div>`);
     return;
   }
 
   const { deviceId: currentDeviceId } = getStoredDeviceInfo();
 
   const deviceCards = devices.map((device) => {
-    const displayName = device.deviceName ? escapeHtmlValue(device.deviceName) : 'Unnamed Device';
-    const deviceId = escapeHtmlValue(device.deviceId);
+    const displayName = device.deviceName || 'Unnamed Device';
+    const deviceId = device.deviceId;
     const lastSeen = formatDeviceTimestamp(device.lastSeen);
     const created = formatDeviceTimestamp(device.created);
     const isCurrent = currentDeviceId && device.deviceId === currentDeviceId;
     const currentBadge = isCurrent
-      ? '<span class="px-2 py-0.5 text-xs bg-purple-600 text-white rounded-full uppercase tracking-wide">This Device</span>'
+      ? safeHtml`<span class="px-2 py-0.5 text-xs bg-purple-600 text-white rounded-full uppercase tracking-wide">This Device</span>`
       : '';
 
-    return `
+    return safeHtml`
       <div class="bg-gray-800/50 rounded-lg p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border border-gray-700/50 hover:border-purple-500/50 transition-colors group">
         <div class="space-y-1 text-sm">
           <div class="text-white font-semibold text-base flex flex-wrap items-center gap-2">
@@ -98,9 +130,9 @@ export function renderDeviceList(devices) {
         </div>
       </div>
     `;
-  }).join('');
+  });
 
-  devicesListDiv.innerHTML = deviceCards;
+  renderContent(devicesListDiv, deviceCards);
 
   // Add event listeners to remove buttons
   document.querySelectorAll('.device-remove-btn').forEach(btn => {
@@ -161,7 +193,7 @@ export async function loadUserList() {
         filterDiv.classList.remove('hidden');
 
         // Populate dropdown
-        userSelect.innerHTML = '<option value="">My Devices</option>';
+        renderContent(userSelect, safeHtml`<option value="">My Devices</option>`);
         data.users.forEach(user => {
           const option = document.createElement('option');
           option.value = user.userId;
@@ -195,7 +227,7 @@ export async function refreshDeviceList() {
   }
 
   setDevicesStatus('Loading devices...', 'info', false);
-  devicesListDiv.innerHTML = '<div class="bg-gray-700 text-gray-300 p-4 rounded-lg">Loading devices...</div>';
+  renderContent(devicesListDiv, safeHtml`<div class="bg-gray-700 text-gray-300 p-4 rounded-lg">Loading devices...</div>`);
 
   try {
     // Check if user filter is set (admin only)
@@ -223,7 +255,7 @@ export async function refreshDeviceList() {
       setDevicesStatus('', 'info');
     }
   } catch (error) {
-    devicesListDiv.innerHTML = '<div class="bg-gray-700 text-red-400 p-4 rounded-lg">Failed to load devices.</div>';
+    renderContent(devicesListDiv, safeHtml`<div class="bg-gray-700 text-red-400 p-4 rounded-lg">Failed to load devices.</div>`);
     setDevicesStatus(`Failed to load devices: ${error.message}`, 'error', false);
   } finally {
     if (refreshDevicesBtn) {

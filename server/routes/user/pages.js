@@ -1,5 +1,12 @@
 const fs = require('fs');
 const path = require('path');
+const sharp = require('sharp');
+const { getEntryBuffer } = require('../../services/archive-utils');
+const {
+  getPageCacheKey,
+  getPageCacheBuffer,
+  setPageCacheBuffer
+} = require('../../services/page-cache');
 
 // Collapses concurrent transcodes of the same page (e.g. preload bursts) into a
 // single sharp run. Keyed by WebP cache key; entries are removed once settled.
@@ -149,13 +156,6 @@ module.exports = function attach(router, deps) {
       const pageName = getQueryParamString(req.query.page);
       if (!p || !pageName || !fs.existsSync(p)) return res.status(404).end();
 
-      const { getEntryBuffer } = require('../../services/archive-utils');
-      const {
-        getPageCacheKey,
-        getPageCacheBuffer,
-        setPageCacheBuffer
-      } = require('../../services/page-cache');
-
       const rawW = parseInt(getQueryParamString(req.query.w), 10);
       const targetWidth = (!isNaN(rawW) && rawW > 0) ? Math.min(rawW, 2400) : null;
       // fmt=webp requests a full-resolution WebP (no resize). The fullscreen reader
@@ -195,7 +195,6 @@ module.exports = function attach(router, deps) {
         try {
           let transcode = inFlightTranscodes.get(webpCacheKey);
           if (!transcode) {
-            const sharp = require('sharp');
             let pipeline = sharp(sourceBuffer);
             if (targetWidth) {
               pipeline = pipeline.resize({ width: targetWidth, withoutEnlargement: true });

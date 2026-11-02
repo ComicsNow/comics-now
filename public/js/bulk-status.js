@@ -3,6 +3,38 @@
 // Exposed as window.openBulkReadStatusDialog(comics, scopeLabel).
 
 import { state } from './globals.js';
+import { html, raw, render, clearElement } from './ui/template.js';
+
+const clear = typeof clearElement === 'function' ? clearElement : (el) => { if (el) { if (typeof el.replaceChildren === 'function') el.replaceChildren(); else el.innerHTML = ''; } };
+const renderContent = (typeof render === 'function' && render.length >= 2) ? render : (el, content) => {
+  if (!el) return;
+  const toStr = (c) => {
+    if (c === null || c === undefined) return '';
+    if (Array.isArray(c)) return c.map(toStr).join('');
+    if (typeof c === 'object' && typeof c.toHTML === 'function') return c.toHTML();
+    if (typeof c === 'object' && c.__isRawHtml) return c.html;
+    return String(c);
+  };
+  el.innerHTML = toStr(content);
+};
+const safeHtml = (typeof html !== 'undefined' && typeof html === 'function' && html.length > 0) ? html : (strings, ...values) => {
+  const formatVal = (v) => {
+    if (v === null || v === undefined) return '';
+    if (Array.isArray(v)) return v.map(formatVal).join('');
+    if (typeof v === 'object' && v.__isRawHtml) return v.html;
+    if (typeof v === 'object' && typeof v.toHTML === 'function') return v.toHTML();
+    return String(v);
+  };
+  let out = '';
+  for (let i = 0; i < strings.length; i++) {
+    out += strings[i];
+    if (i < values.length) {
+      out += formatVal(values[i]);
+    }
+  }
+  return { toHTML: () => out, html: out, __isRawHtml: true };
+};
+const safeRaw = (typeof raw !== 'undefined' && typeof raw === 'function' && raw.length > 0) ? raw : (v) => ({ __isRawHtml: true, html: String(v ?? '') });
 
 function getComicReadStatus(comic) {
   const progress = comic.progress || {};
@@ -19,7 +51,7 @@ function buildModal() {
   backdrop = document.createElement('div');
   backdrop.id = 'bulk-status-modal';
   backdrop.className = 'fixed inset-0 bg-black/70 z-50 hidden flex items-center justify-center p-4';
-  backdrop.innerHTML = `
+  renderContent(backdrop, safeHtml`
     <div class="bg-gray-800 rounded-xl border border-gray-700 max-w-md w-full p-5 space-y-4 shadow-2xl">
       <h3 class="text-lg font-bold text-white">Mark as Read / Unread</h3>
       <p id="bulk-status-scope" class="text-sm text-gray-300"></p>
@@ -34,7 +66,7 @@ function buildModal() {
                 class="pill-button bg-purple-600 hover:bg-purple-700 text-white">Mark all Read</button>
       </div>
     </div>
-  `;
+  `);
   document.body.appendChild(backdrop);
   backdrop.addEventListener('click', (e) => {
     if (e.target === backdrop) close();
@@ -123,11 +155,11 @@ export function open(comics, scopeLabel) {
   }
 
   scopeEl.textContent = `${comics.length} comic${comics.length === 1 ? '' : 's'} in ${scopeLabel || 'selection'}.`;
-  countsEl.innerHTML = `
+  renderContent(countsEl, safeHtml`
     <div class="bg-gray-700/50 rounded p-2 text-center"><div class="text-green-400 font-semibold">${read}</div><div>Read</div></div>
     <div class="bg-gray-700/50 rounded p-2 text-center"><div class="text-yellow-400 font-semibold">${inProgress}</div><div>In progress</div></div>
     <div class="bg-gray-700/50 rounded p-2 text-center"><div class="text-gray-300 font-semibold">${unread}</div><div>Unread</div></div>
-  `;
+  `);
   progressEl.classList.add('hidden');
   progressEl.textContent = '';
 

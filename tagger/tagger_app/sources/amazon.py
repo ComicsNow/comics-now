@@ -1,3 +1,4 @@
+# ARCHITECTURAL_EXEMPTION: Multi-tier DOM fallback scraper (JSON-LD, desktop selectors, and semantic scanner)
 """Amazon metadata source.
 
 Provides resilient metadata querying, synopsis extraction, ISBN resolution,
@@ -30,17 +31,11 @@ def _clean_text(text: str) -> str:
 
 
 def parse_amazon_product_soup(soup, url):
-    """
-    Parses an Amazon book product page using a multi-strategy resilient extractor:
-    1. Structured schema.org JSON-LD & meta tags.
-    2. Primary Amazon desktop selectors (with expander & noscript fallbacks).
-    3. Dynamic JSON image parser for maximum resolution cover extraction.
-    4. Fuzzy semantic DOM scanner (traverses all DOM elements to find ISBN, publisher, pages, etc.).
-    """
+    """Parses an Amazon book product page using structured data and DOM fallbacks."""
     if not soup:
         return None
 
-    # 0. Anti-bot / CAPTCHA challenge detection
+    # Anti-bot / CAPTCHA challenge detection
     page_text = soup.get_text()
     if 'Robot Check' in page_text or 'validateCaptcha' in page_text or 'Type the characters you see in this image' in page_text:
         print(f'[-] Amazon anti-bot challenge encountered on {url}; skipping gracefully.')
@@ -65,13 +60,10 @@ def parse_amazon_product_soup(soup, url):
             ld_data = json.loads(script_tag.string or '{}')
             if isinstance(ld_data, list):
                 ld_data = ld_data[0] if ld_data else {}
-            if isinstance(ld_data, dict) and ('Book' in ld_data.get('@type', '') or 'Product' in ld_data.get('@type', '')):
-                if not title:
-                    title = ld_data.get('name')
-                if not description:
-                    description = ld_data.get('description')
-                if not isbn:
-                    isbn = ld_data.get('isbn')
+            if isinstance(ld_data, dict) and any(k in ld_data.get('@type', '') for k in ('Book', 'Product')):
+                title = title or ld_data.get('name')
+                description = description or ld_data.get('description')
+                isbn = isbn or ld_data.get('isbn')
                 if not pages and ld_data.get('numberOfPages'):
                     pages = str(ld_data.get('numberOfPages'))
                 if not cover_image_url and ld_data.get('image'):
@@ -123,18 +115,14 @@ def parse_amazon_product_soup(soup, url):
                 authors.append(clean_name)
                 if role_m:
                     role = role_m.group(1).lower()
-                    if 'author' in role or 'writer' in role:
-                        if clean_name not in writers:
-                            writers.append(clean_name)
-                    elif 'illustrator' in role or 'artist' in role or 'penciller' in role:
-                        if clean_name not in pencillers:
-                            pencillers.append(clean_name)
-                    elif 'color' in role:
-                        if clean_name not in colorists:
-                            colorists.append(clean_name)
-                    elif 'ink' in role:
-                        if clean_name not in inkers:
-                            inkers.append(clean_name)
+                    if ('author' in role or 'writer' in role) and clean_name not in writers:
+                        writers.append(clean_name)
+                    elif any(r in role for r in ('illustrator', 'artist', 'penciller')) and clean_name not in pencillers:
+                        pencillers.append(clean_name)
+                    elif 'color' in role and clean_name not in colorists:
+                        colorists.append(clean_name)
+                    elif 'ink' in role and clean_name not in inkers:
+                        inkers.append(clean_name)
 
     # Description (with expander, noscript, and editorial review fallbacks)
     if not description:
@@ -145,26 +133,21 @@ def parse_amazon_product_soup(soup, url):
             or soup.find('div', attrs={'data-feature-name': 'bookDescription'})
         )
         if desc_div:
-            # Check noscript first for un-minified raw HTML
             noscript = desc_div.find('noscript')
             if noscript and noscript.string:
                 try:
-                    ns_soup = BeautifulSoup(noscript.string, 'html.parser')
-                    description = _clean_text(ns_soup.get_text())
+                    description = _clean_text(BeautifulSoup(noscript.string, 'html.parser').get_text())
                 except Exception:
                     pass
-
             if not description:
                 expander = desc_div.find('div', class_='a-expander-content') or desc_div
                 description = _clean_text(expander.get_text())
 
-    # Fallback to meta description
     if not description or len(description) < 20:
         meta_desc = soup.find('meta', attrs={'name': 'description'}) or soup.find('meta', property='og:description')
         if meta_desc and meta_desc.get('content'):
             description = _clean_text(meta_desc['content'])
 
-    # Clean description boilerplate prefixes
     if description:
         description = re.sub(r'^(?:SUMMARY|Product Description|Editorial Reviews|About the Author|Book Description)\s*:\s*', '', description, flags=re.I).strip()
 
@@ -180,24 +163,19 @@ def parse_amazon_product_soup(soup, url):
 
             if 'ISBN-13' in li_text:
                 m = re.search(r'ISBN-13\s*:\s*([0-9-]{13,17})', li_text, re.I)
-                if m:
-                    isbn_13 = m.group(1).replace('-', '').strip()
+                if m: isbn_13 = m.group(1).replace('-', '').strip()
             elif 'ISBN-10' in li_text:
                 m = re.search(r'ISBN-10\s*:\s*([0-9X-]{10,13})', li_text, re.I)
-                if m:
-                    isbn_10 = m.group(1).replace('-', '').strip()
+                if m: isbn_10 = m.group(1).replace('-', '').strip()
             elif 'Publisher' in li_text and not publisher:
                 m = re.search(r'Publisher\s*:\s*([^;(]+)', li_text, re.I)
-                if m:
-                    publisher = _clean_text(m.group(1))
+                if m: publisher = _clean_text(m.group(1))
             elif ('Print length' in li_text or 'pages' in li_text.lower()) and not pages:
                 m = re.search(r'(\d+)\s*pages?', li_text, re.I)
-                if m:
-                    pages = m.group(1)
+                if m: pages = m.group(1)
             elif 'Publication date' in li_text and not publish_date:
                 m = re.search(r'Publication date\s*:\s*(.+)$', li_text, re.I)
-                if m:
-                    publish_date = _clean_text(m.group(1))
+                if m: publish_date = _clean_text(m.group(1))
 
     if isbn_13:
         isbn = isbn_13
@@ -231,20 +209,15 @@ def parse_amazon_product_soup(soup, url):
             t = _clean_text(elem.get_text())
             if not isbn:
                 m = re.search(r'(?:ISBN-13|ISBN 13|ISBN13)\s*[:\s]*([0-9-]{13,17})', t, re.I)
-                if m:
-                    isbn = m.group(1).replace('-', '').strip()
-                else:
-                    m10 = re.search(r'(?:ISBN-10|ISBN 10|ISBN10)\s*[:\s]*([0-9X-]{10,13})', t, re.I)
-                    if m10:
-                        isbn = m10.group(1).replace('-', '').strip()
+                m10 = re.search(r'(?:ISBN-10|ISBN 10|ISBN10)\s*[:\s]*([0-9X-]{10,13})', t, re.I) if not m else None
+                isbn = (m.group(1).replace('-', '') if m else (m10.group(1).replace('-', '') if m10 else None)) or isbn
             if not publisher:
                 mp = re.search(r'Publisher\s*[:\s]+([A-Za-z0-9\s.,&\'-]+?)(?:;|\(|$|\n)', t, re.I)
-                if mp and len(mp.group(1).strip()) > 2 and len(mp.group(1).strip()) < 60:
+                if mp and 2 < len(mp.group(1).strip()) < 60:
                     publisher = _clean_text(mp.group(1))
             if not pages:
                 mpg = re.search(r'(?:Print length|Hardcover|Paperback|Length)\s*[:\s]*(\d+)\s*pages?', t, re.I)
-                if mpg:
-                    pages = mpg.group(1)
+                if mpg: pages = mpg.group(1)
 
     # 4. Strategy 4: High-Resolution Cover Art Extraction
     if not cover_image_url:
@@ -299,7 +272,7 @@ def parse_amazon_product_soup(soup, url):
     return metadata
 
 
-def search_amazon_multi(query, limit=10):
+def search_amazon_multi(query, limit=3):
     """Search Amazon Books for volume candidates with anti-bot headers & rate limits."""
     if not query or not query.strip():
         return []
@@ -396,7 +369,7 @@ def resolve_amazon(filename, cover_path=None, on_progress=None, existing_meta=No
     query = clean_search_query(filename)
 
     try:
-        res = search_amazon_multi(query, limit=2)
+        res = search_amazon_multi(query, limit=3)
     except Exception as e:
         print(f'[-] Amazon resolve failed: {e}')
         return []

@@ -16,9 +16,14 @@
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const cryptoVault = require('../utils/crypto-vault');
+const { CONFIG_FILE, THUMBNAILS_DIRECTORY } = require('../constants');
+const { getGeminiApiKey } = require('../config');
 const { matchCoverToCandidates } = require('./gemini-cover');
 const { synthesizeMetadataWithGemini } = require('./gemini-metadata');
 const { incrementDailyUsage, startMidnightPacificScheduler } = require('./gemini-quota');
+const { generateThumbnail } = require('./library-pages');
+const { getComicInfoFromArchive } = require('./metadata');
 
 let isHookInstalled = false;
 
@@ -82,7 +87,6 @@ function installTaggerHook(ctx) {
         if (keyRow?.value) {
           let rawVal = keyRow.value;
           try { rawVal = JSON.parse(rawVal); } catch { rawVal = keyRow.value; }
-          const cryptoVault = require('../utils/crypto-vault');
           config.apiKey = (cryptoVault.decrypt(rawVal) || rawVal || '').trim();
           if (ctx.config) ctx.config.geminiApiKey = config.apiKey;
         }
@@ -216,13 +220,7 @@ function installTaggerHook(ctx) {
 function getConfig(ctx) {
     let fileConfig = {};
     try {
-      const defaultConfigFile = (() => {
-        try {
-          return require('../constants').CONFIG_FILE;
-        } catch (_) {
-          return path.join(__dirname, '../../config.json');
-        }
-      })();
+      const defaultConfigFile = CONFIG_FILE || path.join(__dirname, '../../config.json');
       const configPath = ctx.paths?.CONFIG_FILE || defaultConfigFile;
       if (fs.existsSync(configPath)) {
         fileConfig = JSON.parse(fs.readFileSync(configPath, 'utf8'));
@@ -231,7 +229,6 @@ function getConfig(ctx) {
 
     let configGetterKey = '';
     try {
-      const { getGeminiApiKey } = require('../config');
       configGetterKey = getGeminiApiKey();
     } catch (_) {}
 
@@ -240,7 +237,6 @@ function getConfig(ctx) {
       : (fileConfig.geminiCoverMatchEnabled !== undefined ? !!fileConfig.geminiCoverMatchEnabled : true);
 
     const termsAccepted = fileConfig.geminiTermsAccepted === true;
-    const cryptoVault = require('../utils/crypto-vault');
     const rawApiKey = process.env.GEMINI_API_KEY || configGetterKey || fileConfig.geminiApiKey || ctx.config?.geminiApiKey || '';
     const apiKey = (cryptoVault.decrypt(rawApiKey) || rawApiKey || '').trim();
     const model = (fileConfig.geminiModel || ctx.config?.geminiModel || process.env.GEMINI_MODEL || 'gemini-3.5-flash-lite').trim();
@@ -268,7 +264,6 @@ async function resolveLocalCover(ctx, filePath, logger) {
 
       // 2. Try library-pages generateThumbnail
       try {
-        const { generateThumbnail } = require('../../server/services/library-pages');
         if (typeof generateThumbnail === 'function') {
           const thumb = await generateThumbnail(filePath);
           if (thumb) {
@@ -370,7 +365,6 @@ async function evaluateWithGemini(ctx, originalFetch, logger, res, reqBody, conf
 
         let existingMeta = {};
         try {
-          const { getComicInfoFromArchive } = require('../../server/services/metadata');
           existingMeta = await getComicInfoFromArchive(filePath);
         } catch (_) {}
 

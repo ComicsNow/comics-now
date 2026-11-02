@@ -19,6 +19,7 @@
  */
 const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
+const cryptoVault = require('../utils/crypto-vault');
 
 const COOKIE_NAME = 'cn_imp';
 const SECRET_KEY = 'impersonation_secret';
@@ -33,12 +34,10 @@ async function getSecret(dbGet, dbRun) {
   if (row && row.value) {
     let rawVal = row.value;
     try { rawVal = JSON.parse(rawVal); } catch (_) {}
-    const cryptoVault = require('../utils/crypto-vault');
     cachedSecret = (cryptoVault.decrypt(rawVal) || rawVal || '').trim();
     return cachedSecret;
   }
   const secret = crypto.randomBytes(32).toString('hex');
-  const cryptoVault = require('../utils/crypto-vault');
   await dbRun('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)', [SECRET_KEY, cryptoVault.encrypt(secret)]);
   cachedSecret = secret;
   return cachedSecret;

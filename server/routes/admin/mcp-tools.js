@@ -1,8 +1,11 @@
 const fs = require('fs');
 const path = require('path');
+const sharp = require('sharp');
 
 const { ROOT_DIR } = require('../../constants');
 const { getMetadataStorage } = require('../../config');
+const metadata = require('../../services/metadata');
+const { getEntryBuffer } = require('../../services/archive-utils');
 
 // Guided-view sidecars live here (mirrors panel-detector.js GUIDED_VIEW_DIR and
 // the reconnect logic in library-scan.js). Computed from ROOT_DIR directly so we
@@ -22,7 +25,6 @@ const GUIDED_VIEW_DIR = path.join(ROOT_DIR, 'metadata', 'guided_view');
  */
 module.exports = function attach(router, deps) {
   const { dbGet, dbRun, dbAll, log, formatErrorMessage, getComicPages, getMimeFromExt } = deps;
-  const metadata = require('../../services/metadata');
 
   async function getComic(id) {
     return dbGet(
@@ -116,7 +118,6 @@ module.exports = function attach(router, deps) {
       const pageName = typeof req.query.page === 'string' ? req.query.page : '';
       if (!pageName) return res.status(400).end();
 
-      const { getEntryBuffer } = require('../../services/archive-utils');
       const buffer = await getEntryBuffer(comic.path, pageName);
       if (!buffer) return res.status(404).end();
       res.setHeader('Content-Type', getMimeFromExt(pageName));
@@ -150,8 +151,6 @@ module.exports = function attach(router, deps) {
       // authoring model actually saw (clients often downscale images). 'absolute':
       // boxes are already native pixels (what the ONNX detector produces).
       const coords = body.coords === 'absolute' ? 'absolute' : 'normalized';
-      const sharp = require('sharp');
-      const { getEntryBuffer } = require('../../services/archive-utils');
 
       const isBox = (b) => Array.isArray(b) && b.length === 4 && b.every(n => typeof n === 'number' && isFinite(n));
       const dimsCache = {};

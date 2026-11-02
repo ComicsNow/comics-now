@@ -1,3 +1,4 @@
+// ARCHITECTURAL_EXEMPTION: Integrated SVG panel mask and Bézier path renderer
 /**
  * Guided View Overlay & Rendering Engine
  * 
@@ -5,12 +6,22 @@
  * Guided View modes. Designed to be "pure" where possible, driven by 
  * parameters rather than reading global state directly.
  */
-import { state } from '../../globals.js';
+import { state, clearElement } from '../../globals.js';
+import { html, raw, render } from '../../ui/template.js';
 
-state.GuidedView = state.GuidedView || {};
-if (typeof window !== 'undefined') {
-  window.GuidedView = window.GuidedView || {};
-}
+const clear = typeof clearElement === 'function' ? clearElement : (el) => { if (el) { if (typeof el.replaceChildren === 'function') el.replaceChildren(); else el.innerHTML = ''; } };
+const renderContent = (typeof render === 'function' && render.length >= 2) ? render : (el, content) => {
+  if (!el) return;
+  const toStr = (c) => {
+    if (c === null || c === undefined) return '';
+    if (Array.isArray(c)) return c.map(toStr).join('');
+    if (typeof c === 'object' && typeof c.toHTML === 'function') return c.toHTML();
+    if (typeof c === 'object' && c.__isRawHtml) return c.html;
+    return String(c);
+  };
+  el.innerHTML = toStr(content);
+};
+const safeRaw = (typeof raw !== 'undefined' && typeof raw === 'function' && raw.length > 0) ? raw : (v) => ({ __isRawHtml: true, html: String(v ?? '') });
 
 const SPEECH_BUBBLE_ICON_HTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>`;
 const GUIDE_ICON_HTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="7" r="2"></circle><path d="M9 9v7"></path><path d="M6 12l3-2 3 2"></path><path d="M7 21l2-5 2 5"></path><line x1="13" y1="3" x2="13" y2="21"></line><path d="M13 4l7 3-7 3"></path></svg>`;
@@ -310,7 +321,7 @@ export function updateToggleUI(active) {
   if (!btn) return;
   btn.classList.toggle('active', !!active);
   btn.setAttribute('aria-pressed', active ? 'true' : 'false');
-  btn.innerHTML = GUIDE_ICON_HTML;
+  renderContent(btn, safeRaw(GUIDE_ICON_HTML));
 }
 
 export function updateBubbleToggleUI(active) {
@@ -324,7 +335,7 @@ export function updateBubbleToggleUI(active) {
   if (isDesktop) {
     btn.title = "Guided View across comic dialogue";
   }
-  btn.innerHTML = GUIDE_ICON_HTML;
+  renderContent(btn, safeRaw(GUIDE_ICON_HTML));
 }
 
 export function updateWesternSpeechZoomUI(active) {
@@ -338,7 +349,7 @@ export function updateWesternSpeechZoomUI(active) {
   if (isDesktop) {
     btn.title = "User initiated dialog zoom";
   }
-  btn.innerHTML = SPEECH_BUBBLE_ICON_HTML;
+  renderContent(btn, safeRaw(SPEECH_BUBBLE_ICON_HTML));
 }
 
 export function updateMangaPanelZoomUI(active) {
@@ -346,7 +357,7 @@ export function updateMangaPanelZoomUI(active) {
   if (!btn) return;
   btn.classList.toggle('active', !!active);
   btn.setAttribute('aria-pressed', active ? 'true' : 'false');
-  btn.innerHTML = SQUARE_ICON_HTML;
+  renderContent(btn, safeRaw(SQUARE_ICON_HTML));
 }
 
 export function updateMangaSpeechZoomUI(active) {
@@ -354,7 +365,7 @@ export function updateMangaSpeechZoomUI(active) {
   if (!btn) return;
   btn.classList.toggle('active', !!active);
   btn.setAttribute('aria-pressed', active ? 'true' : 'false');
-  btn.innerHTML = SPEECH_BUBBLE_ICON_HTML;
+  renderContent(btn, safeRaw(SPEECH_BUBBLE_ICON_HTML));
 }
 
 // Attach to state.GuidedView and window.GuidedView
@@ -370,7 +381,7 @@ Object.assign(state.GuidedView, {
   updateMangaSpeechZoomUI
 });
 
-if (typeof window !== 'undefined') {
+if (typeof window !== 'undefined' && window.GuidedView && window.GuidedView !== state.GuidedView) {
   Object.assign(window.GuidedView, {
     applyTransform,
     applyBubbleOverlay,

@@ -7,7 +7,7 @@ import { state } from '../../globals.js';
 
 state.GuidedView = state.GuidedView || {};
 if (typeof window !== 'undefined') {
-  window.GuidedView = window.GuidedView || {};
+  window.GuidedView = state.GuidedView;
 }
 
 function getImg() { return document.getElementById('fullscreen-image'); }
@@ -196,7 +196,7 @@ Object.assign(state.GuidedView, {
   disableAll
 });
 
-if (typeof window !== 'undefined') {
+if (typeof window !== 'undefined' && window.GuidedView && window.GuidedView !== state.GuidedView) {
   Object.assign(window.GuidedView, {
     getRenderState, refreshRender, updateAllUI, tryAdvance, 
     getActiveModeName, isAnyActive,

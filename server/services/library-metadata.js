@@ -1,3 +1,4 @@
+const { getFolderRules } = require('../config');
 const { generateVirtualMetadataFromHierarchy } = require('./organization');
 
 /**
@@ -6,7 +7,6 @@ const { generateVirtualMetadataFromHierarchy } = require('./organization');
  */
 function generateVirtualMetadata(filePath, libraryRootPath, customFolderRules = null) {
   try {
-    const { getFolderRules } = require('../config');
     const folderRules = customFolderRules || (typeof getFolderRules === 'function' ? getFolderRules() : null);
     return generateVirtualMetadataFromHierarchy(filePath, libraryRootPath, folderRules);
   } catch (err) {

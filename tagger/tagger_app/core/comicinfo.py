@@ -1,3 +1,4 @@
+# ARCHITECTURAL_EXEMPTION: Exhaustive ComicInfo XML v2.1 schema serialization
 """ComicInfo.xml read/generate/write for CBZ archives.
 
 Extracted from the legacy tagger.py monolith (architecture review, step 1).

@@ -49,7 +49,8 @@ describe('events.js UI interactions and API integrations', () => {
     // Load globals.js
     const globalsPath = path.resolve(__dirname, '..', 'public', 'js', 'globals.js');
     let globalsCode = fs.readFileSync(globalsPath, 'utf8');
-    // Replace export keywords correctly
+    // Strip imports and replace export keywords correctly
+    globalsCode = globalsCode.replace(/import\s+[\s\S]*?from\s+['"][^'"]+['"];?/g, '');
     globalsCode = globalsCode.replace(/export\s+(async\s+)?(function|const|let|var|class)\s+/g, '$1$2 ');
     globalsCode = globalsCode.replace(/export\s+\{[^}]*\};?/g, '');
     globalsCode = globalsCode.replace(/const state = /g, 'var state = ');

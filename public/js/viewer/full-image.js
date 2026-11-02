@@ -2,26 +2,11 @@
 // Reuses the same scroll-based pan path as the dblclick zoom so the
 // boundaries clamp correctly. Continuous, double-tap zoom, page nav are
 // disabled while active. Composes with landscape (rotation).
-import { state } from '../globals.js';
+import { state, global as canonicalGlobal } from '../globals.js';
 
-const global = new Proxy(typeof window !== 'undefined' ? window : globalThis, {
-  get(target, prop) {
-    if (prop in state) {
-      return state[prop];
-    }
-    const val = target[prop];
-    if (typeof val === 'function') {
-      return val.bind(target);
-    }
-    return val;
-  },
-  set(target, prop, value) {
-    state[prop] = value;
-    try {
-      target[prop] = value;
-    } catch (e) {}
-    return true;
-  }
+const global = typeof canonicalGlobal !== 'undefined' ? canonicalGlobal : new Proxy(typeof window !== 'undefined' ? window : globalThis, {
+  get: (t, p) => (typeof state !== 'undefined' && p in state) ? state[p] : t[p],
+  set: (t, p, v) => { if (typeof state !== 'undefined') state[p] = v; try { t[p] = v; } catch {} return true; }
 });
 
   function getImage() {

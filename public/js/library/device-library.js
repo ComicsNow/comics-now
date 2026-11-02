@@ -1,4 +1,16 @@
-import { state, escapeHtml } from '../globals.js';
+import { state, escapeHtml, clearElement, render, html, raw } from '../globals.js';
+
+const clear = typeof clearElement === 'function' ? clearElement : (el) => { if (el) { if (typeof el.replaceChildren === 'function') el.replaceChildren(); else el.innerHTML = ''; } };
+const renderContent = typeof render === 'function' ? render : (el, content) => {
+  if (!el) return;
+  if (content && typeof content === 'object' && typeof content.toHTML === 'function') {
+    el.innerHTML = content.toHTML();
+  } else if (content && typeof content === 'object' && content.__isRawHtml) {
+    el.innerHTML = content.html;
+  } else {
+    el.innerHTML = String(content ?? '');
+  }
+};
 
 const DEVICE_LIBRARIES_STORE = 'deviceLibraries';
 const DEVICE_COMICS_STORE = 'deviceComics';
@@ -299,15 +311,15 @@ export async function appendDeviceLibraryCards(container) {
       }
     }
 
-    card.innerHTML = `
+    renderContent(card, html`
       <div class="aspect-2/3 bg-gray-700 flex flex-col items-center justify-center p-4 text-center">
         <svg xmlns="http://www.w3.org/2000/svg" class="w-16 h-16 ${isDisconnected ? 'text-gray-600' : 'text-gray-500'} mb-2 group-hover:text-purple-400 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
         </svg>
-        <div class="text-white font-bold truncate w-full">${escapeHtml(lib.name)}</div>
+        <div class="text-white font-bold truncate w-full">${lib.name}</div>
         <div class="text-gray-400 text-sm mt-1">Local Device Library</div>
         <div class="text-xs text-gray-500 mt-2">${comics.length} Comics</div>
-        ${statusHtml}
+        ${raw(statusHtml)}
       </div>
       <div class="absolute top-2 right-2 z-20">
         <button class="bg-red-600/80 hover:bg-red-600 text-white p-1.5 rounded-full remove-device-lib shadow-lg backdrop-blur-xs transition-all" data-id="${lib.id}" title="Remove Library">
@@ -316,7 +328,7 @@ export async function appendDeviceLibraryCards(container) {
           </svg>
         </button>
       </div>
-    `;
+    `);
 
     card.onclick = async (e) => {
       if (e.target.closest('.remove-device-lib')) {
@@ -435,7 +447,7 @@ export function renderLocalComicList(title, comics) {
   if (!container || !titleElem) return;
 
   titleElem.textContent = title;
-  container.innerHTML = '';
+  clear(container);
   
   const showView = state.showView || window.showView;
   if (typeof showView === 'function') {
@@ -446,16 +458,16 @@ export function renderLocalComicList(title, comics) {
     const card = document.createElement('div');
     card.className = 'comic-card bg-gray-800 rounded-lg overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-300 cursor-pointer group border border-gray-700 hover:border-purple-500';
     
-    card.innerHTML = `
+    renderContent(card, html`
       <div class="aspect-2/3 bg-gray-700 flex items-center justify-center relative overflow-hidden">
         <svg xmlns="http://www.w3.org/2000/svg" class="w-12 h-12 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
         </svg>
         <div class="absolute bottom-0 left-0 right-0 bg-linear-to-t from-black/80 to-transparent p-2">
-          <div class="text-white text-xs font-bold truncate">${escapeHtml(comic.name)}</div>
+          <div class="text-white text-xs font-bold truncate">${comic.name}</div>
         </div>
       </div>
-    `;
+    `);
 
     card.onclick = () => {
       const openComicViewer = state.openComicViewer || window.openComicViewer;

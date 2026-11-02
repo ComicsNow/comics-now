@@ -1,10 +1,5 @@
 import { state } from '../../globals.js';
 
-state.GuidedView = state.GuidedView || {};
-if (typeof window !== 'undefined') {
-  window.GuidedView = window.GuidedView || {};
-}
-
 // Fraction of box A's area that lies inside box B.
 export function intersectionOverArea(a, b) {
   const [ax, ay, aw, ah] = a;
@@ -132,7 +127,7 @@ state.GuidedView.classifyMangaBoxes = classifyMangaBoxes;
 state.GuidedView.classifyMangaPage = classifyMangaPage;
 state.GuidedView.findBubbleAtPoint = findBubbleAtPoint;
 
-if (typeof window !== 'undefined') {
+if (typeof window !== 'undefined' && window.GuidedView && window.GuidedView !== state.GuidedView) {
   window.GuidedView.intersectionOverArea = intersectionOverArea;
   window.GuidedView.classifyMangaBoxes = classifyMangaBoxes;
   window.GuidedView.classifyMangaPage = classifyMangaPage;

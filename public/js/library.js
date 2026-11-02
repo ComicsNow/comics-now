@@ -1,24 +1,10 @@
-import { state } from './globals.js';
+import { state, global as canonicalGlobal, actions } from './globals.js';
 
-const global = new Proxy(typeof window !== 'undefined' ? window : globalThis, {
-  get(target, prop) {
-    if (prop in state) {
-      return state[prop];
-    }
-    const val = target[prop];
-    if (typeof val === 'function') {
-      return val.bind(target);
-    }
-    return val;
-  },
-  set(target, prop, value) {
-    state[prop] = value;
-    try {
-      target[prop] = value;
-    } catch (e) {}
-    return true;
-  }
+const global = typeof canonicalGlobal !== 'undefined' ? canonicalGlobal : new Proxy(typeof window !== 'undefined' ? window : globalThis, {
+  get: (t, p) => (typeof state !== 'undefined' && p in state) ? state[p] : t[p],
+  set: (t, p, v) => { if (typeof state !== 'undefined') state[p] = v; try { t[p] = v; } catch {} return true; }
 });
+const actionsRef = (typeof actions !== 'undefined' && actions?.navigation) ? actions : global?.actions;
 
 // Filter library function simplified - status filters are applied during rendering
 function filterLibrary(originalLibrary, filter) {
@@ -66,12 +52,17 @@ function goToInitialView() {
   });
 
   // Clear smart-filter scope
-  global.activeSmartFilter = null;
-  if (typeof window !== 'undefined') window.activeSmartFilter = null;
-
-  // Reset status filter to 'all'
-  global.activeFilter = 'all';
-  if (typeof window !== 'undefined') window.activeFilter = 'all';
+  if (actionsRef?.navigation?.setFilter) {
+    actionsRef.navigation.setFilter('smart', null);
+    actionsRef.navigation.setFilter('status', 'all');
+  } else {
+    global.activeSmartFilter = null;
+    global.activeFilter = 'all';
+  }
+  if (typeof window !== 'undefined') {
+    window.activeSmartFilter = null;
+    window.activeFilter = 'all';
+  }
 
   // Mirror the visual state of the status filter pills
   document.querySelectorAll('.filter-btn').forEach(btn => {
@@ -124,7 +115,11 @@ function handleFilterClick(event) {
   button.classList.remove('bg-gray-700', 'hover:bg-gray-600');
 
   const filter = button.dataset.filter || 'all';
-  global.activeFilter = filter;
+  if (actionsRef?.navigation?.setFilter) {
+    actionsRef.navigation.setFilter('status', filter);
+  } else {
+    global.activeFilter = filter;
+  }
   if (typeof window !== 'undefined') window.activeFilter = filter;
 
   if (filter === 'all') {

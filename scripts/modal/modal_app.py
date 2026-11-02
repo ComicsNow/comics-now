@@ -1,3 +1,4 @@
+# ARCHITECTURAL_EXEMPTION: Modal cloud deployment single-entrypoint app specification
 """
 Comics Guided View – Modal GPU inference service.
 

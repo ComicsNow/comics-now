@@ -1,10 +1,5 @@
 import { state } from '../../globals.js';
 
-state.GuidedView = state.GuidedView || {};
-if (typeof window !== 'undefined') {
-  window.GuidedView = window.GuidedView || {};
-}
-
 export let isPanning = false;
 let startX = 0, startY = 0;
 let initialBox = null;
@@ -186,7 +181,7 @@ Object.defineProperty(state.GuidedView, 'isPanning', {
   configurable: true
 });
 
-if (typeof window !== 'undefined') {
+if (typeof window !== 'undefined' && window.GuidedView && window.GuidedView !== state.GuidedView) {
   Object.defineProperty(window.GuidedView, 'isPanning', {
     get() { return isPanning; },
     set(val) { isPanning = val; },

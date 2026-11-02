@@ -3,6 +3,7 @@ const { log, guidedLog } = require('../logger');
 const { getComicsDirectories } = require('../config');
 const panelDetector = require('./panel-detector');
 const modalDetector = require('./modal-detector');
+const cryptoVault = require('../utils/crypto-vault');
 
 const SETTINGS_KEYS = {
   autoOnAdd: 'guided.autoOnAdd',
@@ -177,7 +178,6 @@ async function processComic(comic, options = {}) {
   if (settings.useModal) {
     try {
       guidedLog('INFO', `   [Modal] Attempting GPU detection via Modal...`);
-      const cryptoVault = require('../utils/crypto-vault');
       const rawSecret = await getSetting(SETTINGS_KEYS.modalTokenSecret, '');
       const secret = cryptoVault.decrypt(rawSecret);
       if (typeof modalDetector.ensureEnvironmentReady === 'function') {

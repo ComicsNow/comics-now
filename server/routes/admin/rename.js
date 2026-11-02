@@ -1,5 +1,8 @@
 const fs = require('fs');
 const path = require('path');
+const { THUMBNAILS_DIRECTORY, GUIDED_VIEW_DIR } = require('../../constants');
+const { formatComicFilename, updateComicIdentity } = require('../../services/organization');
+const { getNamingRules } = require('../../config');
 
 /**
  * Admin Rename Routes
@@ -22,9 +25,6 @@ module.exports = function attach(router, deps) {
     createId,
     getComicInfoFromArchive
   } = deps;
-
-  const { THUMBNAILS_DIRECTORY, GUIDED_VIEW_DIR } = require('../../constants');
-  const { formatComicFilename, updateComicIdentity } = require('../../services/organization');
 
   router.post('/api/v1/rename-cbz', async (req, res) => {
     try {
@@ -85,7 +85,7 @@ module.exports = function attach(router, deps) {
       let errors = 0;
       const results = [];
 
-      const namingRules = (deps.getNamingRules || require('../../config').getNamingRules)();
+      const namingRules = (deps.getNamingRules || getNamingRules)();
 
       for (const comicRecord of files) {
         const file = comicRecord.name;

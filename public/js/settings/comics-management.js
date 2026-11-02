@@ -1,4 +1,35 @@
-import { state } from '../globals.js';
+import { state, clearElement, render, html, raw, escapeHtml } from '../globals.js';
+
+const clear = typeof clearElement === 'function' ? clearElement : (el) => { if (el) { if (typeof el.replaceChildren === 'function') el.replaceChildren(); else el.innerHTML = ''; } };
+const renderContent = (typeof render === 'function' && render.length >= 2) ? render : (el, content) => {
+  if (!el) return;
+  if (content && typeof content === 'object' && typeof content.toHTML === 'function') {
+    el.innerHTML = content.toHTML();
+  } else if (content && typeof content === 'object' && content.__isRawHtml) {
+    el.innerHTML = content.html;
+  } else {
+    el.innerHTML = String(content ?? '');
+  }
+};
+
+const safeHtml = (typeof html !== 'undefined' && typeof html === 'function' && html.length > 0) ? html : (strings, ...values) => {
+  let out = '';
+  for (let i = 0; i < strings.length; i++) {
+    out += strings[i];
+    if (i < values.length) {
+      const v = values[i];
+      if (v && typeof v === 'object' && v.__isRawHtml) out += v.html;
+      else if (v && typeof v === 'object' && typeof v.toHTML === 'function') out += v.toHTML();
+      else out += (typeof escapeHtml === 'function' ? escapeHtml(v) : String(v ?? ''));
+    }
+  }
+  return { toHTML: () => out, html: out, __isRawHtml: true };
+};
+
+const safeRaw = (typeof raw !== 'undefined' && typeof raw === 'function' && raw.length > 0) ? raw : (v) => ({
+  __isRawHtml: true,
+  html: String(v ?? '')
+});
 
 let renameEventSource = null;
 let moveEventSource = null;
@@ -87,7 +118,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // Clear rename output
   if (renameClearBtn) {
     renameClearBtn.addEventListener('click', async () => {
-      renameOutputDiv.innerHTML = '';
+      clear(renameOutputDiv);
       renameOutputDiv.classList.add('hidden');
       try {
         await fetch(`${apiBaseUrl}/api/v1/rename/clear`, { method: 'POST' });
@@ -100,7 +131,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // Clear move output
   if (moveClearBtn) {
     moveClearBtn.addEventListener('click', async () => {
-      moveOutputDiv.innerHTML = '';
+      clear(moveOutputDiv);
       moveOutputDiv.classList.add('hidden');
       try {
         await fetch(`${apiBaseUrl}/api/v1/move/clear`, { method: 'POST' });
@@ -124,26 +155,27 @@ document.addEventListener('DOMContentLoaded', () => {
 
   async function loadOperationErrors() {
     if (!errorsList) return;
-    errorsList.innerHTML = '<p class="text-sm text-gray-500 animate-pulse">Loading errors...</p>';
+    renderContent(errorsList, safeHtml`<p class="text-sm text-gray-500 animate-pulse">Loading errors...</p>`);
     try {
       const res = await fetch(`${apiBaseUrl}/api/v1/operation-errors`);
       const data = await res.json();
       if (!data.ok || data.errors.length === 0) {
-        errorsList.innerHTML = '<p class="text-sm text-gray-500">No errors recorded this session.</p>';
+        renderContent(errorsList, safeHtml`<p class="text-sm text-gray-500">No errors recorded this session.</p>`);
         return;
       }
-      errorsList.innerHTML = data.errors.map(e => {
+      const errorsHtml = data.errors.map(e => {
         const time = new Date(e.timestamp).toLocaleTimeString();
         const badge = e.source === 'rename'
           ? '<span class="text-blue-400 text-xs font-bold uppercase">rename</span>'
           : '<span class="text-green-400 text-xs font-bold uppercase">move</span>';
         return `<div class="bg-gray-900 rounded-lg p-3 border border-red-900/40">
           <div class="flex items-center gap-2 mb-1">${badge}<span class="text-gray-500 text-xs">${time}</span></div>
-          <p class="text-red-400 text-xs font-mono break-all">${e.message}</p>
+          <p class="text-red-400 text-xs font-mono break-all">${escapeHtml(e.message)}</p>
         </div>`;
       }).join('');
+      renderContent(errorsList, safeRaw(errorsHtml));
     } catch {
-      errorsList.innerHTML = '<p class="text-sm text-red-400">Failed to load errors.</p>';
+      renderContent(errorsList, safeHtml`<p class="text-sm text-red-400">Failed to load errors.</p>`);
     }
   }
 
@@ -166,7 +198,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const libraries = data.directories.filter(dir => !dir.isInbox);
       selects.forEach(sel => {
         const current = sel.value;
-        sel.innerHTML = '';
+        clear(sel);
         if (libraries.length === 0) {
           const opt = document.createElement('option');
           opt.value = '';
@@ -325,7 +357,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function renderNamingTokens() {
     if (!namingTokensList) return;
-    namingTokensList.innerHTML = '';
+    clear(namingTokensList);
 
     namingRules.tokens.forEach((token, index) => {
       const row = document.createElement('div');
@@ -333,7 +365,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
       const labelText = TOKEN_LABELS[token.id] || token.id;
 
-      row.innerHTML = `
+      renderContent(row, safeHtml`
         <div class="flex items-center gap-2">
           <span class="w-5 text-gray-500 font-mono text-[11px]">${index + 1}.</span>
           <span class="font-medium text-white">${labelText}</span>
@@ -352,7 +384,7 @@ document.addEventListener('DOMContentLoaded', () => {
             <button class="token-down-btn px-2 py-0.5 bg-gray-700 hover:bg-gray-600 rounded text-gray-200 ${index === namingRules.tokens.length - 1 ? 'opacity-30 cursor-not-allowed' : ''}">▼</button>
           </div>
         </div>
-      `;
+      `);
 
       // Event listeners
       const enableCb = row.querySelector('.token-enable-cb');
@@ -475,10 +507,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function renderFolderLevels() {
     if (!folderLevelsList) return;
-    folderLevelsList.innerHTML = '';
+    clear(folderLevelsList);
 
     if (folderRules.hierarchy.length === 0) {
-      folderLevelsList.innerHTML = '<p class="text-xs text-amber-400 p-2">No hierarchy levels added. Comics will be placed directly in the destination folder.</p>';
+      renderContent(folderLevelsList, safeHtml`<p class="text-xs text-amber-400 p-2">No hierarchy levels added. Comics will be placed directly in the destination folder.</p>`);
       return;
     }
 
@@ -488,7 +520,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
       const labelText = TOKEN_LABELS[token] || token;
 
-      row.innerHTML = `
+      renderContent(row, safeHtml`
         <div class="flex items-center gap-2">
           <span class="w-16 font-mono text-[11px] text-gray-400">Level ${index + 1}:</span>
           <span class="font-bold text-white uppercase text-[11px] bg-gray-700 px-2 py-0.5 rounded">${labelText}</span>
@@ -498,7 +530,7 @@ document.addEventListener('DOMContentLoaded', () => {
           <button class="level-down-btn px-2 py-0.5 bg-gray-700 hover:bg-gray-600 rounded text-gray-200 ${index === folderRules.hierarchy.length - 1 ? 'opacity-30 cursor-not-allowed' : ''}">▼</button>
           <button class="level-remove-btn px-2 py-0.5 bg-red-900/60 hover:bg-red-800 text-red-300 rounded">✕</button>
         </div>
-      `;
+      `);
 
       const upBtn = row.querySelector('.level-up-btn');
       const downBtn = row.querySelector('.level-down-btn');
@@ -606,7 +638,7 @@ document.addEventListener('DOMContentLoaded', () => {
   async function runRename(body, btn) {
     if (!renameStatusDiv) return;
     renameOutputDiv.classList.remove('hidden');
-    renameOutputDiv.innerHTML = '';
+    clear(renameOutputDiv);
     startRenameStream();
 
     const origLabel = btn ? btn.textContent : '';
@@ -702,7 +734,7 @@ document.addEventListener('DOMContentLoaded', () => {
     //   { libraryPath, confirmation } -> reorganize whole library in place (Folder tab)
     async function performMove(body, btn) {
       moveOutputDiv.classList.remove('hidden');
-      moveOutputDiv.innerHTML = '';
+      clear(moveOutputDiv);
       startMoveStream();
 
       const origLabel = btn ? btn.textContent : '';
@@ -763,20 +795,20 @@ document.addEventListener('DOMContentLoaded', () => {
       const closeBtn = document.getElementById('directory-modal-close');
 
       // Clear previous options
-      optionsContainer.innerHTML = '';
+      clear(optionsContainer);
       let selectedDirectory = null;
 
       // Create radio buttons for each directory
       directories.forEach((dir, index) => {
         const option = document.createElement('div');
         option.className = 'flex items-center space-x-3 p-3 rounded-lg border border-gray-600 hover:border-gray-500 hover:bg-gray-750 transition-colors cursor-pointer';
-        option.innerHTML = `
+        renderContent(option, safeHtml`
           <input type="radio" id="dir-${index}" name="directory" value="${dir.fullPath}" class="w-4 h-4 text-green-600 bg-gray-700 border-gray-600 focus:ring-green-500 focus:ring-2">
           <div class="grow">
             <label for="dir-${index}" class="text-white cursor-pointer font-medium block">${dir.name}</label>
             <span class="text-gray-400 text-sm">${dir.fullPath}</span>
           </div>
-        `;
+        `);
         optionsContainer.appendChild(option);
 
         // Make the whole option clickable

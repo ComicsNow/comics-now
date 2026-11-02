@@ -1,23 +1,8 @@
-import { state } from '../globals.js';
+import { state, actions, global as canonicalGlobal } from '../globals.js';
 
-const global = new Proxy(typeof window !== 'undefined' ? window : globalThis, {
-  get(target, prop) {
-    if (prop in state) {
-      return state[prop];
-    }
-    const val = target[prop];
-    if (typeof val === 'function') {
-      return val.bind(target);
-    }
-    return val;
-  },
-  set(target, prop, value) {
-    state[prop] = value;
-    try {
-      target[prop] = value;
-    } catch (e) {}
-    return true;
-  }
+const global = typeof canonicalGlobal !== 'undefined' ? canonicalGlobal : new Proxy(typeof window !== 'undefined' ? window : globalThis, {
+  get: (t, p) => (typeof state !== 'undefined' && p in state) ? state[p] : t[p],
+  set: (t, p, v) => { if (typeof state !== 'undefined') state[p] = v; try { t[p] = v; } catch {} return true; }
 });
 
   const PAGE_COUNTER_PLACEHOLDER = '\u2014 / \u2014';
@@ -106,7 +91,12 @@ const global = new Proxy(typeof window !== 'undefined' ? window : globalThis, {
     }
 
     const previousIndex = global.currentPageIndex;
-    global.currentPageIndex = clampedPage - 1;
+    const actionsRef = (typeof actions !== 'undefined' ? actions : global?.actions);
+    if (actionsRef?.viewer?.setPageIndex) {
+      actionsRef.viewer.setPageIndex(clampedPage - 1, { source: 'jump_input' });
+    } else {
+      global.currentPageIndex = clampedPage - 1;
+    }
 
     try {
       // Save progress before rendering
@@ -157,12 +147,22 @@ const global = new Proxy(typeof window !== 'undefined' ? window : globalThis, {
       }
 
       const rendered = await global.renderPage?.();
+      const rollbackActions = (typeof actions !== 'undefined' ? actions : global?.actions);
       if (rendered === false) {
-        global.currentPageIndex = previousIndex;
+        if (rollbackActions?.viewer?.setPageIndex) {
+          rollbackActions.viewer.setPageIndex(previousIndex, { source: 'jump_rollback' });
+        } else {
+          global.currentPageIndex = previousIndex;
+        }
         global.updateViewerPageCounter(totalPages);
       }
     } catch (error) {
-      global.currentPageIndex = previousIndex;
+      const rollbackActions = (typeof actions !== 'undefined' ? actions : global?.actions);
+      if (rollbackActions?.viewer?.setPageIndex) {
+        rollbackActions.viewer.setPageIndex(previousIndex, { source: 'jump_rollback' });
+      } else {
+        global.currentPageIndex = previousIndex;
+      }
 
       global.updateViewerPageCounter(totalPages);
     } finally {
@@ -253,7 +253,12 @@ const global = new Proxy(typeof window !== 'undefined' ? window : globalThis, {
     }
 
     const previousIndex = global.currentPageIndex;
-    global.currentPageIndex = clampedPage - 1;
+    const actionsRef = (typeof actions !== 'undefined' ? actions : global?.actions);
+    if (actionsRef?.viewer?.setPageIndex) {
+      actionsRef.viewer.setPageIndex(clampedPage - 1, { source: 'jump_input' });
+    } else {
+      global.currentPageIndex = clampedPage - 1;
+    }
 
     try {
       // Save progress before rendering
@@ -304,12 +309,22 @@ const global = new Proxy(typeof window !== 'undefined' ? window : globalThis, {
       }
 
       const rendered = await global.renderPage?.();
+      const rollbackActions = (typeof actions !== 'undefined' ? actions : global?.actions);
       if (rendered === false) {
-        global.currentPageIndex = previousIndex;
+        if (rollbackActions?.viewer?.setPageIndex) {
+          rollbackActions.viewer.setPageIndex(previousIndex, { source: 'jump_rollback' });
+        } else {
+          global.currentPageIndex = previousIndex;
+        }
         global.updateViewerPageCounter(totalPages);
       }
     } catch (error) {
-      global.currentPageIndex = previousIndex;
+      const rollbackActions = (typeof actions !== 'undefined' ? actions : global?.actions);
+      if (rollbackActions?.viewer?.setPageIndex) {
+        rollbackActions.viewer.setPageIndex(previousIndex, { source: 'jump_rollback' });
+      } else {
+        global.currentPageIndex = previousIndex;
+      }
 
       global.updateViewerPageCounter(totalPages);
     } finally {

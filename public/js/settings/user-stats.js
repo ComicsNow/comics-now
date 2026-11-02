@@ -1,5 +1,37 @@
-import { state, escapeHtml } from '../globals.js';
+import { state, escapeHtml, clearElement } from '../globals.js';
 import { formatTimestamp } from './shared.js';
+import { html, raw, render } from '../ui/template.js';
+
+const clear = typeof clearElement === 'function' ? clearElement : (el) => { if (el) { if (typeof el.replaceChildren === 'function') el.replaceChildren(); else el.innerHTML = ''; } };
+const renderContent = (typeof render === 'function' && render.length >= 2) ? render : (el, content) => {
+  if (!el) return;
+  const toStr = (c) => {
+    if (c === null || c === undefined) return '';
+    if (Array.isArray(c)) return c.map(toStr).join('');
+    if (typeof c === 'object' && typeof c.toHTML === 'function') return c.toHTML();
+    if (typeof c === 'object' && c.__isRawHtml) return c.html;
+    return String(c);
+  };
+  el.innerHTML = toStr(content);
+};
+const safeHtml = (typeof html !== 'undefined' && typeof html === 'function' && html.length > 0) ? html : (strings, ...values) => {
+  const formatVal = (v) => {
+    if (v === null || v === undefined) return '';
+    if (Array.isArray(v)) return v.map(formatVal).join('');
+    if (typeof v === 'object' && v.__isRawHtml) return v.html;
+    if (typeof v === 'object' && typeof v.toHTML === 'function') return v.toHTML();
+    return typeof escapeHtml === 'function' ? escapeHtml(v) : String(v);
+  };
+  let out = '';
+  for (let i = 0; i < strings.length; i++) {
+    out += strings[i];
+    if (i < values.length) {
+      out += formatVal(values[i]);
+    }
+  }
+  return { toHTML: () => out, html: out, __isRawHtml: true };
+};
+const safeRaw = (typeof raw !== 'undefined' && typeof raw === 'function' && raw.length > 0) ? raw : (v) => ({ __isRawHtml: true, html: String(v ?? '') });
 
 // --- USER READING STATS ---
 // Derived from saved reading progress (no time telemetry). Shows opened /
@@ -73,8 +105,8 @@ function setupRecentPagination(root, recent) {
   if (!listEl) return;
 
   if (!recent.length) {
-    listEl.innerHTML = '<p class="py-4 text-center text-gray-500 text-sm">No reading activity yet</p>';
-    if (pagerEl) pagerEl.innerHTML = '';
+    renderContent(listEl, safeHtml`<p class="py-4 text-center text-gray-500 text-sm">No reading activity yet</p>`);
+    if (pagerEl) clear(pagerEl);
     return;
   }
 
@@ -84,13 +116,13 @@ function setupRecentPagination(root, recent) {
 
   const render = () => {
     const start = page * PAGE_SIZE;
-    listEl.innerHTML = recent.slice(start, start + PAGE_SIZE).map(recentRowHtml).join('');
+    renderContent(listEl, safeRaw(recent.slice(start, start + PAGE_SIZE).map(recentRowHtml).join('')));
 
-    if (totalPages <= 1) { pagerEl.innerHTML = ''; return; }
-    pagerEl.innerHTML = `
+    if (totalPages <= 1) { clear(pagerEl); return; }
+    renderContent(pagerEl, safeHtml`
       <button id="stats-prev" class="px-3 py-1 text-xs rounded-lg bg-gray-700/60 text-gray-200 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-gray-600 transition-colors" ${page === 0 ? 'disabled' : ''}>‹ Prev</button>
       <span class="text-xs text-gray-400">Page ${page + 1} of ${totalPages}</span>
-      <button id="stats-next" class="px-3 py-1 text-xs rounded-lg bg-gray-700/60 text-gray-200 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-gray-600 transition-colors" ${page >= totalPages - 1 ? 'disabled' : ''}>Next ›</button>`;
+      <button id="stats-next" class="px-3 py-1 text-xs rounded-lg bg-gray-700/60 text-gray-200 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-gray-600 transition-colors" ${page >= totalPages - 1 ? 'disabled' : ''}>Next ›</button>`);
     const prev = pagerEl.querySelector('#stats-prev');
     const next = pagerEl.querySelector('#stats-next');
     if (prev) prev.addEventListener('click', () => { if (page > 0) { page--; render(); } });
@@ -106,17 +138,17 @@ export async function showUserStatsView(userId, userEmail) {
   const view = document.createElement('div');
   view.id = 'user-stats-view';
   view.className = 'bg-linear-to-r from-blue-900/30 to-purple-900/30 border-2 border-blue-700/50 rounded-xl p-6 shadow-lg';
-  view.innerHTML = `
+  renderContent(view, safeHtml`
     <button id="back-to-users-from-stats" class="flex items-center text-gray-400 hover:text-white transition-colors mb-4 group">
       <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 mr-1 group-hover:-translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
       </svg>
       Back to Users
     </button>
-    <h3 class="text-xl font-bold text-white mb-1">Reading Stats — ${escapeHtml(userEmail)}</h3>
+    <h3 class="text-xl font-bold text-white mb-1">Reading Stats — ${userEmail}</h3>
     <p class="text-sm text-gray-400 mb-6">Derived from saved reading progress (last 30 days for activity).</p>
     <div id="user-stats-body" class="text-gray-300">Loading…</div>
-  `;
+  `);
 
   if (usersListDiv && usersListDiv.parentElement) {
     usersListDiv.parentElement.appendChild(view);
@@ -137,19 +169,19 @@ export async function showUserStatsView(userId, userEmail) {
 
     const s = data.summary;
 
-    body.innerHTML = `
+    renderContent(body, safeHtml`
       <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
-        ${summaryCard('Opened', s.opened, 'text-blue-300')}
-        ${summaryCard('Completed', s.completed, 'text-green-300')}
-        ${summaryCard('In progress', s.inProgress, 'text-yellow-300')}
-        ${summaryCard('Active days', s.activeDays, 'text-purple-300')}
+        ${safeRaw(summaryCard('Opened', s.opened, 'text-blue-300'))}
+        ${safeRaw(summaryCard('Completed', s.completed, 'text-green-300'))}
+        ${safeRaw(summaryCard('In progress', s.inProgress, 'text-yellow-300'))}
+        ${safeRaw(summaryCard('Active days', s.activeDays, 'text-purple-300'))}
       </div>
       <div class="mb-6">
         <div class="flex items-center justify-between mb-2">
           <span class="text-sm font-semibold text-gray-300">Daily activity (comics touched)</span>
           <span class="text-xs text-gray-500">Last active: ${s.lastActive ? formatTimestamp(s.lastActive) : 'never'}</span>
         </div>
-        ${renderBarChart(data.perDay)}
+        ${safeRaw(renderBarChart(data.perDay))}
       </div>
       <div>
         <div class="flex items-center justify-between mb-2">
@@ -159,12 +191,12 @@ export async function showUserStatsView(userId, userEmail) {
         <div id="stats-recent-list"></div>
         <div id="stats-recent-pager" class="flex items-center justify-between mt-3"></div>
       </div>
-      <p class="text-xs text-gray-600 mt-4 italic">${escapeHtml(data.note || '')}</p>
-    `;
+      <p class="text-xs text-gray-600 mt-4 italic">${data.note || ''}</p>
+    `);
 
     setupRecentPagination(body, data.recent || []);
   } catch (error) {
-    body.innerHTML = `<p class="text-red-400 py-4">Failed to load stats: ${escapeHtml(error.message)}</p>`;
+    renderContent(body, safeHtml`<p class="text-red-400 py-4">Failed to load stats: ${error.message}</p>`);
   }
 }
 

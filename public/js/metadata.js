@@ -1,24 +1,40 @@
-import { state } from './globals.js';
+import { state, global as canonicalGlobal, clearElement } from './globals.js';
+import { html, raw, render } from './ui/template.js';
 
-const global = new Proxy(typeof window !== 'undefined' ? window : globalThis, {
-  get(target, prop) {
-    if (prop in state) {
-      return state[prop];
-    }
-    const val = target[prop];
-    if (typeof val === 'function') {
-      return val.bind(target);
-    }
-    return val;
-  },
-  set(target, prop, value) {
-    state[prop] = value;
-    try {
-      target[prop] = value;
-    } catch (e) {}
-    return true;
-  }
+const global = typeof canonicalGlobal !== 'undefined' ? canonicalGlobal : new Proxy(typeof window !== 'undefined' ? window : globalThis, {
+  get: (t, p) => (typeof state !== 'undefined' && p in state) ? state[p] : t[p],
+  set: (t, p, v) => { if (typeof state !== 'undefined') state[p] = v; try { t[p] = v; } catch {} return true; }
 });
+const clear = typeof clearElement === 'function' ? clearElement : (el) => { if (el) { if (typeof el.replaceChildren === 'function') el.replaceChildren(); else el.innerHTML = ''; } };
+const renderContent = (typeof render === 'function' && render.length >= 2) ? render : (el, content) => {
+  if (!el) return;
+  const toStr = (c) => {
+    if (c === null || c === undefined) return '';
+    if (Array.isArray(c)) return c.map(toStr).join('');
+    if (typeof c === 'object' && typeof c.toHTML === 'function') return c.toHTML();
+    if (typeof c === 'object' && c.__isRawHtml) return c.html;
+    return String(c);
+  };
+  el.innerHTML = toStr(content);
+};
+const safeHtml = (typeof html !== 'undefined' && typeof html === 'function' && html.length > 0) ? html : (strings, ...values) => {
+  const formatVal = (v) => {
+    if (v === null || v === undefined) return '';
+    if (Array.isArray(v)) return v.map(formatVal).join('');
+    if (typeof v === 'object' && v.__isRawHtml) return v.html;
+    if (typeof v === 'object' && typeof v.toHTML === 'function') return v.toHTML();
+    return typeof global.escapeHtml === 'function' ? global.escapeHtml(v) : String(v);
+  };
+  let out = '';
+  for (let i = 0; i < strings.length; i++) {
+    out += strings[i];
+    if (i < values.length) {
+      out += formatVal(values[i]);
+    }
+  }
+  return { toHTML: () => out, html: out, __isRawHtml: true };
+};
+const safeRaw = (typeof raw !== 'undefined' && typeof raw === 'function' && raw.length > 0) ? raw : (v) => ({ __isRawHtml: true, html: String(v ?? '') });
 
 // --- METADATA ---
 
@@ -31,7 +47,7 @@ async function loadMetadata() {
   const comic = global.currentComic;
   const isLocal = comic && (comic.handle || comic.file || (comic.id && String(comic.id).startsWith('device-')));
   if (isLocal || (comic && comic.libraryMode === 'folder')) {
-    global.metadataForm.innerHTML = `<p class="text-gray-400 text-center italic">Metadata management is disabled for folder mode library comics.</p>`;
+    renderContent(global.metadataForm, safeHtml`<p class="text-gray-400 text-center italic">Metadata management is disabled for folder mode library comics.</p>`);
     return;
   }
 
@@ -48,7 +64,7 @@ async function loadMetadata() {
     }
     renderMetadataDisplay(global.currentMetadata, true, { preserveTitle: true }); // true = clear and render fresh, preserving manual titles
   } catch (error) {
-    global.metadataForm.innerHTML = `<p class="text-red-400 text-center">${global.escapeHtml(error.message)}</p>`;
+    renderContent(global.metadataForm, safeHtml`<p class="text-red-400 text-center">${error.message}</p>`);
   }
 }
 
@@ -146,7 +162,9 @@ function createChipInputRow(name, initialCSV = '') {
     chips.push(t);
     const chip = document.createElement('span');
     chip.className = 'px-2 py-1 rounded-full bg-gray-600 text-sm flex items-center gap-1';
-    chip.innerHTML = `<span>${global.escapeHtml(t)}</span>`;
+    const textSpan = document.createElement('span');
+    textSpan.textContent = t;
+    chip.appendChild(textSpan);
     const x = document.createElement('button');
     x.type = 'button';
     x.className = 'ml-1 rounded-full w-4 h-4 text-xs bg-gray-500 hover:bg-red-600';
@@ -481,7 +499,7 @@ function createUrlTaggerBox() {
   container.id = 'tag-from-url-container';
   container.className = 'bg-gray-800/80 border border-blue-500/30 rounded-lg p-3 mb-4';
 
-  container.innerHTML = `
+  renderContent(container, safeHtml`
     <div class="flex items-center justify-between mb-1.5">
       <label class="text-xs font-semibold text-blue-400 flex items-center gap-1.5" for="tag-url-input">
         <span>🌐</span> Tag from Web URL (r.jina + Gemini)
@@ -495,7 +513,7 @@ function createUrlTaggerBox() {
       </button>
     </div>
     <div id="tag-url-status" class="text-[11px] mt-1 text-gray-300 hidden"></div>
-  `;
+  `);
 
   const btn = container.querySelector('#tag-url-btn');
   const input = container.querySelector('#tag-url-input');
@@ -510,7 +528,7 @@ function createUrlTaggerBox() {
     }
 
     btn.disabled = true;
-    btn.innerHTML = `<span>⏳</span> Extracting...`;
+    renderContent(btn, safeHtml`<span>⏳</span> Extracting...`);
     status.className = 'text-[11px] mt-1 text-blue-300 block';
     status.textContent = 'Fetching clean markdown via r.jina.ai & synthesizing ComicInfo with Gemini...';
 
@@ -556,7 +574,7 @@ function createUrlTaggerBox() {
       status.textContent = `❌ ${err.message}`;
     } finally {
       btn.disabled = false;
-      btn.innerHTML = `<span>⚡</span> Extract & Apply`;
+      renderContent(btn, safeHtml`<span>⚡</span> Extract & Apply`);
     }
   });
 
@@ -574,7 +592,7 @@ function renderMetadataDisplay(metadata, clearForm = true, options = {}) {
   }
 
   if (clearForm) {
-    global.metadataForm.innerHTML = '';
+    clear(global.metadataForm);
     const statusDiv = document.createElement('div');
     statusDiv.id = 'save-status';
     statusDiv.className = 'text-sm text-gray-300';

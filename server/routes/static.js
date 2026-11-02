@@ -8,6 +8,7 @@ const {
   LOGOS_DIRECTORY
 } = require('../constants');
 const { log } = require('../logger');
+const { isAuthEnabled } = require('../config');
 
 function createStaticRouter({ getConfig, getComicsDirectories, getPublicLibraries }) {
   const router = express.Router();
@@ -32,7 +33,7 @@ function createStaticRouter({ getConfig, getComicsDirectories, getPublicLibrarie
           `<script>window.APP_CONFIG = ${JSON.stringify({
             baseUrl: config.baseUrl,
             libraries: getPublicLibraries(),
-            authEnabled: require('../config').isAuthEnabled(),
+            authEnabled: isAuthEnabled(),
             cloudflareTeamDomain: config.authentication?.cloudflare?.teamDomain || null,
             hideSupportForAdmin: config.hideSupportForAdmin || false
           })}</script>${supportCss}\n  <link rel="manifest" href="${baseHref}manifest.json">`

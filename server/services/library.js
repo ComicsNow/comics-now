@@ -4,9 +4,9 @@ const { extractPageBuffer, getComicPages } = require('./library-pages');
 const { generateVirtualMetadata } = require('./library-metadata');
 const { scanLibrary, scheduleNextScan, isScanning } = require('./library-scan');
 
-const { dbGet, dbAll } = require('../db');
+const { dbGet, dbAll, getReadingPrefMaps, resolveReadingModes, checkComicAccess } = require('../db');
 const { log } = require('../logger');
-const { getComicsDirectories } = require('../config');
+const { getComicsDirectories, getLibraries, getConfig, getLibraryIdFromPath } = require('../config');
 const { safeDirName } = require('../utils');
 const { LOGOS_DIRECTORY } = require('../constants');
 
@@ -26,12 +26,11 @@ async function buildLibrary(userId = 'default-user') {
   log('INFO', 'SERVER', `Build library for UI with ${rows.length} rows for user ${userId} (role: ${userRole})`);
 
   // Load all reading preferences for this user
-  const { getReadingPrefMaps, resolveReadingModes, checkComicAccess } = require('../db');
   const prefMaps = await getReadingPrefMaps(userId);
 
   const lib = {};
   const directories = getComicsDirectories();
-  const libraryConfigs = require('../config').getLibraries();
+  const libraryConfigs = getLibraries();
 
   // Pre-fetch access list once for the whole library build
   const accessList = userRole === 'admin' ? [] : await dbAll(
@@ -61,11 +60,11 @@ async function buildLibrary(userId = 'default-user') {
 
     // User has access to this comic, include it in the library
     const absoluteRootDir = directories.find(d => r.path.startsWith(d));
-    const configObj = require('../config').getConfig();
+    const configObj = getConfig();
     const comicsLocation = configObj.comicsLocation;
     const isInboxComic = comicsLocation && r.path.startsWith(comicsLocation);
 
-    const rootDirKey = isInboxComic ? 'Smart Inbox' : (require('../config').getLibraryIdFromPath(absoluteRootDir) || 'Library');
+    const rootDirKey = isInboxComic ? 'Smart Inbox' : (getLibraryIdFromPath(absoluteRootDir) || 'Library');
 
     if (!lib[rootDirKey]) {
       const config = libraryConfigs.find(c => c.path === absoluteRootDir);

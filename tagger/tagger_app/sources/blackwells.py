@@ -118,7 +118,7 @@ def parse_blackwells_product_soup(soup, url):
     return metadata
 
 
-def search_blackwells_multi(query, limit=10):
+def search_blackwells_multi(query, limit=3):
     cached = tagger_cache.get_query("blackwells", query)
     if cached is not None:
         return cached
@@ -190,7 +190,7 @@ def resolve_blackwells(filename, cover_path=None, on_progress=None, existing_met
     query = clean_search_query(filename)
 
     try:
-        res = search_blackwells_multi(query, limit=2)
+        res = search_blackwells_multi(query, limit=3)
     except Exception as e:
         print(f"[-] Blackwell's resolve failed: {e}")
         return []

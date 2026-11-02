@@ -1,23 +1,9 @@
 const fs = require('fs');
 const path = require('path');
 const { safeDirName } = require('../utils');
-
-const DEFAULT_NAMING_RULES = {
-  tokens: [
-    { id: 'number', enabled: true, mandatory: false },
-    { id: 'series', enabled: true, mandatory: true },
-    { id: 'title', enabled: true, mandatory: false },
-    { id: 'publisher', enabled: true, mandatory: true },
-    { id: 'year', enabled: true, mandatory: true },
-    { id: 'pages', enabled: true, mandatory: false },
-    { id: 'writer', enabled: false, mandatory: false },
-    { id: 'volume', enabled: false, mandatory: false }
-  ]
-};
-
-const DEFAULT_FOLDER_RULES = {
-  hierarchy: ['publisher', 'series']
-};
+const { DEFAULT_NAMING_RULES, DEFAULT_FOLDER_RULES } = require('../constants');
+const guidedReader = require('./guided-reader');
+const { dbAll } = require('../db');
 
 /**
  * Format a comic filename from metadata according to configured naming rules.
@@ -383,7 +369,6 @@ async function updateComicIdentity({
     // If guided view was missing, trigger generation
     if (newGvStatus === 'pending') {
       try {
-        const guidedReader = require('./guided-reader');
         guidedReader.startRunForScope('comic', newId).catch(() => {
           guidedReader.onLibraryScanComplete([newId]).catch(() => {});
         });
@@ -394,7 +379,6 @@ async function updateComicIdentity({
     // don't log "no such table" errors for tables a deployment doesn't have.
     let tables = new Set();
     try {
-      const { dbAll } = require('../db');
       const rows = await dbAll("SELECT name FROM sqlite_master WHERE type = 'table'");
       tables = new Set(rows.map(r => r.name));
     } catch (_) {}

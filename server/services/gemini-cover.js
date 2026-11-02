@@ -1,3 +1,4 @@
+// ARCHITECTURAL_EXEMPTION: Single-purpose multimodal vision API client
 /**
  * Gemini Vision Arbiter: Visual Cover Matcher
  *
@@ -7,6 +8,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const cryptoVault = require('../utils/crypto-vault');
 
 let lastGeminiCallTime = 0;
 const DEFAULT_THROTTLE_MS = 4000; // ~4s spacing => <=15 RPM (free tier safety)
@@ -292,7 +294,6 @@ async function matchCoverToCandidates({
   model = 'gemini-3.5-flash-lite',
   throttleMs = DEFAULT_THROTTLE_MS
 }) {
-  const cryptoVault = require('../utils/crypto-vault');
   const effectiveApiKey = (cryptoVault.decrypt(apiKey) || apiKey || '').trim();
   const activeModel = (model || '').trim() || 'gemini-3.5-flash-lite';
   if (!effectiveApiKey) {

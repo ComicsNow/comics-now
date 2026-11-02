@@ -1,5 +1,7 @@
 const fs = require('fs');
 const path = require('path');
+const os = require('os');
+const { execFile } = require('child_process');
 const { openArchive } = require('./archive-utils');
 const yauzl = require('yauzl'); // yauzl still needed for writeComicInfoToCbz repacking logic
 const xml2js = require('xml2js');
@@ -902,9 +904,6 @@ async function getExistingComicInfoPath(cbzPath) {
 }
 
 function writeComicInfoNative(cbzPath, metadataXml) {
-  const os = require('os');
-  const { execFile } = require('child_process');
-
   return new Promise(async (resolve, reject) => {
     // Find if there is an existing ComicInfo.xml path (case-insensitive) in the ZIP
     const existingPath = await getExistingComicInfoPath(cbzPath);

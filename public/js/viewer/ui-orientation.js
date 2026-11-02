@@ -1,24 +1,40 @@
-import { state } from '../globals.js';
+import { state, global as canonicalGlobal, clearElement } from '../globals.js';
+import { html, raw, render } from '../ui/template.js';
 
-const global = new Proxy(typeof window !== 'undefined' ? window : globalThis, {
-  get(target, prop) {
-    if (prop in state) {
-      return state[prop];
-    }
-    const val = target[prop];
-    if (typeof val === 'function') {
-      return val.bind(target);
-    }
-    return val;
-  },
-  set(target, prop, value) {
-    state[prop] = value;
-    try {
-      target[prop] = value;
-    } catch (e) {}
-    return true;
-  }
+const global = typeof canonicalGlobal !== 'undefined' ? canonicalGlobal : new Proxy(typeof window !== 'undefined' ? window : globalThis, {
+  get: (t, p) => (typeof state !== 'undefined' && p in state) ? state[p] : t[p],
+  set: (t, p, v) => { if (typeof state !== 'undefined') state[p] = v; try { t[p] = v; } catch {} return true; }
 });
+const clear = typeof clearElement === 'function' ? clearElement : (el) => { if (el) { if (typeof el.replaceChildren === 'function') el.replaceChildren(); else el.innerHTML = ''; } };
+const renderContent = (typeof render === 'function' && render.length >= 2) ? render : (el, content) => {
+  if (!el) return;
+  const toStr = (c) => {
+    if (c === null || c === undefined) return '';
+    if (Array.isArray(c)) return c.map(toStr).join('');
+    if (typeof c === 'object' && typeof c.toHTML === 'function') return c.toHTML();
+    if (typeof c === 'object' && c.__isRawHtml) return c.html;
+    return String(c);
+  };
+  el.innerHTML = toStr(content);
+};
+const safeHtml = (typeof html !== 'undefined' && typeof html === 'function' && html.length > 0) ? html : (strings, ...values) => {
+  const formatVal = (v) => {
+    if (v === null || v === undefined) return '';
+    if (Array.isArray(v)) return v.map(formatVal).join('');
+    if (typeof v === 'object' && v.__isRawHtml) return v.html;
+    if (typeof v === 'object' && typeof v.toHTML === 'function') return v.toHTML();
+    return String(v);
+  };
+  let out = '';
+  for (let i = 0; i < strings.length; i++) {
+    out += strings[i];
+    if (i < values.length) {
+      out += formatVal(values[i]);
+    }
+  }
+  return { toHTML: () => out, html: out, __isRawHtml: true };
+};
+const safeRaw = (typeof raw !== 'undefined' && typeof raw === 'function' && raw.length > 0) ? raw : (v) => ({ __isRawHtml: true, html: String(v ?? '') });
 
   const PORTRAIT_ICON_HTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect><line x1="12" y1="18" x2="12" y2="18"></line></svg>`;
   const LANDSCAPE_ICON_HTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="5" width="20" height="14" rx="2" ry="2"></rect><line x1="18" y1="12" x2="18" y2="12"></line></svg>`;
@@ -99,7 +115,7 @@ const global = new Proxy(typeof window !== 'undefined' ? window : globalThis, {
     ];
     orientationBtns.forEach(btn => {
       if (btn) {
-        btn.innerHTML = orientationLabel;
+        renderContent(btn, safeRaw(orientationLabel));
         btn.setAttribute('aria-pressed', global.isLandscapeOrientation ? 'true' : 'false');
       }
     });
@@ -107,13 +123,13 @@ const global = new Proxy(typeof window !== 'undefined' ? window : globalThis, {
     // Continuous Mode
     const continuousBtn = document.getElementById('fullscreen-continuous-mode-btn');
     if (continuousBtn) {
-      continuousBtn.innerHTML = CONTINUOUS_ICON_HTML;
+      renderContent(continuousBtn, safeRaw(CONTINUOUS_ICON_HTML));
     }
 
     // Manga Mode
     const mangaBtn = document.getElementById('fullscreen-manga-mode-btn');
     if (mangaBtn) {
-      mangaBtn.innerHTML = MANGA_ICON_HTML;
+      renderContent(mangaBtn, safeRaw(MANGA_ICON_HTML));
     }
 
     // Guided/Bubble/Hot Zoom labels are handled in guided.js refreshGuidedToggle()

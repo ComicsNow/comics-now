@@ -3,6 +3,7 @@ const { createExtractorFromFile } = require('node-unrar-js');
 const fs = require('fs');
 const path = require('path');
 const { Readable } = require('stream');
+const { spawn } = require('child_process');
 const { isImage } = require('../utils');
 
 function isSafeEntry(name) {
@@ -60,7 +61,6 @@ class ZipReader {
             throw new Error('Entry not found: ' + name);
         }
         const actualName = entry.fileName || name;
-        const { spawn } = require('child_process');
         const child = spawn('unzip', ['-p', '--', this.filePath, escapeZipGlob(actualName)]);
         return child.stdout;
     }
@@ -123,7 +123,6 @@ class ZipReader {
         };
 
         return new Promise((resolve, reject) => {
-            const { spawn } = require('child_process');
             const child = spawn('unzip', ['-p', '--', this.filePath, escapeZipGlob(actualName)]);
             const chunks = [];
             let errorOutput = '';

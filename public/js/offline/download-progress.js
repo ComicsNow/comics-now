@@ -1,4 +1,36 @@
-import { state } from '../globals.js';
+import { state, clearElement } from '../globals.js';
+import { html, raw, render } from '../ui/template.js';
+
+const clear = typeof clearElement === 'function' ? clearElement : (el) => { if (el) { if (typeof el.replaceChildren === 'function') el.replaceChildren(); else el.innerHTML = ''; } };
+const renderContent = (typeof render === 'function' && render.length >= 2) ? render : (el, content) => {
+  if (!el) return;
+  const toStr = (c) => {
+    if (c === null || c === undefined) return '';
+    if (Array.isArray(c)) return c.map(toStr).join('');
+    if (typeof c === 'object' && typeof c.toHTML === 'function') return c.toHTML();
+    if (typeof c === 'object' && c.__isRawHtml) return c.html;
+    return String(c);
+  };
+  el.innerHTML = toStr(content);
+};
+const safeHtml = (typeof html !== 'undefined' && typeof html === 'function' && html.length > 0) ? html : (strings, ...values) => {
+  const formatVal = (v) => {
+    if (v === null || v === undefined) return '';
+    if (Array.isArray(v)) return v.map(formatVal).join('');
+    if (typeof v === 'object' && v.__isRawHtml) return v.html;
+    if (typeof v === 'object' && typeof v.toHTML === 'function') return v.toHTML();
+    return String(v);
+  };
+  let out = '';
+  for (let i = 0; i < strings.length; i++) {
+    out += strings[i];
+    if (i < values.length) {
+      out += formatVal(values[i]);
+    }
+  }
+  return { toHTML: () => out, html: out, __isRawHtml: true };
+};
+const safeRaw = (typeof raw !== 'undefined' && typeof raw === 'function' && raw.length > 0) ? raw : (v) => ({ __isRawHtml: true, html: String(v ?? '') });
 
 export async function fetchWithProgress(url, onProgress) {
   const res = await fetch(url, { method: 'GET', credentials: 'include' });
@@ -34,19 +66,19 @@ export async function refreshDownloadsInfo() {
   const downloadsInfoDiv = state.downloadsInfoDiv || window.downloadsInfoDiv;
   if (!downloadsInfoDiv) return;
 
-  downloadsInfoDiv.innerHTML = 'Calculating...';
+  downloadsInfoDiv.textContent = 'Calculating...';
   let downloadedComics = [];
   try {
     downloadedComics = await db.getAllDownloadedComics();
   } catch (err) {
     console.error('[DOWNLOADS INFO] Failed to calculate downloads:', err);
-    downloadsInfoDiv.innerHTML = '<div class="text-red-400 text-sm">Error calculating downloads. Please refresh.</div>';
+    renderContent(downloadsInfoDiv, safeHtml`<div class="text-red-400 text-sm">Error calculating downloads. Please refresh.</div>`);
     return;
   }
   let totalSize = 0;
   
   // Clear and prepare container
-  downloadsInfoDiv.innerHTML = '';
+  clear(downloadsInfoDiv);
   const list = document.createElement('ul');
 
   const applyDisplayInfoToComic = state.applyDisplayInfoToComic || window.applyDisplayInfoToComic;
@@ -76,10 +108,10 @@ export async function refreshDownloadsInfo() {
   });
 
   const summary = document.createElement('div');
-  summary.innerHTML = `
+  renderContent(summary, safeHtml`
     <p><strong>${downloadedComics.length}</strong> comics downloaded.</p>
     <p><strong>Total size:</strong> ${(totalSize / 1024 / 1024).toFixed(2)} MB</p>
-  `;
+  `);
   
   const listWrapper = document.createElement('div');
   listWrapper.className = 'mt-4 max-h-48 overflow-y-auto';

@@ -1,5 +1,6 @@
 import {
   state,
+  global as canonicalGlobal,
   escapeHtml,
   createErrorMessage,
   getRelativePath,
@@ -99,25 +100,9 @@ import './js/auth.js';
 import './js/reading-lists.js';
 
 
-const global = new Proxy(typeof window !== 'undefined' ? window : globalThis, {
-  get(target, prop) {
-    if (prop === 'state') return state;
-    if (prop in state) {
-      return state[prop];
-    }
-    const val = target[prop];
-    if (typeof val === 'function') {
-      return val.bind(target);
-    }
-    return val;
-  },
-  set(target, prop, value) {
-    state[prop] = value;
-    try {
-      target[prop] = value;
-    } catch (e) {}
-    return true;
-  }
+const global = typeof canonicalGlobal !== 'undefined' ? canonicalGlobal : new Proxy(typeof window !== 'undefined' ? window : globalThis, {
+  get: (t, p) => (typeof state !== 'undefined' && p in state) ? state[p] : t[p],
+  set: (t, p, v) => { if (typeof state !== 'undefined') state[p] = v; try { t[p] = v; } catch {} return true; }
 });
 
 const APP_CONFIG_STORAGE_KEY = 'comics-now-app-config';

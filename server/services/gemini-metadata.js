@@ -20,6 +20,16 @@
  *    - Provides both PascalCase (for ComicInfo.xml and Node metadata) and lowercase (for Python sidecar and tagger.js) keys so no fields are ever dropped.
  */
 
+const {
+  cleanFormatAndEdition,
+  splitVolumeSeriesAndTitle,
+  normalizePublisher,
+  isTitleSameAsSeries,
+  cleanDescription,
+  resolveCreatorRoles,
+  cleanGenreAndTags
+} = require('./metadata');
+
 const STRICT_MODEL = 'gemini-3.5-flash-lite';
 
 /**
@@ -296,16 +306,6 @@ async function synthesizeMetadataWithGemini({
   let cleanVolume = parsed.Volume != null ? String(parsed.Volume).trim() : '';
 
   try {
-    const {
-      cleanFormatAndEdition,
-      splitVolumeSeriesAndTitle,
-      normalizePublisher,
-      isTitleSameAsSeries,
-      cleanDescription,
-      resolveCreatorRoles,
-      cleanGenreAndTags
-    } = require('../services/metadata');
-
     cleanSeries = cleanFormatAndEdition(cleanSeries);
     cleanTitle = cleanFormatAndEdition(cleanTitle);
     parsed.Genre = cleanGenreAndTags(parsed.Genre || '');

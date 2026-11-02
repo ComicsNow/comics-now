@@ -1,6 +1,7 @@
 const crypto = require('crypto');
 const path = require('path');
 const fs = require('fs');
+const { getConfig } = require('./config');
 
 function createId(p) {
   return crypto.createHash('sha1').update(p).digest('hex');
@@ -42,12 +43,12 @@ function resolveLibraryPath(requestedPath, getPathFromLibraryId) {
 
   // Handle Smart Inbox virtual path
   if (normalizedPath.startsWith('Smart Inbox/')) {
-    const config = require('./config').getConfig();
+    const config = getConfig();
     const relativePart = normalizedPath.slice('Smart Inbox/'.length);
     return path.join(config.comicsLocation, relativePart.replace(/\//g, path.sep));
   }
   if (normalizedPath === 'Smart Inbox') {
-    const config = require('./config').getConfig();
+    const config = getConfig();
     return config.comicsLocation;
   }
 

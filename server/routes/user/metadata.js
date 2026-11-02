@@ -3,6 +3,11 @@
  * 
  * Handles comic metadata retrieval and ComicVine searching.
  */
+const cryptoVault = require('../../utils/crypto-vault');
+const { getConfig, getGoogleBooksApiKey, getMetronPassword, getGcdPassword } = require('../../config');
+const geminiQuota = require('../../services/gemini-quota');
+const geminiMetadata = require('../../services/gemini-metadata');
+const urlExtractor = require('../../services/url-metadata-extractor');
 const { cleanFormatAndEdition, splitVolumeSeriesAndTitle, isTitleSameAsSeries, sanitizeMetadata } = require('../../services/metadata');
 
 module.exports = function attach(router, deps) {
@@ -338,8 +343,6 @@ module.exports = function attach(router, deps) {
         return res.status(400).json({ message: 'Query is required' });
       }
 
-      const { getConfig, getGoogleBooksApiKey, getMetronPassword, getGcdPassword } = require('../../config');
-      const cryptoVault = require('../../utils/crypto-vault');
       const config = getConfig();
       const sidecarUrl = config.taggerServiceUrl || 'http://localhost:5000';
       const requestBody = { source, query };
@@ -460,8 +463,6 @@ module.exports = function attach(router, deps) {
   }
 
   async function resolveFallbackCoverImage(series, issueNumber, queryContext, reqTargetUrl = '', description = '') {
-    const { getConfig, getMetronPassword } = require('../../config');
-    const cryptoVault = require('../../utils/crypto-vault');
     const config = getConfig();
     const sidecarUrl = config.taggerServiceUrl || 'http://localhost:5000';
     const rawCvApiKey = (typeof getComicVineApiKey === 'function' ? getComicVineApiKey() : null) || config.comicVineApiKey || process.env.COMICVINE_API_KEY || '';
@@ -1017,8 +1018,6 @@ module.exports = function attach(router, deps) {
       }
 
       // Check Gemini API key
-      const { getConfig } = require('../../config');
-      const cryptoVault = require('../../utils/crypto-vault');
       const config = getConfig();
       let geminiApiKey = (process.env.NODE_ENV === 'test' ? '' : process.env.GEMINI_API_KEY) || config.geminiApiKey || '';
       let geminiModel = config.geminiModel || 'gemini-3.5-flash-lite';
@@ -1047,7 +1046,6 @@ module.exports = function attach(router, deps) {
       }
 
       // Check and increment Gemini daily quota counter (tracked under Settings -> Tag Comics Now! -> Gemini AI)
-      const { incrementDailyUsage } = require('../../services/gemini-quota');
       let dailyCap = 450;
       try {
         if (typeof dbGet === 'function') {
@@ -1058,7 +1056,7 @@ module.exports = function attach(router, deps) {
         }
       } catch (_) {}
 
-      const quotaResult = await incrementDailyUsage({ dbGet, dbRun }, dailyCap);
+      const quotaResult = await geminiQuota.incrementDailyUsage({ dbGet, dbRun }, dailyCap);
       if (!quotaResult.allowed) {
         return res.status(429).json({
           message: `Daily Gemini API request cap (${dailyCap}) reached. Requests will reset at midnight Pacific Time.`
@@ -1123,8 +1121,7 @@ module.exports = function attach(router, deps) {
         };
       });
 
-      const { synthesizeMetadataWithGemini } = require('../../services/gemini-metadata');
-      const synthesized = await synthesizeMetadataWithGemini({
+      const synthesized = await geminiMetadata.synthesizeMetadataWithGemini({
         winningCandidate: formattedCandidates[0],
         allCandidates: formattedCandidates,
         filename: filename || 'Unknown Comic.cbz',
@@ -1176,16 +1173,13 @@ module.exports = function attach(router, deps) {
         });
       }
 
-      const { isSafeWebUrl } = require('../../services/url-metadata-extractor');
-      if (!isSafeWebUrl(url)) {
+      if (!urlExtractor.isSafeWebUrl(url)) {
         return res.status(400).json({
           message: 'Invalid or restricted URL target.'
         });
       }
 
       // Check Gemini API key
-      const { getConfig } = require('../../config');
-      const cryptoVault = require('../../utils/crypto-vault');
       const config = getConfig();
       let geminiApiKey = (process.env.NODE_ENV === 'test' ? '' : process.env.GEMINI_API_KEY) || config.geminiApiKey || '';
       let geminiModel = config.geminiModel || 'gemini-3.5-flash-lite';
@@ -1212,7 +1206,6 @@ module.exports = function attach(router, deps) {
       }
 
       // Check and increment Gemini daily quota counter (tracked under Settings -> Tag Comics Now! -> Gemini AI)
-      const { incrementDailyUsage } = require('../../services/gemini-quota');
       let dailyCap = 450;
       try {
         if (typeof dbGet === 'function') {
@@ -1223,7 +1216,7 @@ module.exports = function attach(router, deps) {
         }
       } catch (_) {}
 
-      const quotaResult = await incrementDailyUsage({ dbGet, dbRun }, dailyCap);
+      const quotaResult = await geminiQuota.incrementDailyUsage({ dbGet, dbRun }, dailyCap);
       if (!quotaResult.allowed) {
         return res.status(429).json({
           message: `Daily Gemini API request cap (${dailyCap}) reached. Requests will reset at midnight Pacific Time.`
@@ -1239,8 +1232,7 @@ module.exports = function attach(router, deps) {
         }
       } catch (_) {}
 
-      const { extractMetadataFromUrl } = require('../../services/url-metadata-extractor');
-      const metadata = await extractMetadataFromUrl({
+      const metadata = await urlExtractor.extractMetadataFromUrl({
         url: url.trim(),
         filename: filename || 'Unknown Comic.cbz',
         existingMeta: existingMeta || {},

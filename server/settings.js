@@ -7,7 +7,19 @@ const {
   setAllowedFormats,
   setMetadataStorage,
   setTaggerMode,
-  setTaggerServiceUrl
+  setTaggerServiceUrl,
+  setTaggerLowerThreshold,
+  setTaggerUpperThreshold,
+  setTaggerEnabledSources,
+  setMetronUser,
+  setMetronPassword,
+  setNamingRules,
+  setFolderRules,
+  setGeminiApiKey,
+  setGeminiModel,
+  setGeminiCoverMatchEnabled,
+  setGeminiCoverDailyCap,
+  setGeminiTermsAccepted
 } = require('./config');
 
 async function loadSettings() {
@@ -72,72 +84,60 @@ async function loadSettings() {
       }
       if (row.key === 'taggerLowerThreshold') {
         const val = typeof row.value === 'string' ? JSON.parse(row.value) : row.value;
-        const { setTaggerLowerThreshold } = require('./config');
         setTaggerLowerThreshold(val, true);
       }
       if (row.key === 'taggerUpperThreshold') {
         const val = typeof row.value === 'string' ? JSON.parse(row.value) : row.value;
-        const { setTaggerUpperThreshold } = require('./config');
         setTaggerUpperThreshold(val, true);
       }
       if (row.key === 'taggerEnabledSources') {
         let val;
         try { val = JSON.parse(row.value); } catch { val = row.value; }
-        const { setTaggerEnabledSources } = require('./config');
         setTaggerEnabledSources(val, true);
       }
       if (row.key === 'metronUser') {
         let val;
         try { val = JSON.parse(row.value); } catch { val = row.value; }
-        const { setMetronUser } = require('./config');
         setMetronUser(val, true);
       }
       if (row.key === 'metronPassword') {
         let val;
         try { val = JSON.parse(row.value); } catch { val = row.value; }
-        const { setMetronPassword } = require('./config');
         setMetronPassword(val, true);
       }
       if (row.key === 'namingRules') {
         let val;
         try { val = JSON.parse(row.value); } catch { val = row.value; }
-        const { setNamingRules } = require('./config');
         setNamingRules(val, true);
       }
       if (row.key === 'folderRules') {
         let val;
         try { val = JSON.parse(row.value); } catch { val = row.value; }
-        const { setFolderRules } = require('./config');
         setFolderRules(val, true);
       }
       if (row.key === 'geminiApiKey') {
         let val;
         try { val = JSON.parse(row.value); } catch { val = row.value; }
-        const { setGeminiApiKey } = require('./config');
         setGeminiApiKey(val, true);
       }
       if (row.key === 'geminiModel') {
         let val;
         try { val = JSON.parse(row.value); } catch { val = row.value; }
-        const { setGeminiModel } = require('./config');
         setGeminiModel(val, true);
       }
       if (row.key === 'geminiCoverMatchEnabled') {
         let val;
         try { val = JSON.parse(row.value); } catch { val = row.value; }
-        const { setGeminiCoverMatchEnabled } = require('./config');
         setGeminiCoverMatchEnabled(val !== false && val !== 'false', true);
       }
       if (row.key === 'geminiCoverDailyCap') {
         let val;
         try { val = JSON.parse(row.value); } catch { val = row.value; }
-        const { setGeminiCoverDailyCap } = require('./config');
         setGeminiCoverDailyCap(val, true);
       }
       if (row.key === 'geminiTermsAccepted') {
         let val;
         try { val = JSON.parse(row.value); } catch { val = row.value; }
-        const { setGeminiTermsAccepted } = require('./config');
         setGeminiTermsAccepted(val === true || val === 'true', true);
       }
     }

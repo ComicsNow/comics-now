@@ -1,10 +1,5 @@
 import { state } from '../../globals.js';
 
-state.GuidedView = state.GuidedView || {};
-if (typeof window !== 'undefined') {
-  window.GuidedView = window.GuidedView || {};
-}
-
 export function isFullscreenOpen() {
   const fv = document.getElementById('fullscreen-viewer');
   return !!(fv && !fv.classList.contains('hidden'));
@@ -258,7 +253,7 @@ Object.assign(state.GuidedView, {
   isAnyGuidedActive
 });
 
-if (typeof window !== 'undefined') {
+if (typeof window !== 'undefined' && window.GuidedView && window.GuidedView !== state.GuidedView) {
   Object.assign(window.GuidedView, {
     isFullscreenOpen,
     onPageRendered,

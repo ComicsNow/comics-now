@@ -133,7 +133,7 @@ def parse_waterstones_product_soup(soup, url):
     return metadata
 
 
-def search_waterstones_multi(query, limit=10):
+def search_waterstones_multi(query, limit=3):
     cached = tagger_cache.get_query("waterstones", query)
     if cached is not None:
         return cached
@@ -207,7 +207,7 @@ def resolve_waterstones(filename, cover_path=None, on_progress=None, existing_me
     query = clean_search_query(filename)
 
     try:
-        res = search_waterstones_multi(query, limit=2)
+        res = search_waterstones_multi(query, limit=3)
     except Exception as e:
         print(f"[-] Waterstones resolve failed: {e}")
         return []

@@ -1,3 +1,4 @@
+// ARCHITECTURAL_EXEMPTION: W3C Service Worker single-file scope specification constraint
 // service-worker.js
 // PWA service worker that respects subpath deployment (e.g., /comics-home)
 

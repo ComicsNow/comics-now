@@ -1,3 +1,9 @@
+import { ComicsStore, createStateProxy, createGlobalProxy } from './store/index.js';
+import { html, raw, render, clearElement } from './ui/template.js';
+import { getIconSvg, rawIcon, renderIcon } from './ui/icons.js';
+
+export { html, raw, render, clearElement, getIconSvg, rawIcon, renderIcon };
+
 // Save original console methods before any modifications
 const rawConsole = {
   log: console.log.bind(console),
@@ -210,7 +216,7 @@ export function createEmptyMessage(message) {
       <svg class="empty-state-icon" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
         <path stroke-linecap="round" stroke-linejoin="round" d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25" />
       </svg>
-      <p class="empty-state-message">${message}</p>
+      <p class="empty-state-message">${escapeHtml(message)}</p>
     </div>`;
 }
 
@@ -221,7 +227,7 @@ export function createErrorMessage(message) {
 export function createCheckmarkIcon() {
   const check = document.createElement('div');
   check.className = CSS_CLASSES.DOWNLOAD_BTN;
-  check.innerHTML = ICONS.READ;
+  render(check, raw(ICONS.READ));
   return check;
 }
 
@@ -589,10 +595,10 @@ function detectEinkDevice() {
 }
 
 // --- STATE MANAGEMENT ---
-export const state = {
+const initialAppState = {
   einkMode: (typeof localStorage !== 'undefined' ? localStorage.getItem('eink_mode') || detectEinkDevice() : 'none'),
-  APP_CONFIG: window.APP_CONFIG || {}, // Dynamically injected app config
-  API_BASE_URL: (window.APP_CONFIG && window.APP_CONFIG.baseUrl) ? window.APP_CONFIG.baseUrl.replace(/\/$/, '') : '',
+  APP_CONFIG: (typeof window !== 'undefined' && window.APP_CONFIG) || {}, // Dynamically injected app config
+  API_BASE_URL: (typeof window !== 'undefined' && window.APP_CONFIG && window.APP_CONFIG.baseUrl) ? window.APP_CONFIG.baseUrl.replace(/\/$/, '') : '',
   library: {},
   lastSearchQuery: '',
   lastSearchField: 'all',
@@ -603,6 +609,7 @@ export const state = {
   activeFilter: 'all',
   activeSmartFilter: null,
   smartListViewMode: 'folders',
+  GuidedView: {},
   currentPageIndex: 0,
   currentComic: null,
   currentMetadata: null,
@@ -645,6 +652,30 @@ export const state = {
   applyFullscreenFitMode: null
 };
 
+// Fallback store class if evaluated in raw test sandbox where module imports are stripped
+const StoreConstructor = typeof ComicsStore !== 'undefined' ? ComicsStore : class FallbackStore {
+  constructor(initial = {}) {
+    this.state = { ...initial };
+    this.audit = { record() {}, getEntries() { return []; }, clear() {} };
+    this.bus = { on() { return () => {}; }, off() {}, emit() {} };
+  }
+  get(k) { return this.state[k]; }
+  set(k, v) { this.state[k] = v; }
+  subscribe() { return () => {}; }
+};
+
+export const store = new StoreConstructor(initialAppState);
+
+export const state = typeof createStateProxy === 'function'
+  ? createStateProxy(store, {
+      warnOnDirectMutation: typeof window !== 'undefined' && Boolean(window.__COMICS_WARN_DIRECT_MUTATIONS__ || isComicsNowDebugEnabled('STORE'))
+    })
+  : store.state;
+
+export { createGlobalProxy };
+export const global = typeof createGlobalProxy === 'function' ? createGlobalProxy(state) : state;
+export const actions = (store && store.actions) ? store.actions : {};
+
 export function resetFullscreenZoom() {
   fullscreenImage.style.transform = '';
   fullscreenImage.style.transformOrigin = '';
@@ -660,10 +691,14 @@ export function resetFullscreenZoom() {
   fullscreenNavLeft.classList.remove('hidden');
   fullscreenNavRight.classList.remove('hidden');
   
-  state.isFullscreenZoomed = false;
-  state.fullscreenZoomScale = 1;
-  state.fullscreenZoomBaseWidth = 0;
-  state.fullscreenZoomBaseHeight = 0;
+  if (actions.viewer?.setZoom) {
+    actions.viewer.setZoom(false, { scale: 1, baseWidth: 0, baseHeight: 0 });
+  } else {
+    state.isFullscreenZoomed = false;
+    state.fullscreenZoomScale = 1;
+    state.fullscreenZoomBaseWidth = 0;
+    state.fullscreenZoomBaseHeight = 0;
+  }
 
   if (typeof state.onFullscreenReset === 'function') {
     state.onFullscreenReset();
@@ -858,10 +893,19 @@ const globalsObj = {
   seriesSortSelect
 };
 
+if (typeof html !== 'undefined') globalsObj.html = html;
+if (typeof raw !== 'undefined') globalsObj.raw = raw;
+if (typeof render !== 'undefined') globalsObj.render = render;
+if (typeof clearElement !== 'undefined') globalsObj.clearElement = clearElement;
+if (typeof getIconSvg !== 'undefined') globalsObj.getIconSvg = getIconSvg;
+if (typeof rawIcon !== 'undefined') globalsObj.rawIcon = rawIcon;
+if (typeof renderIcon !== 'undefined') globalsObj.renderIcon = renderIcon;
+
 Object.assign(state, globalsObj);
 if (typeof window !== 'undefined') {
   Object.assign(window, globalsObj);
   window.API_BASE_URL = state.API_BASE_URL;
   window.seriesSortOrder = state.seriesSortOrder;
+  window.__COMICS_STORE__ = store;
 }
 

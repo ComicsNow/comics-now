@@ -3,6 +3,8 @@ const fs = require('fs');
 const path = require('path');
 const { DB_FILE } = require('./constants');
 const { log } = require('./logger');
+const { isTitleSameAsSeries, resolveCreatorRoles } = require('./services/metadata');
+const { migratePlaintextSecrets } = require('./services/secrets-migrator');
 
 const dbDir = path.dirname(DB_FILE);
 if (!fs.existsSync(dbDir)) {
@@ -282,7 +284,6 @@ async function initializeDatabase() {
     const titleMigrationFlag = await dbGet("SELECT value FROM settings WHERE key = 'migration_title_cleanup_v1'");
     if (!titleMigrationFlag) {
       try {
-        const { isTitleSameAsSeries } = require('./services/metadata');
         const rows = db.prepare("SELECT id, series, metadata FROM comics WHERE metadata LIKE '%\"Title\":%'").all();
         const updateStmt = db.prepare("UPDATE comics SET metadata = ? WHERE id = ?");
         let cleanedCount = 0;
@@ -312,7 +313,6 @@ async function initializeDatabase() {
     const creatorRolesFlag = await dbGet("SELECT value FROM settings WHERE key = 'migration_creator_roles_v1'");
     if (!creatorRolesFlag) {
       try {
-        const { resolveCreatorRoles } = require('./services/metadata');
         const rows = db.prepare("SELECT id, series, metadata FROM comics WHERE metadata LIKE '%\"Writer\":%' OR metadata LIKE '%\"writer\":%'").all();
         const updateStmt = db.prepare("UPDATE comics SET metadata = ? WHERE id = ?");
         let disambiguatedCount = 0;
@@ -382,7 +382,6 @@ async function initializeDatabase() {
     const secretsMigrationFlag = await dbGet("SELECT value FROM settings WHERE key = 'migration_secrets_encryption_v1'");
     if (!secretsMigrationFlag) {
       try {
-        const { migratePlaintextSecrets } = require('./services/secrets-migrator');
         const stats = await migratePlaintextSecrets({ all: dbAll, run: dbRun });
         await dbRun("INSERT OR REPLACE INTO settings (key, value) VALUES ('migration_secrets_encryption_v1', '1')");
         if (stats.migratedCount > 0) {

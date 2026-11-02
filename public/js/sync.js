@@ -5,6 +5,38 @@ import {
   escapeHtml,
   debugLog
 } from './globals.js';
+import { html, raw, render, clearElement } from './ui/template.js';
+
+const clear = typeof clearElement === 'function' ? clearElement : (el) => { if (el) { if (typeof el.replaceChildren === 'function') el.replaceChildren(); else el.innerHTML = ''; } };
+const renderContent = (typeof render === 'function' && render.length >= 2) ? render : (el, content) => {
+  if (!el) return;
+  const toStr = (c) => {
+    if (c === null || c === undefined) return '';
+    if (Array.isArray(c)) return c.map(toStr).join('');
+    if (typeof c === 'object' && typeof c.toHTML === 'function') return c.toHTML();
+    if (typeof c === 'object' && c.__isRawHtml) return c.html;
+    return String(c);
+  };
+  el.innerHTML = toStr(content);
+};
+const safeHtml = (typeof html !== 'undefined' && typeof html === 'function' && html.length > 0) ? html : (strings, ...values) => {
+  const formatVal = (v) => {
+    if (v === null || v === undefined) return '';
+    if (Array.isArray(v)) return v.map(formatVal).join('');
+    if (typeof v === 'object' && v.__isRawHtml) return v.html;
+    if (typeof v === 'object' && typeof v.toHTML === 'function') return v.toHTML();
+    return typeof escapeHtml === 'function' ? escapeHtml(v) : String(v);
+  };
+  let out = '';
+  for (let i = 0; i < strings.length; i++) {
+    out += strings[i];
+    if (i < values.length) {
+      out += formatVal(values[i]);
+    }
+  }
+  return { toHTML: () => out, html: out, __isRawHtml: true };
+};
+const safeRaw = (typeof raw !== 'undefined' && typeof raw === 'function' && raw.length > 0) ? raw : (v) => ({ __isRawHtml: true, html: String(v ?? '') });
 
 export class SyncManager {
   constructor() {
@@ -372,7 +404,7 @@ export class SyncManager {
     modal.className = 'fixed inset-0 bg-gray-900/75 flex items-center justify-center';
     modal.style.zIndex = '10000';
 
-    modal.innerHTML = `
+    renderContent(modal, safeHtml`
       <div class="bg-gray-800 rounded-lg p-6 w-96 max-w-lg mx-4 shadow-2xl border border-gray-700">
         <div class="flex items-center mb-4">
           <svg class="w-6 h-6 text-blue-500 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -385,7 +417,7 @@ export class SyncManager {
           <p class="text-gray-300 mb-4">This comic was read on another device:</p>
           <div class="bg-gray-700 p-4 rounded-lg mb-4">
             <div class="text-sm text-gray-400 mb-2">Last read on:</div>
-            <div class="text-white font-medium">${escapeHtml(serverProgress.lastSyncDeviceName || 'Unknown Device')}</div>
+            <div class="text-white font-medium">${serverProgress.lastSyncDeviceName || 'Unknown Device'}</div>
             <div class="text-gray-400 text-sm">${serverDate}</div>
           </div>
 
@@ -410,7 +442,7 @@ export class SyncManager {
           </button>
         </div>
       </div>
-    `;
+    `);
 
     // Handle button clicks
     modal.querySelector('#sync-accept').addEventListener('click', async () => {
@@ -496,7 +528,7 @@ export class SyncManager {
       `;
     }).join('');
 
-    modal.innerHTML = `
+    renderContent(modal, safeHtml`
       <div class="bg-gray-800 rounded-lg p-6 w-[500px] max-w-[90vw] mx-4 shadow-2xl border border-gray-700">
         <div class="flex items-center mb-4">
           <svg class="w-6 h-6 text-blue-500 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -508,10 +540,10 @@ export class SyncManager {
         <div class="mb-6">
           <p class="text-gray-300 mb-4">This comic has been read on another device. Choose a device to sync with or continue with your current progress:</p>
           <div class="max-h-64 overflow-y-auto">
-            ${deviceListHtml}
+            ${safeRaw(deviceListHtml)}
           </div>
           ${devices.filter(d => !d.isCurrentDevice && d.lastReadPage !== null).length === 0 ?
-            '<p class="text-gray-400 text-center py-4">No other devices have read this comic.</p>' :
+            safeHtml`<p class="text-gray-400 text-center py-4">No other devices have read this comic.</p>` :
             ''}
         </div>
 
@@ -524,7 +556,7 @@ export class SyncManager {
           </button>
         </div>
       </div>
-    `;
+    `);
 
     // Handle device selection clicks
     modal.querySelectorAll('[data-selectable="true"]').forEach(deviceElement => {
@@ -712,11 +744,11 @@ export class SyncManager {
     const notification = document.createElement('div');
     notification.id = 'sync-notification';
     notification.className = 'fixed top-4 right-4 bg-blue-600 text-white p-4 rounded-lg shadow-lg z-50 max-w-sm';
-    notification.innerHTML = `
+    renderContent(notification, safeHtml`
       <div class="flex items-center justify-between">
         <div>
           <div class="font-medium">Sync Available</div>
-          <div class="text-sm opacity-90">Updated on ${escapeHtml(syncData.serverProgress?.lastSyncDeviceName || 'Another Device')}</div>
+          <div class="text-sm opacity-90">Updated on ${syncData.serverProgress?.lastSyncDeviceName || 'Another Device'}</div>
         </div>
         <button id="sync-notification-close" class="ml-4 text-white hover:text-gray-200">
           <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -732,7 +764,7 @@ export class SyncManager {
           Dismiss
         </button>
       </div>
-    `;
+    `);
 
     document.body.appendChild(notification);
 

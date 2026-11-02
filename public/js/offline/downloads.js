@@ -1,7 +1,38 @@
-import { state, ICONS, encodePath, downloadQueueDiv } from '../globals.js';
+import { state, ICONS, encodePath, downloadQueueDiv, clearElement, render, html, raw, getIconSvg, rawIcon, renderIcon } from '../globals.js';
 import { isDesktopDevice } from '../utils/device-detection.js';
 import * as DownloadCore from './download-core.js';
 import * as DownloadHistory from './download-history.js';
+
+const clear = typeof clearElement === 'function' ? clearElement : (el) => { if (el) { if (typeof el.replaceChildren === 'function') el.replaceChildren(); else el.innerHTML = ''; } };
+const renderContent = (typeof render === 'function' && render.length >= 2) ? render : (el, content) => {
+  if (!el) return;
+  if (content && typeof content === 'object' && typeof content.toHTML === 'function') {
+    el.innerHTML = content.toHTML();
+  } else if (content && typeof content === 'object' && content.__isRawHtml) {
+    el.innerHTML = content.html;
+  } else {
+    el.innerHTML = String(content ?? '');
+  }
+};
+
+const safeHtml = (typeof html !== 'undefined' && typeof html === 'function' && html.length > 0) ? html : (strings, ...values) => {
+  let out = '';
+  for (let i = 0; i < strings.length; i++) {
+    out += strings[i];
+    if (i < values.length) {
+      const v = values[i];
+      if (v && typeof v === 'object' && v.__isRawHtml) out += v.html;
+      else if (v && typeof v === 'object' && typeof v.toHTML === 'function') out += v.toHTML();
+      else out += (v ?? '');
+    }
+  }
+  return { toHTML: () => out, html: out, __isRawHtml: true };
+};
+
+const safeRaw = (typeof raw !== 'undefined' && typeof raw === 'function' && raw.length > 0) ? raw : (v) => ({
+  __isRawHtml: true,
+  html: String(v ?? '')
+});
 
 // ============================================================================
 // BACKGROUND DOWNLOAD MANAGER
@@ -749,7 +780,7 @@ export class BackgroundDownloadManager {
   createButton(icon, title, colorClass, onClick) {
     const btn = document.createElement('button');
     btn.className = `${colorClass} hover:opacity-80 text-2xl p-2 min-w-[44px] min-h-[44px] flex items-center justify-center`;
-    btn.innerHTML = icon;
+    renderContent(btn, safeRaw(icon));
     btn.title = title;
     btn.onclick = async (e) => {
       e.stopPropagation();
@@ -802,7 +833,7 @@ export class BackgroundDownloadManager {
     const prevScroll = downloadQueueDiv.querySelector('.download-queue-scroll');
     const savedScrollTop = prevScroll ? prevScroll.scrollTop : 0;
 
-    downloadQueueDiv.innerHTML = '';
+    clear(downloadQueueDiv);
 
     // Hide download queue on desktop devices
     if (typeof isDesktopDevice === 'function' && isDesktopDevice()) {
@@ -837,7 +868,7 @@ export class BackgroundDownloadManager {
       iconButton.title = 'Show download queue';
 
       const icon = document.createElement('span');
-      icon.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"/></svg>';
+      renderContent(icon, safeHtml`<svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"/></svg>`);
       icon.className = 'inline-flex items-center justify-center';
       iconButton.appendChild(icon);
 
@@ -860,7 +891,7 @@ export class BackgroundDownloadManager {
     // Header content: icon
     const dlIcon = document.createElement('div');
     dlIcon.className = 'dl-icon';
-    dlIcon.innerHTML = '<svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>';
+    renderContent(dlIcon, safeHtml`<svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>`);
     header.appendChild(dlIcon);
 
     // Title text
@@ -884,7 +915,7 @@ export class BackgroundDownloadManager {
     collapseBtn.type = 'button';
     collapseBtn.className = 'ha';
     collapseBtn.title = 'Collapse';
-    collapseBtn.innerHTML = '<svg viewBox="0 0 24 24"><polyline points="18 15 12 9 6 15" stroke="currentColor" stroke-width="2" fill="none"/></svg>';
+    renderContent(collapseBtn, safeHtml`<svg viewBox="0 0 24 24"><polyline points="18 15 12 9 6 15" stroke="currentColor" stroke-width="2" fill="none"/></svg>`);
     collapseBtn.onclick = (e) => {
       e.stopPropagation();
       this.toggleCollapsed();
@@ -896,7 +927,7 @@ export class BackgroundDownloadManager {
     closeBtn.type = 'button';
     closeBtn.className = 'ha';
     closeBtn.title = 'Close';
-    closeBtn.innerHTML = '<svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18" stroke="currentColor" stroke-width="2"/><line x1="6" y1="6" x2="18" y2="18" stroke="currentColor" stroke-width="2"/></svg>';
+    renderContent(closeBtn, safeHtml`<svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18" stroke="currentColor" stroke-width="2"/><line x1="6" y1="6" x2="18" y2="18" stroke="currentColor" stroke-width="2"/></svg>`);
     closeBtn.onclick = (e) => {
       e.stopPropagation();
       this.explicitlyOpen = false;
@@ -938,7 +969,7 @@ export class BackgroundDownloadManager {
     if (this.activeTab === 'in-progress') {
       const syncIndicator = document.createElement('div');
       const syncText = document.createElement('p');
-      syncIndicator.innerHTML = '<svg viewBox="0 0 24 24"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>';
+      renderContent(syncIndicator, safeHtml`<svg viewBox="0 0 24 24"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>`);
       if (this.useBackgroundFetch) {
         syncIndicator.className = 'sync-notice sync-active';
         syncText.textContent = 'Downloads run one at a time — see progress in your notifications.';
@@ -959,7 +990,7 @@ export class BackgroundDownloadManager {
           b.className = `dl-batch-btn ${cls}`;
           b.title = title;
           b.setAttribute('aria-label', title);
-          b.innerHTML = icon;
+          renderContent(b, safeRaw(icon));
           b.onclick = (e) => { e.stopPropagation(); handler(); };
           bar.appendChild(b);
         };
@@ -979,7 +1010,7 @@ export class BackgroundDownloadManager {
       retryBtn.className = 'dl-retry-all-btn';
       retryBtn.title = `Retry all (${activeItems.length})`;
       retryBtn.setAttribute('aria-label', `Retry all (${activeItems.length})`);
-      retryBtn.innerHTML = DL_ICONS.retry;
+      renderContent(retryBtn, safeRaw(DL_ICONS.retry));
       retryBtn.onclick = (e) => { e.stopPropagation(); this.retryAllFailed(); };
       retryBar.appendChild(retryBtn);
       queueContent.appendChild(retryBar);
@@ -1041,7 +1072,7 @@ export class BackgroundDownloadManager {
         const b = document.createElement('div');
         b.className = 'dl-action';
         b.title = title;
-        b.innerHTML = svg;
+        renderContent(b, safeRaw(svg));
         b.onclick = (e) => { e.stopPropagation(); handler(); };
         topRow.appendChild(b);
       };
@@ -1060,7 +1091,7 @@ export class BackgroundDownloadManager {
       const cancelBtn = document.createElement('div');
       cancelBtn.className = 'cancel';
       cancelBtn.title = (item.status === 'completed' || item.status === 'error') ? 'Remove' : 'Cancel';
-      cancelBtn.innerHTML = '<svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>';
+      renderContent(cancelBtn, safeHtml`<svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>`);
       cancelBtn.onclick = (e) => {
         e.stopPropagation();
         this.cancelDownload(item.id);
@@ -1106,7 +1137,7 @@ export class BackgroundDownloadManager {
     // If nothing at all is queued or in history, show empty state message
     if (this.persistentQueue.length === 0) {
       downloadQueueDiv.className = 'fixed bottom-0 right-4 sm:right-8 z-40 w-[22rem] max-w-[calc(100vw-2rem)] dl-queue-container';
-      downloadQueueDiv.innerHTML = `
+      renderContent(downloadQueueDiv, safeHtml`
         <div class="handle"></div>
         <div class="modal-header">
           <div class="dl-icon">
@@ -1127,7 +1158,7 @@ export class BackgroundDownloadManager {
           <p class="empty-title">No active downloads</p>
           <p class="empty-subtitle">Comics you queue will appear here.</p>
         </div>
-      `;
+      `);
       const closeBtn = downloadQueueDiv.querySelector('[data-close="downloads"]');
       if (closeBtn) {
         closeBtn.addEventListener('click', () => {

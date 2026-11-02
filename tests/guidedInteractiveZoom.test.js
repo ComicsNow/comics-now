@@ -13,7 +13,8 @@ function createInteractiveZoomSandbox() {
     activeSmartFilter: null,
     comicIdMap: new Map(),
     mangaModePreference: false,
-    fullscreenPage: 0
+    fullscreenPage: 0,
+    GuidedView: {}
   };
 
   const sandbox = {

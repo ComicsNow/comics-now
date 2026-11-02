@@ -1,5 +1,13 @@
 const fs = require('fs');
 const cryptoVault = require('../../utils/crypto-vault');
+const { getNamingRules, setNamingRules, getFolderRules, setFolderRules } = require('../../config');
+const { saveSetting: defaultSaveSetting } = require('../../settings');
+const {
+  DEFAULT_NAMING_RULES,
+  DEFAULT_FOLDER_RULES,
+  formatComicFilename,
+  formatFolderPath
+} = require('../../services/organization');
 
 const VALID_SCAN_MODES = ['default', 'unmatched', 'existing-xml', 'force'];
 
@@ -510,8 +518,7 @@ module.exports = function attach(router, deps) {
 
   // Naming & Folder Organization Rules
   router.get('/api/v1/tag-comics-now/naming-rules', (req, res) => {
-    const fn = deps.getNamingRules || require('../../config').getNamingRules;
-    const { DEFAULT_NAMING_RULES } = require('../../services/organization');
+    const fn = deps.getNamingRules || getNamingRules;
     res.json({ ok: true, rules: fn ? fn() : DEFAULT_NAMING_RULES });
   });
 
@@ -521,8 +528,8 @@ module.exports = function attach(router, deps) {
       if (!rules || !Array.isArray(rules.tokens)) {
         return res.status(400).json({ ok: false, error: 'Invalid naming rules format' });
       }
-      const setFn = deps.setNamingRules || require('../../config').setNamingRules;
-      const saveFn = deps.saveSetting || require('../../settings').saveSetting;
+      const setFn = deps.setNamingRules || setNamingRules;
+      const saveFn = deps.saveSetting || defaultSaveSetting;
       if (setFn) setFn(rules);
       if (saveFn) await saveFn('namingRules', rules);
       res.json({ ok: true });
@@ -532,8 +539,7 @@ module.exports = function attach(router, deps) {
   });
 
   router.get('/api/v1/tag-comics-now/folder-rules', (req, res) => {
-    const fn = deps.getFolderRules || require('../../config').getFolderRules;
-    const { DEFAULT_FOLDER_RULES } = require('../../services/organization');
+    const fn = deps.getFolderRules || getFolderRules;
     res.json({ ok: true, rules: fn ? fn() : DEFAULT_FOLDER_RULES });
   });
 
@@ -543,8 +549,8 @@ module.exports = function attach(router, deps) {
       if (!rules || !Array.isArray(rules.hierarchy)) {
         return res.status(400).json({ ok: false, error: 'Invalid folder rules format' });
       }
-      const setFn = deps.setFolderRules || require('../../config').setFolderRules;
-      const saveFn = deps.saveSetting || require('../../settings').saveSetting;
+      const setFn = deps.setFolderRules || setFolderRules;
+      const saveFn = deps.saveSetting || defaultSaveSetting;
       if (setFn) setFn(rules);
       if (saveFn) await saveFn('folderRules', rules);
       res.json({ ok: true });
@@ -556,7 +562,6 @@ module.exports = function attach(router, deps) {
   router.post('/api/v1/tag-comics-now/naming-preview', (req, res) => {
     try {
       const { metadata = {}, rules } = req.body || {};
-      const { formatComicFilename, DEFAULT_NAMING_RULES } = require('../../services/organization');
       const filename = formatComicFilename(metadata, rules || DEFAULT_NAMING_RULES, '.cbz');
       res.json({ ok: true, filename });
     } catch (e) {
@@ -567,7 +572,6 @@ module.exports = function attach(router, deps) {
   router.post('/api/v1/tag-comics-now/folder-preview', (req, res) => {
     try {
       const { metadata = {}, rules } = req.body || {};
-      const { formatFolderPath, DEFAULT_FOLDER_RULES } = require('../../services/organization');
       const folderPath = formatFolderPath(metadata, rules || DEFAULT_FOLDER_RULES);
       res.json({ ok: true, folderPath });
     } catch (e) {

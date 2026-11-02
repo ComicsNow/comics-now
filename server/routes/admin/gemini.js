@@ -10,6 +10,16 @@
 
 const fs = require('fs');
 const path = require('path');
+const { CONFIG_FILE } = require('../../constants');
+const cryptoVault = require('../../utils/crypto-vault');
+const { getOrResetDailyUsage } = require('../../services/gemini-quota');
+const {
+  getGeminiApiKey,
+  setGeminiApiKey,
+  setGeminiModel,
+  setGeminiCoverMatchEnabled,
+  setGeminiCoverDailyCap
+} = require('../../config');
 
 module.exports = function attach(router, deps) {
   const {
@@ -20,13 +30,7 @@ module.exports = function attach(router, deps) {
     saveConfigToDisk
   } = deps;
 
-  const defaultConfigFile = (() => {
-    try {
-      return require('../../constants').CONFIG_FILE;
-    } catch (_) {
-      return path.join(__dirname, '../../../config.json');
-    }
-  })();
+  const defaultConfigFile = CONFIG_FILE || path.join(__dirname, '../../../config.json');
   const configPath = deps.paths?.CONFIG_FILE || defaultConfigFile;
 
   async function readConfig() {
@@ -95,16 +99,13 @@ module.exports = function attach(router, deps) {
 
       let configGetterKey = '';
       try {
-        const { getGeminiApiKey } = require('../../config');
         configGetterKey = getGeminiApiKey();
       } catch (_) {}
 
-      const cryptoVault = require('../../utils/crypto-vault');
       const plainDbApiKey = cryptoVault.decrypt(dbApiKey);
       const plainCfgApiKey = cryptoVault.decrypt(cfg.geminiApiKey);
       const apiKey = (process.env.NODE_ENV === 'test' ? '' : process.env.GEMINI_API_KEY) || plainDbApiKey || plainCfgApiKey || config.geminiApiKey || configGetterKey || '';
 
-      const { getOrResetDailyUsage } = require('../../services/gemini-quota');
       const quotaCount = await getOrResetDailyUsage({ dbGet, dbRun });
 
 
@@ -129,7 +130,6 @@ module.exports = function attach(router, deps) {
   async function handleGetModels(req, res) {
     try {
       const cfg = await readConfig();
-      const cryptoVault = require('../../utils/crypto-vault');
       const rawKey = req.query.apiKey || cfg.geminiApiKey || config.geminiApiKey || (process.env.NODE_ENV === 'test' ? '' : process.env.GEMINI_API_KEY) || '';
       const apiKey = (cryptoVault.decrypt(rawKey) || rawKey || '').trim();
 
@@ -244,14 +244,12 @@ module.exports = function attach(router, deps) {
       }
 
       if (geminiApiKey !== undefined) {
-        const cryptoVault = require('../../utils/crypto-vault');
         const key = String(geminiApiKey).trim();
         if (!cryptoVault.isMasked(key)) {
           const encKey = cryptoVault.encrypt(key);
           cfg.geminiApiKey = encKey;
           config.geminiApiKey = encKey;
           try {
-            const { setGeminiApiKey } = require('../../config');
             setGeminiApiKey(encKey, true);
           } catch (_) {}
           if (typeof dbRun === 'function') {
@@ -264,7 +262,6 @@ module.exports = function attach(router, deps) {
         cfg.geminiModel = model;
         config.geminiModel = model;
         try {
-          const { setGeminiModel } = require('../../config');
           setGeminiModel(model, true);
         } catch (_) {}
         if (typeof dbRun === 'function') {
@@ -276,7 +273,6 @@ module.exports = function attach(router, deps) {
         cfg.geminiCoverMatchEnabled = enabled;
         config.geminiCoverMatchEnabled = enabled;
         try {
-          const { setGeminiCoverMatchEnabled } = require('../../config');
           setGeminiCoverMatchEnabled(enabled, true);
         } catch (_) {}
         if (typeof dbRun === 'function') {
@@ -295,7 +291,6 @@ module.exports = function attach(router, deps) {
         cfg.geminiCoverDailyCap = cap;
         config.geminiCoverDailyCap = cap;
         try {
-          const { setGeminiCoverDailyCap } = require('../../config');
           setGeminiCoverDailyCap(cap, true);
         } catch (_) {}
         if (typeof dbRun === 'function') {

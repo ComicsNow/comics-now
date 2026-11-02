@@ -1,10 +1,5 @@
 import { state } from '../../globals.js';
 
-state.GuidedView = state.GuidedView || {};
-if (typeof window !== 'undefined') {
-  window.GuidedView = window.GuidedView || {};
-}
-
 export const cache = new Map(); // comicId -> data | null
 
 export function api(p) {
@@ -140,7 +135,7 @@ Object.assign(state.GuidedView, {
   api
 });
 
-if (typeof window !== 'undefined') {
+if (typeof window !== 'undefined' && window.GuidedView && window.GuidedView !== state.GuidedView) {
   Object.assign(window.GuidedView, {
     cache,
     loadGuidedView,

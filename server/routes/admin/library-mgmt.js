@@ -1,6 +1,9 @@
 const fs = require('fs');
 const path = require('path');
 
+const { THUMBNAILS_DIRECTORY, GUIDED_VIEW_DIR } = require('../../constants');
+const { formatFolderPath, updateComicIdentity } = require('../../services/organization');
+const { getFolderRules } = require('../../config');
 const { writeComicInfoToCbz, buildComicInfoXml } = require('../../services/metadata');
 const { trimObjectStrings } = require('../../utils');
 
@@ -287,9 +290,7 @@ module.exports = function attach(router, deps) {
       let errors = 0;
       const results = [];
 
-      const { THUMBNAILS_DIRECTORY, GUIDED_VIEW_DIR } = require('../../constants');
-      const { formatFolderPath, updateComicIdentity } = require('../../services/organization');
-      const folderRules = (deps.getFolderRules || require('../../config').getFolderRules)();
+      const folderRules = (deps.getFolderRules || getFolderRules)();
 
       for (const comicRecord of files) {
         const file = comicRecord.name;

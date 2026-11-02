@@ -1,4 +1,36 @@
-import { state, encodePath } from '../globals.js';
+import { state, actions, encodePath, clearElement, escapeHtml } from '../globals.js';
+import { html, raw, render } from '../ui/template.js';
+
+const clear = typeof clearElement === 'function' ? clearElement : (el) => { if (el) { if (typeof el.replaceChildren === 'function') el.replaceChildren(); else el.innerHTML = ''; } };
+const renderContent = (typeof render === 'function' && render.length >= 2) ? render : (el, content) => {
+  if (!el) return;
+  const toStr = (c) => {
+    if (c === null || c === undefined) return '';
+    if (Array.isArray(c)) return c.map(toStr).join('');
+    if (typeof c === 'object' && typeof c.toHTML === 'function') return c.toHTML();
+    if (typeof c === 'object' && c.__isRawHtml) return c.html;
+    return String(c);
+  };
+  el.innerHTML = toStr(content);
+};
+const safeHtml = (typeof html !== 'undefined' && typeof html === 'function' && html.length > 0) ? html : (strings, ...values) => {
+  const formatVal = (v) => {
+    if (v === null || v === undefined) return '';
+    if (Array.isArray(v)) return v.map(formatVal).join('');
+    if (typeof v === 'object' && v.__isRawHtml) return v.html;
+    if (typeof v === 'object' && typeof v.toHTML === 'function') return v.toHTML();
+    return typeof escapeHtml === 'function' ? escapeHtml(v) : String(v);
+  };
+  let out = '';
+  for (let i = 0; i < strings.length; i++) {
+    out += strings[i];
+    if (i < values.length) {
+      out += formatVal(values[i]);
+    }
+  }
+  return { toHTML: () => out, html: out, __isRawHtml: true };
+};
+const safeRaw = (typeof raw !== 'undefined' && typeof raw === 'function' && raw.length > 0) ? raw : (v) => ({ __isRawHtml: true, html: String(v ?? '') });
 
 // The overlay is built on open and removed on close, so nothing full-screen
 // lingers in the DOM to intercept scrolling/pointer events while it's closed.
@@ -50,7 +82,12 @@ export async function goToPage(targetIndex) {
 
   const clampedIndex = Math.max(0, Math.min(targetIndex, pages.length - 1));
   const previousIndex = global.currentPageIndex;
-  global.currentPageIndex = clampedIndex;
+  const actionsRef = (typeof actions !== 'undefined' ? actions : global?.actions);
+  if (actionsRef?.viewer?.setPageIndex) {
+    actionsRef.viewer.setPageIndex(clampedIndex, { source: 'page_preview' });
+  } else {
+    global.currentPageIndex = clampedIndex;
+  }
 
   try {
     const comic = global.currentComic;
@@ -75,10 +112,21 @@ export async function goToPage(targetIndex) {
     }
 
     const rendered = await global.renderPage?.();
-    if (rendered === false) { global.currentPageIndex = previousIndex; return false; }
+    if (rendered === false) {
+      if (actionsRef?.viewer?.setPageIndex) {
+        actionsRef.viewer.setPageIndex(previousIndex, { source: 'preview_rollback' });
+      } else {
+        global.currentPageIndex = previousIndex;
+      }
+      return false;
+    }
     return true;
   } catch (err) {
-    global.currentPageIndex = previousIndex;
+    if (actionsRef?.viewer?.setPageIndex) {
+      actionsRef.viewer.setPageIndex(previousIndex, { source: 'preview_rollback' });
+    } else {
+      global.currentPageIndex = previousIndex;
+    }
     return false;
   }
 }
@@ -95,7 +143,7 @@ function buildOverlay() {
   overlay.setAttribute('role', 'dialog');
   overlay.setAttribute('aria-modal', 'true');
   overlay.setAttribute('aria-label', 'Comic Pages Grid');
-  overlay.innerHTML = `
+  renderContent(overlay, safeHtml`
     <div id="comic-page-grid-backdrop" class="comic-page-grid-backdrop"></div>
     <div class="comic-page-grid-modal">
       <div class="comic-page-grid-header">
@@ -109,7 +157,7 @@ function buildOverlay() {
       <div id="comic-page-grid-scroll" class="comic-page-grid-scroll">
         <div id="comic-page-grid-items" class="comic-page-grid-items"></div>
       </div>
-    </div>`;
+    </div>`);
 
   overlay.querySelector('#comic-page-grid-close').addEventListener('click', (e) => {
     e.stopPropagation();
@@ -460,7 +508,7 @@ export function renderThumbnailFilmstrip() {
     filmstripObserver = null;
   }
 
-  itemsContainer.innerHTML = '';
+  clear(itemsContainer);
   lastRenderedComicId = comicId;
   lastRenderedPageCount = pages.length;
 

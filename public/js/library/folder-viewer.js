@@ -1,5 +1,17 @@
-import { state, getRelativePath, escapeHtml, folderAlphaFilter } from '../globals.js';
+import { state, getRelativePath, escapeHtml, folderAlphaFilter, clearElement, render, html, raw } from '../globals.js';
 import { renderAlphaFilter } from './alpha-list.js';
+
+const clear = typeof clearElement === 'function' ? clearElement : (el) => { if (el) { if (typeof el.replaceChildren === 'function') el.replaceChildren(); else el.innerHTML = ''; } };
+const renderContent = typeof render === 'function' ? render : (el, content) => {
+  if (!el) return;
+  if (content && typeof content === 'object' && typeof content.toHTML === 'function') {
+    el.innerHTML = content.toHTML();
+  } else if (content && typeof content === 'object' && content.__isRawHtml) {
+    el.innerHTML = content.html;
+  } else {
+    el.innerHTML = String(content ?? '');
+  }
+};
 
 let lastFolderData = null;
 let lastFolderPath = null;
@@ -107,9 +119,12 @@ export async function showFolderView(folderPath, options = {}) {
 
   const createLoadingMessage = state.createLoadingMessage || window.createLoadingMessage;
   if (container) {
-    container.innerHTML = typeof createLoadingMessage === 'function' 
-      ? createLoadingMessage('Loading folder contents...') 
-      : 'Loading folder contents...';
+    renderContent(
+      container,
+      typeof createLoadingMessage === 'function'
+        ? createLoadingMessage('Loading folder contents...')
+        : 'Loading folder contents...'
+    );
   }
 
   try {
@@ -132,7 +147,7 @@ export async function showFolderView(folderPath, options = {}) {
         // Not JSON
       }
       if (container) {
-        container.innerHTML = typeof createErrorMessage === 'function' ? createErrorMessage(errorMessage) : errorMessage;
+        renderContent(container, typeof createErrorMessage === 'function' ? createErrorMessage(errorMessage) : errorMessage);
       }
       return;
     }
@@ -149,14 +164,14 @@ export async function showFolderView(folderPath, options = {}) {
        }
     } else {
        if (container) {
-         container.innerHTML = typeof createErrorMessage === 'function' ? createErrorMessage(data.message || 'Error loading folder.') : (data.message || 'Error loading folder.');
+         renderContent(container, typeof createErrorMessage === 'function' ? createErrorMessage(data.message || 'Error loading folder.') : (data.message || 'Error loading folder.'));
        }
     }
   } catch (error) {
     console.error('[folder-view] Error:', error);
     const createErrorMessage = state.createErrorMessage || window.createErrorMessage;
     if (container) {
-      container.innerHTML = typeof createErrorMessage === 'function' ? createErrorMessage('Failed to load folder contents.') : 'Failed to load folder contents.';
+      renderContent(container, typeof createErrorMessage === 'function' ? createErrorMessage('Failed to load folder contents.') : 'Failed to load folder contents.');
     }
   }
 }
@@ -165,7 +180,7 @@ export function renderFolderView(data) {
   const container = document.getElementById('folder-list-container');
   if (!container) return;
   
-  container.innerHTML = '';
+  clear(container);
   
   let { folders, comics } = data;
 
@@ -182,9 +197,12 @@ export function renderFolderView(data) {
 
   const createEmptyMessage = state.createEmptyMessage || window.createEmptyMessage;
   if (folders.length === 0 && comics.length === 0) {
-    container.innerHTML = typeof createEmptyMessage === 'function' 
-      ? createEmptyMessage('This folder is empty.') 
-      : 'This folder is empty.';
+    renderContent(
+      container,
+      typeof createEmptyMessage === 'function'
+        ? createEmptyMessage('This folder is empty.')
+        : 'This folder is empty.'
+    );
     return;
   }
 
@@ -192,14 +210,14 @@ export function renderFolderView(data) {
   folders.forEach(folder => {
     const card = document.createElement('div');
     card.className = 'folder-card bg-gray-800 rounded-lg shadow-lg overflow-hidden cursor-pointer p-4 flex flex-col items-center justify-center';
-    card.innerHTML = `
+    renderContent(card, html`
       <div class="h-32 w-32 text-purple-500 mb-4">
         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
         </svg>
       </div>
-      <h3 class="text-sm font-semibold text-white text-center truncate w-full">${escapeHtml(folder.name)}</h3>
-    `;
+      <h3 class="text-sm font-semibold text-white text-center truncate w-full">${folder.name}</h3>
+    `);
     card.addEventListener('click', () => showFolderView(folder.path));
 
     // Add context menu support (right-click and long-press)

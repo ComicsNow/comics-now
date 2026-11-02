@@ -53,3 +53,8 @@ LOGS_DIR = os.environ.get("SCAN_LOGS_DIR", os.path.join(_DATA_DIR, "scan_logs"))
 # Persisted scheduler config + status.
 CONFIG_FILE = os.environ.get("SCHEDULER_CONFIG_PATH", os.path.join(_DATA_DIR, "scheduler_config.json"))
 
+# Upload and temp directories
+UPLOAD_FOLDER = os.path.join(_ROOT, "uploads")
+STATIC_TEMP_DIR = os.path.join(_ROOT, "static", "temp")
+
+

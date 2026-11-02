@@ -160,9 +160,13 @@ describe('Continuous Reading Mode MutationObserver & Event Safety Regression Tes
       const fullPath = path.join(__dirname, '..', relPath);
       let code = fs.readFileSync(fullPath, 'utf-8')
         .replace(/import\s+[\s\S]*?from\s+['"][^'"]+['"];?/g, '')
+        .replace(/export\s+[\s\S]*?\s+from\s+['"][^'"]+['"];?/g, '')
         .replace(/export\s+async\s+function\s+/g, 'async function ')
         .replace(/export\s+function\s+/g, 'function ')
-        .replace(/export\s+const\s+/g, 'const ')
+        .replace(/export\s+const\s+/g, 'var ')
+        .replace(/export\s+let\s+/g, 'var ')
+        .replace(/\bconst\s+/g, 'var ')
+        .replace(/\blet\s+/g, 'var ')
         .replace(/export\s+\{[\s\S]*?\};?/g, '')
         .replace(/export\s+default\s+[^;]+;?/g, '');
       new vm.Script(code, { filename: fullPath }).runInContext(sandbox);
@@ -171,7 +175,8 @@ describe('Continuous Reading Mode MutationObserver & Event Safety Regression Tes
     loadModule('public/js/viewer/guided/mode-registry.js');
     loadModule('public/js/viewer/guided/modes/guided.js');
     loadModule('public/js/viewer/guided/lifecycle.js');
-    loadModule('public/js/viewer/fullscreen.js');
+    loadModule('public/js/viewer/fullscreen/controls.js');
+    loadModule('public/js/viewer/fullscreen/lifecycle.js');
     loadModule('public/js/continuous.js');
   });
 

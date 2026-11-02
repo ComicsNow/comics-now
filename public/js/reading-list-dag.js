@@ -6,7 +6,38 @@
  * reading progress, and instant issue launch.
  */
 
-import { state, escapeHtml, getComicById } from './globals.js';
+import { state, escapeHtml, getComicById, clearElement, render, html, raw } from './globals.js';
+
+const clear = typeof clearElement === 'function' ? clearElement : (el) => { if (el) { if (typeof el.replaceChildren === 'function') el.replaceChildren(); else el.innerHTML = ''; } };
+const renderContent = (typeof render === 'function' && render.length >= 2) ? render : (el, content) => {
+  if (!el) return;
+  if (content && typeof content === 'object' && typeof content.toHTML === 'function') {
+    el.innerHTML = content.toHTML();
+  } else if (content && typeof content === 'object' && content.__isRawHtml) {
+    el.innerHTML = content.html;
+  } else {
+    el.innerHTML = String(content ?? '');
+  }
+};
+
+const safeHtml = (typeof html !== 'undefined' && typeof html === 'function' && html.length > 0) ? html : (strings, ...values) => {
+  let out = '';
+  for (let i = 0; i < strings.length; i++) {
+    out += strings[i];
+    if (i < values.length) {
+      const v = values[i];
+      if (v && typeof v === 'object' && v.__isRawHtml) out += v.html;
+      else if (v && typeof v === 'object' && typeof v.toHTML === 'function') out += v.toHTML();
+      else out += (typeof escapeHtml === 'function' ? escapeHtml(v) : String(v ?? ''));
+    }
+  }
+  return { toHTML: () => out, html: out, __isRawHtml: true };
+};
+
+const safeRaw = (typeof raw !== 'undefined' && typeof raw === 'function' && raw.length > 0) ? raw : (v) => ({
+  __isRawHtml: true,
+  html: String(v ?? '')
+});
 
 let currentDAGData = null;
 let graphTransform = { x: 60, y: 220, scale: 0.85 };
@@ -274,13 +305,13 @@ export function renderReadingListDAG(mountContainer, dagData, options = {}) {
   activeSeriesFilter = null;
 
   if (!dagData || !dagData.nodes || dagData.nodes.length === 0) {
-    mountContainer.innerHTML = `
+    renderContent(mountContainer, safeHtml`
       <div class="py-16 text-center text-gray-400 bg-gray-900/40 rounded-2xl border border-gray-800 p-8 max-w-md mx-auto my-8">
         <span class="text-4xl mb-3 inline-block">📚</span>
         <h3 class="text-lg font-bold text-white mb-1">No Comics in this List</h3>
         <p class="text-xs text-gray-400">Add comics to this reading list to explore its interactive continuity graph.</p>
       </div>
-    `;
+    `);
     return;
   }
 
@@ -288,8 +319,22 @@ export function renderReadingListDAG(mountContainer, dagData, options = {}) {
 
   const percent = dagData.totalIssues > 0 ? Math.round((dagData.readCount / dagData.totalIssues) * 100) : 0;
   const seriesColorMap = new Map((dagData.seriesLanes || []).map(sl => [sl.series, sl.color]));
+  const seriesLanesHtml = (dagData.seriesLanes && dagData.seriesLanes.length > 1) ? `
+    <div class="px-3 py-1.5 bg-gray-900/60 border-b border-gray-800/80 flex items-center gap-2 overflow-x-auto text-xs z-10 scrollbar-none">
+      <span class="text-[10px] uppercase font-bold tracking-wider text-gray-500 shrink-0">Series:</span>
+      ${dagData.seriesLanes.map(sl => `
+        <button class="rl-series-legend-chip px-2 py-0.5 rounded-full text-[11px] font-semibold shrink-0 transition-all border flex items-center gap-1.5"
+                style="border-color: ${sl.color}40; background-color: ${sl.color}15; color: ${sl.color};"
+                data-series="${escapeHtml(sl.series)}">
+          <span class="w-1.5 h-1.5 rounded-full" style="background-color: ${sl.color};"></span>
+          <span class="truncate max-w-[140px]">${escapeHtml(sl.series)}</span>
+          <span class="text-[10px] opacity-70">(${sl.count})</span>
+        </button>
+      `).join('')}
+    </div>
+  ` : '';
 
-  mountContainer.innerHTML = `
+  renderContent(mountContainer, safeHtml`
     <div class="rl-dag-wrapper flex flex-col h-[76vh] sm:h-[82vh] min-h-[500px] bg-gray-950 rounded-2xl border border-gray-800/80 overflow-hidden relative shadow-2xl select-none">
       <!-- DAG Toolbar -->
       <div class="flex flex-wrap items-center justify-between gap-3 p-3 bg-gray-900/90 border-b border-gray-800 backdrop-blur-md z-20">
@@ -333,20 +378,7 @@ export function renderReadingListDAG(mountContainer, dagData, options = {}) {
       </div>
 
       <!-- Series Lanes Legend Bar -->
-      ${(dagData.seriesLanes && dagData.seriesLanes.length > 1) ? `
-        <div class="px-3 py-1.5 bg-gray-900/60 border-b border-gray-800/80 flex items-center gap-2 overflow-x-auto text-xs z-10 scrollbar-none">
-          <span class="text-[10px] uppercase font-bold tracking-wider text-gray-500 shrink-0">Series:</span>
-          ${dagData.seriesLanes.map(sl => `
-            <button class="rl-series-legend-chip px-2 py-0.5 rounded-full text-[11px] font-semibold shrink-0 transition-all border flex items-center gap-1.5"
-                    style="border-color: ${sl.color}40; background-color: ${sl.color}15; color: ${sl.color};"
-                    data-series="${escapeHtml(sl.series)}">
-              <span class="w-1.5 h-1.5 rounded-full" style="background-color: ${sl.color};"></span>
-              <span class="truncate max-w-[140px]">${escapeHtml(sl.series)}</span>
-              <span class="text-[10px] opacity-70">(${sl.count})</span>
-            </button>
-          `).join('')}
-        </div>
-      ` : ''}
+      ${safeRaw(seriesLanesHtml)}
 
       <!-- Interactive Canvas Area -->
       <div id="rl-dag-viewport" class="flex-1 w-full h-full overflow-hidden relative cursor-grab bg-[radial-gradient(#374151_1px,transparent_1px)] [background-size:24px_24px]">
@@ -361,7 +393,7 @@ export function renderReadingListDAG(mountContainer, dagData, options = {}) {
       <!-- Node Inspector Bottom Drawer -->
       <div id="rl-dag-inspector" class="hidden absolute bottom-0 left-0 right-0 z-30 transition-all"></div>
     </div>
-  `;
+  `);
 
   fitDAGToViewport(mountContainer, dagData, false);
   renderVisuals(mountContainer);
@@ -429,7 +461,7 @@ function renderVisuals(container) {
     `;
   });
 
-  svg.innerHTML = edgeHtml;
+  renderContent(svg, safeRaw(edgeHtml));
 
   // Render HTML Cards
   let nodesHtml = '';
@@ -487,7 +519,7 @@ function renderVisuals(container) {
     `;
   });
 
-  nodesContainer.innerHTML = nodesHtml;
+  renderContent(nodesContainer, safeRaw(nodesHtml));
   applyTransform(container);
 }
 
@@ -706,7 +738,7 @@ function showNodeInspector(container, nodeId) {
     ? `${baseUrl}/thumbnails/${encodeURIComponent(node.thumbnailPath)}`
     : `${baseUrl}/background.png`;
 
-  inspector.innerHTML = `
+  renderContent(inspector, safeHtml`
     <div class="p-4 bg-gray-900/95 border-t border-purple-500/40 backdrop-blur-lg flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 animate-slide-up shadow-2xl">
       <div class="flex items-center gap-3 min-w-0">
         <img src="${thumbUrl}" class="w-12 h-16 object-cover rounded-lg shadow-md border border-gray-700 shrink-0" loading="lazy">
@@ -715,10 +747,10 @@ function showNodeInspector(container, nodeId) {
             <span class="text-[10px] uppercase font-mono font-extrabold px-1.5 py-0.5 rounded bg-purple-900/60 text-purple-300 border border-purple-500/30">
               Step #${node.step}
             </span>
-            <span class="text-xs font-semibold text-gray-300 truncate">${escapeHtml(node.series)} ${node.number ? `#${escapeHtml(node.number)}` : ''}</span>
+            <span class="text-xs font-semibold text-gray-300 truncate">${node.series} ${node.number ? `#${node.number}` : ''}</span>
           </div>
-          <h4 class="text-sm font-bold text-white truncate mt-0.5">${escapeHtml(node.name)}</h4>
-          <p class="text-[11px] text-gray-400 line-clamp-1 mt-0.5">${escapeHtml(node.summary || node.publisher || 'In reading order')}</p>
+          <h4 class="text-sm font-bold text-white truncate mt-0.5">${node.name}</h4>
+          <p class="text-[11px] text-gray-400 line-clamp-1 mt-0.5">${node.summary || node.publisher || 'In reading order'}</p>
         </div>
       </div>
 
@@ -732,7 +764,7 @@ function showNodeInspector(container, nodeId) {
         </button>
       </div>
     </div>
-  `;
+  `);
 
   inspector.classList.remove('hidden');
 
@@ -755,7 +787,7 @@ function hideNodeInspector(container) {
   const inspector = container.querySelector('#rl-dag-inspector');
   if (inspector) {
     inspector.classList.add('hidden');
-    inspector.innerHTML = '';
+    clear(inspector);
   }
 }
 

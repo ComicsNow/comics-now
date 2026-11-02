@@ -97,7 +97,7 @@ def parse_goodreads_ld_json(goodreads_url, session=None, query=None):
     return metadata
 
 
-def search_goodreads_multi(query):
+def search_goodreads_multi(query, limit=3):
     cached = tagger_cache.get_query("goodreads", query)
     if cached is not None:
         return cached
@@ -141,7 +141,7 @@ def search_goodreads_multi(query):
             if href and href not in product_paths:
                 product_paths.append(href)
 
-        product_paths = product_paths[:10]
+        product_paths = product_paths[:limit]
         print(f"[*] Goodreads found {len(product_paths)} book URLs to fetch.")
 
         for path in product_paths:

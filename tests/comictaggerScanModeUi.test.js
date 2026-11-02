@@ -94,19 +94,31 @@ describe('Tag Comics Now! scoped scan mode UI', () => {
     sandbox.globalThis = sandbox;
     vm.createContext(sandbox);
 
-    const filePath = path.resolve(__dirname, '../public/js/comictagger.js');
-    const content = fs.readFileSync(filePath, 'utf8');
-    const cleanContent = content
-      .replace(/import\s+[\s\S]*?from\s+['"][^'"]+['"];?/g, '')
-      .replace(/export\s+const\s+/g, 'const ')
-      .replace(/export\s+let\s+/g, 'let ')
-      .replace(/export\s+function\s+/g, 'function ')
-      .replace(/export\s+async\s+function\s+/g, 'async function ')
-      .replace(/export\s+\{[\s\S]*?\};?/g, '')
-      .replace(/export\s+default\s+[\s\S]*?;?/g, '');
+    function loadFile(relPath) {
+      const fullPath = path.resolve(__dirname, relPath);
+      const content = fs.readFileSync(fullPath, 'utf8');
+      const cleanContent = content
+        .replace(/import\s+[\s\S]*?from\s+['"][^'"]+['"];?/g, '')
+        .replace(/export\s+[\s\S]*?\s+from\s+['"][^'"]+['"];?/g, '')
+        .replace(/export\s+const\s+/g, 'var ')
+        .replace(/export\s+let\s+/g, 'var ')
+        .replace(/export\s+function\s+/g, 'function ')
+        .replace(/export\s+async\s+function\s+/g, 'async function ')
+        .replace(/\bconst\s+/g, 'var ')
+        .replace(/\blet\s+/g, 'var ')
+        .replace(/export\s+\{[\s\S]*?\};?/g, '')
+        .replace(/export\s+default\s+[\s\S]*?;?/g, '');
+      const script = new vm.Script(cleanContent);
+      script.runInContext(sandbox);
+    }
 
-    const script = new vm.Script(cleanContent);
-    script.runInContext(sandbox);
+    loadFile('../public/js/comictagger/logging.js');
+    loadFile('../public/js/comictagger/progress.js');
+    loadFile('../public/js/comictagger/scan.js');
+    loadFile('../public/js/comictagger/settings.js');
+    loadFile('../public/js/comictagger/gemini.js');
+    loadFile('../public/js/comictagger/matches.js');
+    loadFile('../public/js/comictagger/lifecycle.js');
     ctModule = sandbox;
   });
 

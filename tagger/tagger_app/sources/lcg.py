@@ -153,7 +153,7 @@ def parse_lcg_product_page(html, url):
     }
 
 
-def search_lcg_multi(query):
+def search_lcg_multi(query, limit=5):
     """Find LCG comic pages via DuckDuckGo and parse each one directly (with caching)."""
     cached = tagger_cache.get_query("lcg", query)
     if cached is not None:
@@ -166,8 +166,10 @@ def search_lcg_multi(query):
         scraper = cloudscraper.create_scraper()
         search_q = f"site:leagueofcomicgeeks.com/comic/ {query}"
         domain_limiter.wait_for_domain("duckduckgo.com")
-        ddg_results = list(DDGS().text(search_q, max_results=20))
+        ddg_results = list(DDGS().text(search_q, max_results=max(limit, 5)))
         for r in ddg_results:
+            if len(out) >= limit:
+                break
             url = r.get("href", "")
             if "leagueofcomicgeeks.com/comic/" not in url:
                 continue

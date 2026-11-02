@@ -1,10 +1,5 @@
 import { state } from '../../../globals.js';
 
-state.GuidedView = state.GuidedView || {};
-if (typeof window !== 'undefined') {
-  window.GuidedView = window.GuidedView || {};
-}
-
 let active = false;
 let bubbleIndex = -1;
 

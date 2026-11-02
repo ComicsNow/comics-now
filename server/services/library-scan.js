@@ -15,10 +15,16 @@ const {
 const { convertCbrToCbz, convertPdfToCbz } = require('./library-conversion');
 const { getComicPages, generateThumbnail } = require('./library-pages');
 const { generateVirtualMetadata } = require('./library-metadata');
+const guidedReader = require('./guided-reader');
 
 let isScanning = false;
 let scanProgress = { totalFiles: 0, scannedFiles: 0, status: 'Idle' };
 let scanTimeout = null;
+let isTaggerRunningFn = null;
+
+function setTaggerRunningCheck(fn) {
+  isTaggerRunningFn = fn;
+}
 
 async function scanLibrary(force = false) {
   if (isScanning) {
@@ -27,8 +33,8 @@ async function scanLibrary(force = false) {
   }
   if (!force) {
     try {
-      const tagger = require('./tagger');
-      if (tagger.isTaggerRunning && tagger.isTaggerRunning()) {
+      const isRunning = isTaggerRunningFn ? isTaggerRunningFn() : false;
+      if (isRunning) {
         log('INFO', 'SCAN', 'Scan skipped: Tag Comics Now is actively running.');
         return;
       }
@@ -441,9 +447,7 @@ async function scanLibrary(force = false) {
   log('INFO', 'SCAN', `Scan complete in ${ms(startScan)} ms. Seen: ${totalSeen}, Upserted: ${totalInsertedOrUpdated}, Converted: ${totalConverted}, Thumbs: ${thumbOk} ok / ${thumbFail} fail, Errors: ${errors}`);
 
   // Notify guided reader so it can auto-process new comics if that setting is enabled.
-  // Lazy require avoids a circular dependency at module-load time.
   try {
-    const guidedReader = require('./guided-reader');
     guidedReader.onLibraryScanComplete(newComicIds).catch(err =>
       log('ERROR', 'GUIDED', `onLibraryScanComplete failed: ${err.message}`)
     );
@@ -464,5 +468,6 @@ function scheduleNextScan() {
 module.exports = {
   scanLibrary,
   scheduleNextScan,
-  isScanning: () => isScanning
+  isScanning: () => isScanning,
+  setTaggerRunningCheck
 };

@@ -161,6 +161,46 @@ def test_gcd_query_cache():
         assert mock_get.call_count == count_first
 
 
+def test_gcd_series_fuzzy_filtering_skips_irrelevant_series():
+    """Verify that search_gcd_multi pre-filters series by title similarity before fetching issues."""
+    tagger_cache.clear()
+
+    mock_series_resp = MagicMock()
+    mock_series_resp.status_code = 200
+    mock_series_resp.json.return_value = {
+        "results": [
+            {"name": "1515 connais pas !", "active_issues": ["https://www.comics.org/api/issue/999/"]},
+            {"name": "51", "active_issues": ["https://www.comics.org/api/issue/1/"]}
+        ]
+    }
+
+    mock_issue_resp = MagicMock()
+    mock_issue_resp.status_code = 200
+    mock_issue_resp.json.return_value = {
+        "series_name": "51",
+        "number": "1",
+        "publication_date": "2026-01-01",
+        "publisher_name": "Mad Cave Studios",
+        "cover": "https://www.comics.org/cover51.jpg"
+    }
+
+    requested_issue_urls = []
+    def side_effect(url, **kwargs):
+        if "series/name" in url:
+            return mock_series_resp
+        requested_issue_urls.append(url)
+        return mock_issue_resp
+
+    with patch("requests.get", side_effect=side_effect):
+        results = gcd.search_gcd_multi("51")
+        assert len(results) == 1
+        assert results[0]["series"] == "51"
+        # Must have skipped issue 999 from the irrelevant series 1515
+        assert "https://www.comics.org/api/issue/999/" not in requested_issue_urls
+        assert "https://www.comics.org/api/issue/1/" in requested_issue_urls
+
+
+
 def test_all_enabled_sources_queried_regardless_of_score():
     """Verify that all enabled sources are queried regardless of high-confidence Tier 1 score."""
     from app import query_all_sources_sequentially
@@ -199,4 +239,85 @@ def test_all_enabled_sources_queried_regardless_of_score():
         assert best_score >= 0.92
         # Verify Tier 2 is queried unconditionally to contribute its fields
         assert tier2_called["called"] is True
+
+
+def test_retailer_default_limits():
+    """Verify retailer sources default to safe limit of 3."""
+    import inspect
+    from tagger_app.sources import blackwells, waterstones, amazon
+
+    sig_bw = inspect.signature(blackwells.search_blackwells_multi)
+    assert sig_bw.parameters["limit"].default == 3
+
+    sig_ws = inspect.signature(waterstones.search_waterstones_multi)
+    assert sig_ws.parameters["limit"].default == 3
+
+    sig_amz = inspect.signature(amazon.search_amazon_multi)
+    assert sig_amz.parameters["limit"].default == 3
+
+
+def test_query_all_sources_parallel_speedup():
+    """Verify query_all_sources_sequentially runs sources in parallel threads."""
+    import time
+    from unittest.mock import patch
+    from tagger_app.core.enrichment import query_all_sources_sequentially
+
+    # Create dummy source resolver responses that sleep for 0.12s
+    def slow_resolver(*args, **kwargs):
+        time.sleep(0.12)
+        return [({"title": "Test Comic #1", "series": "Test Comic", "number": "1"}, 0.90, "dummy")]
+
+    progress_events = []
+    def track_progress(filename, source_name, msg):
+        progress_events.append((source_name, msg))
+
+    # Patch resolvers across multiple enabled sources
+    with patch("tagger_app.sources.comicvine.resolve_comicvine", side_effect=slow_resolver), \
+         patch("tagger_app.sources.metron.resolve_metron", side_effect=slow_resolver), \
+         patch("tagger_app.sources.gcd.resolve_gcd", side_effect=slow_resolver), \
+         patch("tagger_app.sources.lcg.resolve_lcg", side_effect=slow_resolver):
+
+        start = time.time()
+        results = query_all_sources_sequentially(
+            "Test Comic #01.cbz",
+            enabled_sources=["src-comicvine", "src-metron", "src-gcd", "src-lcg"],
+            on_progress=track_progress
+        )
+        elapsed = time.time() - start
+
+        # 4 sources * 0.12s serial would be >= 0.48s.
+        # Running concurrently with max_workers=4..6 should take < 0.35s.
+        assert elapsed < 0.35, f"Execution was serial! Elapsed: {elapsed}s"
+        assert len(results) >= 1
+        assert len(progress_events) >= 4
+
+
+def test_query_all_sources_deterministic_collation():
+    """Verify that parallel worker candidates are collated in registered source priority order."""
+    import time
+    from unittest.mock import patch
+    from tagger_app.core.enrichment import query_all_sources_sequentially
+
+    # ComicVine (priority 0) resolves slowly (0.04s)
+    def cv_resolver(*args, **kwargs):
+        time.sleep(0.04)
+        return [({"title": "Comic Alpha", "series": "Alpha", "number": "1", "source_url": "cv_url"}, 0.90, "ComicVine")]
+
+    # Metron (priority 1) resolves quickly (0.005s)
+    def metron_resolver(*args, **kwargs):
+        time.sleep(0.005)
+        return [({"title": "Comic Beta", "series": "Beta", "number": "1", "source_url": "metron_url"}, 0.90, "Metron")]
+
+    with patch("tagger_app.sources.comicvine.resolve_comicvine", side_effect=cv_resolver), \
+         patch("tagger_app.sources.metron.resolve_metron", side_effect=metron_resolver):
+
+        results = query_all_sources_sequentially(
+            "Alpha #01.cbz",
+            enabled_sources=["src-comicvine", "src-metron"]
+        )
+
+        # Both have 0.90 score, but ComicVine is registered first, so its candidate leads
+        assert len(results) == 2
+        assert results[0][0]["series"] == "Alpha"
+        assert results[1][0]["series"] == "Beta"
 

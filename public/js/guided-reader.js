@@ -1,24 +1,40 @@
-import { state } from './globals.js';
+import { state, global as canonicalGlobal, clearElement } from './globals.js';
+import { html, raw, render } from './ui/template.js';
 
-const global = new Proxy(typeof window !== 'undefined' ? window : globalThis, {
-  get(target, prop) {
-    if (prop in state) {
-      return state[prop];
-    }
-    const val = target[prop];
-    if (typeof val === 'function') {
-      return val.bind(target);
-    }
-    return val;
-  },
-  set(target, prop, value) {
-    state[prop] = value;
-    try {
-      target[prop] = value;
-    } catch (e) {}
-    return true;
-  }
+const global = typeof canonicalGlobal !== 'undefined' ? canonicalGlobal : new Proxy(typeof window !== 'undefined' ? window : globalThis, {
+  get: (t, p) => (typeof state !== 'undefined' && p in state) ? state[p] : t[p],
+  set: (t, p, v) => { if (typeof state !== 'undefined') state[p] = v; try { t[p] = v; } catch {} return true; }
 });
+const clear = typeof clearElement === 'function' ? clearElement : (el) => { if (el) { if (typeof el.replaceChildren === 'function') el.replaceChildren(); else el.innerHTML = ''; } };
+const renderContent = (typeof render === 'function' && render.length >= 2) ? render : (el, content) => {
+  if (!el) return;
+  const toStr = (c) => {
+    if (c === null || c === undefined) return '';
+    if (Array.isArray(c)) return c.map(toStr).join('');
+    if (typeof c === 'object' && typeof c.toHTML === 'function') return c.toHTML();
+    if (typeof c === 'object' && c.__isRawHtml) return c.html;
+    return String(c);
+  };
+  el.innerHTML = toStr(content);
+};
+const safeHtml = (typeof html !== 'undefined' && typeof html === 'function' && html.length > 0) ? html : (strings, ...values) => {
+  const formatVal = (v) => {
+    if (v === null || v === undefined) return '';
+    if (Array.isArray(v)) return v.map(formatVal).join('');
+    if (typeof v === 'object' && v.__isRawHtml) return v.html;
+    if (typeof v === 'object' && typeof v.toHTML === 'function') return v.toHTML();
+    return typeof global.escapeHtml === 'function' ? global.escapeHtml(v) : String(v);
+  };
+  let out = '';
+  for (let i = 0; i < strings.length; i++) {
+    out += strings[i];
+    if (i < values.length) {
+      out += formatVal(values[i]);
+    }
+  }
+  return { toHTML: () => out, html: out, __isRawHtml: true };
+};
+const safeRaw = (typeof raw !== 'undefined' && typeof raw === 'function' && raw.length > 0) ? raw : (v) => ({ __isRawHtml: true, html: String(v ?? '') });
 
 // Guided Reader settings tab — UI logic.
 // Loads/saves settings, drives manual run/cancel, polls status, streams the live log.
@@ -49,7 +65,7 @@ function rerenderLog() {
   const logBox = document.getElementById('guided-log');
   if (!logBox) return;
   const filter = getLevelFilter();
-  logBox.innerHTML = logBuffer.filter(e => entryMatches(e, filter)).map(entryHtml).join('');
+  renderContent(logBox, safeRaw(logBuffer.filter(e => entryMatches(e, filter)).map(entryHtml).join('')));
   requestAnimationFrame(() => { logBox.scrollTop = logBox.scrollHeight; });
 }
 
@@ -86,14 +102,14 @@ function appendLogLine(entry) {
     const existing = logBox.querySelector(`[data-log-id="${CSS.escape(entry.id)}"]`);
     if (existing) {
       const wrap = document.createElement('div');
-      wrap.innerHTML = entryHtml(entry);
+      renderContent(wrap, safeRaw(entryHtml(entry)));
       existing.replaceWith(wrap.firstChild);
       return;
     }
   }
 
   const wrap = document.createElement('div');
-  wrap.innerHTML = entryHtml(entry);
+  renderContent(wrap, safeRaw(entryHtml(entry)));
   logBox.appendChild(wrap.firstChild);
   while (logBox.children.length > LOG_BUFFER_MAX) logBox.removeChild(logBox.firstChild);
 
@@ -455,7 +471,7 @@ function bindOnce() {
   el('guided-log-clear')?.addEventListener('click', async () => {
     logBuffer.length = 0;
     const logBox = el('guided-log');
-    if (logBox) logBox.innerHTML = '';
+    if (logBox) clear(logBox);
     try {
       await fetch(api('/api/v1/guided/logs/clear'), { method: 'POST' });
     } catch (_) {}

@@ -1,10 +1,5 @@
 import { state } from '../../globals.js';
 
-state.GuidedView = state.GuidedView || {};
-if (typeof window !== 'undefined') {
-  window.GuidedView = window.GuidedView || {};
-}
-
 const modes = new Map();
 let activeModeName = null;
 let manualOverrideBox = null;
@@ -202,6 +197,6 @@ export const ModeRegistry = {
 };
 
 state.GuidedView.ModeRegistry = ModeRegistry;
-if (typeof window !== 'undefined') {
+if (typeof window !== 'undefined' && window.GuidedView && window.GuidedView !== state.GuidedView) {
   window.GuidedView.ModeRegistry = ModeRegistry;
 }

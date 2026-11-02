@@ -1,10 +1,5 @@
 import { state } from '../../globals.js';
 
-state.GuidedView = state.GuidedView || {};
-if (typeof window !== 'undefined') {
-  window.GuidedView = window.GuidedView || {};
-}
-
 let lastDblZoomAt = 0;
 const DOUBLE_TAP_MS = 300;
 const DOUBLE_TAP_MOVE_TOLERANCE = 30;
@@ -173,7 +168,7 @@ else init();
 state.GuidedView.handleImageClick = handleImageClick;
 state.GuidedView.handleDoubleClickZoom = handleDoubleClickZoom;
 
-if (typeof window !== 'undefined') {
+if (typeof window !== 'undefined' && window.GuidedView && window.GuidedView !== state.GuidedView) {
   window.GuidedView.handleImageClick = handleImageClick;
   window.GuidedView.handleDoubleClickZoom = handleDoubleClickZoom;
 }

@@ -2,8 +2,40 @@
  * Continuous Mode - Vertical scroll through all pages like webtoon/manga reader
  */
 
-import { state } from './globals.js';
+import { state, actions, clearElement, escapeHtml } from './globals.js';
 import { saveProgressToDB, updateLibraryProgress } from './progress.js';
+import { html, raw, render } from './ui/template.js';
+
+const clear = typeof clearElement === 'function' ? clearElement : (el) => { if (el) { if (typeof el.replaceChildren === 'function') el.replaceChildren(); else el.innerHTML = ''; } };
+const renderContent = (typeof render === 'function' && render.length >= 2) ? render : (el, content) => {
+  if (!el) return;
+  const toStr = (c) => {
+    if (c === null || c === undefined) return '';
+    if (Array.isArray(c)) return c.map(toStr).join('');
+    if (typeof c === 'object' && typeof c.toHTML === 'function') return c.toHTML();
+    if (typeof c === 'object' && c.__isRawHtml) return c.html;
+    return String(c);
+  };
+  el.innerHTML = toStr(content);
+};
+const safeHtml = (typeof html !== 'undefined' && typeof html === 'function' && html.length > 0) ? html : (strings, ...values) => {
+  const formatVal = (v) => {
+    if (v === null || v === undefined) return '';
+    if (Array.isArray(v)) return v.map(formatVal).join('');
+    if (typeof v === 'object' && v.__isRawHtml) return v.html;
+    if (typeof v === 'object' && typeof v.toHTML === 'function') return v.toHTML();
+    return typeof escapeHtml === 'function' ? escapeHtml(v) : String(v);
+  };
+  let out = '';
+  for (let i = 0; i < strings.length; i++) {
+    out += strings[i];
+    if (i < values.length) {
+      out += formatVal(values[i]);
+    }
+  }
+  return { toHTML: () => out, html: out, __isRawHtml: true };
+};
+const safeRaw = (typeof raw !== 'undefined' && typeof raw === 'function' && raw.length > 0) ? raw : (v) => ({ __isRawHtml: true, html: String(v ?? '') });
 
 // ============================================================================
 // STATE MANAGEMENT
@@ -107,11 +139,11 @@ async function loadPage(pageName, container) {
     // Set up error handler
     img.onerror = () => {
       console.error('[CONTINUOUS] Failed to load image:', pageName, pageUrl);
-      container.innerHTML = `<div class="text-red-400 p-4">Failed to load: ${pageName}</div>`;
+      renderContent(container, safeHtml`<div class="text-red-400 p-4">Failed to load: ${pageName}</div>`);
     };
 
     // Clear placeholder and add image to DOM
-    container.innerHTML = '';
+    clear(container);
     container.appendChild(img);
     pageElements.set(pageName, img);
 
@@ -120,7 +152,7 @@ async function loadPage(pageName, container) {
 
   } catch (error) {
     console.error('[CONTINUOUS] Error loading page:', pageName, error);
-    container.innerHTML = `<div class="text-red-400 p-4">Error: ${error.message}</div>`;
+    renderContent(container, safeHtml`<div class="text-red-400 p-4">Error: ${error.message}</div>`);
   }
 }
 
@@ -145,7 +177,7 @@ export async function renderContinuousMode() {
   }
 
   // Clear previous content
-  continuousContainer.innerHTML = '';
+  clear(continuousContainer);
   loadedPages.clear();
   pageElements.clear();
 
@@ -157,9 +189,9 @@ export async function renderContinuousMode() {
     pageContainer.dataset.index = index;
 
     // Add loading placeholder
-    pageContainer.innerHTML = `
+    renderContent(pageContainer, safeHtml`
       <div class="animate-pulse bg-gray-700 h-96 w-full max-w-2xl rounded"></div>
-    `;
+    `);
 
     continuousContainer.appendChild(pageContainer);
 
@@ -250,7 +282,12 @@ export async function enableContinuousMode() {
   }
 
   isContinuousMode = true;
-  state.isContinuousMode = true;
+  const actionsRef = (typeof actions !== 'undefined' ? actions : (typeof state !== 'undefined' ? state?.actions : null));
+  if (actionsRef?.viewer?.setContinuousMode) {
+    actionsRef.viewer.setContinuousMode(true);
+  } else {
+    state.isContinuousMode = true;
+  }
   
   const refreshGuidedToggle = state.refreshGuidedToggle || window.refreshGuidedToggle;
   if (typeof refreshGuidedToggle === 'function') {
@@ -381,7 +418,12 @@ export async function enableContinuousMode() {
  */
 export async function disableContinuousMode() {
   isContinuousMode = false;
-  state.isContinuousMode = false;
+  const actionsRef = (typeof actions !== 'undefined' ? actions : (typeof state !== 'undefined' ? state?.actions : null));
+  if (actionsRef?.viewer?.setContinuousMode) {
+    actionsRef.viewer.setContinuousMode(false);
+  } else {
+    state.isContinuousMode = false;
+  }
 
   const currentComic = state.currentComic || window.currentComic;
   if (currentComic) {
@@ -542,12 +584,16 @@ async function updateCurrentPageFromScroll() {
 
   // Update global page index
   if (state.currentPageIndex !== closestPage) {
-    state.currentPageIndex = closestPage;
-
-    if (isEinkActive()) {
-      const triggerEinkFlash = state.triggerEinkFlash || (typeof window !== 'undefined' ? window.triggerEinkFlash : null);
-      if (typeof triggerEinkFlash === 'function') {
-        triggerEinkFlash();
+    const actionsRef = (typeof actions !== 'undefined' ? actions : (typeof state !== 'undefined' ? state?.actions : null));
+    if (actionsRef?.viewer?.setPageIndex) {
+      actionsRef.viewer.setPageIndex(closestPage, { source: 'continuous_scroll', triggerFlash: isEinkActive() });
+    } else {
+      state.currentPageIndex = closestPage;
+      if (isEinkActive()) {
+        const triggerEinkFlash = state.triggerEinkFlash || (typeof window !== 'undefined' ? window.triggerEinkFlash : null);
+        if (typeof triggerEinkFlash === 'function') {
+          triggerEinkFlash();
+        }
       }
     }
 

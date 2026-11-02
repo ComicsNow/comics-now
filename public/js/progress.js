@@ -6,8 +6,42 @@ import {
   state,
   ICONS,
   debugLog,
-  applyDisplayInfoToComic
+  applyDisplayInfoToComic,
+  escapeHtml,
+  clearElement
 } from './globals.js';
+import { html, raw, render } from './ui/template.js';
+
+const clear = typeof clearElement === 'function' ? clearElement : (el) => { if (el) { if (typeof el.replaceChildren === 'function') el.replaceChildren(); else el.innerHTML = ''; } };
+const renderContent = (typeof render === 'function' && render.length >= 2) ? render : (el, content) => {
+  if (!el) return;
+  const toStr = (c) => {
+    if (c === null || c === undefined) return '';
+    if (Array.isArray(c)) return c.map(toStr).join('');
+    if (typeof c === 'object' && typeof c.toHTML === 'function') return c.toHTML();
+    if (typeof c === 'object' && c.__isRawHtml) return c.html;
+    return String(c);
+  };
+  el.innerHTML = toStr(content);
+};
+const safeHtml = (typeof html !== 'undefined' && typeof html === 'function' && html.length > 0) ? html : (strings, ...values) => {
+  const formatVal = (v) => {
+    if (v === null || v === undefined) return '';
+    if (Array.isArray(v)) return v.map(formatVal).join('');
+    if (typeof v === 'object' && v.__isRawHtml) return v.html;
+    if (typeof v === 'object' && typeof v.toHTML === 'function') return v.toHTML();
+    return typeof escapeHtml === 'function' ? escapeHtml(v) : String(v);
+  };
+  let out = '';
+  for (let i = 0; i < strings.length; i++) {
+    out += strings[i];
+    if (i < values.length) {
+      out += formatVal(values[i]);
+    }
+  }
+  return { toHTML: () => out, html: out, __isRawHtml: true };
+};
+const safeRaw = (typeof raw !== 'undefined' && typeof raw === 'function' && raw.length > 0) ? raw : (v) => ({ __isRawHtml: true, html: String(v ?? '') });
 
 // --- Dynamic Wrappers for Transitioning Functions ---
 
@@ -509,7 +543,7 @@ export async function toggleReadStatus(button) {
   const iconUnread = ICONS.UNREAD;
 
   // Optimistically update button UI
-  button.innerHTML = newStatus === 'read' ? iconRead : iconUnread;
+  renderContent(button, safeRaw(newStatus === 'read' ? iconRead : iconUnread));
   button.dataset.currentStatus = newStatus;
   if (newStatus === 'read') {
     button.classList.add('text-green-400');
@@ -580,7 +614,7 @@ export async function toggleReadStatus(button) {
 
   } catch (error) {
     // ROLLBACK: Revert optimistic UI update on error
-    button.innerHTML = originalIcon;
+    renderContent(button, safeRaw(originalIcon));
     button.className = originalColor;
     button.dataset.currentStatus = currentStatus;
 
@@ -625,7 +659,7 @@ export async function toggleReadStatus(button) {
     });
 
     // Re-apply optimistic update for offline mode
-    button.innerHTML = newStatus === 'read' ? iconRead : iconUnread;
+    renderContent(button, safeRaw(newStatus === 'read' ? iconRead : iconUnread));
     button.dataset.currentStatus = newStatus;
     if (newStatus === 'read') {
       button.classList.add('text-green-400');

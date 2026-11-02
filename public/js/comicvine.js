@@ -1,11 +1,46 @@
 import {
   state,
   escapeHtml,
+  clearElement,
+  render,
+  html,
+  raw,
   searchStatusDiv,
   searchResultsUl,
   searchForm,
   searchQueryInput
 } from './globals.js';
+
+const clear = typeof clearElement === 'function' ? clearElement : (el) => { if (el) { if (typeof el.replaceChildren === 'function') el.replaceChildren(); else el.innerHTML = ''; } };
+const renderContent = (typeof render === 'function' && render.length >= 2) ? render : (el, content) => {
+  if (!el) return;
+  if (content && typeof content === 'object' && typeof content.toHTML === 'function') {
+    el.innerHTML = content.toHTML();
+  } else if (content && typeof content === 'object' && content.__isRawHtml) {
+    el.innerHTML = content.html;
+  } else {
+    el.innerHTML = String(content ?? '');
+  }
+};
+
+const safeHtml = (typeof html !== 'undefined' && typeof html === 'function' && html.length > 0) ? html : (strings, ...values) => {
+  let out = '';
+  for (let i = 0; i < strings.length; i++) {
+    out += strings[i];
+    if (i < values.length) {
+      const v = values[i];
+      if (v && typeof v === 'object' && v.__isRawHtml) out += v.html;
+      else if (v && typeof v === 'object' && typeof v.toHTML === 'function') out += v.toHTML();
+      else out += (typeof escapeHtml === 'function' ? escapeHtml(v) : String(v ?? ''));
+    }
+  }
+  return { toHTML: () => out, html: out, __isRawHtml: true };
+};
+
+const safeRaw = (typeof raw !== 'undefined' && typeof raw === 'function' && raw.length > 0) ? raw : (v) => ({
+  __isRawHtml: true,
+  html: String(v ?? '')
+});
 
 // --- ComicVine Search State & Elements ---
 export const cvState = {
@@ -97,10 +132,10 @@ export function updateStageButtons() {
     const staged = isSourceStaged(item);
     if (staged) {
       btn.className = 'stage-source-btn shrink-0 ml-2 px-2.5 py-1 text-xs font-semibold rounded-lg transition-all cursor-pointer flex items-center gap-1 bg-purple-600/30 text-purple-300 border border-purple-500/50 shadow-xs';
-      btn.innerHTML = `<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg><span>✓ Staged</span>`;
+      renderContent(btn, safeHtml`<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg><span>✓ Staged</span>`);
     } else {
       btn.className = 'stage-source-btn shrink-0 ml-2 px-2.5 py-1 text-xs font-semibold rounded-lg transition-all cursor-pointer flex items-center gap-1 bg-gray-800 text-gray-300 hover:bg-gray-700 hover:text-white border border-gray-600';
-      btn.innerHTML = `<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg><span>+ Stage</span>`;
+      renderContent(btn, safeHtml`<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg><span>+ Stage</span>`);
     }
   });
 }
@@ -130,7 +165,7 @@ export function renderStagingTray() {
 
   if (count === 0) {
     tray.classList.add('hidden');
-    if (listEl) listEl.innerHTML = '';
+    if (listEl) clear(listEl);
     return;
   }
 
@@ -151,7 +186,7 @@ export function renderStagingTray() {
   }
 
   if (listEl) {
-    listEl.innerHTML = '';
+    clear(listEl);
     for (const sourceItem of cvState.stagedSources) {
       const chip = document.createElement('div');
       chip.className = 'inline-flex items-center gap-1.5 pl-2 pr-1.5 py-1 bg-gray-700/80 hover:bg-gray-700 border border-gray-600 rounded-lg text-xs text-white shadow-xs';
@@ -162,16 +197,16 @@ export function renderStagingTray() {
       const title = sourceItem.name || sourceItem.volumeName || sourceItem.title || 'Unknown';
       const num = sourceItem.issueNumber || sourceItem.number ? ` #${sourceItem.issueNumber || sourceItem.number}` : '';
 
-      chip.innerHTML = `
-        ${badge}
-        <span class="max-w-[120px] sm:max-w-[180px] truncate font-medium">${escapeHtml(title)}${escapeHtml(num)}</span>
-      `;
+      renderContent(chip, safeHtml`
+        ${safeRaw(badge)}
+        <span class="max-w-[120px] sm:max-w-[180px] truncate font-medium">${title}${num}</span>
+      `);
 
       const removeBtn = document.createElement('button');
       removeBtn.type = 'button';
       removeBtn.className = 'remove-staged-btn ml-1 p-0.5 text-gray-400 hover:text-white hover:bg-gray-600 rounded cursor-pointer transition-colors';
       removeBtn.title = 'Remove staged source';
-      removeBtn.innerHTML = `<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>`;
+      renderContent(removeBtn, safeHtml`<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>`);
       removeBtn.addEventListener('click', (e) => {
         e.stopPropagation();
         unstageSource(getSourceKey(sourceItem));
@@ -192,10 +227,10 @@ export async function synthesizeStagedSources() {
 
   if (synthBtn) {
     synthBtn.disabled = true;
-    synthBtn.innerHTML = `
+    renderContent(synthBtn, safeHtml`
       <svg class="animate-spin w-3.5 h-3.5 text-white" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
       <span>Synthesizing...</span>
-    `;
+    `);
   }
 
   if (statusDiv) {
@@ -259,7 +294,7 @@ export async function synthesizeStagedSources() {
   } finally {
     if (synthBtn) {
       synthBtn.disabled = (cvState.stagedSources || []).length < 2;
-      synthBtn.innerHTML = originalBtnHtml;
+      renderContent(synthBtn, safeRaw(originalBtnHtml));
     }
   }
 }
@@ -286,11 +321,11 @@ function openCoverPreviewModal(imageUrl, title) {
   
   const closeBtn = document.createElement('button');
   closeBtn.className = 'absolute top-4 right-4 bg-black/60 hover:bg-black/80 text-white rounded-full p-2 focus:outline-hidden transition-colors border border-white/10';
-  closeBtn.innerHTML = `
+  renderContent(closeBtn, safeHtml`
     <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
     </svg>
-  `;
+  `);
   
   const caption = document.createElement('div');
   caption.className = 'text-white text-sm font-semibold text-center mt-3 px-4 max-w-md truncate';
@@ -352,7 +387,7 @@ function getSourceInfo(rawSource) {
 function renderSourceFilterTabs(results) {
   const tabsContainer = document.getElementById('cv-source-filter-tabs');
   if (!tabsContainer) return;
-  tabsContainer.innerHTML = '';
+  clear(tabsContainer);
 
   if (!results || results.length === 0) {
     tabsContainer.classList.add('hidden');
@@ -415,7 +450,7 @@ function renderSourceFilterTabs(results) {
 function renderResultsList() {
   const resultsUl = document.getElementById('search-results') || document.getElementById('cv-results');
   if (!resultsUl) return;
-  resultsUl.innerHTML = '';
+  clear(resultsUl);
 
   const filter = cvState.activeSourceFilter || 'all';
   const filtered = filter === 'all'
@@ -460,13 +495,13 @@ function renderResultsList() {
     // Base row
     const baseRow = document.createElement('div');
     baseRow.className = 'flex items-center space-x-3 cursor-pointer';
-    baseRow.innerHTML = `
-      ${coverUrl ? `<img src="${escapeHtml(coverUrl)}" alt="cover" class="w-10 h-14 object-cover rounded shrink-0 hover:brightness-110 transition-all shadow hover:shadow-lg" loading="lazy" referrerpolicy="no-referrer" onerror="this.onerror=null; this.src='data:image/svg+xml;utf8,<svg xmlns=\\'http://www.w3.org/2000/svg\\' width=\\'40\\' height=\\'56\\' viewBox=\\'0 0 40 56\\'><rect width=\\'100%\\' height=\\'100%\\' fill=\\'%23374151\\'/><rect x=\\'2\\' y=\\'2\\' width=\\'36\\' height=\\'52\\' fill=\\'none\\' stroke=\\'%234b5563\\' rx=\\'2\\'/><text x=\\'50%\\' y=\\'50%\\' fill=\\'%239ca3af\\' font-size=\\'7\\' font-family=\\'sans-serif\\' text-anchor=\\'middle\\' dominant-baseline=\\'middle\\'>NO COVER</text></svg>';"/>` : `<div class="w-10 h-14 bg-gray-800 rounded shrink-0 flex items-center justify-center border border-gray-700 shadow"><span class="text-[9px] text-gray-400 font-bold">NO COVER</span></div>`}
+    renderContent(baseRow, safeHtml`
+      ${safeRaw(coverUrl ? `<img src="${escapeHtml(coverUrl)}" alt="cover" class="w-10 h-14 object-cover rounded shrink-0 hover:brightness-110 transition-all shadow hover:shadow-lg" loading="lazy" referrerpolicy="no-referrer" onerror="this.onerror=null; this.src='data:image/svg+xml;utf8,<svg xmlns=\\'http://www.w3.org/2000/svg\\' width=\\'40\\' height=\\'56\\' viewBox=\\'0 0 40 56\\'><rect width=\\'100%\\' height=\\'100%\\' fill=\\'%23374151\\'/><rect x=\\'2\\' y=\\'2\\' width=\\'36\\' height=\\'52\\' fill=\\'none\\' stroke=\\'%234b5563\\' rx=\\'2\\'/><text x=\\'50%\\' y=\\'50%\\' fill=\\'%239ca3af\\' font-size=\\'7\\' font-family=\\'sans-serif\\' text-anchor=\\'middle\\' dominant-baseline=\\'middle\\'>NO COVER</text></svg>';"/>` : `<div class="w-10 h-14 bg-gray-800 rounded shrink-0 flex items-center justify-center border border-gray-700 shadow"><span class="text-[9px] text-gray-400 font-bold">NO COVER</span></div>`)}
       <div class="flex-1 min-w-0">
-        <span class="font-bold block truncate">${escapeHtml(displayName)}${badgeHtml}</span>
-        <span class="text-sm text-gray-400 block truncate">${escapeHtml(subtitle)}</span>
+        <span class="font-bold block truncate">${displayName}${safeRaw(badgeHtml)}</span>
+        <span class="text-sm text-gray-400 block truncate">${subtitle}</span>
       </div>
-    `;
+    `);
 
     // Allow clicking thumbnail image to preview full high-res cover
     const coverImg = baseRow.querySelector('img');
@@ -488,9 +523,9 @@ function renderResultsList() {
         ? 'bg-purple-600/30 text-purple-300 border border-purple-500/50 shadow-xs'
         : 'bg-gray-800 text-gray-300 hover:bg-gray-700 hover:text-white border border-gray-600'
     }`;
-    stageBtn.innerHTML = staged
-      ? `<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg><span>✓ Staged</span>`
-      : `<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg><span>+ Stage</span>`;
+    renderContent(stageBtn, staged
+      ? safeHtml`<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg><span>✓ Staged</span>`
+      : safeHtml`<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg><span>+ Stage</span>`);
 
     stageBtn.addEventListener('click', (e) => {
       e.stopPropagation();
@@ -542,7 +577,7 @@ function renderResultsList() {
               const issues = await res.json();
               if (!res.ok) throw new Error(issues.message || 'Failed to fetch issues');
 
-              issueList.innerHTML = '';
+              clear(issueList);
               if (Array.isArray(issues) && issues.length > 0) {
                 for (const issue of issues) {
                   const issueLi = document.createElement('li');
@@ -557,13 +592,13 @@ function renderResultsList() {
 
                   const issueDisplayName = `${issue.name || 'Unknown'}${issue.issueNumber ? ` #${issue.issueNumber}` : ''}`;
 
-                  issueLi.innerHTML = `
-                    ${issueCoverUrl ? `<img src="${escapeHtml(issueCoverUrl)}" class="w-8 h-12 object-cover rounded shrink-0 hover:brightness-110 transition-all shadow" loading="lazy" referrerpolicy="no-referrer" onerror="this.onerror=null; this.src='data:image/svg+xml;utf8,<svg xmlns=\\'http://www.w3.org/2000/svg\\' width=\\'32\\' height=\\'48\\' viewBox=\\'0 0 32 48\\'><rect width=\\'100%\\' height=\\'100%\\' fill=\\'%23374151\\'/><rect x=\\'2\\' y=\\'2\\' width=\\'28\\' height=\\'44\\' fill=\\'none\\' stroke=\\'%234b5563\\' rx=\\'2\\'/><text x=\\'50%\\' y=\\'50%\\' fill=\\'%239ca3af\\' font-size=\\'6\\' font-family=\\'sans-serif\\' text-anchor=\\'middle\\' dominant-baseline=\\'middle\\'>NO COVER</text></svg>';"/>` : `<div class="w-8 h-12 bg-gray-700 rounded shrink-0 flex items-center justify-center border border-gray-600 shadow"><span class="text-[9px] text-gray-400 font-bold">NO COVER</span></div>`}
+                  renderContent(issueLi, safeHtml`
+                    ${safeRaw(issueCoverUrl ? `<img src="${escapeHtml(issueCoverUrl)}" class="w-8 h-12 object-cover rounded shrink-0 hover:brightness-110 transition-all shadow" loading="lazy" referrerpolicy="no-referrer" onerror="this.onerror=null; this.src='data:image/svg+xml;utf8,<svg xmlns=\\'http://www.w3.org/2000/svg\\' width=\\'32\\' height=\\'48\\' viewBox=\\'0 0 32 48\\'><rect width=\\'100%\\' height=\\'100%\\' fill=\\'%23374151\\'/><rect x=\\'2\\' y=\\'2\\' width=\\'28\\' height=\\'44\\' fill=\\'none\\' stroke=\\'%234b5563\\' rx=\\'2\\'/><text x=\\'50%\\' y=\\'50%\\' fill=\\'%239ca3af\\' font-size=\\'6\\' font-family=\\'sans-serif\\' text-anchor=\\'middle\\' dominant-baseline=\\'middle\\'>NO COVER</text></svg>';"/>` : `<div class="w-8 h-12 bg-gray-700 rounded shrink-0 flex items-center justify-center border border-gray-600 shadow"><span class="text-[9px] text-gray-400 font-bold">NO COVER</span></div>`)}
                     <div class="flex-1 min-w-0">
-                      <span class="font-bold block truncate">${escapeHtml(issueDisplayName)}</span>
-                      <span class="text-sm text-gray-400 block truncate">${escapeHtml(issueSubtitle)}</span>
+                      <span class="font-bold block truncate">${issueDisplayName}</span>
+                      <span class="text-sm text-gray-400 block truncate">${issueSubtitle}</span>
                     </div>
-                  `;
+                  `);
 
                   const itemImg = issueLi.querySelector('img');
                   if (itemImg) {
@@ -584,9 +619,9 @@ function renderResultsList() {
                       ? 'bg-purple-600/30 text-purple-300 border border-purple-500/50 shadow-xs'
                       : 'bg-gray-800 text-gray-300 hover:bg-gray-700 hover:text-white border border-gray-600'
                   }`;
-                  issueStageBtn.innerHTML = issueStaged
-                    ? `<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg><span>✓ Staged</span>`
-                    : `<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg><span>+ Stage</span>`;
+                  renderContent(issueStageBtn, issueStaged
+                    ? safeHtml`<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg><span>✓ Staged</span>`
+                    : safeHtml`<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg><span>+ Stage</span>`);
                   issueStageBtn.addEventListener('click', (ev) => {
                     ev.stopPropagation();
                     toggleStageSource(issueItem);
@@ -660,7 +695,7 @@ export async function performCvSearch() {
   const nextBtn = document.getElementById('cv-next');
 
   if (statusDiv) statusDiv.textContent = 'Searching across sources...';
-  if (resultsUl) resultsUl.innerHTML = '';
+  if (resultsUl) clear(resultsUl);
   const tabsContainer = document.getElementById('cv-source-filter-tabs');
   if (tabsContainer) tabsContainer.classList.add('hidden');
 

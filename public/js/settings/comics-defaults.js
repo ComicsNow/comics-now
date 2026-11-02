@@ -1,4 +1,37 @@
-import { state } from '../globals.js';
+import { state, clearElement } from '../globals.js';
+import { html, raw, render } from '../ui/template.js';
+import { showSettingsMessage } from './shared.js';
+
+const clear = typeof clearElement === 'function' ? clearElement : (el) => { if (el) { if (typeof el.replaceChildren === 'function') el.replaceChildren(); else el.innerHTML = ''; } };
+const renderContent = (typeof render === 'function' && render.length >= 2) ? render : (el, content) => {
+  if (!el) return;
+  const toStr = (c) => {
+    if (c === null || c === undefined) return '';
+    if (Array.isArray(c)) return c.map(toStr).join('');
+    if (typeof c === 'object' && typeof c.toHTML === 'function') return c.toHTML();
+    if (typeof c === 'object' && c.__isRawHtml) return c.html;
+    return String(c);
+  };
+  el.innerHTML = toStr(content);
+};
+const safeHtml = (typeof html !== 'undefined' && typeof html === 'function' && html.length > 0) ? html : (strings, ...values) => {
+  const formatVal = (v) => {
+    if (v === null || v === undefined) return '';
+    if (Array.isArray(v)) return v.map(formatVal).join('');
+    if (typeof v === 'object' && v.__isRawHtml) return v.html;
+    if (typeof v === 'object' && typeof v.toHTML === 'function') return v.toHTML();
+    return String(v);
+  };
+  let out = '';
+  for (let i = 0; i < strings.length; i++) {
+    out += strings[i];
+    if (i < values.length) {
+      out += formatVal(values[i]);
+    }
+  }
+  return { toHTML: () => out, html: out, __isRawHtml: true };
+};
+const safeRaw = (typeof raw !== 'undefined' && typeof raw === 'function' && raw.length > 0) ? raw : (v) => ({ __isRawHtml: true, html: String(v ?? '') });
 
 // --- COMICS DEFAULTS (deferred save) ---
 // All controls on this subtab stage their changes locally and are only
@@ -16,9 +49,9 @@ const baseline = {
 };
 
 const $ = (id) => document.getElementById(id);
-const apiBase = () => state.API_BASE_URL || window.API_BASE_URL || '';
+const apiBase = () => state.API_BASE_URL || '';
 const toast = (msg, type) =>
-  (state.showSettingsMessage || window.showSettingsMessage || (() => {}))(msg, type);
+  (typeof showSettingsMessage === 'function' ? showSettingsMessage : (state.showSettingsMessage || window.showSettingsMessage || (() => {})))(msg, type);
 
 // --- DIRTY STATE ---
 function currentState() {
@@ -205,7 +238,7 @@ async function loadMasterDefaults() {
 async function renderLibraryPreferences() {
   const container = $('library-preferences-container');
   if (!container) return;
-  container.innerHTML = '<p class="text-xs text-gray-500">Loading library folders…</p>';
+  renderContent(container, safeHtml`<p class="text-xs text-gray-500">Loading library folders…</p>`);
 
   try {
     const [libRes, prefRes] = await Promise.all([
@@ -220,12 +253,14 @@ async function renderLibraryPreferences() {
     baseline.libraryPrefs = {};
 
     if (libraries.length === 0) {
-      container.innerHTML =
-        '<p class="text-xs text-gray-500">No library folders configured yet.</p>';
+      renderContent(
+        container,
+        safeHtml`<p class="text-xs text-gray-500">No library folders configured yet.</p>`
+      );
       return;
     }
 
-    container.innerHTML = '';
+    clear(container);
     for (const lib of libraries) {
       const p = lib.path;
       const effectivePref = prefs[p] || {};
@@ -292,8 +327,10 @@ async function renderLibraryPreferences() {
     }
   } catch (e) {
     console.error('[DEFAULTS] Failed to render library preferences:', e);
-    container.innerHTML =
-      '<p class="text-xs text-red-400">Failed to load library preferences.</p>';
+    renderContent(
+      container,
+      safeHtml`<p class="text-xs text-red-400">Failed to load library preferences.</p>`
+    );
   }
 }
 

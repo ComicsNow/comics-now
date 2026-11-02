@@ -1,7 +1,40 @@
 /**
  * Reading Lists - Frontend functionality for managing reading lists
  */
-import { state, escapeHtml } from './globals.js';
+import { state, escapeHtml, clearElement } from './globals.js';
+import { html, raw, render } from './ui/template.js';
+import { isAppOnline } from './offline/status.js';
+
+const clear = typeof clearElement === 'function' ? clearElement : (el) => { if (el) { if (typeof el.replaceChildren === 'function') el.replaceChildren(); else el.innerHTML = ''; } };
+const renderContent = (typeof render === 'function' && render.length >= 2) ? render : (el, content) => {
+  if (!el) return;
+  const toStr = (c) => {
+    if (c === null || c === undefined) return '';
+    if (Array.isArray(c)) return c.map(toStr).join('');
+    if (typeof c === 'object' && typeof c.toHTML === 'function') return c.toHTML();
+    if (typeof c === 'object' && c.__isRawHtml) return c.html;
+    return String(c);
+  };
+  el.innerHTML = toStr(content);
+};
+const safeHtml = (typeof html !== 'undefined' && typeof html === 'function' && html.length > 0) ? html : (strings, ...values) => {
+  const formatVal = (v) => {
+    if (v === null || v === undefined) return '';
+    if (Array.isArray(v)) return v.map(formatVal).join('');
+    if (typeof v === 'object' && v.__isRawHtml) return v.html;
+    if (typeof v === 'object' && typeof v.toHTML === 'function') return v.toHTML();
+    return typeof escapeHtml === 'function' ? escapeHtml(v) : String(v);
+  };
+  let out = '';
+  for (let i = 0; i < strings.length; i++) {
+    out += strings[i];
+    if (i < values.length) {
+      out += formatVal(values[i]);
+    }
+  }
+  return { toHTML: () => out, html: out, __isRawHtml: true };
+};
+const safeRaw = (typeof raw !== 'undefined' && typeof raw === 'function' && raw.length > 0) ? raw : (v) => ({ __isRawHtml: true, html: String(v ?? '') });
 import {
   saveReadingListsCacheToDB,
   loadReadingListsCacheFromDB,
@@ -18,6 +51,9 @@ let selectedListIds = new Set();
  * @returns {boolean}
  */
 export function isOffline() {
+  if (typeof isAppOnline === 'function') {
+    return !isAppOnline();
+  }
   const status = typeof window !== 'undefined' ? (window.OfflineStatus || window) : null;
   if (status && typeof status.isAppOnline === 'function') {
     return !status.isAppOnline();
@@ -485,23 +521,23 @@ async function refreshAddToListModal() {
   const lists = await fetchReadingLists();
 
   if (lists.length === 0) {
-    container.innerHTML = '<p class="text-sm text-gray-400 text-center py-4">No reading lists yet. Create one to get started!</p>';
+    renderContent(container, safeHtml`<p class="text-sm text-gray-400 text-center py-4">No reading lists yet. Create one to get started!</p>`);
     return;
   }
 
-  container.innerHTML = '';
+  clear(container);
   lists.forEach(list => {
     const checkbox = document.createElement('label');
     checkbox.className = 'flex items-center gap-2 p-2 hover:bg-gray-700 rounded cursor-pointer';
-    checkbox.innerHTML = `
+    renderContent(checkbox, safeHtml`
       <input type="checkbox"
              class="w-4 h-4 rounded border-gray-600 text-purple-600 focus:ring-purple-500"
-             data-list-id="${escapeHtml(list.id)}">
+             data-list-id="${list.id}">
       <span class="flex-1">
-        <span class="font-semibold">${escapeHtml(list.name)}</span>
+        <span class="font-semibold">${list.name}</span>
         <span class="text-sm text-gray-400 ml-2">(${list.totalComics} items)</span>
       </span>
-    `;
+    `);
     const input = checkbox.querySelector('input');
     input.addEventListener('change', (e) => {
       if (e.target.checked) selectedListIds.add(list.id);
