@@ -106,14 +106,13 @@ describe('Automated CI/CD Release & SemVer Logic', () => {
       expect(npmWf.jobs['publish-npm']).toBeDefined();
     });
 
-    test('docker-publish workflow gates Docker publishing with the test job', () => {
+    test('docker-publish workflow runs build-and-push-image directly without a redundant CI test job', () => {
       const wf = yaml.load(fs.readFileSync(dockerWfPath, 'utf8'));
-      expect(wf.jobs.test).toBeDefined();
+      expect(wf.jobs.test).toBeUndefined();
 
       const dockerJob = wf.jobs['build-and-push-image'];
       expect(dockerJob).toBeDefined();
-      const dockerNeeds = Array.isArray(dockerJob.needs) ? dockerJob.needs : [dockerJob.needs];
-      expect(dockerNeeds).toContain('test');
+      expect(dockerJob.needs).toBeUndefined();
     });
   });
 });

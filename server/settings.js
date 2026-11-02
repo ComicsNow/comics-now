@@ -5,6 +5,8 @@ const {
   setComicVineApiKey,
   setCtScheduleMinutes,
   setAllowedFormats,
+  setDeleteCbrAfterConversion,
+  setDeletePdfAfterConversion,
   setMetadataStorage,
   setTaggerMode,
   setTaggerServiceUrl,
@@ -60,6 +62,16 @@ async function loadSettings() {
         } catch {
           setAllowedFormats(row.value, true);
         }
+      }
+      if (row.key === 'delete_cbr_after_conversion') {
+        let val;
+        try { val = JSON.parse(row.value); } catch { val = row.value; }
+        setDeleteCbrAfterConversion(val, true);
+      }
+      if (row.key === 'delete_pdf_after_conversion') {
+        let val;
+        try { val = JSON.parse(row.value); } catch { val = row.value; }
+        setDeletePdfAfterConversion(val, true);
       }
       if (row.key === 'metadata_storage') {
         try {

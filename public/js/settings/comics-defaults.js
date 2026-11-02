@@ -1,6 +1,7 @@
 import { state, clearElement } from '../globals.js';
 import { html, raw, render } from '../ui/template.js';
 import { showSettingsMessage } from './shared.js';
+import { buildLibraryPrefRow } from './library-pref-row.js';
 
 const clear = typeof clearElement === 'function' ? clearElement : (el) => { if (el) { if (typeof el.replaceChildren === 'function') el.replaceChildren(); else el.innerHTML = ''; } };
 const renderContent = (typeof render === 'function' && render.length >= 2) ? render : (el, content) => {
@@ -45,6 +46,8 @@ const baseline = {
   masterManga: false,
   masterContinuous: false,
   allowedFormats: 'cbz',
+  deleteCbrAfterConversion: false,
+  deletePdfAfterConversion: false,
   libraryPrefs: {}, // path -> { mangaMode, continuousMode }
 };
 
@@ -63,10 +66,20 @@ function currentState() {
       continuousMode: !!row.querySelector('.lib-toggle-scroll')?.checked,
     };
   });
+  const cbrSelect = $('cbr-conversion-originals-select');
+  const pdfSelect = $('pdf-conversion-originals-select');
+  const deleteCbrAfterConversion = cbrSelect
+    ? cbrSelect.value === 'delete'
+    : baseline.deleteCbrAfterConversion;
+  const deletePdfAfterConversion = pdfSelect
+    ? pdfSelect.value === 'delete'
+    : baseline.deletePdfAfterConversion;
   return {
     masterManga: !!$('master-manga-toggle')?.checked,
     masterContinuous: !!$('master-continuous-toggle')?.checked,
     allowedFormats: $('allowed-formats-select')?.value || 'cbz',
+    deleteCbrAfterConversion,
+    deletePdfAfterConversion,
     libraryPrefs,
   };
 }
@@ -74,6 +87,8 @@ function currentState() {
 function isDirty() {
   const cur = currentState();
   if (cur.allowedFormats !== baseline.allowedFormats) return true;
+  if (cur.deleteCbrAfterConversion !== baseline.deleteCbrAfterConversion) return true;
+  if (cur.deletePdfAfterConversion !== baseline.deletePdfAfterConversion) return true;
   if (cur.masterManga !== baseline.masterManga) return true;
   if (cur.masterContinuous !== baseline.masterContinuous) return true;
   const paths = new Set([
@@ -139,8 +154,12 @@ async function saveAll() {
   if (status) status.textContent = 'Saving…';
 
   try {
-    // 1. Library format settings (allowedFormats).
-    if (cur.allowedFormats !== baseline.allowedFormats) {
+    // 1. Library format & conversion settings (allowedFormats, deleteCbrAfterConversion, deletePdfAfterConversion).
+    if (
+      cur.allowedFormats !== baseline.allowedFormats ||
+      cur.deleteCbrAfterConversion !== baseline.deleteCbrAfterConversion ||
+      cur.deletePdfAfterConversion !== baseline.deletePdfAfterConversion
+    ) {
       let interval = 5;
       let apiKey = '';
       let metadataStorage = 'archive';
@@ -159,6 +178,8 @@ async function saveAll() {
           interval,
           apiKey,
           allowedFormats: cur.allowedFormats,
+          deleteCbrAfterConversion: cur.deleteCbrAfterConversion,
+          deletePdfAfterConversion: cur.deletePdfAfterConversion,
           metadataStorage,
         }),
       });
@@ -210,6 +231,14 @@ async function loadSettingsValues() {
     const data = await res.json();
     const af = $('allowed-formats-select');
     if (af && data.allowedFormats) af.value = data.allowedFormats;
+    const cbrSelect = $('cbr-conversion-originals-select');
+    const pdfSelect = $('pdf-conversion-originals-select');
+    const delCbr = data.deleteCbrAfterConversion === true;
+    const delPdf = data.deletePdfAfterConversion === true;
+    if (cbrSelect) cbrSelect.value = delCbr ? 'delete' : 'keep';
+    if (pdfSelect) pdfSelect.value = delPdf ? 'delete' : 'keep';
+    baseline.deleteCbrAfterConversion = delCbr;
+    baseline.deletePdfAfterConversion = delPdf;
   } catch (e) {
     console.error('[DEFAULTS] Failed to load settings:', e);
   }
@@ -274,56 +303,7 @@ async function renderLibraryPreferences() {
           : baseline.masterContinuous;
 
       baseline.libraryPrefs[p] = { mangaMode: manga, continuousMode: continuous };
-
-      const row = document.createElement('div');
-      row.className =
-        'flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3 bg-gray-900/60 rounded-lg border border-gray-800 text-xs';
-      row.setAttribute('data-lib-path', p);
-
-      const label = document.createElement('div');
-      label.className = 'flex-1 min-w-0';
-      const name = document.createElement('div');
-      name.className = 'font-semibold text-white truncate';
-      name.textContent = lib.name || p;
-      const pathEl = document.createElement('div');
-      pathEl.className = 'text-gray-400 font-mono truncate text-[11px]';
-      pathEl.textContent = p;
-      label.appendChild(name);
-      label.appendChild(pathEl);
-
-      const toggles = document.createElement('div');
-      toggles.className = 'flex items-center gap-3 shrink-0';
-
-      const mangaLabel = document.createElement('label');
-      mangaLabel.className = 'inline-flex items-center gap-1.5 cursor-pointer text-gray-300';
-      mangaLabel.title = 'Default to Manga (RTL) mode for this library';
-      const mangaCb = document.createElement('input');
-      mangaCb.type = 'checkbox';
-      mangaCb.className =
-        'lib-toggle-manga rounded bg-gray-800 border-gray-700 text-purple-600 focus:ring-0';
-      mangaCb.checked = manga;
-      mangaCb.addEventListener('change', refreshDirtyUI);
-      mangaLabel.appendChild(mangaCb);
-      mangaLabel.appendChild(document.createTextNode('Manga'));
-
-      const scrollLabel = document.createElement('label');
-      scrollLabel.className = 'inline-flex items-center gap-1.5 cursor-pointer text-gray-300';
-      scrollLabel.title = 'Default to Vertical Scroll mode for this library';
-      const scrollCb = document.createElement('input');
-      scrollCb.type = 'checkbox';
-      scrollCb.className =
-        'lib-toggle-scroll rounded bg-gray-800 border-gray-700 text-purple-600 focus:ring-0';
-      scrollCb.checked = continuous;
-      scrollCb.addEventListener('change', refreshDirtyUI);
-      scrollLabel.appendChild(scrollCb);
-      scrollLabel.appendChild(document.createTextNode('Scroll'));
-
-      toggles.appendChild(mangaLabel);
-      toggles.appendChild(scrollLabel);
-
-      row.appendChild(label);
-      row.appendChild(toggles);
-      container.appendChild(row);
+      container.appendChild(buildLibraryPrefRow(p, lib.name, manga, continuous, refreshDirtyUI));
     }
   } catch (e) {
     console.error('[DEFAULTS] Failed to render library preferences:', e);
@@ -356,6 +336,8 @@ export function initComicsDefaults() {
   wired = true;
 
   $('allowed-formats-select')?.addEventListener('change', refreshDirtyUI);
+  $('cbr-conversion-originals-select')?.addEventListener('change', refreshDirtyUI);
+  $('pdf-conversion-originals-select')?.addEventListener('change', refreshDirtyUI);
   $('master-manga-toggle')?.addEventListener('change', onMasterMangaChange);
   $('master-continuous-toggle')?.addEventListener('change', onMasterContinuousChange);
   $('comics-defaults-save-btn')?.addEventListener('click', saveAll);

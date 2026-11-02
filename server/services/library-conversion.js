@@ -3,18 +3,26 @@ const path = require('path');
 const { spawn } = require('child_process');
 const { log } = require('../logger');
 const { t0, ms } = require('../utils');
+const {
+  getDeleteCbrAfterConversion,
+  getDeletePdfAfterConversion
+} = require('../config');
 
-async function convertCbrToCbz(cbrPath) {
+async function convertCbrToCbz(cbrPath, options = {}) {
   return new Promise((resolve) => {
     const start = t0();
     log('INFO', 'CONVERT', `Converting: ${path.basename(cbrPath)}`);
     const cbzPath = cbrPath.replace(/\.cbr$/i, '.cbz');
     const scriptPath = path.join(__dirname, '..', '..', 'scripts', 'convert_cbr_to_cbz.sh');
     const cbrDir = path.dirname(cbrPath);
+    const shouldDelete = options.deleteOriginals !== undefined
+      ? Boolean(options.deleteOriginals)
+      : (typeof getDeleteCbrAfterConversion === 'function' ? getDeleteCbrAfterConversion() : false);
 
     // Run the bash script from the directory containing the CBR file
     const conversionProcess = spawn(scriptPath, [cbrPath], {
       cwd: cbrDir,
+      env: { ...process.env, DELETE_ORIGINALS: shouldDelete ? 'true' : 'false' },
       maxBuffer: 1024 * 1024 * 100, // 100MB buffer
       timeout: 30 * 60 * 1000 // 30 minute timeout
     });
@@ -66,17 +74,21 @@ async function convertCbrToCbz(cbrPath) {
   });
 }
 
-async function convertPdfToCbz(pdfPath) {
+async function convertPdfToCbz(pdfPath, options = {}) {
   return new Promise((resolve) => {
     const start = t0();
     log('INFO', 'CONVERT', `Converting PDF: ${path.basename(pdfPath)}`);
     const cbzPath = pdfPath.replace(/\.pdf$/i, '.cbz');
     const scriptPath = path.join(__dirname, '..', '..', 'scripts', 'pdf2cbz.sh');
     const pdfDir = path.dirname(pdfPath);
+    const shouldDelete = options.deleteOriginals !== undefined
+      ? Boolean(options.deleteOriginals)
+      : (typeof getDeletePdfAfterConversion === 'function' ? getDeletePdfAfterConversion() : false);
 
     // Run the bash script from the directory containing the PDF file
     const conversionProcess = spawn(scriptPath, [pdfPath], {
       cwd: pdfDir,
+      env: { ...process.env, DELETE_ORIGINALS: shouldDelete ? 'true' : 'false' },
       maxBuffer: 1024 * 1024 * 100, // 100MB buffer
       timeout: 30 * 60 * 1000 // 30 minute timeout
     });

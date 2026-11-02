@@ -187,6 +187,8 @@ async function walkLibraryDirectory({ dir, libraryMode, libraryRootPath, ctx }) 
         if (ctx.allowedFormats === 'cbr' || ctx.allowedFormats === 'both') {
           log('INFO', 'SCAN', `📄 CBR (Native): ${path.basename(filePath)}`);
         } else if (ctx.conversionRoot && path.resolve(filePath).startsWith(ctx.conversionRoot)) {
+          const siblingCbz = filePath.replace(/\.cbr$/i, '.cbz');
+          if (fs.existsSync(siblingCbz)) return;
           log('INFO', 'SCAN', `Convert needed: ${file}`);
           const newCbz = await convertCbrToCbz(filePath);
           if (newCbz) { filePath = newCbz; wasConverted = true; ctx.stats.totalConverted++; }
@@ -197,6 +199,8 @@ async function walkLibraryDirectory({ dir, libraryMode, libraryRootPath, ctx }) 
         }
       } else if (isPdf) {
         if (ctx.conversionRoot && path.resolve(filePath).startsWith(ctx.conversionRoot)) {
+          const siblingCbz = filePath.replace(/\.pdf$/i, '.cbz');
+          if (fs.existsSync(siblingCbz)) return;
           log('INFO', 'SCAN', `PDF convert needed: ${file}`);
           const newCbz = await convertPdfToCbz(filePath);
           if (newCbz) { filePath = newCbz; wasConverted = true; ctx.stats.totalConverted++; }

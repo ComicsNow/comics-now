@@ -142,6 +142,8 @@ The template clearly indicates which settings are required before startup versus
 | `[BOOT]` | `authentication` | `{ "enabled": false, ... }` | Set to `true` with `adminEmail` if using Cloudflare Zero Trust. |
 | `[UI]` | `comicsLocation` | `"/path/to/inbox"` | Ingestion directory where Tag Comics Now! scans for untagged CBZ files. |
 | `[UI]` | `libraries` | `[{"path": "...", "hierarchyMode": "metadata"}]` | Organized collections. Choose `"metadata"` or `"folder"`. |
+| `[UI]` | `delete_cbr_after_conversion` | `false` | Whether to delete (`true`) or keep (`false`, default) source `.cbr` files after converting them to `.cbz`. |
+| `[UI]` | `delete_pdf_after_conversion` | `false` | Whether to delete (`true`) or keep (`false`, default) source `.pdf` files after converting them to `.cbz`. |
 | `[UI]` | `geminiApiKey` | `"AIzaSy..."` | Optional Google Gemini API key for AI visual cover matching (encrypted at rest). |
 
 *(For full schema tables, Cloudflare Zero Trust setup, and in-depth UI vs. file configuration guides, see the [Wiki Configuration Reference](docs/WIKI.md#configuration-reference-configjson).)*

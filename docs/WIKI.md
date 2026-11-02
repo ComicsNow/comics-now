@@ -212,7 +212,9 @@ Settings are resolved in the following order:
 | `libraries[].hierarchyMode` | `string` | `"metadata"` | `"metadata"` organizes the UI by Publisher and Series extracted from ComicInfo.xml. `"folder"` mirrors the physical folder hierarchy on disk. |
 | `comicsLocation` | `string` | `"/comics"` | Ingestion/inbox workspace where Tag Comics Now! scans for untagged or newly downloaded CBZ files. |
 | `scanIntervalMinutes` | `number` | `5` | Frequency (in minutes) of background filesystem scans to discover new comics. |
-| `allowed_formats` | `string` | `"cbz"` | Permitted archive formats. Automatic conversion converts PDF and CBR to CBZ. |
+| `allowed_formats` | `string` | `"cbz"` | Permitted archive formats (`"cbz"`, `"cbr"`, or `"both"`). Automatic conversion converts PDF and CBR to CBZ in `comicsLocation`. |
+| `delete_cbr_after_conversion` | `boolean` | `false` | Whether to delete (`true`) or keep (`false`, default) original `.cbr` files after converting them to `.cbz`. |
+| `delete_pdf_after_conversion` | `boolean` | `false` | Whether to delete (`true`) or keep (`false`, default) original `.pdf` files after converting them to `.cbz`. |
 | `metadata_storage` | `string` | `"archive"` | Where comic metadata is stored: `"sidecar"` (writes external `.ComicInfo.xml` files alongside the comic), `"archive"` (embeds `ComicInfo.xml` directly inside the `.cbz` zip archive), or `"database"` (stored in SQLite only). |
 
 ##### 3. Tag Comics Now! & Metadata Services
@@ -494,9 +496,13 @@ In **Settings → General Settings**:
 - **PDF (`.pdf`)**: Adobe Portable Document Format.
 
 ### Automatic PDF & CBR Conversion to CBZ
-In **Settings → Server Settings**:
-- **Convert PDF to CBZ**: When enabled, the scanner invokes `pdftoppm` to extract PDF pages at native resolution and packages them into a lightweight `.cbz` archive.
-- **Convert CBR to CBZ**: Uses `unrar` to extract proprietary RAR archives and repacks them into open `.cbz` archives for faster extraction and lower memory usage.
+In **Settings → Comics Defaults → Allowed Library Formats**:
+- **Convert PDF to CBZ**: When a `.pdf` is placed in `comicsLocation`, the scanner invokes `pdftoppm` to extract PDF pages at native resolution and packages them into a `.cbz` archive.
+- **Convert CBR to CBZ**: When `allowed_formats` is set to `"cbz"`, the scanner uses `unrar` to extract `.cbr` RAR archives in `comicsLocation` and repacks them into store-only `.cbz` archives for faster extraction and lower memory usage.
+- **Independent Source Retention (`Keep` by Default)**:
+  - **Original CBR Files After Conversion** (`delete_cbr_after_conversion`): Defaults to **Keep CBR Originals (`false`)**. Can be switched to **Delete CBR After Conversion (`true`)** to automatically remove the source `.cbr` once the `.cbz` is verified.
+  - **Original PDF Files After Conversion** (`delete_pdf_after_conversion`): Defaults to **Keep PDF Originals (`false`)**. Can be switched to **Delete PDF After Conversion (`true`)** to automatically remove the source `.pdf` once the `.cbz` is verified.
+  - When originals are kept on disk, the scanner automatically detects existing sibling `.cbz` files and skips redundant re-conversion on subsequent library scans.
 
 ### The 3 Metadata Storage Options
 When saving metadata in Comics Now!, you can choose where tags reside:

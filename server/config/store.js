@@ -21,6 +21,8 @@ const DEFAULT_CONFIG = {
   comicVineApiKey: '',
   ctScheduleMinutes: 60,
   allowed_formats: 'cbz',
+  delete_cbr_after_conversion: false,
+  delete_pdf_after_conversion: false,
   metadata_storage: 'archive',
   trustProxy: false,
   taggerMode: 'new',
@@ -205,6 +207,32 @@ function setAllowedFormats(value, skipSave = false) {
   return sanitized;
 }
 
+function getDeleteCbrAfterConversion() {
+  return config.delete_cbr_after_conversion === true;
+}
+
+function setDeleteCbrAfterConversion(value, skipSave = false) {
+  const sanitized = value === true || value === 'true' || value === 'delete';
+  config.delete_cbr_after_conversion = sanitized;
+  if (!skipSave) {
+    saveConfigToDisk();
+  }
+  return sanitized;
+}
+
+function getDeletePdfAfterConversion() {
+  return config.delete_pdf_after_conversion === true;
+}
+
+function setDeletePdfAfterConversion(value, skipSave = false) {
+  const sanitized = value === true || value === 'true' || value === 'delete';
+  config.delete_pdf_after_conversion = sanitized;
+  if (!skipSave) {
+    saveConfigToDisk();
+  }
+  return sanitized;
+}
+
 function getMetadataStorage() {
   return config.metadata_storage || 'archive';
 }
@@ -287,6 +315,10 @@ module.exports = {
   setComicsLocation,
   getAllowedFormats,
   setAllowedFormats,
+  getDeleteCbrAfterConversion,
+  setDeleteCbrAfterConversion,
+  getDeletePdfAfterConversion,
+  setDeletePdfAfterConversion,
   getMetadataStorage,
   setMetadataStorage,
   getCorsConfig,

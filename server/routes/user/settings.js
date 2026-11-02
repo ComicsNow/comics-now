@@ -8,6 +8,8 @@ module.exports = function attach(router, deps) {
     getComicVineApiKey,
     getScanIntervalMinutes,
     getAllowedFormats,
+    getDeleteCbrAfterConversion,
+    getDeletePdfAfterConversion,
     getMetadataStorage
   } = deps;
 
@@ -18,6 +20,8 @@ module.exports = function attach(router, deps) {
     res.json({
       scanInterval: getScanIntervalMinutes(),
       allowedFormats: getAllowedFormats(),
+      deleteCbrAfterConversion: getDeleteCbrAfterConversion ? getDeleteCbrAfterConversion() : false,
+      deletePdfAfterConversion: getDeletePdfAfterConversion ? getDeletePdfAfterConversion() : false,
       metadataStorage: getMetadataStorage(),
       hasApiKey: !!(apiKey && apiKey !== 'YOUR_API_KEY_HERE'),
       // Only send actual key to admins (for settings form)

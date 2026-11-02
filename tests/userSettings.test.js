@@ -42,6 +42,8 @@ describe('User Settings Routes', () => {
     expect(res.json).toHaveBeenCalledWith({
       scanInterval: 15,
       allowedFormats: 'cbz',
+      deleteCbrAfterConversion: false,
+      deletePdfAfterConversion: false,
       metadataStorage: 'sidecar',
       hasApiKey: true,
       comicVineApiKey: 'api-key-value'
@@ -61,6 +63,8 @@ describe('User Settings Routes', () => {
     expect(res.json).toHaveBeenCalledWith({
       scanInterval: 15,
       allowedFormats: 'cbz',
+      deleteCbrAfterConversion: false,
+      deletePdfAfterConversion: false,
       metadataStorage: 'sidecar',
       hasApiKey: true,
       comicVineApiKey: undefined

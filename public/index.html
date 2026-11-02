@@ -271,7 +271,7 @@
               </h5>
               <p class="text-sm text-gray-400 mb-4">Choose which comic file formats to include in your library scans:</p>
 
-              <div class="bg-linear-to-r from-green-900/30 to-emerald-900/30 border-2 border-green-700/50 rounded-xl p-6 shadow-lg hover:shadow-green-900/20 transition-all duration-300">
+              <div class="bg-linear-to-r from-green-900/30 to-emerald-900/30 border-2 border-green-700/50 rounded-xl p-6 shadow-lg hover:shadow-green-900/20 transition-all duration-300 space-y-4">
                 <div class="flex flex-col md:flex-row items-center justify-between gap-4">
                   <div class="grow">
                     <p class="text-white font-medium">Select Formats</p>
@@ -282,6 +282,32 @@
                       <option value="cbz">CBZ Only</option>
                       <option value="cbr">CBR Only</option>
                       <option value="both">Both (CBZ & CBR)</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div class="flex flex-col md:flex-row items-center justify-between gap-4 pt-4 border-t border-green-700/50">
+                  <div class="grow">
+                    <p class="text-white font-medium">Original CBR Files After Conversion</p>
+                    <p class="text-xs text-gray-400">Choose whether to keep or delete source .cbr files after converting them to .cbz</p>
+                  </div>
+                  <div class="flex items-center space-x-2">
+                    <select id="cbr-conversion-originals-select" class="bg-gray-900 border border-gray-600 text-white text-sm rounded-lg focus:ring-green-500 focus:border-green-500 block w-full p-2.5">
+                      <option value="keep">Keep CBR Originals (Default)</option>
+                      <option value="delete">Delete CBR After Conversion</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div class="flex flex-col md:flex-row items-center justify-between gap-4 pt-4 border-t border-green-700/50">
+                  <div class="grow">
+                    <p class="text-white font-medium">Original PDF Files After Conversion</p>
+                    <p class="text-xs text-gray-400">Choose whether to keep or delete source .pdf files after converting them to .cbz</p>
+                  </div>
+                  <div class="flex items-center space-x-2">
+                    <select id="pdf-conversion-originals-select" class="bg-gray-900 border border-gray-600 text-white text-sm rounded-lg focus:ring-green-500 focus:border-green-500 block w-full p-2.5">
+                      <option value="keep">Keep PDF Originals (Default)</option>
+                      <option value="delete">Delete PDF After Conversion</option>
                     </select>
                   </div>
                 </div>

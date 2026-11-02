@@ -101,6 +101,12 @@ for INPUT_PDF in "$@"; do
 
     echo "Conversion successful!"
     echo "Output file: $OUTPUT_CBZ"
+    if [ "${DELETE_ORIGINALS:-false}" = "true" ] && [ -f "$OUTPUT_CBZ" ]; then
+        echo "Removing original $INPUT_PDF..."
+        rm "$INPUT_PDF"
+    else
+        echo "Keeping original $INPUT_PDF"
+    fi
 
 done
 

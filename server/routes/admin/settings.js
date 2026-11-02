@@ -167,7 +167,14 @@ module.exports = function attach(router, deps) {
 
   router.post('/api/v1/settings', requireAdmin, async (req, res) => {
     try {
-      const { interval = 5, apiKey = '', allowedFormats = 'cbz', metadataStorage = 'archive' } = req.body || {};
+      const {
+        interval = 5,
+        apiKey = '',
+        allowedFormats = 'cbz',
+        metadataStorage = 'archive',
+        deleteCbrAfterConversion,
+        deletePdfAfterConversion
+      } = req.body || {};
 
       // Validate scan interval
       const parsedInterval = parseInt(interval, 10);
@@ -195,6 +202,28 @@ module.exports = function attach(router, deps) {
       await saveSetting('scanInterval', minutes);
       await saveSetting('allowed_formats', allowedFormats);
       await saveSetting('metadata_storage', effectiveStorage);
+
+      if (deleteCbrAfterConversion !== undefined) {
+        const shouldDeleteCbr =
+          deleteCbrAfterConversion === true ||
+          deleteCbrAfterConversion === 'true' ||
+          deleteCbrAfterConversion === 'delete';
+        if (typeof deps.setDeleteCbrAfterConversion === 'function') {
+          deps.setDeleteCbrAfterConversion(shouldDeleteCbr);
+        }
+        await saveSetting('delete_cbr_after_conversion', shouldDeleteCbr);
+      }
+
+      if (deletePdfAfterConversion !== undefined) {
+        const shouldDeletePdf =
+          deletePdfAfterConversion === true ||
+          deletePdfAfterConversion === 'true' ||
+          deletePdfAfterConversion === 'delete';
+        if (typeof deps.setDeletePdfAfterConversion === 'function') {
+          deps.setDeletePdfAfterConversion(shouldDeletePdf);
+        }
+        await saveSetting('delete_pdf_after_conversion', shouldDeletePdf);
+      }
 
       if (apiKey !== undefined && !cryptoVault.isMasked(apiKey)) {
         const encApiKey = cryptoVault.encrypt(sanitizedApiKey);

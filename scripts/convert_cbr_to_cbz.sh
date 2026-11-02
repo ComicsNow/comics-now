@@ -75,11 +75,15 @@ for cbr_file in "$@"; do
     # 4. Change back to the original directory
     cd "$original_dir" || exit 1
 
-    # 5. Check if zip was successful, THEN delete original
+    # 5. Check if zip was successful, THEN delete or keep original based on DELETE_ORIGINALS
     if [ $zip_success -eq 0 ] && [ -f "$cbz_file" ]; then
         echo "Successfully created $cbz_file"
-        echo "Removing original $cbr_file..."
-        rm "$cbr_file"
+        if [ "${DELETE_ORIGINALS:-false}" = "true" ]; then
+            echo "Removing original $cbr_file..."
+            rm "$cbr_file"
+        else
+            echo "Keeping original $cbr_file"
+        fi
     else
         echo "Error: Failed to create $cbz_file (zip code $zip_success). Original file NOT deleted." >&2
         if [ -n "$zip_output" ]; then echo "$zip_output" >&2; fi
