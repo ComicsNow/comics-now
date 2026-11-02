@@ -10,14 +10,12 @@ const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const fs = require('fs');
-const rateLimit = require('express-rate-limit');
 
 const {
   LOGOS_DIRECTORY,
   ICONS_DIRECTORY,
   THUMBNAILS_DIRECTORY,
-  PAGE_CACHE_DIRECTORY,
-  SCRIPTS_DIRECTORY
+  PAGE_CACHE_DIRECTORY
 } = require('./server/constants');
 const { initPageCache } = require('./server/services/page-cache');
 
@@ -25,118 +23,28 @@ const {
   loadConfigFromDisk,
   getConfig,
   getComicsDirectories,
-  getLibraries,
   getPublicLibraries,
-  getPathFromLibraryId,
-  getLibraryIdFromPath,
-  addLibrary,
-  removeLibrary,
-  saveConfigToDisk,
   getScanIntervalMinutes,
-  setScanIntervalMinutes,
-  getComicVineApiKey,
-  setComicVineApiKey,
-  getGoogleBooksApiKey,
-  setGoogleBooksApiKey,
-  getCtScheduleMinutes,
-  setCtScheduleMinutes,
-  getComicsLocation,
-  setComicsLocation,
-  getAllowedFormats,
-  setAllowedFormats,
-  getMetadataStorage,
-  setMetadataStorage,
   getCorsConfig,
   isAuthEnabled,
-  getAuthConfig,
-  setTaggerMode,
-  getTaggerServiceUrl,
-  setTaggerServiceUrl,
-  getTaggerLowerThreshold,
-  setTaggerLowerThreshold,
-  getTaggerUpperThreshold,
-  setTaggerUpperThreshold,
-  getTaggerEnabledSources,
-  setTaggerEnabledSources,
-  getMetronUser,
-  setMetronUser,
-  getMetronPassword,
-  setMetronPassword,
-  getGcdUser,
-  setGcdUser,
-  getGcdPassword,
-  setGcdPassword,
-  getTaggerForceReprocess,
-  setTaggerForceReprocess
+  getAuthConfig
 } = require('./server/config');
 
-const {
-  log,
-  ctLog,
-  registerCtClient,
-  unregisterCtClient,
-  getLogs,
-  getCtLogs,
-  renameLog,
-  registerRenameClient,
-  unregisterRenameClient,
-  getRenameLogs,
-  clearRenameLogs,
-  moveLog,
-  registerMoveClient,
-  unregisterMoveClient,
-  getMoveLogs,
-  clearMoveLogs,
-  registerGuidedClient,
-  unregisterGuidedClient,
-  getGuidedLogs,
-  clearGuidedLogs
-} = require('./server/logger');
-
+const { log } = require('./server/logger');
 const { initializeDatabase, dbGet, dbRun, dbAll, closeDb } = require('./server/db');
-const { loadSettings, saveSetting } = require('./server/settings');
-const {
-  scanLibrary,
-  scheduleNextScan,
-  buildLibrary,
-  getComicPages,
-  extractPageBuffer,
-  generateVirtualMetadata,
-  isScanning
-} = require('./server/services/library');
-const {
-  scheduleCtRun,
-  runComicTagger,
-  resolveScanMode,
-  getScanScopeCounts,
-  cancelComicTagger,
-  isTaggerRunning,
-  applyUserSelection,
-  skipCurrentMatch,
-  getPendingMatch,
-  searchExternal,
-  getScanLogsList,
-  getScanLogDetail,
-  clearEnhancedTracking
-} = require('./server/services/tagger');
-const { startTaggerWorker, stopTaggerWorker, isWorkerOnline } = require('./server/services/tagger-process');
+const { loadSettings } = require('./server/settings');
+const { scanLibrary, scheduleNextScan } = require('./server/services/library');
+const { scheduleCtRun } = require('./server/services/tagger');
+const { startTaggerWorker } = require('./server/services/tagger-process');
 const guidedReader = require('./server/services/guided-reader');
-const { saveMetadataToComic, getComicInfoFromArchive } = require('./server/services/metadata');
 
-const {
-  cvFetchJson,
-  normalizeCvId,
-  COMICVINE_API_URL
-} = require('./server/services/comicvine');
-const { createApiRouter } = require('./server/routes');
 const { createStaticRouter } = require('./server/routes/static');
-const { createId, getMimeFromExt, t0, ms, stripHtml, sanitizeHtml } = require('./server/utils');
+const { createConfiguredApiRouter } = require('./server/bootstrap/api-router');
+const { setupGracefulShutdown } = require('./server/lifecycle');
+const { setupRateLimits } = require('./server/middleware/rate-limits');
 
-// Import auth middleware
 const {
   extractUserFromJWT,
-  requireAdmin,
-  requireAuth,
   initJwksClient
 } = require('./server/middleware/auth');
 const {
@@ -154,248 +62,91 @@ const dbReady = initializeDatabase();
   }
 
   const app = express();
-const bootConfig = getConfig();
-if (bootConfig.trustProxy !== undefined) {
-  app.set('trust proxy', bootConfig.trustProxy);
-}
-// 10mb limit so bulk operations (e.g. granting a user access to all comics,
-// which sends one access entry per node) don't hit the default 100kb cap and
-// get rejected with an HTML 413 page that breaks client-side response.json().
-app.use(express.json({ limit: '10mb' }));
-
-app.use(helmet({
-  contentSecurityPolicy: {
-    useDefaults: true,
-    directives: {
-      "script-src": ["'self'", "'unsafe-inline'"],
-      "script-src-attr": ["'unsafe-inline'"],
-      "style-src": ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
-      "font-src": ["'self'", "https:", "data:", "https://fonts.gstatic.com"],
-      "img-src": ["'self'", "data:", "https://placehold.co", "blob:", "https:"],
-      "upgrade-insecure-requests": null,
-    },
-  },
-}));
-
-// CORS middleware - standardized using the 'cors' package
-app.use(cors((req, callback) => {
-  const corsConfig = getCorsConfig();
-  const origin = req.header('Origin');
-  
-  const options = {
-    credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Cf-Access-Jwt-Assertion']
-  };
-
-  if (!corsConfig.enabled || !origin) {
-    options.origin = false;
-    return callback(null, options);
+  const bootConfig = getConfig();
+  if (bootConfig.trustProxy !== undefined) {
+    app.set('trust proxy', bootConfig.trustProxy);
   }
 
-  const isAllowed = (corsConfig.allowedOrigins || []).some(allowed => {
-    return allowed === origin;
-  });
+  // 10mb limit for bulk operations without 413 rejection
+  app.use(express.json({ limit: '10mb' }));
 
-  options.origin = isAllowed ? origin : false;
-  callback(null, options);
-}));
+  app.use(helmet({
+    contentSecurityPolicy: {
+      useDefaults: true,
+      directives: {
+        "script-src": ["'self'", "'unsafe-inline'"],
+        "script-src-attr": ["'unsafe-inline'"],
+        "style-src": ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+        "font-src": ["'self'", "https:", "data:", "https://fonts.gstatic.com"],
+        "img-src": ["'self'", "data:", "https://placehold.co", "blob:", "https:"],
+        "upgrade-insecure-requests": null,
+      },
+    },
+  }));
 
-const apiRouter = createApiRouter({
-  log,
-  ctLog,
-  registerCtClient,
-  unregisterCtClient,
-  getLogs,
-  getCtLogs,
-  renameLog,
-  registerRenameClient,
-  unregisterRenameClient,
-  getRenameLogs,
-  clearRenameLogs,
-  moveLog,
-  registerMoveClient,
-  unregisterMoveClient,
-  getMoveLogs,
-  clearMoveLogs,
-  registerGuidedClient,
-  unregisterGuidedClient,
-  getGuidedLogs,
-  clearGuidedLogs,
-  guidedReader,
-  getScanIntervalMinutes,
-  setScanIntervalMinutes,
-  getComicVineApiKey,
-  setComicVineApiKey,
-  getGoogleBooksApiKey,
-  setGoogleBooksApiKey,
-  getLibraries,
-  getPathFromLibraryId,
-  getLibraryIdFromPath,
-  addLibrary,
-  removeLibrary,
-  getCtScheduleMinutes,
-  setCtScheduleMinutes,
-  getComicsLocation,
-  setComicsLocation,
-  getAllowedFormats,
-  setAllowedFormats,
-  getMetadataStorage,
-  setMetadataStorage,
-  setTaggerMode,
-  getTaggerServiceUrl,
-  setTaggerServiceUrl,
-  startTaggerWorker,
-  stopTaggerWorker,
-  isWorkerOnline,
-  getTaggerLowerThreshold,
-  setTaggerLowerThreshold,
-  getTaggerUpperThreshold,
-  setTaggerUpperThreshold,
-  getTaggerEnabledSources,
-  setTaggerEnabledSources,
-  getMetronUser,
-  setMetronUser,
-  getMetronPassword,
-  setMetronPassword,
-  getGcdUser,
-  setGcdUser,
-  getGcdPassword,
-  setGcdPassword,
-  getTaggerForceReprocess,
-  setTaggerForceReprocess,
-  getComicsDirectories,
-  getConfig,
-  saveSetting,
-  scanLibrary,
-  scheduleNextScan,
-  buildLibrary,
-  getComicPages,
-  extractPageBuffer,
-  generateVirtualMetadata,
-  isScanning,
-  dbGet,
-  dbRun,
-  dbAll,
-  runComicTagger,
-  resolveScanMode,
-  getScanScopeCounts,
-  cancelComicTagger,
-  isTaggerRunning,
-  scheduleCtRun,
-  applyUserSelection,
-  skipCurrentMatch,
-  getPendingMatch,
-  searchExternal,
-  getScanLogsList,
-  getScanLogDetail,
-  clearEnhancedTracking,
-  saveMetadataToComic,
-  getComicInfoFromArchive,
-  cvFetchJson,
-  normalizeCvId,
-  stripHtml,
-  sanitizeHtml,
-  COMICVINE_API_URL,
-  SCRIPTS_DIRECTORY,
-  createId,
-  getMimeFromExt,
-  t0,
-  ms,
-  requireAdmin,
-  requireAuth,
-  isAuthEnabled,
-  saveConfigToDisk,
-  paths: require('./server/constants')
-});
+  // CORS middleware - standardized using the 'cors' package
+  app.use(cors((req, callback) => {
+    const corsConfig = getCorsConfig();
+    const origin = req.header('Origin');
 
-const staticRouter = createStaticRouter({
-  getConfig,
-  getComicsDirectories,
-  getPublicLibraries
-});
+    const options = {
+      credentials: true,
+      methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+      allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Cf-Access-Jwt-Assertion']
+    };
 
-const config = getConfig();
-const baseUrl = config.baseUrl || '/';
-
-// Rate limiting middleware to address js/missing-rate-limiting alerts
-const authLimiter = rateLimit({
-  windowMs: 1 * 60 * 1000, // 1 minute
-  max: 60, // Limit each IP to 60 authentication attempts per minute
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: 'Too many authentication attempts, please try again after a minute'
-});
-
-const pagesLimiter = rateLimit({
-  windowMs: 1 * 60 * 1000, // 1 minute
-  max: 1500, // Very generous to support rapid page-turning, gallery preloads, etc.
-  standardHeaders: true,
-  legacyHeaders: false
-});
-
-const generalLimiter = rateLimit({
-  windowMs: 1 * 60 * 1000, // 1 minute
-  max: 10000, // Very generous limit for overall API usage, static files, and admin actions to handle large libraries
-  standardHeaders: true,
-  legacyHeaders: false
-});
-
-const pathJoin = (base, sub) => {
-  const b = base.endsWith('/') ? base : (base + '/');
-  const s = sub.startsWith('/') ? sub.substring(1) : sub;
-  return b + s;
-};
-
-// Apply rate limiting before routes and authentication
-app.use(pathJoin(baseUrl, 'api/v1/public/auth'), authLimiter);
-app.use(pathJoin(baseUrl, 'api/v1/comics/pages/image'), pagesLimiter);
-const generalLimiterExclusions = new Set([
-  '/api/v1/public/auth',
-  '/api/v1/comics/pages/image',
-  '/thumbnails',
-  '/icons',
-  '/logos'
-]);
-app.use(baseUrl, (req, res, next) => {
-  const relativePath = req.path.startsWith(baseUrl) ? req.path.slice(baseUrl.length) || '/' : req.path;
-  for (const excluded of generalLimiterExclusions) {
-    if (relativePath === excluded || relativePath.startsWith(excluded + '/')) {
-      return next();
+    if (!corsConfig.enabled || !origin) {
+      options.origin = false;
+      return callback(null, options);
     }
+
+    const isAllowed = (corsConfig.allowedOrigins || []).some(allowed => allowed === origin);
+    options.origin = isAllowed ? origin : false;
+    callback(null, options);
+  }));
+
+  const config = getConfig();
+  const baseUrl = config.baseUrl || '/';
+
+  // Apply rate limiting before routes and authentication
+  setupRateLimits(app, baseUrl);
+
+  // Apply authentication middleware globally
+  app.use(baseUrl, extractUserFromJWT);
+
+  // Admin impersonation guards
+  app.use(baseUrl, createImpersonationMiddleware({ dbGet, dbRun, log }));
+  app.use(baseUrl, impersonationReadOnlyGuard);
+
+  // Main API router
+  const apiRouter = createConfiguredApiRouter();
+  app.use(baseUrl, apiRouter);
+
+  // Optional local extensions (no-op if absent)
+  try {
+    const { installGeminiTagger } = require('./server/services/gemini-tagger');
+    installGeminiTagger({
+      app,
+      config,
+      db: { dbGet, dbRun, dbAll, closeDb },
+      paths: require('./server/constants'),
+      services: {
+        metadata: require('./server/services/metadata'),
+        tagger: require('./server/services/tagger'),
+        library: require('./server/services/library')
+      },
+      log
+    });
+  } catch (err) {
+    log('WARN', 'GEMINI', `Gemini tagger initialization note: ${err.message}`);
   }
-  return generalLimiter(req, res, next);
-});
 
-// Apply authentication middleware globally
-app.use(baseUrl, extractUserFromJWT);
-
-// Admin impersonation: swap req.user to the impersonated target (real admin +
-// valid cookie only), then block mutating requests while impersonating.
-app.use(baseUrl, createImpersonationMiddleware({ dbGet, dbRun, log }));
-app.use(baseUrl, impersonationReadOnlyGuard);
-
-app.use(baseUrl, apiRouter);
-
-// Optional local extensions (no-op if absent)
-try {
-  const { installGeminiTagger } = require('./server/services/gemini-tagger');
-  installGeminiTagger({
-    app,
-    config,
-    db: { dbGet, dbRun, dbAll, closeDb },
-    paths: require('./server/constants'),
-    services: {
-      metadata: require('./server/services/metadata'),
-      tagger: require('./server/services/tagger'),
-      library: require('./server/services/library')
-    },
-    log
+  // Static routes
+  const staticRouter = createStaticRouter({
+    getConfig,
+    getComicsDirectories,
+    getPublicLibraries
   });
-} catch (err) {
-  log('WARN', 'GEMINI', `Gemini tagger initialization note: ${err.message}`);
-}
-
   app.use(baseUrl, staticRouter);
 
   const PORT = process.env.PORT || config.port || 3000;
@@ -435,35 +186,7 @@ try {
     }
   });
 
-  let shuttingDown = false;
-  async function shutdown(signal) {
-    if (shuttingDown) return;
-    shuttingDown = true;
-    log('INFO', 'SERVER', `Received ${signal}, shutting down…`);
-    
-    server.close(async () => {
-      log('INFO', 'SERVER', 'HTTP server closed.');
-      stopTaggerWorker();
-      try {
-        await closeDb();
-        log('INFO', 'SERVER', 'DB closed cleanly.');
-      } catch (e) {
-        log('ERROR', 'SERVER', `closeDb failed: ${e.message}`);
-      }
-      process.exit(0);
-    });
-
-    // Fallback exit if server.close hangs
-    const forceExitTimer = setTimeout(() => {
-      log('WARN', 'SERVER', 'Shutdown timed out, forcing exit.');
-      stopTaggerWorker();
-      process.exit(1);
-    }, 10000);
-    forceExitTimer.unref();
-  }
-
-  process.on('SIGTERM', () => shutdown('SIGTERM'));
-  process.on('SIGINT',  () => shutdown('SIGINT'));
+  setupGracefulShutdown(server);
 
   try {
     await startTaggerWorker();
@@ -473,7 +196,6 @@ try {
 
   scheduleCtRun();
   await guidedReader.initialize();
-
 
   (async () => {
     await scanLibrary();

@@ -13,17 +13,10 @@
  * Falls back to standard tagger cover matching (pHash) with zero alteration.
  */
 
-const fs = require('fs');
-const path = require('path');
-const crypto = require('crypto');
 const cryptoVault = require('../utils/crypto-vault');
-const { CONFIG_FILE, THUMBNAILS_DIRECTORY } = require('../constants');
-const { getGeminiApiKey } = require('../config');
-const { matchCoverToCandidates } = require('./gemini-cover');
-const { synthesizeMetadataWithGemini } = require('./gemini-metadata');
-const { incrementDailyUsage, startMidnightPacificScheduler } = require('./gemini-quota');
-const { generateThumbnail } = require('./library-pages');
-const { getComicInfoFromArchive } = require('./metadata');
+const { startMidnightPacificScheduler } = require('./gemini-quota');
+const { getConfig, checkAndIncrementQuota } = require('./gemini-tag/resolver');
+const { evaluateWithGemini } = require('./gemini-tag/evaluator');
 
 let isHookInstalled = false;
 
@@ -34,22 +27,11 @@ function installTaggerHook(ctx) {
   const originalFetch = globalThis.fetch;
   const logger = ctx.log || (() => {});
 
-
-
   if (ctx.db) {
     try {
       startMidnightPacificScheduler({ db: ctx.db, log: logger });
     } catch (_) {}
   }
-
-
-
-
-
-
-
-
-
 
   // Override global fetch
   globalThis.fetch = async function hookFetch(input, init) {
@@ -108,8 +90,8 @@ function installTaggerHook(ctx) {
     // Adjust request to Python so it gathers candidates without auto-writing with pHash
     const pythonReqBody = {
       ...reqBody,
-      upper_threshold: 1.01, // Prevent premature pHash auto-tagging
-      lower_threshold: 0.30  // Allow all viable title matches through for Gemini visual evaluation
+      upper_threshold: 1.01,
+      lower_threshold: 0.30
     };
 
     const newInit = {
@@ -216,280 +198,7 @@ function installTaggerHook(ctx) {
   logger('INFO', 'EXT_COVER', '✓ Gemini Vision transparent cover matcher hooked into Tag Comics Now! scan.');
 }
 
-
-function getConfig(ctx) {
-    let fileConfig = {};
-    try {
-      const defaultConfigFile = CONFIG_FILE || path.join(__dirname, '../../config.json');
-      const configPath = ctx.paths?.CONFIG_FILE || defaultConfigFile;
-      if (fs.existsSync(configPath)) {
-        fileConfig = JSON.parse(fs.readFileSync(configPath, 'utf8'));
-      }
-    } catch (_) {}
-
-    let configGetterKey = '';
-    try {
-      configGetterKey = getGeminiApiKey();
-    } catch (_) {}
-
-    const enabled = process.env.GEMINI_COVER_MATCH_ENABLED !== undefined
-      ? (process.env.GEMINI_COVER_MATCH_ENABLED === 'true' || process.env.GEMINI_COVER_MATCH_ENABLED === '1')
-      : (fileConfig.geminiCoverMatchEnabled !== undefined ? !!fileConfig.geminiCoverMatchEnabled : true);
-
-    const termsAccepted = fileConfig.geminiTermsAccepted === true;
-    const rawApiKey = process.env.GEMINI_API_KEY || configGetterKey || fileConfig.geminiApiKey || ctx.config?.geminiApiKey || '';
-    const apiKey = (cryptoVault.decrypt(rawApiKey) || rawApiKey || '').trim();
-    const model = (fileConfig.geminiModel || ctx.config?.geminiModel || process.env.GEMINI_MODEL || 'gemini-3.5-flash-lite').trim();
-    const dailyCap = parseInt(process.env.GEMINI_COVER_DAILY_CAP || fileConfig.geminiCoverDailyCap || '450', 10);
-    const taggerServiceUrl = fileConfig.taggerServiceUrl || ctx.config?.taggerServiceUrl || 'http://127.0.0.1:5000';
-
-    return { enabled, apiKey, model, dailyCap, taggerServiceUrl, termsAccepted };
-  }
-
-async function checkAndIncrementQuota(ctx, dailyCap) {
-    return incrementDailyUsage(ctx.db, dailyCap);
-  }
-
-async function resolveLocalCover(ctx, filePath, logger) {
-    try {
-      // 1. Check existing thumbnail from SQLite
-      if (ctx.db && typeof ctx.db.dbGet === 'function') {
-        const row = await ctx.db.dbGet("SELECT thumbnailPath FROM comics WHERE path = ?", [filePath]);
-        if (row && row.thumbnailPath) {
-          const thumbDir = ctx.paths?.THUMBNAILS_DIRECTORY || path.join(__dirname, '../../thumbnails');
-          const thumbPath = path.join(thumbDir, path.basename(row.thumbnailPath));
-          if (fs.existsSync(thumbPath)) return thumbPath;
-        }
-      }
-
-      // 2. Try library-pages generateThumbnail
-      try {
-        if (typeof generateThumbnail === 'function') {
-          const thumb = await generateThumbnail(filePath);
-          if (thumb) {
-            const thumbDir = ctx.paths?.THUMBNAILS_DIRECTORY || path.join(__dirname, '../../thumbnails');
-            const full = path.join(thumbDir, path.basename(thumb));
-            if (fs.existsSync(full)) return full;
-          }
-        }
-      } catch (_) {}
-
-      // 3. Check persistent cover extracted by Python tagger
-      const fileHash = crypto.createHash('md5').update(filePath).digest('hex');
-      const filename = path.basename(filePath);
-      const taggerUpload = path.join(__dirname, '../../tagger/uploads', fileHash, `cover_${filename}.jpg`);
-      if (fs.existsSync(taggerUpload)) {
-        return taggerUpload;
-      }
-    } catch (err) {
-      logger('DEBUG', 'TAGGER_HOOK', `Cover resolution exception: ${err.message}`);
-    }
-    return null;
-  }
-
-async function recordDecision(ctx, filePath, decision, winnerTitle) {
-    if (!ctx.db || typeof ctx.db.dbRun !== 'function') return;
-    try {
-      const comicRow = await ctx.db.dbGet("SELECT id FROM comics WHERE path = ?", [filePath]);
-      const comicId = comicRow?.id || crypto.createHash('sha1').update(filePath).digest('hex');
-      const bestSource = decision.bestIndex >= 0 ? (winnerTitle || `candidate_${decision.bestIndex}`) : 'rejected';
-      await ctx.db.dbRun(`
-        INSERT INTO _ext_cover_match (comicId, bestSource, confidence, reason, decidedAt)
-        VALUES (?, ?, ?, ?, ?)
-        ON CONFLICT(comicId) DO UPDATE SET
-          bestSource = excluded.bestSource,
-          confidence = excluded.confidence,
-          reason = excluded.reason,
-          decidedAt = excluded.decidedAt
-      `, [comicId, bestSource, decision.confidence || 0, decision.reason || '', Date.now()]);
-    } catch (_) {}
-  }
-
-async function evaluateWithGemini(ctx, originalFetch, logger, res, reqBody, config, controller, textEncoder) {
-    const filePath = reqBody.path;
-    const candidates = res.candidates || [];
-    const upperThreshold = typeof reqBody.upper_threshold === 'number' ? reqBody.upper_threshold : 0.85;
-    const lowerThreshold = typeof reqBody.lower_threshold === 'number' ? reqBody.lower_threshold : 0.80;
-
-    const localCoverPath = await resolveLocalCover(ctx, filePath, logger);
-    if (!localCoverPath) {
-      if (controller && textEncoder) {
-        controller.enqueue(textEncoder.encode(`data: ${JSON.stringify({
-          type: 'progress',
-          source: 'Gemini Vision',
-          message: 'Local cover art unavailable; using standard tagger candidate ranking'
-        })}\n\n`));
-      }
-      return res;
-    }
-
-    let decision;
-    try {
-      decision = await matchCoverToCandidates({
-        localCoverPath,
-        candidates,
-        apiKey: config.apiKey,
-        model: config.model
-      });
-    } catch (err) {
-      if (controller && textEncoder) {
-        controller.enqueue(textEncoder.encode(`data: ${JSON.stringify({
-          type: 'progress',
-          source: 'Gemini Vision',
-          message: `Gemini vision request failed (${err.message}); using standard tagger ranking`
-        })}\n\n`));
-      }
-      return res;
-    }
-
-    const { bestIndex, confidence, reason } = decision;
-    const winner = (bestIndex >= 0 && bestIndex < candidates.length) ? candidates[bestIndex] : null;
-    const winnerTitle = winner ? (winner.metadata?.title || winner.title || 'Unknown Title') : null;
-
-    recordDecision(ctx, filePath, decision, winnerTitle);
-
-    if (winner) {
-      const pct = Math.round(confidence * 100);
-
-      // Request 2: Metadata Synthesis & Normalization (only for confirmed matches >= lowerThreshold)
-      let finalMetadata = winner.metadata || {};
-      const metaQuota = await checkAndIncrementQuota(ctx, config.dailyCap);
-      if (metaQuota.allowed) {
-        if (controller && textEncoder) {
-          controller.enqueue(textEncoder.encode(`data: ${JSON.stringify({
-            type: 'progress',
-            source: 'Gemini AI',
-            message: 'Synthesizing canonical metadata with Gemini 3.5 Flash-Lite...'
-          })}\n\n`));
-        }
-
-        let existingMeta = {};
-        try {
-          existingMeta = await getComicInfoFromArchive(filePath);
-        } catch (_) {}
-
-        let publisherCodex = [];
-        try {
-          if (ctx.db && typeof ctx.db.dbAll === 'function') {
-            const rows = await ctx.db.dbAll("SELECT DISTINCT publisher FROM comics WHERE publisher IS NOT NULL AND publisher != '' AND publisher != 'Unknown Publisher'");
-            publisherCodex = (rows || []).map(r => r.publisher).filter(Boolean);
-          }
-        } catch (_) {}
-
-        try {
-          const synthesized = await synthesizeMetadataWithGemini({
-            winningCandidate: winner,
-            allCandidates: candidates,
-            filename: path.basename(filePath),
-            existingMeta,
-            publisherCodex,
-            apiKey: config.apiKey,
-            model: config.model
-          });
-
-          if (synthesized && typeof synthesized === 'object') {
-            finalMetadata = synthesized;
-            winner.metadata = synthesized;
-            if (controller && textEncoder) {
-              controller.enqueue(textEncoder.encode(`data: ${JSON.stringify({
-                type: 'progress',
-                source: 'Gemini AI',
-                message: `✓ Metadata synthesized (Series: "${synthesized.Series}", Vol: ${synthesized.Volume || '1'}, Publisher: ${synthesized.Publisher})`
-              })}\n\n`));
-            }
-          }
-        } catch (synthErr) {
-          logger('WARN', 'TAGGER_HOOK', `Metadata synthesis failed; using raw candidate data: ${synthErr.message}`);
-        }
-      }
-
-      const displayTitle = finalMetadata.Series
-        ? `${finalMetadata.Series} #${finalMetadata.Number || winner.issue || ''}`.trim()
-        : (winnerTitle || 'Unknown Title');
-
-      if (confidence >= upperThreshold) {
-        // >= Upper threshold: Auto-accept!
-        if (controller && textEncoder) {
-          controller.enqueue(textEncoder.encode(`data: ${JSON.stringify({
-            type: 'progress',
-            source: 'Gemini Vision',
-            message: `✓ Match confirmed (${pct}% >= ${Math.round(upperThreshold * 100)}%): "${displayTitle}" - ${reason}`
-          })}\n\n`));
-        }
-
-        // Apply metadata to file via sidecar /api/apply-tag
-        try {
-          const serviceUrl = config.taggerServiceUrl || 'http://127.0.0.1:5000';
-          await originalFetch(`${serviceUrl}/api/apply-tag`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              path: filePath,
-              metadata: finalMetadata,
-              metadata_storage: reqBody.metadata_storage || 'archive'
-            })
-          });
-        } catch (applyErr) {
-          logger('WARN', 'TAGGER_HOOK', `Failed to apply tag via sidecar: ${applyErr.message}`);
-        }
-
-        res.status = 'tagged';
-        res.matched_title = displayTitle;
-        res.confidence = pct;
-        res.metadata = finalMetadata;
-        res.source = winner.source;
-        res.matching_url = winner.matching_url || winner.source;
-        res.reason = `Auto-tagged by Gemini Vision & Metadata AI (${pct}%): ${reason}`;
-      } else if (confidence >= lowerThreshold) {
-        // Between lower and upper threshold: Needs user review
-        if (controller && textEncoder) {
-          controller.enqueue(textEncoder.encode(`data: ${JSON.stringify({
-            type: 'progress',
-            source: 'Gemini Vision',
-            message: `ⓘ Review required (${pct}% in ${Math.round(lowerThreshold * 100)}%-${Math.round(upperThreshold * 100)}%): "${displayTitle}" - ${reason}`
-          })}\n\n`));
-        }
-
-        // Place winning candidate with synthesized metadata as choice #1
-        winner.metadata = finalMetadata;
-        const reordered = [winner, ...candidates.filter((_, idx) => idx !== bestIndex)];
-        res.candidates = reordered;
-        res.status = 'review';
-        res.matched_title = displayTitle;
-        res.confidence = pct;
-        res.metadata = finalMetadata;
-        res.source = winner.source;
-        res.matching_url = winner.matching_url || winner.source;
-        res.reason = `Needs Confirmation (Gemini Vision confidence: ${pct}% - ${reason})`;
-      } else {
-        // Below lower threshold: Ignored/rejected
-        if (controller && textEncoder) {
-          controller.enqueue(textEncoder.encode(`data: ${JSON.stringify({
-            type: 'progress',
-            source: 'Gemini Vision',
-            message: `✘ Match rejected (${pct}% < ${Math.round(lowerThreshold * 100)}%): ${reason}`
-          })}\n\n`));
-        }
-        res.status = 'skipped';
-        res.confidence = 0;
-        res.reason = `Rejected by Gemini Vision: ${reason}`;
-      }
-    } else {
-      // Rejection / None match
-      if (controller && textEncoder) {
-        controller.enqueue(textEncoder.encode(`data: ${JSON.stringify({
-          type: 'progress',
-          source: 'Gemini Vision',
-          message: `✘ All candidates rejected by Gemini Vision: ${reason}`
-        })}\n\n`));
-      }
-      res.status = 'skipped';
-      res.confidence = 0;
-      res.reason = `All candidates rejected by Gemini Vision: ${reason}`;
-    }
-
-    return res;
-  }
-
-
-module.exports = { installTaggerHook, installGeminiTagger: installTaggerHook };
+module.exports = {
+  installTaggerHook,
+  installGeminiTagger: installTaggerHook
+};

@@ -50,22 +50,7 @@ const GRANDFATHERED_LEGACY_FILES = new Set([
   'server/routes/admin/library-mgmt.js',
   'server/services/guided-reader.js',
   'public/js/library/smart-filters.js',
-  'public/js/library/device-library.js',
-  'server/services/gemini-tagger.js',
-  'public/js/events.js',
-  'tagger/tagger_app/sources/comicvine.py',
-  'server.js',
-  'server/services/library-scan.js',
-  'public/js/library/render/series.js',
-  'public/js/library/status.js',
-  'server/services/gemini-metadata.js',
-  'public/js/library.js',
-  'server/services/organization.js',
-  'public/js/settings.js',
-  'mcp/comics_mcp/reading_curator.py',
-  'public/js/library/render/comics.js',
-  'public/js/viewer/viewer-server.js',
-  'server/routes/user/library.js'
+  'public/js/library/device-library.js'
 ]);
 
 // Documented Cohesive Architectural Exemptions (Indivisible single responsibilities where splitting harms cohesion)
@@ -235,7 +220,7 @@ describe('Architectural Ratchet & Code Health Invariants', () => {
   });
 
   test('Grandfathered legacy files allowlist is correctly documented and tracked', () => {
-    expect(GRANDFATHERED_LEGACY_FILES.size).toBe(47);
+    expect(GRANDFATHERED_LEGACY_FILES.size).toBe(32);
   });
 
   test('Cohesive architectural exemptions have documented rationales, valid file paths, and source headers', () => {

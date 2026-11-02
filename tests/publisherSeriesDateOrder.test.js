@@ -125,6 +125,8 @@ describe('Publisher Series Published Date Ordering and Year Display', () => {
 
     env = createModuleSandbox();
     env.loadFile('../public/js/library/render/series-sort.js');
+    env.loadFile('../public/js/library/render/series/banner.js');
+    env.loadFile('../public/js/library/render/series/card.js');
     env.loadFile('../public/js/library/render/series.js');
     env.loadFile('../public/js/library/render.js');
   });
