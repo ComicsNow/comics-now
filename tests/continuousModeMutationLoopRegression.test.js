@@ -177,6 +177,10 @@ describe('Continuous Reading Mode MutationObserver & Event Safety Regression Tes
     loadModule('public/js/viewer/guided/lifecycle.js');
     loadModule('public/js/viewer/fullscreen/controls.js');
     loadModule('public/js/viewer/fullscreen/lifecycle.js');
+    loadModule('public/js/continuous/state.js');
+    loadModule('public/js/continuous/progress.js');
+    loadModule('public/js/continuous/virtualizer.js');
+    loadModule('public/js/continuous/lifecycle.js');
     loadModule('public/js/continuous.js');
   });
 

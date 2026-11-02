@@ -22,7 +22,7 @@ export function handleImageClick(e) {
   const now = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
   const getExternalDblAt = state.getLastDoubleTapAt || (typeof window !== 'undefined' ? window.getLastDoubleTapAt : null);
   const effectiveLastDblAt = Math.max(lastDblZoomAt, typeof getExternalDblAt === 'function' ? getExternalDblAt() : 0);
-  if (now - effectiveLastDblAt < 500) {
+  if (effectiveLastDblAt > 0 && (now - effectiveLastDblAt) < 500) {
     e.preventDefault?.();
     e.stopPropagation?.();
     return;

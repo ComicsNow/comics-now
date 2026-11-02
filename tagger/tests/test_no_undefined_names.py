@@ -42,7 +42,7 @@ def _called_root_names(tree):
     """Names invoked as bare calls or attribute targets (e.g., foo() or foo.bar())."""
     local = set()
     for node in ast.walk(tree):
-        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.Lambda)):
             for a in node.args.posonlyargs + node.args.args + node.args.kwonlyargs:
                 local.add(a.arg)
             if node.args.vararg: local.add(node.args.vararg.arg)

@@ -63,15 +63,24 @@ describe('Continuous Mode Module', () => {
     };
     vm.createContext(sandbox);
 
-    const continuousPath = path.join(__dirname, '../../../public/js/continuous.js');
-    const continuousCode = fs.readFileSync(continuousPath, 'utf-8')
-      .replace(/import\s+[\s\S]*?from\s+['"][^'"]+['"];?/g, '')
-      .replace(/export\s+async\s+function\s+/g, 'async function ')
-      .replace(/export\s+function\s+/g, 'function ')
-      .replace(/export\s+const\s+/g, 'const ')
-      .replace(/export\s+\{[\s\S]*?\};?/g, '')
-      .replace(/export\s+default\s+[^;]+;?/g, '');
-    new vm.Script(continuousCode).runInContext(sandbox);
+    const continuousFiles = [
+      '../../../public/js/continuous/state.js',
+      '../../../public/js/continuous/progress.js',
+      '../../../public/js/continuous/virtualizer.js',
+      '../../../public/js/continuous/lifecycle.js',
+      '../../../public/js/continuous.js'
+    ];
+    for (const rel of continuousFiles) {
+      const continuousPath = path.join(__dirname, rel);
+      const continuousCode = fs.readFileSync(continuousPath, 'utf-8')
+        .replace(/import\s+[\s\S]*?from\s+['"][^'"]+['"];?/g, '')
+        .replace(/export\s+async\s+function\s+/g, 'async function ')
+        .replace(/export\s+function\s+/g, 'function ')
+        .replace(/export\s+const\s+/g, 'const ')
+        .replace(/export\s+\{[\s\S]*?\};?/g, '')
+        .replace(/export\s+default\s+[^;]+;?/g, '');
+      new vm.Script(continuousCode).runInContext(sandbox);
+    }
   });
 
   test('toggleContinuousMode flips the current continuous mode value', () => {

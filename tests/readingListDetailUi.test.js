@@ -109,14 +109,24 @@ describe('Reading List Detail UI - Cover view, List view, Edit mode, Read/Resume
 
     vm.createContext(sandbox);
 
-    // Extract showReadingListDetail and related logic from app.js
-    const appPath = path.resolve(__dirname, '../public/app.js');
-    const appContent = fs.readFileSync(appPath, 'utf8');
+    // Extract showReadingListDetail and related logic from app submodules + app.js
+    const appFiles = [
+      '../public/js/app/bootstrap.js',
+      '../public/js/app/library-loader.js',
+      '../public/js/app/reading-list-modal.js',
+      '../public/js/app/reading-list-actions.js',
+      '../public/js/app/reading-list-detail-cards.js',
+      '../public/js/app/reading-list-detail.js',
+      '../public/app.js'
+    ];
+    const appContent = appFiles
+      .map(rel => fs.readFileSync(path.resolve(__dirname, rel), 'utf8'))
+      .join('\n');
 
     // Clean imports/exports for vm execution
     const cleanContent = appContent
-      .replace(/import\s+[\s\S]*?from\s+['"][^'"]+['"];?/g, '')
-      .replace(/import\s+['"][^'"]+['"];?/g, '')
+      .replace(/^\s*import\s+[\s\S]*?from\s+['"][^'"]+['"];?/gm, '')
+      .replace(/^\s*import\s+['"][^'"]+['"];?/gm, '')
       .replace(/export\s+const\s+/g, 'const ')
       .replace(/export\s+let\s+/g, 'let ')
       .replace(/export\s+function\s+/g, 'function ')

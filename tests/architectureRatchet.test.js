@@ -17,17 +17,8 @@ const path = require('path');
 const ROOT_DIR = path.resolve(__dirname, '..');
 const MAX_LINES = 380;
 
-// The 47 Grandfathered Legacy Files (Written before modularization architecture was codified)
-const GRANDFATHERED_LEGACY_FILES = new Set([
-  'public/app.js',
-  'mcp/comics_mcp/server.py',
-  'server/routes/user/metadata.js',
-  'public/js/offline/downloads.js',
-  'tagger/tagger_app/core/metadata.py',
-  'public/js/continuous.js',
-  'server/services/metadata.js',
-  'server/routes/user/reading-lists.js'
-]);
+// The Grandfathered Legacy Files (All 8 Tier 1 monoliths have been decomposed!)
+const GRANDFATHERED_LEGACY_FILES = new Set([]);
 
 // Documented Cohesive Architectural Exemptions (Indivisible single responsibilities where splitting harms cohesion)
 const COHESIVE_EXEMPTIONS = new Map([
@@ -107,7 +98,15 @@ describe('Architectural Ratchet & Code Health Invariants', () => {
       path.join(ROOT_DIR, 'tagger/tagger_app/sources'),
       path.join(ROOT_DIR, 'public/js/comictagger'),
       path.join(ROOT_DIR, 'public/js/viewer/fullscreen'),
-      path.join(ROOT_DIR, 'public/js/library/render')
+      path.join(ROOT_DIR, 'public/js/library/render'),
+      path.join(ROOT_DIR, 'server/routes/user/reading-lists'),
+      path.join(ROOT_DIR, 'server/services/metadata'),
+      path.join(ROOT_DIR, 'public/js/continuous'),
+      path.join(ROOT_DIR, 'tagger/tagger_app/core/metadata_parts'),
+      path.join(ROOT_DIR, 'public/js/offline/downloads'),
+      path.join(ROOT_DIR, 'server/routes/user/metadata'),
+      path.join(ROOT_DIR, 'mcp/comics_mcp'),
+      path.join(ROOT_DIR, 'public/js/app')
     ];
 
     const violations = [];
@@ -172,7 +171,8 @@ describe('Architectural Ratchet & Code Health Invariants', () => {
     const scanDirs = [
       path.join(ROOT_DIR, 'server'),
       path.join(ROOT_DIR, 'public/js'),
-      path.join(ROOT_DIR, 'tagger/tagger_app')
+      path.join(ROOT_DIR, 'tagger/tagger_app'),
+      path.join(ROOT_DIR, 'mcp/comics_mcp')
     ];
 
     const newFileViolations = [];
@@ -196,7 +196,7 @@ describe('Architectural Ratchet & Code Health Invariants', () => {
   });
 
   test('Grandfathered legacy files allowlist is correctly documented and tracked', () => {
-    expect(GRANDFATHERED_LEGACY_FILES.size).toBe(8);
+    expect(GRANDFATHERED_LEGACY_FILES.size).toBe(0);
   });
 
   test('Cohesive architectural exemptions have documented rationales, valid file paths, and source headers', () => {
