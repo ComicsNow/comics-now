@@ -59,7 +59,13 @@ describe('Publisher View Reading List Filter', () => {
     `;
 
     env = createModuleSandbox();
+    env.loadFile('../public/js/library/smartlists/predicates.js');
+    env.loadFile('../public/js/library/smartlists/publisher-match.js');
+    env.loadFile('../public/js/library/smartlists/downloaded.js');
+    env.loadFile('../public/js/library/smartlists/counters.js');
     env.loadFile('../public/js/library/smartlists.js');
+    env.loadFile('../public/js/library/status/calculator.js');
+    env.loadFile('../public/js/library/status/dom-sync.js');
     env.loadFile('../public/js/library/status.js');
   });
 

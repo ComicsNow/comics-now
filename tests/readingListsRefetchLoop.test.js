@@ -101,6 +101,10 @@ describe('smartlists reading-list lazy fetch (no refetch loop on empty library)'
 
     fetchMock = createEmptyListFetchMock();
     env = createModuleSandbox(fetchMock.impl);
+    env.loadFile('../public/js/library/smartlists/predicates.js');
+    env.loadFile('../public/js/library/smartlists/publisher-match.js');
+    env.loadFile('../public/js/library/smartlists/downloaded.js');
+    env.loadFile('../public/js/library/smartlists/counters.js');
     env.loadFile('../public/js/library/smartlists.js');
   });
 

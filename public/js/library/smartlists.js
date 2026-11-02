@@ -1,642 +1,89 @@
+import { state } from '../globals.js';
 import {
-  state,
-  latestAddedCountSpan,
-  downloadedCountSpan,
-  applyDisplayInfoToComic
-} from '../globals.js';
-
-export const LATEST_ADDED_DAYS = 14;
-
-let latestComics = [];
-let downloadedSmartListComics = [];
-let downloadedSmartListError = null;
-let guidedComics = [];
-let mangaComics = [];
-let nonMangaComics = [];
-
-export function updateLatestButtonCount() {
-  const isInbox = state.currentRootFolder === 'Smart Inbox';
-  const latestBtn = document.getElementById('latest-added-btn');
-  const downloadedBtn = document.getElementById('downloaded-btn');
-
-  if (isInbox) {
-    const rootData = (state.library || window.library)?.[state.currentRootFolder];
-    let successfulCount = 0;
-    let failedCount = 0;
-    if (rootData && rootData.publishers) {
-      for (const pubName of Object.keys(rootData.publishers)) {
-        const pub = rootData.publishers[pubName];
-        if (pub && pub.series) {
-          for (const seriesName of Object.keys(pub.series)) {
-            const seriesComics = pub.series[seriesName];
-            if (Array.isArray(seriesComics)) {
-              for (const comic of seriesComics) {
-                if (comic.tagStatus === 'successful') {
-                  successfulCount++;
-                } else if (comic.tagStatus === 'failed') {
-                  failedCount++;
-                }
-              }
-            }
-          }
-        }
-      }
-    }
-
-    if (latestAddedCountSpan) {
-      latestAddedCountSpan.textContent = successfulCount.toString();
-    }
-    if (downloadedCountSpan) {
-      downloadedCountSpan.textContent = failedCount.toString();
-    }
-
-    if (latestBtn) {
-      const lbl = latestBtn.querySelector('.pill-label');
-      if (lbl) lbl.textContent = 'Successful';
-    }
-    if (downloadedBtn) {
-      const lbl = downloadedBtn.querySelector('.pill-label');
-      if (lbl) lbl.textContent = 'Failed';
-    }
-
-    const guidedBtn = document.getElementById('guided-smart-list-btn');
-    if (guidedBtn) guidedBtn.classList.add('hidden');
-
-    const mangaBtn = document.getElementById('dynamic-manga-filter-btn');
-    if (mangaBtn) mangaBtn.classList.add('hidden');
-  } else {
-    if (latestBtn) {
-      const lbl = latestBtn.querySelector('.pill-label');
-      if (lbl) lbl.textContent = 'New';
-    }
-    if (downloadedBtn) {
-      const lbl = downloadedBtn.querySelector('.pill-label');
-      if (lbl) lbl.textContent = 'Down';
-    }
-
-    const guidedBtn = document.getElementById('guided-smart-list-btn');
-    if (guidedBtn) guidedBtn.classList.remove('hidden');
-
-    updateMangaFilterButtonCount();
-    updateReadingListFilterButtonCount();
-
-    if (latestAddedCountSpan) {
-      latestAddedCountSpan.textContent = latestComics.length.toString();
-    }
-    if (downloadedCountSpan) {
-      downloadedCountSpan.textContent = (Array.isArray(downloadedSmartListComics)
-        ? downloadedSmartListComics.length
-        : 0).toString();
-    }
-  }
-}
-
-export function updateDownloadedButtonCount() {
-  updateLatestButtonCount();
-}
-
-export function updateGuidedButtonCount() {
-  const span = document.getElementById('guided-smart-list-count');
-  if (span) span.textContent = (Array.isArray(guidedComics) ? guidedComics.length : 0).toString();
-}
-
-let cachedReadingLists = [];
-
-// Lazy-load guards. A completed fetch (successful, empty, or failed) sets
-// readingListsLoaded so render-time callers never re-trigger a fetch for the
-// same result — without this, fetchAndCacheReadingLists() and
-// updateReadingListFilterButtonCount() call each other in an unbounded loop
-// whenever the reading-list collection is empty. Explicit callers (Reading
-// Lists modal, mutations) still refetch via fetchAndCacheReadingLists().
-let readingListsLoaded = false;
-let readingListsFetchInFlight = null;
-
-function maybeFetchReadingLists() {
-  if (readingListsLoaded || readingListsFetchInFlight) return;
-  fetchAndCacheReadingLists();
-}
-
-export const PUB_SUFFIX_REGEX = /\b(comics?|publishing|press|studios?|books?|entertainment|productions?|inc|llc|ltd)\b/gi;
-
-export function normalizePub(str) {
-  return String(str || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-}
-
-export function stemPublisher(str) {
-  if (!str) return '';
-  return String(str)
-    .toLowerCase()
-    .replace(PUB_SUFFIX_REGEX, ' ')
-    .replace(/[^a-z0-9]/g, '');
-}
-
-export function isPubMatch(pubA, pubB) {
-  if (!pubA || !pubB) return false;
-  const normA = normalizePub(pubA);
-  const normB = normalizePub(pubB);
-  if (normA && normB && normA === normB) return true;
-  const stemA = stemPublisher(pubA);
-  const stemB = stemPublisher(pubB);
-  if (stemA && stemB && stemA === stemB) return true;
-  return false;
-}
-
-export function matchesPublisher(list, publisherName) {
-  if (!list || !publisherName) return false;
-
-  // 1. Direct or stem match against list.publishers
-  if (Array.isArray(list.publishers)) {
-    for (const p of list.publishers) {
-      if (isPubMatch(p, publisherName)) return true;
-    }
-  }
-
-  // 2. Name prefix match e.g. "DC: ..." or "Dark Horse: ..." or "Image: ..." or "Boom! Studios: ..."
-  const listName = String(list.name || '');
-  const colonIdx = listName.indexOf(':');
-  if (colonIdx > 0) {
-    const prefix = listName.substring(0, colonIdx).trim();
-    if (isPubMatch(prefix, publisherName)) return true;
-    // Also support prefix variations like "DC Event: ..." matching "DC Comics"
-    const prefixStem = stemPublisher(prefix);
-    const targetStem = stemPublisher(publisherName);
-    if (prefixStem && targetStem && (prefixStem === targetStem || prefixStem.startsWith(targetStem))) {
-      return true;
-    }
-  }
-
-  // 3. Fallback: whole word boundary matching of target publisher in list name
-  const cleanTarget = String(publisherName).trim();
-  if (cleanTarget.length >= 2) {
-    const escaped = cleanTarget.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const wordPattern = new RegExp('\\b' + escaped + '\\b', 'i');
-    if (wordPattern.test(listName)) return true;
-
-    // Check stemmed target (e.g. "Dark Horse" from "Dark Horse Comics") as whole word
-    const stem = stemPublisher(cleanTarget);
-    if (stem.length >= 3) {
-      const stemPattern = new RegExp('\\b' + stem + '\\b', 'i');
-      if (stemPattern.test(listName)) return true;
-    }
-  }
-
-  return false;
-}
-
-export async function fetchAndCacheReadingLists() {
-  if (readingListsFetchInFlight) return readingListsFetchInFlight;
-
-  const inFlight = (async () => {
-    try {
-      const fetchLists = (state.ReadingLists || window.ReadingLists)?.fetchReadingLists;
-      if (typeof fetchLists === 'function') {
-        cachedReadingLists = await fetchLists();
-      } else {
-        const resp = await fetch('/api/v1/reading-lists');
-        const data = await resp.json();
-        if (data && data.ok) {
-          cachedReadingLists = data.lists || [];
-        }
-      }
-    } catch (err) {
-      console.warn('[smartlists] Error caching reading lists:', err);
-    } finally {
-      // Mark the attempt complete on every outcome so an empty or failed load
-      // is not auto-retried on each render (that retry cycle was the loop).
-      readingListsLoaded = true;
-      readingListsFetchInFlight = null;
-    }
-
-    updateReadingListFilterButtonCount();
-
-    const currentView = state.currentView || window.currentView;
-    const scope = state.activeSmartFilter || window.activeSmartFilter;
-    if (scope === 'reading-list' && (currentView === 'publishers' || currentView === 'series')) {
-      const applyFilter = state.applyFilterAndRender || window.applyFilterAndRender || state.LibraryRender?.applyFilterAndRender;
-      if (typeof applyFilter === 'function') {
-        applyFilter();
-      }
-    }
-
-    return cachedReadingLists;
-  })();
-
-  readingListsFetchInFlight = inFlight;
-  return inFlight;
-}
-
-export function getCachedReadingLists() {
-  return cachedReadingLists;
-}
-
-export function setCachedReadingLists(lists) {
-  cachedReadingLists = Array.isArray(lists) ? lists : [];
-  readingListsLoaded = true;
-  updateReadingListFilterButtonCount();
-}
-
-export function getReadingListsForPublisher(publisherName) {
-  if (!publisherName) return [];
-  if (cachedReadingLists.length === 0) {
-    maybeFetchReadingLists();
-  }
-  return cachedReadingLists.filter(list => matchesPublisher(list, publisherName));
-}
-
-export function updateReadingListFilterButtonCount() {
-  const span = document.getElementById('dynamic-reading-list-filter-count');
-  const btn = document.getElementById('dynamic-reading-list-filter-btn');
-  if (!span || !btn) return;
-
-  const currentView = state.currentView || window.currentView;
-  const currentPublisher = state.currentPublisher || window.currentPublisher;
-  const currentRootFolder = state.currentRootFolder || window.currentRootFolder;
-  const library = state.library || window.library;
-
-  if (cachedReadingLists.length === 0) {
-    maybeFetchReadingLists();
-  }
-
-  if (currentView === 'series' && currentPublisher) {
-    const matchingLists = getReadingListsForPublisher(currentPublisher);
-    span.textContent = matchingLists.length.toString();
-    btn.classList.toggle('hidden', matchingLists.length === 0);
-    return;
-  }
-
-  if (currentView === 'publishers') {
-    let publishers = {};
-    if (currentRootFolder && library) {
-      const normalizedPath = currentRootFolder.replace(/[\\\/]+$/, '');
-      const rootData = library[currentRootFolder] || library[normalizedPath] || library[normalizedPath + '/'];
-      publishers = rootData?.publishers || {};
-    }
-    const pubNamesWithLists = Object.keys(publishers).filter(pubName => getReadingListsForPublisher(pubName).length > 0);
-    span.textContent = pubNamesWithLists.length.toString();
-    btn.classList.toggle('hidden', pubNamesWithLists.length === 0);
-    return;
-  }
-
-  btn.classList.add('hidden');
-}
-
-export function updateMangaFilterButtonCount() {
-  const span = document.getElementById('dynamic-manga-filter-count');
-  const label = document.getElementById('dynamic-manga-filter-label');
-  const btn = document.getElementById('dynamic-manga-filter-btn');
-  if (!span || !label || !btn) return;
-
-  const isMangaDefault = state.mangaModePreference === true || window.mangaModePreference === true;
-  
-  if (isMangaDefault) {
-    label.textContent = 'Non-Manga';
-    span.textContent = nonMangaComics.length.toString();
-    btn.classList.toggle('hidden', nonMangaComics.length === 0);
-  } else {
-    label.textContent = 'Manga';
-    span.textContent = mangaComics.length.toString();
-    btn.classList.toggle('hidden', mangaComics.length === 0);
-  }
-}
-
-export function rebuildMangaSmartLists() {
-  const manga = [];
-  const nonManga = [];
-  
-  const comicIdMap = state.comicIdMap || window.comicIdMap;
-  if (comicIdMap && comicIdMap.size > 0) {
-    for (const comic of comicIdMap.values()) {
-      if (comic.mangaMode === true) {
-        manga.push(comic);
-      } else {
-        nonManga.push(comic);
-      }
-    }
-  }
-  
-  const sortFn = (a, b) => {
-    const an = (a.displayName || a.name || '').toLowerCase();
-    const bn = (b.displayName || b.name || '').toLowerCase();
-    return an < bn ? -1 : an > bn ? 1 : 0;
-  };
-  
-  manga.sort(sortFn);
-  nonManga.sort(sortFn);
-  
-  mangaComics = manga;
-  nonMangaComics = nonManga;
-  updateMangaFilterButtonCount();
-}
-
-export function getMangaComics() { return mangaComics; }
-export function getNonMangaComics() { return nonMangaComics; }
-
-export function rebuildGuidedComics() {
-  const out = [];
-  const comicIdMap = state.comicIdMap || window.comicIdMap;
-  if (comicIdMap && comicIdMap.size > 0) {
-    for (const comic of comicIdMap.values()) {
-      if (comic.guidedViewStatus === 'completed') out.push(comic);
-    }
-  }
-  out.sort((a, b) => {
-    const an = (a.displayName || a.name || '').toLowerCase();
-    const bn = (b.displayName || b.name || '').toLowerCase();
-    return an < bn ? -1 : an > bn ? 1 : 0;
-  });
-  guidedComics = out;
-  updateGuidedButtonCount();
-}
-
-export function getGuidedComics() { return guidedComics; }
-
-export function rebuildLatestComics() {
-  const cutoff = Date.now() - (LATEST_ADDED_DAYS * 24 * 60 * 60 * 1000);
-  const recentComics = [];
-
-  const comicIdMap = state.comicIdMap || window.comicIdMap;
-  if (comicIdMap && comicIdMap.size > 0) {
-    for (const comic of comicIdMap.values()) {
-      const updatedValue = Number(comic.updatedAt ?? comic.convertedAt ?? 0);
-      if (!Number.isFinite(updatedValue) || updatedValue <= 0) continue;
-      if (updatedValue >= cutoff) {
-        recentComics.push(comic);
-      }
-    }
-  }
-
-  recentComics.sort((a, b) => {
-    const bTime = Number(b.updatedAt ?? b.convertedAt ?? 0);
-    const aTime = Number(a.updatedAt ?? a.convertedAt ?? 0);
-    return bTime - aTime;
-  });
-
-  latestComics = recentComics;
-  updateLatestButtonCount();
-}
-
-export function parseDownloadedTimestamp(value) {
-  if (value == null) return NaN;
-  if (typeof value === 'number') {
-    return Number.isFinite(value) ? value : NaN;
-  }
-  if (typeof value === 'string') {
-    const parsed = Date.parse(value);
-    return Number.isFinite(parsed) ? parsed : NaN;
-  }
-  return NaN;
-}
-
-export function findDownloadedComicById(comicId) {
-  if (!Array.isArray(downloadedSmartListComics) || downloadedSmartListComics.length === 0) {
-    return null;
-  }
-  const idStr = comicId == null ? null : String(comicId);
-  if (!idStr) {
-    return null;
-  }
-  return downloadedSmartListComics.find(entry => String(entry.id) === idStr) || null;
-}
-
-export function updateDownloadedComicProgressData(comicId, progress = {}) {
-  const target = findDownloadedComicById(comicId);
-  if (!target) return false;
-
-  if (!target.progress || typeof target.progress !== 'object') {
-    target.progress = { totalPages: 0, lastReadPage: 0 };
-  }
-
-  const normalized = target.progress;
-
-  if (progress.lastReadPage != null) {
-    const lastRead = Number(progress.lastReadPage);
-    if (Number.isFinite(lastRead) && lastRead >= 0) {
-      normalized.lastReadPage = lastRead;
-    }
-  }
-
-  if (progress.totalPages != null) {
-    const totalPages = Number(progress.totalPages);
-    if (Number.isFinite(totalPages) && totalPages >= 0) {
-      normalized.totalPages = totalPages;
-    }
-  }
-
-  return true;
-}
-
-export function resolveTotalPagesForComic(comic) {
-  if (!comic) return 0;
-  const progress = comic.progress || {};
-  const candidates = [
-    progress.totalPages,
-    comic.totalPages,
-    comic.pageCount,
-  ];
-
-  for (const candidate of candidates) {
-    const value = Number(candidate);
-    if (Number.isFinite(value) && value > 0) {
-      return value;
-    }
-  }
-
-  return 0;
-}
-
-export function syncDownloadedComicStatusFromLibrary(comic, normalizedStatus) {
-  if (!comic) return false;
-  const totalPages = resolveTotalPagesForComic(comic);
-
-  if (normalizedStatus === 'read') {
-    const resolvedTotal = Math.max(totalPages, 1);
-    return updateDownloadedComicProgressData(comic.id, {
-      totalPages: resolvedTotal,
-      lastReadPage: Math.max(resolvedTotal - 1, 0),
-    });
-  }
-
-  const payload = { lastReadPage: 0 };
-  if (totalPages <= 1) {
-    payload.totalPages = 0;
-  } else if (Number.isFinite(totalPages) && totalPages > 1) {
-    payload.totalPages = totalPages;
-  }
-
-  return updateDownloadedComicProgressData(comic.id, payload);
-}
-
-export async function rebuildDownloadedComics(options = {}) {
-  const { skipRender = false, forceRender = false } = options || {};
-
-  const getAllDownloadedComics = state.getAllDownloadedComics || window.getAllDownloadedComics || (state.OfflineDB?.getAllDownloadedComics) || (window.OfflineDB?.getAllDownloadedComics);
-
-  if (typeof getAllDownloadedComics !== 'function') {
-    downloadedSmartListComics = [];
-    downloadedSmartListError = new Error('Offline downloads unavailable');
-    updateDownloadedButtonCount();
-    const LibraryRender = state.LibraryRender || window.LibraryRender;
-    const currentView = state.currentView || window.currentView;
-    if (forceRender || (!skipRender && currentView === 'downloaded')) {
-      LibraryRender?.renderDownloadedSmartList?.();
-    }
-    return downloadedSmartListComics;
-  }
-
-  try {
-    const offlineRecords = await getAllDownloadedComics();
-    const normalizedEntries = (Array.isArray(offlineRecords) ? offlineRecords : [])
-      .map(record => {
-        if (!record) return null;
-
-        const baseComic = {
-          ...(record.comicInfo || {}),
-        };
-
-        if (baseComic.id == null) {
-          baseComic.id = record.id;
-        }
-
-        const sourceProgress = record.progress || record.comicInfo?.progress;
-        if (!baseComic.progress || typeof baseComic.progress !== 'object') {
-          if (sourceProgress && typeof sourceProgress === 'object') {
-            baseComic.progress = {
-              totalPages: Number(sourceProgress.totalPages) || 0,
-              lastReadPage: Number(sourceProgress.lastReadPage) || 0,
-            };
-          } else {
-            baseComic.progress = { totalPages: 0, lastReadPage: 0 };
-          }
-        } else {
-          baseComic.progress = {
-            totalPages: Number(baseComic.progress.totalPages) || 0,
-            lastReadPage: Number(baseComic.progress.lastReadPage) || 0,
-          };
-        }
-
-        const comicIdMap = state.comicIdMap || window.comicIdMap;
-        if (comicIdMap) {
-          const libraryComic = comicIdMap.get(baseComic.id);
-
-          if (libraryComic && libraryComic.mangaMode !== undefined) {
-            baseComic.mangaMode = libraryComic.mangaMode;
-          }
-
-          if (libraryComic && libraryComic.continuousMode !== undefined) {
-            baseComic.continuousMode = libraryComic.continuousMode;
-          }
-        }
-
-        applyDisplayInfoToComic(baseComic);
-
-        const timestampCandidates = [
-          baseComic.downloadedAt,
-          record.downloadedAt,
-          record.savedAt,
-          baseComic.savedAt,
-          baseComic.updatedAt,
-          baseComic.convertedAt,
-        ];
-
-        const sortTimestamp = timestampCandidates
-          .map(value => parseDownloadedTimestamp(value))
-          .find(value => Number.isFinite(value)) || 0;
-
-        const sortName = (baseComic.displayName || baseComic.title || baseComic.name || '')
-          .toLowerCase();
-
-        return {
-          comic: baseComic,
-          sortTimestamp,
-          sortName,
-        };
-      })
-      .filter(Boolean);
-
-    normalizedEntries.sort((a, b) => {
-      if (b.sortTimestamp !== a.sortTimestamp) {
-        return b.sortTimestamp - a.sortTimestamp;
-      }
-      if (a.sortName < b.sortName) return -1;
-      if (a.sortName > b.sortName) return 1;
-      return 0;
-    });
-
-    downloadedSmartListComics = normalizedEntries.map(entry => entry.comic);
-    downloadedSmartListError = null;
-  } catch (error) {
-    downloadedSmartListComics = [];
-    downloadedSmartListError = error;
-  }
-
-  updateDownloadedButtonCount();
-
-  const LibraryRender = state.LibraryRender || window.LibraryRender;
-  const currentView = state.currentView || window.currentView;
-  if (forceRender || (!skipRender && currentView === 'downloaded')) {
-    LibraryRender?.renderDownloadedSmartList?.();
-  }
-
-  return downloadedSmartListComics;
-}
-
-export function getLatestComics() {
-  return latestComics;
-}
-
-export function getDownloadedSmartListComics() {
-  return downloadedSmartListComics;
-}
-
-export function getDownloadedSmartListError() {
-  return downloadedSmartListError;
-}
-
-export function updateDownloadedSmartListComic(comicId, updates) {
-  if (!comicId || !updates) return false;
-
-  const target = findDownloadedComicById(comicId);
-  if (!target) return false;
-
-  Object.assign(target, updates);
-  return true;
-}
-
-export function isComicLatest(comic) {
-  if (!comic) return false;
-  const cutoff = Date.now() - (LATEST_ADDED_DAYS * 24 * 60 * 60 * 1000);
-  const updatedValue = Number(comic.updatedAt ?? comic.convertedAt ?? 0);
-  return Number.isFinite(updatedValue) && updatedValue >= cutoff;
-}
-
-export function isComicDownloaded(comic) {
-  if (!comic) return false;
-  const downloadedComicIds = state.downloadedComicIds || window.downloadedComicIds;
-  return !!(downloadedComicIds && downloadedComicIds.has(comic.id));
-}
-
-export function isComicGuided(comic) {
-  if (!comic) return false;
-  return comic.guidedViewStatus === 'completed';
-}
-
-export function isComicManga(comic) {
-  if (!comic) return false;
-  return comic.mangaMode === true || comic.mangaMode == 1;
-}
-
-export function comicMatchesActiveSmartScope(comic) {
-  const scope = state.activeSmartFilter || window.activeSmartFilter;
-  if (!scope) return true;
-  if (scope === 'successful') return comic.tagStatus === 'successful';
-  if (scope === 'failed') return comic.tagStatus === 'failed';
-  if (scope === 'latest') return isComicLatest(comic);
-  if (scope === 'downloaded') return isComicDownloaded(comic);
-  if (scope === 'guided') return isComicGuided(comic);
-  if (scope === 'manga') return isComicManga(comic);
-  if (scope === 'non-manga') return !isComicManga(comic);
-  return true;
-}
+  LATEST_ADDED_DAYS,
+  isComicLatest,
+  isComicDownloaded,
+  isComicGuided,
+  isComicManga,
+  comicMatchesActiveSmartScope
+} from './smartlists/predicates.js';
+import {
+  PUB_SUFFIX_REGEX,
+  normalizePub,
+  stemPublisher,
+  isPubMatch,
+  matchesPublisher,
+  maybeFetchReadingLists,
+  fetchAndCacheReadingLists,
+  getCachedReadingLists,
+  setCachedReadingLists,
+  getReadingListsForPublisher,
+  updateReadingListFilterButtonCount
+} from './smartlists/publisher-match.js';
+import {
+  parseDownloadedTimestamp,
+  findDownloadedComicById,
+  updateDownloadedComicProgressData,
+  resolveTotalPagesForComic,
+  syncDownloadedComicStatusFromLibrary,
+  rebuildDownloadedComics,
+  getDownloadedSmartListComics,
+  getDownloadedSmartListError,
+  updateDownloadedSmartListComic
+} from './smartlists/downloaded.js';
+import {
+  updateLatestButtonCount,
+  updateDownloadedButtonCount,
+  updateGuidedButtonCount,
+  updateMangaFilterButtonCount,
+  rebuildMangaSmartLists,
+  getMangaComics,
+  getNonMangaComics,
+  rebuildGuidedComics,
+  getGuidedComics,
+  rebuildLatestComics,
+  getLatestComics
+} from './smartlists/counters.js';
+
+export {
+  LATEST_ADDED_DAYS,
+  isComicLatest,
+  isComicDownloaded,
+  isComicGuided,
+  isComicManga,
+  comicMatchesActiveSmartScope,
+  PUB_SUFFIX_REGEX,
+  normalizePub,
+  stemPublisher,
+  isPubMatch,
+  matchesPublisher,
+  maybeFetchReadingLists,
+  fetchAndCacheReadingLists,
+  getCachedReadingLists,
+  setCachedReadingLists,
+  getReadingListsForPublisher,
+  updateReadingListFilterButtonCount,
+  parseDownloadedTimestamp,
+  findDownloadedComicById,
+  updateDownloadedComicProgressData,
+  resolveTotalPagesForComic,
+  syncDownloadedComicStatusFromLibrary,
+  rebuildDownloadedComics,
+  getDownloadedSmartListComics,
+  getDownloadedSmartListError,
+  updateDownloadedSmartListComic,
+  updateLatestButtonCount,
+  updateDownloadedButtonCount,
+  updateGuidedButtonCount,
+  updateMangaFilterButtonCount,
+  rebuildMangaSmartLists,
+  getMangaComics,
+  getNonMangaComics,
+  rebuildGuidedComics,
+  getGuidedComics,
+  rebuildLatestComics,
+  getLatestComics
+};
 
 const LibrarySmartLists = {
   LATEST_ADDED_DAYS,
@@ -668,6 +115,8 @@ const LibrarySmartLists = {
   getCachedReadingLists,
   setCachedReadingLists
 };
+
+export default LibrarySmartLists;
 
 state.LibrarySmartLists = LibrarySmartLists;
 Object.assign(state, LibrarySmartLists);

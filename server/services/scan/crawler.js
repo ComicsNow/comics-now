@@ -154,8 +154,9 @@ async function walkLibraryDirectory({ dir, libraryMode, libraryRootPath, ctx }) 
   }
 
   await pMap(files, async (file) => {
-    if (file.startsWith('.')) return;
-    let filePath = path.join(dir, file);
+    const fileName = typeof file === 'string' ? file : (file?.name || String(file || ''));
+    if (!fileName || fileName.startsWith('.')) return;
+    let filePath = path.join(dir, fileName);
     let wasConverted = false;
     let stats;
     try {

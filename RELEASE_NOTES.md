@@ -16,11 +16,15 @@ Welcome to **Comics Now! v2.6.0** — a milestone release delivering major viewe
 * **Fault-Tolerant Image & Archive Processing**: Enhanced the cloud inference runner with automatic support for truncated images via Pillow reader, corrupted archive CRC-32 header tolerance, and automatic worker cancel latch resets across batch executions to ensure smooth unattended batch runs.
 
 ### 3. Architecture Modernization & Modular Subsystems
-* **Modular Subsystems**:
-  - Modularized the Python backend tagger into focused Flask blueprints (`tagger_app/blueprints/`, `tagger_app/services/`).
-  - Modularized frontend ComicTagger into dedicated submodules (`public/js/comictagger/`).
-  - Modularized Fullscreen Reader into dedicated viewer submodules (`public/js/viewer/fullscreen/`).
-  - Modularized Library Renderer into dedicated library submodules (`public/js/library/render/`).
+* **Comprehensive Monolith Decomposition**:
+  - **Core Database & Configuration**: Decomposed `server/db.js` into modular connection, schema migrations, user preferences, and access control submodules (`server/db/`). Decomposed `server/config.js` into environment parsing, filesystem paths, tagger configurations, and configuration store (`server/config/`).
+  - **Server Lifecycle & Bootstrapping**: Modularized `server.js` into dedicated lifecycle coordination, API rate-limiting, and route bootstrapping submodules (`server/lifecycle.js`).
+  - **Library Navigation & Smartlists**: Decomposed `public/js/library/smartlists.js` into predicates, publisher matching, offline downloaded sync, and dynamic counters (`public/js/library/smartlists/`). Modularized `public/js/library/smart-filters.js` into buttons, predicate evaluation, and views (`public/js/library/filters/`). Modularized `public/js/library/device-library.js` into storage and UI submodules (`public/js/library/device/`).
+  - **Scanner & Organization**: Decomposed `server/services/library-scan.js` into recursive directory crawler, scan lock coordinator, orphaned asset cleanup, and background scheduler. Decomposed `server/services/organization.js` into matching patterns and file relocation submodules.
+  - **Guided View Admin & Service Engine**: Decomposed frontend `public/js/guided-reader.js` into live logs streaming, Modal cloud configuration, status polling, and tab event binding (`public/js/guided-admin/`). Modularized backend `server/services/guided-reader.js` into state tracking, settings management, processor coordination, queue management, and background worker execution (`server/services/guided/`).
+  - **Admin Management Routes**: Decomposed `server/routes/admin/library-mgmt.js` into scan metadata, comic move operations, and tree log streaming (`server/routes/admin/library/`). Decomposed `server/routes/admin/comictagger.js` into settings persistence, execution spawning, and SSE log streaming (`server/routes/admin/comictagger/`).
+  - **Offline Status & Sync**: Decomposed `public/js/offline/status.js` into progress synchronization and IndexedDB cache reconciliation (`public/js/offline/status/`).
+  - **Metadata & Tagger Sources**: Modularized Gemini metadata and tagger services into prompt builders, normalizers, evaluators, and resolvers. Decomposed ComicVine source client (`comicvine.py`) into API client and parser submodules. Modularized Reading Curator MCP server into matching and database engines.
 * **Centralized Reactive Store**:
   - Implemented a unified reactive store (`public/js/store.js`) with an event bus, state hydration, audit trails, and explicit action dispatchers for viewer, navigation, and filter states.
   - Eliminated global state mutations on `window`, routing state changes through explicit store actions.
@@ -54,8 +58,34 @@ Welcome to **Comics Now! v2.6.0** — a milestone release delivering major viewe
 - `fix(modal)`: allow loading truncated images in Pillow reader
 - `fix(modal)`: bypass strict CRC assert on archives with corrupted entry headers
 - `fix(guided)`: clear cancelCurrent and isCancelled state latch across worker runs
+- `fix(scan)`: handle Dirent objects properly in directory crawler and load status submodules in reading list tests
 
 ### Refactoring & Code Health
+- `refactor(smartlists)`: decompose public library smartlists into predicates, publisher-match, downloaded, and counters submodules
+- `refactor(guided)`: decompose public guided-reader into logs, modal, status, and events submodules
+- `refactor(config)`: decompose server config into env, paths, tagger-config, and store submodules
+- `refactor(offline)`: decompose offline status into progress-sync and db-sync submodules
+- `refactor(db)`: decompose server database into connection, schema, preferences, and access submodules
+- `refactor(admin)`: decompose comictagger routes into settings, execution, and stream submodules
+- `refactor(admin)`: decompose library-mgmt routes into scan-meta, move, and tree-logs submodules
+- `refactor(guided)`: decompose guided-reader service into state, settings, processor, queue, and worker submodules
+- `refactor(library)`: decompose smart-filters into buttons, predicate, and views submodules
+- `refactor(library)`: decompose device-library into storage and ui submodules
+- `refactor(gemini)`: decompose gemini-tagger into evaluator and resolver submodules
+- `refactor(events)`: extract settings and tagger tab event listeners into tabs submodule
+- `refactor(tagger)`: decompose comicvine source into parser and query client
+- `refactor(server)`: decompose main server script into lifecycle, rate-limits, and api bootstrap submodules
+- `refactor(scan)`: decompose library scan service into crawler, lock, cleanup, and scheduler submodules
+- `refactor(library)`: decompose series card renderer into banner and card builder submodules
+- `refactor(library)`: decompose library status engine into calculator and dom-sync submodules
+- `refactor(server)`: decompose gemini-metadata service into modular prompt and normalizer
+- `refactor(library)`: modularize library.js into navigation, smart-scope, and search-controls submodules
+- `refactor(server)`: modularize organization.js into patterns and relocator submodules
+- `refactor(settings)`: modularize settings.js into libraries and form-sync submodules
+- `refactor(mcp)`: modularize reading_curator.py into matcher and db submodules
+- `refactor(library)`: modularize render/comics.js into card-builder submodule
+- `refactor(viewer)`: modularize viewer-server.js into preloader and navigation submodules
+- `refactor(server)`: modularize server/routes/user/library.js into catalog and folders submodules
 - `refactor(backend)`: modularize tagger/app.py monolith into focused blueprints and submodules
 - `refactor(tagger)`: modularize comictagger.js monolith into focused submodules
 - `refactor(viewer)`: modularize fullscreen.js monolith into focused submodules
@@ -72,5 +102,5 @@ Welcome to **Comics Now! v2.6.0** — a milestone release delivering major viewe
 ---
 
 ## 🧪 Verification & Test Results
-- **Test Suites**: 100% test pass rate across all viewer, tagger, and guided view test suites.
-- **Production Asset Compilation**: Tailwind CSS and Vite production bundles verified clean.
+- **Full Test Suite Coverage**: 100% test pass rate across all Jest unit/integration suites, Python tagger test suites, and MCP curator test suites.
+- **Production Asset Compilation**: Tailwind CSS and Vite production client bundles compiled cleanly.
