@@ -102,19 +102,29 @@ describe('Tag Comics Now! Management UI (Name & Folder Tabs, Token Ordering, Con
       });
     });
 
-    // Load comics-management.js into current jsdom environment
-    const fullPath = path.resolve(__dirname, '../public/js/settings/comics-management.js');
-    const content = fs.readFileSync(fullPath, 'utf8');
-    const cleanContent = content
-      .replace(/import\s+[\s\S]*?from\s+['"][^'"]+['"];?/g, '')
-      .replace(/export\s+const\s+/g, 'const ')
-      .replace(/export\s+let\s+/g, 'let ')
-      .replace(/export\s+function\s+/g, 'function ')
-      .replace(/export\s+async\s+function\s+/g, 'async function ')
-      .replace(/export\s+\{[\s\S]*?\};?/g, '')
-      .replace(/export\s+default\s+[\s\S]*?;?/g, '');
+    // Load management submodules and comics-management.js into current jsdom environment
+    const submodules = [
+      '../public/js/settings/management/dialogs.js',
+      '../public/js/settings/management/rename-stream.js',
+      '../public/js/settings/management/move-stream.js',
+      '../public/js/settings/management/rules.js',
+      '../public/js/settings/comics-management.js'
+    ];
+    let combinedContent = '';
+    for (const rel of submodules) {
+      const fullPath = path.resolve(__dirname, rel);
+      const content = fs.readFileSync(fullPath, 'utf8');
+      combinedContent += '\n' + content
+        .replace(/import\s+[\s\S]*?from\s+['"][^'"]+['"];?/g, '')
+        .replace(/export\s+const\s+/g, 'var ')
+        .replace(/export\s+let\s+/g, 'var ')
+        .replace(/export\s+function\s+/g, 'function ')
+        .replace(/export\s+async\s+function\s+/g, 'async function ')
+        .replace(/export\s+\{[\s\S]*?\};?/g, '')
+        .replace(/export\s+default\s+[\s\S]*?;?/g, '');
+    }
     
-    const fn = new Function('window', 'document', 'fetch', 'state', cleanContent);
+    const fn = new Function('window', 'document', 'fetch', 'state', combinedContent);
     fn(window, document, global.fetch, { API_BASE_URL: '' });
     document.dispatchEvent(new Event('DOMContentLoaded'));
   });

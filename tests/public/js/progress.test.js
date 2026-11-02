@@ -80,21 +80,25 @@ describe('Progress JS Module', () => {
     sandbox.debugLog = jest.fn();
     sandbox.applyDisplayInfoToComic = jest.fn();
 
-    const fullPath = path.resolve(__dirname, '../../../public/js/progress.js');
-    let content = fs.readFileSync(fullPath, 'utf8');
+    function loadFile(relPath) {
+      const fullPath = path.resolve(__dirname, relPath);
+      let content = fs.readFileSync(fullPath, 'utf8');
+      content = content
+        .replace(/import\s+[\s\S]*?from\s+['"][^'"]+['"];?/g, '')
+        .replace(/export\s+const\s+/g, 'var ')
+        .replace(/export\s+let\s+/g, 'var ')
+        .replace(/export\s+function\s+/g, 'function ')
+        .replace(/export\s+async\s+function\s+/g, 'async function ')
+        .replace(/export\s+\{[\s\S]*?\};?/g, '')
+        .replace(/export\s+default\s+[\s\S]*?;?/g, '');
+      const script = new vm.Script(content);
+      script.runInContext(sandbox);
+    }
 
-    // Strip imports and exports for VM execution
-    content = content
-      .replace(/import\s+[\s\S]*?from\s+['"][^'"]+['"];?/g, '')
-      .replace(/export\s+const\s+/g, 'const ')
-      .replace(/export\s+let\s+/g, 'let ')
-      .replace(/export\s+function\s+/g, 'function ')
-      .replace(/export\s+async\s+function\s+/g, 'async function ')
-      .replace(/export\s+\{[\s\S]*?\};?/g, '')
-      .replace(/export\s+default\s+[\s\S]*?;?/g, '');
-
-    const script = new vm.Script(content);
-    script.runInContext(sandbox);
+    loadFile('../../../public/js/progress/db.js');
+    loadFile('../../../public/js/progress/library-sync.js');
+    loadFile('../../../public/js/progress/ui.js');
+    loadFile('../../../public/js/progress.js');
 
     // Add exports to sandbox object explicitly for easier access in tests
     // because they get attached to the sandbox implicitly by vm

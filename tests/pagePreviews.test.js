@@ -111,6 +111,8 @@ describe('Comic Page Previews & Thumbnail Grid Navigator', () => {
 
     sandbox = {
       window, document, state,
+      global: state,
+      process: process,
       navigator: window.navigator,
       IntersectionObserver: MockIntersectionObserver,
       URL: { createObjectURL: jest.fn(() => 'blob:http://localhost/fake-blob') },
@@ -118,19 +120,38 @@ describe('Comic Page Previews & Thumbnail Grid Navigator', () => {
       setTimeout: (fn, ms) => setTimeout(fn, ms),
       clearTimeout: (id) => clearTimeout(id)
     };
+    sandbox.globalThis = sandbox;
+    sandbox.window = window;
     vm.createContext(sandbox);
   });
 
   function loadModule() {
-    const filePath = path.join(__dirname, '../public/js/viewer/page-previews.js');
-    const code = fs.readFileSync(filePath, 'utf-8');
-    const wrapped = code
-      .replace(/import\s+{[^}]+}\s+from\s+['"][^'"]+['"];?/g, '')
-      .replace(/export\s+async\s+function\s+/g, 'async function ')
-      .replace(/export\s+function\s+/g, 'function ')
-      .replace(/export\s+const\s+/g, 'const ')
-      .replace(/export\s+default\s+[^;]+;?/g, '');
-    new vm.Script(`(function(global){ ${wrapped} })(state);`).runInContext(sandbox);
+    function loadFile(relPath) {
+      const fullPath = path.join(__dirname, relPath);
+      const code = fs.readFileSync(fullPath, 'utf-8');
+      const wrapped = code
+        .replace(/import\s+[\s\S]*?from\s+['"][^'"]+['"];?/g, '')
+        .replace(/export\s+async\s+function\s+/g, 'async function ')
+        .replace(/export\s+function\s+/g, 'function ')
+        .replace(/export\s+const\s+/g, 'const ')
+        .replace(/export\s+let\s+/g, 'let ')
+        .replace(/export\s+\{[\s\S]*?\};?/g, '')
+        .replace(/export\s+default\s+[^;]+;?/g, '');
+      vm.runInContext(wrapped, sandbox);
+    }
+
+    const submodules = [
+      '../public/js/viewer/previews/thumbnail-url.js',
+      '../public/js/viewer/previews/grid-overlay.js',
+      '../public/js/viewer/previews/scrubber.js',
+      '../public/js/viewer/previews/filmstrip.js',
+      '../public/js/viewer/page-previews.js'
+    ];
+    submodules.forEach(sub => {
+      if (fs.existsSync(path.join(__dirname, sub))) {
+        loadFile(sub);
+      }
+    });
   }
 
   const overlay = () => document.getElementById('comic-page-grid-overlay');

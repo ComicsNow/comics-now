@@ -171,6 +171,10 @@ describe('User Management Settings UI', () => {
     document.body.appendChild(parentDiv);
 
     accessEnv.sandbox.state.usersListDiv = usersListDiv;
+    accessEnv.loadFile('../public/js/settings/user-access/state.js');
+    accessEnv.loadFile('../public/js/settings/user-access/tree-node.js');
+    accessEnv.loadFile('../public/js/settings/user-access/api.js');
+    accessEnv.loadFile('../public/js/settings/user-access/tree-view.js');
     accessEnv.loadFile('../public/js/settings/user-access.js');
 
     await accessEnv.sandbox.showUserAccessView('user-long', 'user.with.very.long.email@corporate-domain.co.uk', 'user');

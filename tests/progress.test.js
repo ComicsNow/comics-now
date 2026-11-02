@@ -92,25 +92,32 @@ describe('Progress Tracking System', () => {
       }
     };
 
-    const fullPath = path.resolve(__dirname, '../public/js/progress.js');
-    const content = fs.readFileSync(fullPath, 'utf8');
+    const cleanFile = (relPath) => {
+      const full = path.resolve(__dirname, relPath);
+      return fs.readFileSync(full, 'utf8')
+        .replace(/import\s+[\s\S]*?from\s+['"][^'"]+['"];?/g, '')
+        .replace(/export\s+const\s+/g, 'var ')
+        .replace(/export\s+let\s+/g, 'var ')
+        .replace(/export\s+function\s+/g, 'function ')
+        .replace(/export\s+async\s+function\s+/g, 'async function ')
+        .replace(/export\s+\{[\s\S]*?\};?/g, '')
+        .replace(/export\s+default\s+[\s\S]*?;?/g, '');
+    };
 
-    // Strip out imports and exports
-    const cleanContent = content
-      .replace(/import\s+[\s\S]*?from\s+['"][^'"]+['"];?/g, '')
-      .replace(/export\s+const\s+/g, 'const ')
-      .replace(/export\s+let\s+/g, 'let ')
-      .replace(/export\s+function\s+/g, 'function ')
-      .replace(/export\s+async\s+function\s+/g, 'async function ')
-      .replace(/export\s+\{[\s\S]*?\};?/g, '')
-      .replace(/export\s+default\s+[\s\S]*?;?/g, '');
+    const cleanDb = cleanFile('../public/js/progress/db.js');
+    const cleanSync = cleanFile('../public/js/progress/library-sync.js');
+    const cleanUi = cleanFile('../public/js/progress/ui.js');
+    const cleanContent = cleanFile('../public/js/progress.js');
 
     // Add globals that the file relies on from globals.js
     const globalsWrapper = `
-      const ICONS = { READ: 'R', UNREAD: 'U' };
-      const debugLog = function() {};
-      const applyDisplayInfoToComic = function(c) { return c; };
+      var ICONS = { READ: 'R', UNREAD: 'U' };
+      var debugLog = function() {};
+      var applyDisplayInfoToComic = function(c) { return c; };
 
+      ${cleanDb}
+      ${cleanSync}
+      ${cleanUi}
       ${cleanContent}
     `;
 

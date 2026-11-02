@@ -46,13 +46,25 @@ describe('events.js UI interactions and API integrations', () => {
 
     window.APP_CONFIG = { baseUrl: 'http://localhost' };
 
-    // Load globals.js
-    const globalsPath = path.resolve(__dirname, '..', 'public', 'js', 'globals.js');
-    let globalsCode = fs.readFileSync(globalsPath, 'utf8');
-    // Strip imports and replace export keywords correctly
-    globalsCode = globalsCode.replace(/import\s+[\s\S]*?from\s+['"][^'"]+['"];?/g, '');
-    globalsCode = globalsCode.replace(/export\s+(async\s+)?(function|const|let|var|class)\s+/g, '$1$2 ');
-    globalsCode = globalsCode.replace(/export\s+\{[^}]*\};?/g, '');
+    // Load globals submodules and globals.js
+    const files = [
+      '../public/js/core/constants.js',
+      '../public/js/core/debug.js',
+      '../public/js/core/dom-utils.js',
+      '../public/js/core/comic-utils.js',
+      '../public/js/core/elements.js',
+      '../public/js/globals.js'
+    ];
+    let globalsCode = '';
+    for (const rel of files) {
+      const fullPath = path.resolve(__dirname, rel);
+      const content = fs.readFileSync(fullPath, 'utf8');
+      globalsCode += '\n' + content
+        .replace(/import\s+[\s\S]*?from\s+['"][^'"]+['"];?/g, '')
+        .replace(/export\s+\*\s+from\s+['"][^'"]+['"];?/g, '')
+        .replace(/export\s+(async\s+)?(function|const|let|var|class)\s+/g, '$1$2 ')
+        .replace(/export\s+\{[^}]*\};?/g, '');
+    }
     globalsCode = globalsCode.replace(/const state = /g, 'var state = ');
     globalsCode += `\nsandbox.state = state;\n`;
 

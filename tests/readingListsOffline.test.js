@@ -144,7 +144,10 @@ describe('Reading Lists Offline Support & Editing Restrictions', () => {
     env = createSandbox(true);
     // Load cache module
     env.loadFile('../public/js/offline/db-library-cache.js');
-    // Load reading-lists module
+    // Load reading-lists modules
+    env.loadFile('../public/js/reading-lists/api.js');
+    env.loadFile('../public/js/reading-lists/transfer.js');
+    env.loadFile('../public/js/reading-lists/modal.js');
     env.loadFile('../public/js/reading-lists.js');
   });
 

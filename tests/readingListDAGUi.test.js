@@ -39,18 +39,25 @@ describe('Reading List DAG UI - Play button and Read Issue button', () => {
     delete sandbox.global;
     vm.createContext(sandbox);
 
-    const fullPath = path.resolve(__dirname, '../public/js/reading-list-dag.js');
-    const content = fs.readFileSync(fullPath, 'utf8');
-    const cleanContent = content
-      .replace(/import\s+[\s\S]*?from\s+['"][^'"]+['"];?/g, '')
-      .replace(/export\s+const\s+/g, 'const ')
-      .replace(/export\s+let\s+/g, 'let ')
-      .replace(/export\s+function\s+/g, 'function ')
-      .replace(/export\s+async\s+function\s+/g, 'async function ')
-      .replace(/export\s+\{[\s\S]*?\};?/g, '')
-      .replace(/export\s+default\s+[\s\S]*?;?/g, '');
+    function loadScript(relPath) {
+      const fullPath = path.resolve(__dirname, relPath);
+      const content = fs.readFileSync(fullPath, 'utf8');
+      const cleanContent = content
+        .replace(/import\s+[\s\S]*?from\s+['"][^'"]+['"];?/g, '')
+        .replace(/export\s+const\s+/g, 'var ')
+        .replace(/export\s+let\s+/g, 'var ')
+        .replace(/export\s+function\s+/g, 'function ')
+        .replace(/export\s+async\s+function\s+/g, 'async function ')
+        .replace(/export\s+\{[\s\S]*?\};?/g, '')
+        .replace(/export\s+default\s+[\s\S]*?;?/g, '');
+      vm.runInContext(cleanContent, sandbox);
+    }
 
-    vm.runInContext(cleanContent, sandbox);
+    loadScript('../public/js/dag/state.js');
+    loadScript('../public/js/dag/layout.js');
+    loadScript('../public/js/dag/renderer.js');
+    loadScript('../public/js/dag/interactions.js');
+    loadScript('../public/js/reading-list-dag.js');
   });
 
   const sampleDagData = {

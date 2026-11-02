@@ -343,10 +343,30 @@ describe('URL Metadata Extractor Service & Route (TDD)', () => {
     const { JSDOM } = require('jsdom');
 
     function loadClientScript(filepath, sandbox) {
+      const dir = path.join(path.dirname(filepath), 'metadata');
+      if (fs.existsSync(dir)) {
+        const subs = ['sanitizer.js', 'form-fields.js', 'url-tagger.js', 'display.js'];
+        for (const sub of subs) {
+          const subPath = path.join(dir, sub);
+          if (fs.existsSync(subPath)) {
+            const subContent = fs.readFileSync(subPath, 'utf8')
+              .replace(/import\s+[\s\S]*?from\s+['"][^'"]+['"];?/g, '')
+              .replace(/\bexport\s+/g, '')
+              .replace(/const\s+global\s*=/g, 'var global =')
+              .replace(/const\s+renderContent\s*=/g, 'var renderContent =')
+              .replace(/const\s+safeHtml\s*=/g, 'var safeHtml =')
+              .replace(/const\s+clear\s*=/g, 'var clear =');
+            vm.createContext(sandbox);
+            new vm.Script(subContent).runInContext(sandbox);
+          }
+        }
+      }
+
       const fileContent = fs.readFileSync(filepath, 'utf8');
       const cleanContent = fileContent
         .replace(/import\s+[\s\S]*?from\s+['"][^'"]+['"];?/g, '')
         .replace(/\bexport\s+/g, '')
+        .replace(/const\s+global\s*=/g, 'var global =')
         + '\nwindow.renderMetadataDisplay = renderMetadataDisplay;\nwindow.createUrlTaggerBox = createUrlTaggerBox;\n';
       const script = new vm.Script(cleanContent);
       vm.createContext(sandbox);

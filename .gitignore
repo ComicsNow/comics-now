@@ -1,7 +1,7 @@
 node_modules/
 config.json
 thumbnails/
-metadata/
+/metadata/
 .gemini_security/
 conductor/
 temp/

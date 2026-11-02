@@ -1,603 +1,111 @@
+/**
+ * Comics Now! - Application Globals & Store Registry Facade
+ *
+ * Re-exports core utilities, UI selectors, constants, and manages central state proxy.
+ */
+
 import { ComicsStore, createStateProxy, createGlobalProxy } from './store/index.js';
 import { html, raw, render, clearElement } from './ui/template.js';
 import { getIconSvg, rawIcon, renderIcon } from './ui/icons.js';
+import { ICONS, CSS_CLASSES } from './core/constants.js';
+import {
+  debugLog,
+  enableComicsNowDebug,
+  disableComicsNowDebug,
+  isComicsNowDebugEnabled
+} from './core/debug.js';
+import {
+  escapeHtml,
+  safeDirName,
+  getRelativePath,
+  encodePath,
+  toTrimmedString,
+  createLoadingMessage,
+  createEmptyMessage,
+  createErrorMessage,
+  createCheckmarkIcon,
+  triggerEinkFlash
+} from './core/dom-utils.js';
+import {
+  getComicById,
+  turnToPage,
+  pickMetadataValue,
+  sanitizeComicTitle,
+  buildComicDisplayInfo,
+  applyDisplayInfoToComic,
+  applyDisplayInfoToLibrary,
+  getPathForCurrentView,
+  showView
+} from './core/comic-utils.js';
+import * as elements from './core/elements.js';
 
-export { html, raw, render, clearElement, getIconSvg, rawIcon, renderIcon };
-
-// Save original console methods before any modifications
-const rawConsole = {
-  log: console.log.bind(console),
-  warn: console.warn.bind(console),
-  error: console.error.bind(console)
+export {
+  html,
+  raw,
+  render,
+  clearElement,
+  getIconSvg,
+  rawIcon,
+  renderIcon,
+  ICONS,
+  CSS_CLASSES,
+  debugLog,
+  enableComicsNowDebug,
+  disableComicsNowDebug,
+  isComicsNowDebugEnabled,
+  escapeHtml,
+  safeDirName,
+  getRelativePath,
+  encodePath,
+  toTrimmedString,
+  createLoadingMessage,
+  createEmptyMessage,
+  createErrorMessage,
+  createCheckmarkIcon,
+  triggerEinkFlash,
+  getComicById,
+  turnToPage,
+  pickMetadataValue,
+  sanitizeComicTitle,
+  buildComicDisplayInfo,
+  applyDisplayInfoToComic,
+  applyDisplayInfoToLibrary,
+  getPathForCurrentView,
+  showView,
+  createGlobalProxy
 };
 
-// Shared HTML escaper to prevent stored XSS from author-controlled comic metadata.
-export function escapeHtml(value) {
-  if (value === null || value === undefined) return '';
-  return String(value).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-}
+export * from './core/elements.js';
 
-export function safeDirName(str) {
-  return String(str).trim().replace(/[\\/]+/g, '_').replace(/\s+/g, ' ');
-}
-
-export function getRelativePath() {
-  const baseUrl = (state.APP_CONFIG?.baseUrl || '').replace(/\/$/, '');
-  let path = window.location.pathname;
-  if (baseUrl && path.startsWith(baseUrl)) {
-    path = path.substring(baseUrl.length);
-  }
-  return path || '/';
-}
-
-const DEBUG_LOG_STATE = {
-  enabled: false,
-  categories: new Set()
-};
-
-function normalizeDebugCategories(categories) {
-  if (!Array.isArray(categories)) {
-    categories = Array.from(arguments);
-  }
-  return categories
-    .flatMap(category => {
-      if (Array.isArray(category)) return category;
-      if (typeof category === 'string') return category.split(',');
-      return [];
-    })
-    .map(category => (typeof category === 'string' ? category.trim().toUpperCase() : ''))
-    .filter(Boolean);
-}
-
-function isDebugCategoryEnabled(category) {
-  if (!DEBUG_LOG_STATE.enabled) {
-    return false;
-  }
-  if (DEBUG_LOG_STATE.categories.size === 0) {
-    return true;
-  }
-  if (!category) {
-    return false;
-  }
-  return DEBUG_LOG_STATE.categories.has(category);
-}
-
-export function debugLog(category, ...args) {
-  const normalizedCategory = typeof category === 'string' ? category.toUpperCase() : '';
-  if (!isDebugCategoryEnabled(normalizedCategory)) {
-    return;
-  }
-  rawConsole.log(`[${normalizedCategory || 'DEBUG'}]`, ...args);
-}
-
-export function enableComicsNowDebug(...categories) {
-  const normalized = normalizeDebugCategories(categories);
-  DEBUG_LOG_STATE.enabled = true;
-  DEBUG_LOG_STATE.categories = new Set(normalized);
-  rawConsole.log('[DEBUG]', 'Debug logging enabled', normalized.length ? `for categories: ${normalized.join(', ')}` : 'for all categories');
-}
-
-export function disableComicsNowDebug() {
-  DEBUG_LOG_STATE.enabled = false;
-  DEBUG_LOG_STATE.categories.clear();
-  rawConsole.log('[DEBUG]', 'Debug logging disabled');
-}
-
-export function isComicsNowDebugEnabled(category) {
-  const normalizedCategory = typeof category === 'string' ? category.toUpperCase() : '';
-  return isDebugCategoryEnabled(normalizedCategory);
-}
-
-// Standardized icons for the application
-export const ICONS = {
-  READ: `<svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" /></svg>`,
-  UNREAD: `<svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>`,
-  DOWNLOAD: `<svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"/></svg>`,
-};
-
-// CSS class constants to eliminate duplication
-export const CSS_CLASSES = {
-  CARD: 'bg-gray-800 rounded-lg shadow-lg cursor-pointer',
-  INPUT: 'bg-gray-700 text-white p-2 rounded-lg',
-  BUTTON_PRIMARY: 'bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-full',
-  BUTTON_SECONDARY: 'bg-gray-600 hover:bg-gray-500 text-white font-bold py-2 px-4 rounded-lg',
-  LOADING: 'bg-gray-800 rounded-lg p-6 text-center text-gray-500 animate-pulse col-span-full',
-  ERROR: 'bg-gray-800 rounded-lg p-6 text-center text-red-400 col-span-full',
-  DOWNLOAD_BTN: 'download-btn absolute top-2 right-2 text-green-400 pointer-events-none'
-};
-
-// View management utility to eliminate duplication
-export function showView(targetView) {
-  if (!state._isNavigatingFromRouter && state.router && !state._isAppInitializing) {
-    let path = null;
-    if (targetView.id === 'root-folder-list') path = '/';
-    else if (targetView.id === 'search-results-view') path = '/search';
-    else if (targetView.id === 'folder-list-view' && state.currentFolderPath) {
-      path = `/folder?path=${encodeURIComponent(state.currentFolderPath)}`;
-    }
-    else if (targetView.id === 'publisher-list' && state.currentRootFolder) {
-      path = `/library?rootFolder=${encodeURIComponent(state.currentRootFolder)}`;
-    }
-    else if (targetView.id === 'series-list' && state.currentPublisher) {
-      path = `/series-list?publisher=${encodeURIComponent(state.currentPublisher)}`;
-      if (state.currentRootFolder) path += `&rootFolder=${encodeURIComponent(state.currentRootFolder)}`;
-    }
-    else if (targetView.id === 'comic-list' && state.currentSeries) {
-      path = `/series/${encodeURIComponent(state.currentSeries)}`;
-      if (state.currentPublisher) path += `?publisher=${encodeURIComponent(state.currentPublisher)}`;
-      if (state.currentRootFolder) path += `&rootFolder=${encodeURIComponent(state.currentRootFolder)}`;
-    }
-    else if (targetView.id === 'comic-viewer' && state.currentComic) {
-      path = `/comic/${state.currentComic.id}`;
-    }
-
-    const settingsModal = document.getElementById('settings-modal');
-    const readingListModal = document.getElementById('reading-list-modal');
-    const isSettingsOpen = settingsModal && !settingsModal.classList.contains('hidden');
-    const isReadingListOpen = readingListModal && !readingListModal.classList.contains('hidden');
-
-    if (path && (getRelativePath() + window.location.search) !== path && !isSettingsOpen && !isReadingListOpen) {
-      state.router.navigate(path, true);
-    }
-  }
-
-  const views = [
-    rootFolderListDiv,
-    folderListViewDiv,
-    publisherListDiv,
-    seriesListDiv,
-    comicListDiv,
-    comicViewerDiv,
-    searchResultsView,
-    smartListView
-  ];
-
-  views.forEach(view => {
-    if (view) {
-      if (view === targetView) {
-        view.classList.remove('hidden');
-      } else {
-        view.classList.add('hidden');
-      }
-    }
-  });
-
-  // Hide search, filters, and smart lists when comic viewer is shown
-  const searchContainer = document.getElementById('search-container');
-  const filtersContainer = document.getElementById('filters-container');
-
-  if (targetView === comicViewerDiv) {
-    searchContainer?.classList.add('hidden');
-    filtersContainer?.classList.add('hidden');
-  } else {
-    searchContainer?.classList.remove('hidden');
-    filtersContainer?.classList.remove('hidden');
-  }
-
-  // Toggle compact logo styling when drilled down
-  const logoContainer = document.querySelector('.logo-container');
-  if (logoContainer) {
-    if (targetView === rootFolderListDiv) {
-      logoContainer.classList.remove('logo-compact');
-    } else {
-      logoContainer.classList.add('logo-compact');
-    }
-  }
-
-  // Ensure scroll position resets to top on view change (avoid starting partway down on tall views)
-  if (targetView !== comicViewerDiv && typeof window !== 'undefined') {
-    window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
-    if (document.documentElement) document.documentElement.scrollTop = 0;
-    if (document.body) document.body.scrollTop = 0;
-    requestAnimationFrame(() => {
-      window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
-      if (document.documentElement) document.documentElement.scrollTop = 0;
-      if (document.body) document.body.scrollTop = 0;
-    });
-  }
-}
-
-// Template functions for common HTML patterns
-export function createLoadingMessage(message = 'Loading...', count = 8) {
-  const card = `
-    <div class="skeleton-card">
-      <div class="skeleton-img"></div>
-      <div class="p-2 space-y-1.5 mt-1">
-        <div class="skeleton-line w-3/4"></div>
-        <div class="skeleton-line w-1/2 mt-1"></div>
-      </div>
-    </div>`;
-  return card.repeat(count);
-}
-
-export function createEmptyMessage(message) {
-  return `
-    <div class="empty-state">
-      <svg class="empty-state-icon" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-        <path stroke-linecap="round" stroke-linejoin="round" d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25" />
-      </svg>
-      <p class="empty-state-message">${escapeHtml(message)}</p>
-    </div>`;
-}
-
-export function createErrorMessage(message) {
-  return `<div class="${CSS_CLASSES.ERROR}">${escapeHtml(message)}</div>`;
-}
-
-export function createCheckmarkIcon() {
-  const check = document.createElement('div');
-  check.className = CSS_CLASSES.DOWNLOAD_BTN;
-  render(check, raw(ICONS.READ));
-  return check;
-}
-
-// API client wrapper to standardize fetch calls
 export async function apiCall(endpoint, options = {}) {
-  try {
-    const response = await fetch(`${state.API_BASE_URL}/api/v1/${endpoint}`, {
-      headers: {
-        'Content-Type': 'application/json',
-        ...options.headers
-      },
-      ...options
-    });
-    
-    if (!response.ok) {
-      throw new Error(`API call failed: ${response.status} ${response.statusText}`);
-    }
-    
-    return await response.json();
-  } catch (error) {
-    throw error;
+  const baseUrl = (state && state.API_BASE_URL) || '';
+  const response = await fetch(`${baseUrl}/api/v1/${endpoint}`, {
+    headers: {
+      'Content-Type': 'application/json',
+      ...options.headers
+    },
+    ...options
+  });
+  if (!response.ok) {
+    throw new Error(`API call failed: ${response.status} ${response.statusText}`);
   }
+  return await response.json();
 }
 
-export function encodePath(str) {
-  const utf8 = new TextEncoder().encode(str);
-  let binary = '';
-  for (const byte of utf8) {
-    binary += String.fromCharCode(byte);
-  }
-  return btoa(binary);
-}
-
-export function toTrimmedString(value) {
-  if (value == null) return '';
-  return String(value).trim();
-}
-
-export function getComicById(id, includeContext = false) {
-  if (!state.library) return null;
-  for (const rootPath of Object.keys(state.library)) {
-    const root = state.library[rootPath];
-    if (!root.publishers) continue;
-    for (const pubName of Object.keys(root.publishers)) {
-      const pub = root.publishers[pubName];
-      if (!pub.series) continue;
-      for (const seriesName of Object.keys(pub.series)) {
-        const seriesComics = pub.series[seriesName];
-        if (!Array.isArray(seriesComics)) continue;
-        const found = seriesComics.find(c => c.id == id);
-        if (found) {
-          if (includeContext) {
-            return {
-              comic: found,
-              rootFolder: rootPath,
-              publisher: pubName,
-              series: seriesName
-            };
-          }
-          return found;
-        }
-      }
-    }
-  }
-  return null;
-}
-
-export function turnToPage(index) {
-  state.currentPageIndex = index;
-  if (typeof state.renderPage === 'function') {
-    state.renderPage();
-  }
-}
-
-export function pickMetadataValue(metadata = {}, keys = []) {
-  for (const key of keys) {
-    if (Object.prototype.hasOwnProperty.call(metadata, key)) {
-      const candidate = toTrimmedString(metadata[key]);
-      if (candidate) return candidate;
-    }
-  }
-  return '';
-}
-
-export function sanitizeComicTitle(rawTitle) {
-  if (!rawTitle || typeof rawTitle !== 'string') return '';
-  let clean = rawTitle.trim();
-  const isDirtyRelease = /\[[^\]]*\]/.test(clean) || /^\s*\d{1,3}\s*[-._]/.test(clean);
-  // Strip common archive and ebook extensions
-  clean = clean.replace(/\.(cbz|cbr|cb7|cbt|zip|rar|tar|pdf)$/i, '');
-  // Strip bracketed release / scanner tags (e.g. [215 INK], [Digital-HD])
-  clean = clean.replace(/\[[^\]]*\]/g, ' ');
-  // Strip leading track / sorting index prefixes like "01 ", "001 - ", "01. "
-  clean = clean.replace(/^\s*\d{1,3}\s*[-._]\s*(?=[a-zA-Z])/i, '');
-  clean = clean.replace(/^\s*\d{1,3}\s+(?=[a-zA-Z])/i, '');
-  // Strip release year parenthesis if dirty release filename and preceding an issue marker, e.g. "Future Heroes (2015) #86" -> "Future Heroes #86"
-  if (isDirtyRelease) {
-    clean = clean.replace(/\s*\((?:19|20)\d{2}\b[^\)]*\)\s*(?=#\d+)/i, ' ');
-  }
-  // Replace underscores and collapse duplicate whitespace
-  clean = clean.replace(/_/g, ' ').replace(/\s+/g, ' ').trim();
-  return clean || rawTitle.trim();
-}
-
-export function buildComicDisplayInfo(comic = {}) {
-  let metadata = comic.metadata || {};
-  if (typeof metadata === 'string') {
-    try {
-      metadata = JSON.parse(metadata);
-    } catch {
-      metadata = {};
-    }
-  }
-
-  const issueNumber = pickMetadataValue(metadata, ['Number', 'Issue', 'IssueNumber', 'SortNumber', 'AlternateNumber']);
-  let seriesName = pickMetadataValue(metadata, ['Series', 'SeriesName', 'AlternateSeries']);
-  if (!seriesName && comic.series) {
-    seriesName = toTrimmedString(comic.series);
-  }
-  const titleText = pickMetadataValue(metadata, ['Title', 'DisplayTitle', 'SortName', 'FullTitle', 'StoryTitle']);
-
-  // If there's no real metadata (series is missing or "Unknown Series"), use clean filename fallback for Line 1
-  const hasNoMetadata = (!seriesName || seriesName === 'Unknown Series') && !titleText && !issueNumber;
-
-  const seriesWithIssue = seriesName
-    ? (issueNumber ? `${seriesName} #${issueNumber}` : seriesName)
-    : (issueNumber ? `Issue ${issueNumber}` : '');
-
-  const cleanFallbackName = sanitizeComicTitle(comic.name) || toTrimmedString(comic.name) || 'Untitled Comic';
-
-  // Rule Line 1: Series on line 1 (with issue number if available).
-  // If series is missing, fall back to title or clean filename.
-  const displayTitle = hasNoMetadata
-    ? cleanFallbackName
-    : ([
-        seriesWithIssue,
-        titleText,
-        toTrimmedString(comic.title),
-        cleanFallbackName
-      ].find(Boolean) || 'Untitled Comic');
-
-  // Rule Line 2: If there is a title, that should be on line 2.
-  // REMOVE THE FILE NAME! Never fall back to cleanFallbackName or comic.name.
-  let subtitle = '';
-  const rawStoryTitle = titleText || toTrimmedString(comic.title);
-  if (rawStoryTitle) {
-    const trimmedTitle = toTrimmedString(rawStoryTitle);
-    const isFilename = /\.(cbz|cbr|cb7|cbt|zip|rar|tar|pdf)$/i.test(trimmedTitle) ||
-                       (comic.name && trimmedTitle.toLowerCase() === toTrimmedString(comic.name).toLowerCase());
-    const sLower = (seriesName || '').toLowerCase().trim();
-    const tLower = trimmedTitle.toLowerCase().trim();
-    const dLower = displayTitle.toLowerCase().trim();
-    const isRedundant = tLower === sLower ||
-                        tLower === dLower ||
-                        (Boolean(sLower) && tLower.startsWith(sLower) && /^(?:[:\s\-_–—#()]+|\s*(?:issue|no|vol|volume|pt|part|book|bk)\s*\d*|\d+)+$/i.test(tLower.slice(sLower.length)));
-
-    if (trimmedTitle && !isFilename && !isRedundant) {
-      subtitle = trimmedTitle;
-    }
-  }
-
-  const altText = displayTitle || subtitle || 'Comic cover';
-
-  return {
-    displayTitle,
-    subtitle,
-    altText,
-    issueNumber,
-    seriesName,
-    titleText,
-    seriesWithIssue
-  };
-}
-
-export function applyDisplayInfoToComic(comic) {
-  if (!comic || typeof comic !== 'object') return buildComicDisplayInfo();
-  const info = buildComicDisplayInfo(comic);
-  comic.displayName = info.displayTitle;
-  comic.subtitle = info.subtitle;
-  comic.altText = info.altText;
-  return info;
-}
-
-export function applyDisplayInfoToLibrary(libraryData) {
-  if (!libraryData || typeof libraryData !== 'object') return;
-  for (const rootKey of Object.keys(libraryData)) {
-    const publishers = libraryData[rootKey]?.publishers || {};
-    for (const publisherName of Object.keys(publishers)) {
-      const seriesEntries = publishers[publisherName]?.series || {};
-      for (const seriesName of Object.keys(seriesEntries)) {
-        const comics = seriesEntries[seriesName];
-        if (Array.isArray(comics)) {
-          comics.forEach(applyDisplayInfoToComic);
-        }
-      }
-    }
-  }
-}
-
-export function getPathForCurrentView() {
-  if (state.currentView === 'root') return '/';
-  if (state.currentView === 'search') {
-    return `/search?q=${encodeURIComponent(state.lastSearchQuery || '')}&field=${encodeURIComponent(state.lastSearchField || 'all')}`;
-  }
-  if (state.currentView === 'publishers' && state.currentRootFolder) {
-    return `/library?rootFolder=${encodeURIComponent(state.currentRootFolder)}`;
-  }
-  if (state.currentView === 'series' && state.currentPublisher) {
-    let path = `/series-list?publisher=${encodeURIComponent(state.currentPublisher)}`;
-    if (state.currentRootFolder) path += `&rootFolder=${encodeURIComponent(state.currentRootFolder)}`;
-    return path;
-  }
-  if (state.currentView === 'comics' && state.currentSeries) {
-    let path = `/series/${encodeURIComponent(state.currentSeries)}`;
-    if (state.currentPublisher) path += `?publisher=${encodeURIComponent(state.currentPublisher)}`;
-    if (state.currentRootFolder) path += `&rootFolder=${encodeURIComponent(state.currentRootFolder)}`;
-    return path;
-  }
-  if (state.currentView === 'comic' && state.currentComic) {
-    return `/comic/${state.currentComic.id}/page/${(state.currentPageIndex || 0) + 1}`;
-  }
-  return '/';
-}
-
-// --- UI ELEMENT SELECTORS ---
-export const rootFolderListDiv = document.getElementById('root-folder-list');
-export const rootFolderListContainer = document.getElementById('root-folder-list-container');
-export const folderListViewDiv = document.getElementById('folder-list-view');
-export const folderListContainer = document.getElementById('folder-list-container');
-export const searchResultsView = document.getElementById('search-results-view');
-export const searchResultsTitle = document.getElementById('search-results-title');
-export const searchResultsContainer = document.getElementById('search-results-container');
-export const publisherListDiv = document.getElementById('publisher-list');
-export const publisherListContainer = document.getElementById('publisher-list-container');
-export const seriesListDiv = document.getElementById('series-list');
-export const smartListView = document.getElementById('smart-list-view');
-export const smartListContainer = document.getElementById('smart-list-container');
-export const smartListTitle = document.getElementById('smart-list-title');
-export const filterButtonsDiv = document.getElementById('filter-buttons');
-export const smartListButtonsDiv = document.getElementById('smart-list-buttons');
-export const latestAddedButton = document.getElementById('latest-added-btn');
-export const latestAddedCountSpan = document.getElementById('latest-added-count');
-export const downloadedButton = document.getElementById('downloaded-btn');
-export const downloadedCountSpan = document.getElementById('downloaded-count');
-export const comicListDiv = document.getElementById('comic-list');
-export const comicViewerDiv = document.getElementById('comic-viewer');
-export const publisherAlphaFilter = document.getElementById('publisher-alpha-filter');
-export const seriesAlphaFilter = document.getElementById('series-alpha-filter');
-export const seriesSortContainer = document.getElementById('series-sort-container');
-export const seriesSortSelect = document.getElementById('series-sort-select');
-export const comicAlphaFilter = document.getElementById('comic-alpha-filter');
-export const folderAlphaFilter = document.getElementById('folder-alpha-filter');
-export const publisherTitleH2 = document.getElementById('publisher-title');
-export const seriesTitleH2 = document.getElementById('series-title');
-export const comicListTitleH2 = document.getElementById('comic-list-title');
-export const comicTitleH2 = document.getElementById('comic-title');
-export const comicSubtitleP = document.getElementById('comic-subtitle');
-export const comicSummarySection = document.getElementById('comic-summary-section');
-export const comicSummaryToggle = document.getElementById('comic-summary-toggle');
-export const comicSummaryContent = document.getElementById('comic-summary');
-export const pageCounterSpan = document.getElementById('page-counter');
-export const pageJumpInput = document.getElementById('page-jump-input');
-export const pageCounterSpanBottom = document.getElementById('page-counter-bottom');
-export const pageJumpInputBottom = document.getElementById('page-jump-input-bottom');
-export const viewerPagesDiv = document.getElementById('viewer-pages');
-export const pageLoader = document.getElementById('page-loader');
-export const prevPageBtn = document.getElementById('prev-page-btn');
-export const nextPageBtn = document.getElementById('next-page-btn');
-export const prevPageBtnBottom = document.getElementById('prev-page-btn-bottom');
-export const nextPageBtnBottom = document.getElementById('next-page-btn-bottom');
-export const fullscreenBtn = document.getElementById('fullscreen-btn');
-export const viewerTabBtn = document.getElementById('viewer-tab');
-export const metadataTabBtn = document.getElementById('metadata-tab');
-export const viewerContent = document.getElementById('viewer-content');
-export const fitHeightBtn = document.getElementById('fit-height-btn');
-export const orientationToggleBtn = document.getElementById('orientation-toggle-btn');
-export const metadataContent = document.getElementById('metadata-content');
-export const metadataForm = document.getElementById('metadata-form');
-export const saveStatusDiv = document.getElementById('save-status');
-export const searchForm = document.getElementById('search-form');
-export const searchQueryInput = document.getElementById('search-query');
-export const searchStatusDiv = document.getElementById('search-status');
-export const searchResultsUl = document.getElementById('search-results');
-export const librarySearchForm = document.getElementById('library-search-form');
-export const librarySearchQuery = document.getElementById('library-search-query');
-export const librarySearchField = document.getElementById('library-search-field');
-export const clearSearchBtn = document.getElementById('clear-search-btn');
-export const fullscreenViewer = document.getElementById('fullscreen-viewer');
-export const fullscreenInfoBar = document.getElementById('fullscreen-info-bar');
-export const fullscreenProgressIndicator = document.getElementById('fullscreen-progress-indicator');
-export const fullscreenPageCounter = document.getElementById('fullscreen-page-counter');
-export const fullscreenPageJumpInput = document.getElementById('fullscreen-page-jump-input');
-export const fullscreenPrevPageBtn = document.getElementById('fullscreen-prev-page-btn');
-export const fullscreenNextPageBtn = document.getElementById('fullscreen-next-page-btn');
-export const fullscreenImage = document.getElementById('fullscreen-image');
-export const fullscreenCloseBtn = document.getElementById('fullscreen-close-btn');
-export const fullscreenCloseBtnBottom = document.getElementById('fullscreen-close-btn-bottom');
-export const fullscreenTitle = document.getElementById('fullscreen-title');
-export const fullscreenControls = document.getElementById('fullscreen-controls');
-export const fullscreenOrientationBtn = document.getElementById('fullscreen-orientation-btn');
-export const fullscreenNavLeft = document.getElementById('fullscreen-nav-left');
-export const fullscreenNavRight = document.getElementById('fullscreen-nav-right');
-export const settingsModal = document.getElementById('settings-modal');
-export const settingsForm = document.getElementById('settings-form');
-export const scanIntervalInput = document.getElementById('scan-interval-input');
-export const settingsStatusDiv = document.getElementById('settings-status');
-export const scanButton = document.getElementById('scan-button');
-export const fullScanButton = document.getElementById('full-scan-button');
-export const logsContainer = document.getElementById('logs-container');
-export const downloadsInfoDiv = document.getElementById('downloads-info');
-export const clearDownloadsBtn = document.getElementById('clear-downloads-btn');
-export const downloadQueueDiv = document.getElementById('download-queue');
-export const settingsTabDevices = document.getElementById('settings-tab-devices');
-export const settingsContentDevices = document.getElementById('settings-content-devices');
-export const devicesStatusDiv = document.getElementById('devices-status');
-export const devicesListDiv = document.getElementById('devices-list');
-export const refreshDevicesBtn = document.getElementById('refresh-devices-btn');
-export const ctButton = document.getElementById('ct-button');
-export const ctModal = document.getElementById('ct-modal');
-export const ctScheduleInput = document.getElementById('ct-schedule-input');
-export const ctSaveBtn = document.getElementById('ct-save-btn');
-export const ctMatchBody = document.getElementById('ct-match-body');
-export const ctApplyBtn = document.getElementById('ct-apply-btn');
-export const ctSkipBtn = document.getElementById('ct-skip-btn');
-export const ctConfirmBar = document.getElementById('ct-confirm-bar');
-export const ctConfirmMessage = document.getElementById('ct-confirm-message');
-export const ctConfirmYes = document.getElementById('ct-confirm-yes');
-export const ctConfirmNo = document.getElementById('ct-confirm-no');
-export const ctOutputDiv = document.getElementById('ct-output');
-export const ctClearOutputBtn = document.getElementById('ct-clear-output');
-export const ctRunBtn = document.getElementById('ct-run-btn');
-export const ctCancelBtn = document.getElementById('ct-cancel-btn');
-export const ctTabSettings = document.getElementById('ct-tab-settings');
-export const ctTabGemini = document.getElementById('ct-tab-gemini');
-export const ctTabMatches = document.getElementById('ct-tab-matches');
-export const ctTabOutput = document.getElementById('ct-tab-output');
-export const ctTabLogs = document.getElementById('ct-tab-logs');
-export const ctTabManagement = document.getElementById('ct-tab-management');
-export const ctContentSettings = document.getElementById('ct-content-settings');
-export const ctContentGemini = document.getElementById('ct-content-gemini');
-export const ctContentMatches = document.getElementById('ct-content-matches');
-export const ctContentOutput = document.getElementById('ct-content-output');
-export const ctContentLogs = document.getElementById('ct-content-logs');
-export const ctContentManagement = document.getElementById('ct-content-management');
-export const ctMatchesBadge = document.getElementById('ct-matches-badge');
-
-// Helper to automatically detect e-paper/E-Ink devices based on user agent signatures.
 function detectEinkDevice() {
   if (typeof navigator === 'undefined' || !navigator.userAgent) return 'none';
   const ua = navigator.userAgent.toLowerCase();
-  
-  // Kindle (E-Ink versions, excluding Kindle Fire tablets)
-  if (ua.includes('kindle') && !ua.includes('fire')) {
-    return 'monochrome';
-  }
-  // Kobo e-readers
-  if (ua.includes('kobo')) {
-    return 'monochrome';
-  }
-  // Onyx Boox / PocketBook / Generic E-ink signatures
+  if (ua.includes('kindle') && !ua.includes('fire')) return 'monochrome';
+  if (ua.includes('kobo')) return 'monochrome';
   if (ua.includes('onyx') || ua.includes('boox') || ua.includes('pocketbook') || ua.includes('eink') || ua.includes('e-ink')) {
     return 'monochrome';
   }
   return 'none';
 }
 
-// --- STATE MANAGEMENT ---
 const initialAppState = {
   einkMode: (typeof localStorage !== 'undefined' ? localStorage.getItem('eink_mode') || detectEinkDevice() : 'none'),
-  APP_CONFIG: (typeof window !== 'undefined' && window.APP_CONFIG) || {}, // Dynamically injected app config
+  APP_CONFIG: (typeof window !== 'undefined' && window.APP_CONFIG) || {},
   API_BASE_URL: (typeof window !== 'undefined' && window.APP_CONFIG && window.APP_CONFIG.baseUrl) ? window.APP_CONFIG.baseUrl.replace(/\/$/, '') : '',
   library: {},
   lastSearchQuery: '',
@@ -637,7 +145,6 @@ const initialAppState = {
   _isNavigatingFromRouter: false,
   _isAppInitializing: false,
   router: null,
-  // Dynamic callbacks registered by other modules
   renderPage: null,
   applyFilterAndRender: null,
   showComicList: null,
@@ -652,7 +159,6 @@ const initialAppState = {
   applyFullscreenFitMode: null
 };
 
-// Fallback store class if evaluated in raw test sandbox where module imports are stripped
 const StoreConstructor = typeof ComicsStore !== 'undefined' ? ComicsStore : class FallbackStore {
   constructor(initial = {}) {
     this.state = { ...initial };
@@ -672,73 +178,9 @@ export const state = typeof createStateProxy === 'function'
     })
   : store.state;
 
-export { createGlobalProxy };
 export const global = typeof createGlobalProxy === 'function' ? createGlobalProxy(state) : state;
 export const actions = (store && store.actions) ? store.actions : {};
 
-export function resetFullscreenZoom() {
-  fullscreenImage.style.transform = '';
-  fullscreenImage.style.transformOrigin = '';
-  fullscreenImage.style.cursor = 'default';
-  fullscreenImage.style.width = '';
-  fullscreenImage.style.height = '';
-  fullscreenImage.style.maxWidth = '';
-  fullscreenImage.style.maxHeight = '';
-  fullscreenImage.style.margin = 'auto';
-  fullscreenImage.style.touchAction = '';
-  fullscreenViewer.scrollTop = 0;
-  fullscreenViewer.scrollLeft = 0;
-  fullscreenNavLeft.classList.remove('hidden');
-  fullscreenNavRight.classList.remove('hidden');
-  
-  if (actions.viewer?.setZoom) {
-    actions.viewer.setZoom(false, { scale: 1, baseWidth: 0, baseHeight: 0 });
-  } else {
-    state.isFullscreenZoomed = false;
-    state.fullscreenZoomScale = 1;
-    state.fullscreenZoomBaseWidth = 0;
-    state.fullscreenZoomBaseHeight = 0;
-  }
-
-  if (typeof state.onFullscreenReset === 'function') {
-    state.onFullscreenReset();
-  }
-  if (typeof state.applyFullscreenFitMode === 'function') {
-    state.applyFullscreenFitMode();
-  }
-  if (typeof state.syncZoomToggleButton === 'function') {
-    state.syncZoomToggleButton();
-  }
-}
-
-/**
- * Fast black-to-white physical flash reset overlay for e-paper devices.
- */
-export function triggerEinkFlash() {
-  if (!state.einkMode || state.einkMode === 'none') return;
-  
-  let flash = document.getElementById('eink-flash-overlay');
-  if (!flash) {
-    flash = document.createElement('div');
-    flash.id = 'eink-flash-overlay';
-    document.body.appendChild(flash);
-  }
-  
-  // Instant solid black mask
-  flash.style.transition = 'none';
-  flash.style.opacity = '1';
-  flash.style.backgroundColor = 'black';
-  
-  // Cycle to white, then hide
-  setTimeout(() => {
-    flash.style.backgroundColor = 'white';
-    setTimeout(() => {
-      flash.style.opacity = '0';
-    }, 80);
-  }, 80);
-}
-
-// Register all exported functions, constants, and UI selectors on state & window for Proxy accessibility
 const globalsObj = {
   escapeHtml,
   safeDirName,
@@ -763,134 +205,10 @@ const globalsObj = {
   applyDisplayInfoToComic,
   applyDisplayInfoToLibrary,
   getPathForCurrentView,
-  resetFullscreenZoom,
   triggerEinkFlash,
-
-  // Constants
   ICONS,
   CSS_CLASSES,
-
-  // UI Element Selectors
-  rootFolderListDiv,
-  rootFolderListContainer,
-  folderListViewDiv,
-  folderListContainer,
-  searchResultsView,
-  searchResultsTitle,
-  searchResultsContainer,
-  publisherListDiv,
-  publisherListContainer,
-  seriesListDiv,
-  smartListView,
-  smartListContainer,
-  smartListTitle,
-  filterButtonsDiv,
-  smartListButtonsDiv,
-  latestAddedButton,
-  latestAddedCountSpan,
-  downloadedButton,
-  downloadedCountSpan,
-  comicListDiv,
-  comicViewerDiv,
-  publisherAlphaFilter,
-  seriesAlphaFilter,
-  comicAlphaFilter,
-  folderAlphaFilter,
-  publisherTitleH2,
-  seriesTitleH2,
-  comicListTitleH2,
-  comicTitleH2,
-  comicSubtitleP,
-  comicSummarySection,
-  comicSummaryToggle,
-  comicSummaryContent,
-  pageCounterSpan,
-  pageJumpInput,
-  pageCounterSpanBottom,
-  pageJumpInputBottom,
-  viewerPagesDiv,
-  pageLoader,
-  prevPageBtn,
-  nextPageBtn,
-  prevPageBtnBottom,
-  nextPageBtnBottom,
-  fullscreenBtn,
-  viewerTabBtn,
-  metadataTabBtn,
-  viewerContent,
-  fitHeightBtn,
-  orientationToggleBtn,
-  metadataContent,
-  metadataForm,
-  saveStatusDiv,
-  searchForm,
-  searchQueryInput,
-  searchStatusDiv,
-  searchResultsUl,
-  librarySearchForm,
-  librarySearchQuery,
-  librarySearchField,
-  clearSearchBtn,
-  fullscreenViewer,
-  fullscreenInfoBar,
-  fullscreenProgressIndicator,
-  fullscreenPageCounter,
-  fullscreenPageJumpInput,
-  fullscreenPrevPageBtn,
-  fullscreenNextPageBtn,
-  fullscreenImage,
-  fullscreenCloseBtn,
-  fullscreenCloseBtnBottom,
-  fullscreenTitle,
-  fullscreenControls,
-  fullscreenOrientationBtn,
-  fullscreenNavLeft,
-  fullscreenNavRight,
-  settingsModal,
-  settingsForm,
-  scanIntervalInput,
-  settingsStatusDiv,
-  scanButton,
-  fullScanButton,
-  logsContainer,
-  downloadsInfoDiv,
-  clearDownloadsBtn,
-  downloadQueueDiv,
-  settingsTabDevices,
-  settingsContentDevices,
-  devicesStatusDiv,
-  devicesListDiv,
-  refreshDevicesBtn,
-  ctButton,
-  ctModal,
-  ctScheduleInput,
-  ctSaveBtn,
-  ctMatchBody,
-  ctApplyBtn,
-  ctSkipBtn,
-  ctConfirmBar,
-  ctConfirmMessage,
-  ctConfirmYes,
-  ctConfirmNo,
-  ctOutputDiv,
-  ctClearOutputBtn,
-  ctRunBtn,
-  ctCancelBtn,
-  ctTabSettings,
-  ctTabGemini,
-  ctTabMatches,
-  ctTabOutput,
-  ctTabLogs,
-  ctTabManagement,
-  ctContentSettings,
-  ctContentGemini,
-  ctContentMatches,
-  ctContentOutput,
-  ctContentLogs,
-  ctContentManagement,
-  ctMatchesBadge,
-  seriesSortContainer,
-  seriesSortSelect
+  ...(typeof elements !== 'undefined' ? elements : {})
 };
 
 if (typeof html !== 'undefined') globalsObj.html = html;
@@ -908,4 +226,3 @@ if (typeof window !== 'undefined') {
   window.seriesSortOrder = state.seriesSortOrder;
   window.__COMICS_STORE__ = store;
 }
-

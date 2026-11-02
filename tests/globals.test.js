@@ -7,12 +7,24 @@ describe('globals.js', () => {
   let globals;
 
   beforeAll(() => {
-    const globalsPath = path.resolve(__dirname, '..', 'public', 'js', 'globals.js');
-    let code = fs.readFileSync(globalsPath, 'utf8');
-    // Strip import and export keywords for vm execution
-    code = code.replace(/import\s+[\s\S]*?from\s+['"][^'"]+['"];?/g, '');
-    code = code.replace(/export\s+(async\s+)?(function|const|let|var)\s+/g, '$1$2 ');
-    code = code.replace(/export\s+\{[^}]*\};?/g, '');
+    const files = [
+      '../public/js/core/constants.js',
+      '../public/js/core/debug.js',
+      '../public/js/core/dom-utils.js',
+      '../public/js/core/comic-utils.js',
+      '../public/js/core/elements.js',
+      '../public/js/globals.js'
+    ];
+    let code = '';
+    for (const rel of files) {
+      const fullPath = path.resolve(__dirname, rel);
+      const content = fs.readFileSync(fullPath, 'utf8');
+      code += '\n' + content
+        .replace(/import\s+[\s\S]*?from\s+['"][^'"]+['"];?/g, '')
+        .replace(/export\s+\*\s+from\s+['"][^'"]+['"];?/g, '')
+        .replace(/export\s+(async\s+)?(function|const|let|var)\s+/g, '$1$2 ')
+        .replace(/export\s+\{[\s\S]*?\};?/g, '');
+    }
 
     sandbox = {
       window: {},

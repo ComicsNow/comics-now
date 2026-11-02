@@ -7,9 +7,33 @@ const path = require('path');
 const vm = require('vm');
 
 function loadClientScript(filepath, sandbox) {
+  const cvDir = path.join(path.dirname(filepath), 'comicvine');
+  if (fs.existsSync(cvDir)) {
+    const subs = ['source-info.js', 'cover-preview.js', 'staging.js', 'candidate-card.js', 'search-api.js'];
+    for (const sub of subs) {
+      const subPath = path.join(cvDir, sub);
+      if (fs.existsSync(subPath)) {
+        const subContent = fs.readFileSync(subPath, 'utf8')
+          .replace(/import\s+[\s\S]*?from\s+['"][^'"]+['"];?/g, '')
+          .replace(/export\s+const\s+/g, 'var ')
+          .replace(/export\s+let\s+/g, 'var ')
+          .replace(/export\s+function\s+/g, 'function ')
+          .replace(/export\s+async\s+function\s+/g, 'async function ')
+          .replace(/\bexport\s+/g, '');
+        vm.createContext(sandbox);
+        new vm.Script(subContent).runInContext(sandbox);
+      }
+    }
+  }
+
   const fileContent = fs.readFileSync(filepath, 'utf8');
   const cleanContent = fileContent
     .replace(/import\s+[\s\S]*?from\s+['"][^'"]+['"];?/g, '')
+    .replace(/export\s+\{[\s\S]*?\};?/g, '')
+    .replace(/export\s+const\s+/g, 'var ')
+    .replace(/export\s+let\s+/g, 'var ')
+    .replace(/export\s+function\s+/g, 'function ')
+    .replace(/export\s+async\s+function\s+/g, 'async function ')
     .replace(/\bexport\s+/g, '')
     + '\nwindow.cvState = cvState;\nwindow.renderResultsList = renderResultsList;\nwindow.performCvSearch = performCvSearch;\n';
   const script = new vm.Script(cleanContent);

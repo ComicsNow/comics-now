@@ -26,21 +26,7 @@ const GRANDFATHERED_LEGACY_FILES = new Set([
   'tagger/tagger_app/core/metadata.py',
   'public/js/continuous.js',
   'server/services/metadata.js',
-  'server/routes/user/reading-lists.js',
-  'server/services/tagger.js',
-  'public/js/comicvine.js',
-  'public/js/globals.js',
-  'public/js/sync.js',
-  'public/js/settings/comics-management.js',
-  'public/js/reading-list-dag.js',
-  'public/js/metadata.js',
-  'public/js/offline/db-comics.js',
-  'public/js/viewer/page-previews.js',
-  'server/services/panel-detector.js',
-  'public/js/viewer/navigation.js',
-  'public/js/settings/user-access.js',
-  'public/js/reading-lists.js',
-  'public/js/progress.js'
+  'server/routes/user/reading-lists.js'
 ]);
 
 // Documented Cohesive Architectural Exemptions (Indivisible single responsibilities where splitting harms cohesion)
@@ -210,7 +196,7 @@ describe('Architectural Ratchet & Code Health Invariants', () => {
   });
 
   test('Grandfathered legacy files allowlist is correctly documented and tracked', () => {
-    expect(GRANDFATHERED_LEGACY_FILES.size).toBe(22);
+    expect(GRANDFATHERED_LEGACY_FILES.size).toBe(8);
   });
 
   test('Cohesive architectural exemptions have documented rationales, valid file paths, and source headers', () => {

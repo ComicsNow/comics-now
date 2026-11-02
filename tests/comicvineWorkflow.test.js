@@ -8,9 +8,56 @@ const vm = require('vm');
 
 // --- Helper to load and run ES modules in vm context ---
 function loadClientScript(filepath, sandbox) {
+  if (filepath.endsWith('metadata.js')) {
+    const metaDir = path.join(path.dirname(filepath), 'metadata');
+    if (fs.existsSync(metaDir)) {
+      const subs = ['sanitizer.js', 'form-fields.js', 'url-tagger.js', 'display.js'];
+      for (const sub of subs) {
+        const subPath = path.join(metaDir, sub);
+        if (fs.existsSync(subPath)) {
+          const subContent = fs.readFileSync(subPath, 'utf8')
+            .replace(/import\s+[\s\S]*?from\s+['"][^'"]+['"];?/g, '')
+            .replace(/\bexport\s+/g, '')
+            .replace(/const\s+global\s*=/g, 'var global =')
+            .replace(/const\s+renderContent\s*=/g, 'var renderContent =')
+            .replace(/const\s+safeHtml\s*=/g, 'var safeHtml =')
+            .replace(/const\s+clear\s*=/g, 'var clear =');
+          vm.createContext(sandbox);
+          new vm.Script(subContent).runInContext(sandbox);
+        }
+      }
+    }
+  }
+
+  if (filepath.endsWith('comicvine.js')) {
+    const cvDir = path.join(path.dirname(filepath), 'comicvine');
+    if (fs.existsSync(cvDir)) {
+      const subs = ['source-info.js', 'cover-preview.js', 'staging.js', 'candidate-card.js', 'search-api.js'];
+      for (const sub of subs) {
+        const subPath = path.join(cvDir, sub);
+        if (fs.existsSync(subPath)) {
+          const subContent = fs.readFileSync(subPath, 'utf8')
+            .replace(/import\s+[\s\S]*?from\s+['"][^'"]+['"];?/g, '')
+            .replace(/export\s+const\s+/g, 'var ')
+            .replace(/export\s+let\s+/g, 'var ')
+            .replace(/export\s+function\s+/g, 'function ')
+            .replace(/export\s+async\s+function\s+/g, 'async function ')
+            .replace(/\bexport\s+/g, '');
+          vm.createContext(sandbox);
+          new vm.Script(subContent).runInContext(sandbox);
+        }
+      }
+    }
+  }
+
   const fileContent = fs.readFileSync(filepath, 'utf8');
   const cleanContent = fileContent
     .replace(/import\s+[\s\S]*?from\s+['"][^'"]+['"];?/g, '')
+    .replace(/export\s+\{[\s\S]*?\};?/g, '')
+    .replace(/export\s+const\s+/g, 'var ')
+    .replace(/export\s+let\s+/g, 'var ')
+    .replace(/export\s+function\s+/g, 'function ')
+    .replace(/export\s+async\s+function\s+/g, 'async function ')
     .replace(/\bexport\s+/g, '');
   const script = new vm.Script(cleanContent);
   vm.createContext(sandbox);
@@ -225,13 +272,9 @@ describe('ComicVine Rework & Unsaved Changes Warning Integration', () => {
     sandbox.fetch = (...args) => sandbox.window.fetch(...args);
 
     // 2. Load comicvine script with window bindings appended
-    const fileContent = fs.readFileSync(path.resolve(__dirname, '../public/js/comicvine.js'), 'utf8');
-    const cleanContent = fileContent
-      .replace(/import\s+[\s\S]*?from\s+['"][^'"]+['"];?/g, '')
-      .replace(/\bexport\s+/g, '') + '\nwindow.cvState = cvState;\nwindow.performCvSearch = performCvSearch;\n';
-    const script = new vm.Script(cleanContent);
-    vm.createContext(sandbox);
-    script.runInContext(sandbox);
+    loadClientScript(path.resolve(__dirname, '../public/js/comicvine.js'), sandbox);
+    sandbox.window.cvState = sandbox.cvState;
+    sandbox.window.performCvSearch = sandbox.performCvSearch;
 
     // 3. Set up a mock fetch to intercept search and detail API calls
     sandbox.window.fetch = jest.fn().mockImplementation((url) => {
