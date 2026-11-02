@@ -9,9 +9,17 @@ from comics_mcp.tools.core import _dump, _srv, mcp
 
 
 @mcp.tool()
-def search_comics(query: str) -> str:
-    """Search the library for comics matching a text query (title/series/etc.)."""
-    return _dump(_srv()._request("GET", "/api/v1/search", params={"query": query}))
+def search_comics(query: str, field: str = "all") -> str:
+    """Search the library for comics matching a text query, ranked by relevance.
+
+    Args:
+        query: Search term.
+        field: Field filter ("all", "title", "series", "publisher", or "character").
+    """
+    params = {"query": query}
+    if field and field != "all":
+        params["field"] = field
+    return _dump(_srv()._request("GET", "/api/v1/search", params=params))
 
 
 @mcp.tool()

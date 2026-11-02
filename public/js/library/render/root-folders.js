@@ -61,10 +61,12 @@ const safeRaw = (typeof raw === 'function' && raw.length > 0) ? raw : (v) => ({
 const API_BASE_URL = state.API_BASE_URL || (typeof window !== 'undefined' && window.API_BASE_URL) || '';
 
 export function showRootFolderList(options = {}) {
-  const force = Boolean(options.force);
+  const force = Boolean(options.force || state._forceRootFolderList);
+  state._forceRootFolderList = false;
   
   if (!state._isNavigatingFromRouter && state.router && !state._isAppInitializing) {
      if (getRelativePath() !== '/') {
+       if (force) state._forceRootFolderList = true;
        state.router.navigate('/', true);
        return;
      }
@@ -117,8 +119,12 @@ export function showRootFolderList(options = {}) {
   });
 
   const visibleRootCards = rootCards.filter(card => statusCountsMatchFilter(card.counts));
+  const persistedDeviceCount = Number(
+    state.deviceLibraryCount ??
+    (typeof localStorage !== 'undefined' ? localStorage.getItem('comics-now-device-library-count') : 0)
+  ) || 0;
 
-  if (visibleRootCards.length === 1 && !force) {
+  if (visibleRootCards.length === 1 && persistedDeviceCount === 0 && !force) {
     const cardData = visibleRootCards[0];
     const normalizedPath = cardData.folderPath.replace(/[\\\/]+$/, '');
     const actualKey = state.library?.[cardData.folderPath] ? cardData.folderPath : (state.library?.[normalizedPath] ? normalizedPath : (state.library?.[normalizedPath + '/'] ? normalizedPath + '/' : null));
@@ -147,7 +153,7 @@ export function showRootFolderList(options = {}) {
 
   clear(rootFolderListContainer);
 
-  if (visibleRootCards.length === 0) {
+  if (visibleRootCards.length === 0 && persistedDeviceCount === 0) {
     const message = state.activeFilter === 'in-progress'
       ? 'No comics in progress.'
       : state.activeFilter === 'read'

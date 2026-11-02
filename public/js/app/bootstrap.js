@@ -147,6 +147,11 @@ export async function initAppStorage() {
   if (typeof appGlobal.openOfflineDB === 'function') {
     await appGlobal.openOfflineDB();
   }
+  if (typeof appGlobal.getDeviceLibraries === 'function') {
+    try {
+      await appGlobal.getDeviceLibraries();
+    } catch (_) {}
+  }
 
   // Initialize download queue and resume any pending downloads
   if (typeof appGlobal.initializeDownloadQueue === 'function') {

@@ -6,7 +6,8 @@ This document provides a technical overview of the REST API for Comics Now! All 
 
 Comics Now! uses role-based authentication. Most endpoints require a valid user session. Admin endpoints require an `admin` role.
 
-### Public Auth
+### Public Auth & Health
+- **GET `/health`**: Unauthenticated `no-store` connectivity probe (`{ status: 'ok', timestamp }`) used by the offline PWA self-healing check.
 - **GET `/user/me`**: Returns the current user's profile and authentication status.
 
 ---
@@ -17,8 +18,8 @@ Comics Now! uses role-based authentication. Most endpoints require a valid user 
 Returns the complete library accessible to the current user, grouped by publisher and series.
 
 ### `GET /search`
-**Query Params:** `query` (search term)
-Returns a flat list of comics matching the query, filtered by user access.
+**Query Params:** `query` (search term), `field` (`all` | `title` | `series` | `publisher` | `character`, default `all`)
+Returns a flat list of comics matching the query within the selected `field`, filtered by user access and sorted by multi-tier relevance (exact match $\rightarrow$ prefix match $\rightarrow$ whole-word match $\rightarrow$ series/title match $\rightarrow$ metadata/synopsis match) before alphabetical tie-breaking.
 
 ### `GET /folders/:path`
 **Path:** Base64 encoded physical path or `root`.
@@ -184,6 +185,14 @@ Fetches detailed metadata and creator credits for a specific ComicVine resource.
 
 ### `GET /comicvine/volume/:volumeId/issues`
 Lists all issues in a ComicVine volume.
+
+### `POST /metadata/synthesize`
+**Body:** `{ sources: Array, filename?, existingMeta? }` (requires $\ge 2$ candidate sources)
+Synthesizes unified ComicInfo metadata across multiple staged candidates. Uses Google Gemini AI when enabled and within daily quota, or deterministic field-priority and union merging (`synthesizeMetadataDeterministic`) when Gemini is disabled or unconfigured.
+
+### `POST /metadata/extract-from-url`
+**Body:** `{ url, comicId?, filename?, apply?, storage? }`
+Extracts structured ComicInfo metadata from a comic web page URL (via Jina Reader + Google Gemini AI) and optionally applies it to `comicId`.
 
 ---
 

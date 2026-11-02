@@ -4,7 +4,7 @@
 
 const SCOPE_URL = new URL(self.registration.scope);
 const BASE_PATH = SCOPE_URL.pathname;
-const CACHE_VERSION = 'v9.0';
+const CACHE_VERSION = 'v9.2';
 const CACHE_NAME = `comics-now-${CACHE_VERSION}-${BASE_PATH}`;
 const DOWNLOADS_CACHE_NAME = 'comics-now-downloads';
 
@@ -92,6 +92,21 @@ self.addEventListener('fetch', event => {
     return;
   }
 
+  // PLUGIN BYPASS: Private plugin bundles are never PWA-cached. Their loader
+  // script skips them offline and in standalone/fullscreen modes, and they
+  // must not be served from cache in any other case either.
+  if (url.pathname.includes('/plugins/')) {
+    return;
+  }
+
+  // EMBEDDED FRAME BYPASS: Navigations of embedded frames never flow through
+  // the PWA cache. Their documents are not the app shell, so they must neither
+  // be cached as it nor served from it.
+  const secFetchDest = req.headers.get('sec-fetch-dest') || '';
+  if (secFetchDest === 'iframe') {
+    return;
+  }
+
   // SPECIAL CACHE: Comic Pages, Thumbnails, and Guided View JSON (DOWNLOADS_CACHE_NAME)
   const isComicPage = url.pathname.includes('/api/v1/comics/pages/image');
   const isThumbnail = url.pathname.includes('/thumbnails/');
@@ -147,8 +162,20 @@ self.addEventListener('fetch', event => {
       const cache = await caches.open(CACHE_NAME);
       try {
         const net = await fetch(req, { cache: 'no-store' });
-        if (net.ok && url.origin === self.location.origin) {
-          cache.put(new URL('index.html', self.registration.scope).toString(), net.clone());
+        // Only the app's own entry document may refresh the cached shell.
+        // Other in-scope HTML navigations (embedded UI pages, foreign
+        // documents) are served but never cached, so they cannot replace
+        // the app shell with foreign HTML.
+        const shellUrl = new URL('index.html', self.registration.scope);
+        const shellPath = shellUrl.pathname;
+        const rootPath = BASE_PATH.replace(/\/+$/, '');
+        const reqPath = url.pathname;
+        const isShellNavigation = reqPath === shellPath ||
+          reqPath === rootPath ||
+          reqPath === `${rootPath}/` ||
+          reqPath === `${rootPath}/index.html`;
+        if (net.ok && url.origin === self.location.origin && isShellNavigation) {
+          cache.put(shellUrl.toString(), net.clone());
         }
         return net;
       } catch (err) {

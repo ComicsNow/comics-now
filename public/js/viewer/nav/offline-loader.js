@@ -23,15 +23,15 @@ async function loadOfflineComicPages(comic) {
   try {
     let zipData = null;
 
-    // Try local file handle or File object (Device Library) first
-    if (comic.handle) {
+    // Try persisted IndexedDB Blob / File object first, then fallback to FileSystemFileHandle
+    if (comic.file) {
+      zipData = comic.file;
+    } else if (comic.handle) {
       try {
         zipData = await comic.handle.getFile();
       } catch (handleError) {
         console.error('[DEVICE] Failed to get file from handle:', handleError);
       }
-    } else if (comic.file) {
-      zipData = comic.file;
     }
 
     // Fallback to IndexedDB (Downloaded comics)

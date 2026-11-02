@@ -1,4 +1,5 @@
 import { state, actions, encodePath } from '../../globals.js';
+import { continuousState } from '../../continuous/state.js';
 
 /**
  * Thumbnail URL for a page: small w=220 WebP for server comics (rides the WebP
@@ -65,6 +66,23 @@ async function goToPage(targetIndex) {
           global.saveProgress?.(global.currentPageIndex);
           global.updateLibraryProgress?.(comic.id, global.currentPageIndex, comic.progress?.totalPages);
         } catch (e) {}
+      }
+    }
+
+    // In continuous mode the view is the scroll container, not a single
+    // rendered page — scroll the target page into view instead of calling
+    // the single-page renderer (mirrors renderContinuousMode centering).
+    if (typeof continuousState !== 'undefined' && continuousState.isContinuousMode && continuousState.continuousContainer) {
+      const targetContainer = continuousState.continuousContainer.querySelector(
+        `.page-container[data-index="${clampedIndex}"]`
+      );
+      if (targetContainer) {
+        try {
+          targetContainer.scrollIntoView({ behavior: 'auto', block: 'center' });
+        } catch (_) {
+          try { targetContainer.scrollIntoView(true); } catch (e) {}
+        }
+        return true;
       }
     }
 

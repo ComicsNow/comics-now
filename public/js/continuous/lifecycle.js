@@ -200,34 +200,31 @@ export async function disableContinuousMode() {
   const isFullscreen = fullscreenViewer && !fullscreenViewer.classList.contains('hidden');
   const continuousContainer = continuousState.continuousContainer;
 
+  // DOM cleanup must run even when closeFullscreen has already hidden the
+  // viewer — otherwise the continuous page list stays visible and the
+  // fullscreen image stays hidden, leaving the viewer stuck in a stale
+  // continuous state on the next open.
+  if (fullscreenViewer) {
+    fullscreenViewer.classList.remove('continuous-active');
+  }
+  const fullscreenImage = document.getElementById('fullscreen-image');
+  if (fullscreenImage) {
+    fullscreenImage.classList.remove('hidden');
+  }
+
+  if (continuousContainer) {
+    if (continuousState.continuousClickHandler) {
+      continuousContainer.removeEventListener('click', continuousState.continuousClickHandler);
+      continuousState.continuousClickHandler = null;
+    }
+
+    continuousContainer.classList.add('hidden');
+  }
+
   if (isFullscreen) {
-    if (fullscreenViewer) {
-      fullscreenViewer.classList.remove('continuous-active');
-    }
-    const fullscreenImage = document.getElementById('fullscreen-image');
-    if (fullscreenImage) {
-      fullscreenImage.classList.remove('hidden');
-    }
-
-    if (continuousContainer) {
-      if (continuousState.continuousClickHandler) {
-        continuousContainer.removeEventListener('click', continuousState.continuousClickHandler);
-        continuousState.continuousClickHandler = null;
-      }
-
-      continuousContainer.classList.add('hidden');
-    }
-
     const renderPage = state.renderPage || window.renderPage;
     if (typeof renderPage === 'function') {
       await renderPage();
-    }
-  } else {
-    if (continuousContainer) {
-      if (continuousState.continuousClickHandler) {
-        continuousContainer.removeEventListener('click', continuousState.continuousClickHandler);
-        continuousState.continuousClickHandler = null;
-      }
     }
   }
 

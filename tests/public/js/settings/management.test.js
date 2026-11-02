@@ -92,4 +92,68 @@ describe('Comics Management - Modular Settings', () => {
       sandbox.stopMoveStream();
     }).not.toThrow();
   });
+
+  test('startRenameStream called without apiBaseUrl falls back to state.API_BASE_URL', () => {
+    const capturedUrls = [];
+    sandbox.EventSource = class {
+      constructor(url) {
+        capturedUrls.push(url);
+        this.onmessage = null;
+        this.onerror = null;
+      }
+      close() {}
+    };
+
+    sandbox.startRenameStream();
+
+    expect(capturedUrls).toEqual(['http://localhost:3000/api/v1/rename/stream']);
+  });
+
+  test('startRenameStream called with explicit apiBaseUrl uses it', () => {
+    const capturedUrls = [];
+    sandbox.EventSource = class {
+      constructor(url) {
+        capturedUrls.push(url);
+        this.onmessage = null;
+        this.onerror = null;
+      }
+      close() {}
+    };
+
+    sandbox.startRenameStream('/custom-base');
+
+    expect(capturedUrls).toEqual(['/custom-base/api/v1/rename/stream']);
+  });
+
+  test('startMoveStream called without apiBaseUrl falls back to state.API_BASE_URL', () => {
+    const capturedUrls = [];
+    sandbox.EventSource = class {
+      constructor(url) {
+        capturedUrls.push(url);
+        this.onmessage = null;
+        this.onerror = null;
+      }
+      close() {}
+    };
+
+    sandbox.startMoveStream();
+
+    expect(capturedUrls).toEqual(['http://localhost:3000/api/v1/move/stream']);
+  });
+
+  test('startMoveStream called with explicit apiBaseUrl uses it', () => {
+    const capturedUrls = [];
+    sandbox.EventSource = class {
+      constructor(url) {
+        capturedUrls.push(url);
+        this.onmessage = null;
+        this.onerror = null;
+      }
+      close() {}
+    };
+
+    sandbox.startMoveStream('/custom-base');
+
+    expect(capturedUrls).toEqual(['/custom-base/api/v1/move/stream']);
+  });
 });

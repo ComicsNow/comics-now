@@ -4,7 +4,22 @@
  * Server-Sent Events (SSE) stream listener and batch folder relocation runner.
  */
 
+import { state } from '../../globals.js';
+
 let moveEventSource = null;
+
+/**
+ * Resolve the API base URL for stream/fetch calls. Callers (e.g. tab switches)
+ * may invoke startMoveStream with no argument, so fall back to the
+ * centralized store like the pre-modular implementation did.
+ * @param {string} apiBaseUrl
+ * @returns {string}
+ */
+function resolveApiBaseUrl(apiBaseUrl) {
+  if (apiBaseUrl) return apiBaseUrl;
+  return (typeof state !== 'undefined' && state.API_BASE_URL) ||
+         (typeof window !== 'undefined' && window.API_BASE_URL) || '';
+}
 
 /**
  * Setup move output streaming
@@ -14,11 +29,12 @@ export function startMoveStream(apiBaseUrl = '') {
   if (moveEventSource) return;
   if (typeof EventSource === 'undefined') return;
 
+  const base = resolveApiBaseUrl(apiBaseUrl);
   const moveOutputDiv = document.getElementById('move-output');
   if (moveOutputDiv) {
     moveOutputDiv.classList.remove('hidden');
   }
-  moveEventSource = new EventSource(`${apiBaseUrl}/api/v1/move/stream`);
+  moveEventSource = new EventSource(`${base}/api/v1/move/stream`);
 
   moveEventSource.onmessage = (event) => {
     try {

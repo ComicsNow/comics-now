@@ -185,7 +185,9 @@ async function openComicViewer(comic, options = {}) {
   }
 
   if (typeof global.setOrientationMode === 'function') {
-    const wantLandscape = !!(comic.landscapeMode === true || comic.landscapeMode == 1);
+    const wantLandscape = typeof global.resolveLandscapePreference === 'function'
+      ? global.resolveLandscapePreference(comic)
+      : !!(comic.landscapeMode === true || comic.landscapeMode == 1);
     global.setOrientationMode(wantLandscape ? 'landscape' : 'portrait', { persist: false });
   }
 
@@ -201,7 +203,9 @@ async function openComicViewer(comic, options = {}) {
   }
 
   if (typeof global.setFullImageMode === 'function') {
-    const wantFullImage = !!(comic.fullImageMode === true || comic.fullImageMode == 1);
+    const wantFullImage = typeof global.resolveFullImagePreference === 'function'
+      ? global.resolveFullImagePreference(comic)
+      : !!(comic.fullImageMode === true || comic.fullImageMode == 1);
     if (wantFullImage !== !!global.isFullImageMode) {
       global.setFullImageMode(wantFullImage, { persist: false });
     } else if (wantFullImage) {

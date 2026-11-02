@@ -184,21 +184,30 @@ const safeRaw = (typeof raw !== 'undefined' && typeof raw === 'function' && raw.
       global.applyFullscreenFitMode?.();
     }
 
-    // Persist landscape preference per comic so the next open of this issue
-    // restores it. Mirrors the per-comic save pattern used by guided/bubble/etc.
+    // Update the in-memory comic so the library reflects the change for the
+    // current session, and persist per-comic to localStorage so the next open
+    // of this issue restores it (mirrors the guided_pref_* pattern).
     const comic = global.currentComic;
     if (persist && comic && comic.id != null) {
       comic.landscapeMode = newIsLandscape;
       if (typeof global.updateComicInLibrary === 'function') {
         global.updateComicInLibrary(comic.id, { landscapeMode: newIsLandscape });
       }
-      const base = (typeof API_BASE_URL !== 'undefined' ? API_BASE_URL : '') || '';
-      fetch(`${base}/api/v1/comics/${encodeURIComponent(comic.id)}/landscape-mode`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ landscapeMode: newIsLandscape })
-      }).catch(() => { /* non-fatal */ });
+      try {
+        localStorage.setItem(`landscape_pref_${comic.id}`, newIsLandscape ? 'true' : 'false');
+      } catch (_) { /* ignore */ }
     }
+  }
+
+  function resolveLandscapePreference(comic) {
+    if (comic && comic.id != null) {
+      try {
+        const stored = localStorage.getItem(`landscape_pref_${comic.id}`);
+        if (stored === 'true') return true;
+        if (stored === 'false') return false;
+      } catch (_) { /* ignore */ }
+    }
+    return !!(comic && (comic.landscapeMode === true || comic.landscapeMode == 1));
   }
 
   global.computeViewerAvailableHeight = computeViewerAvailableHeight;
@@ -210,6 +219,7 @@ const safeRaw = (typeof raw !== 'undefined' && typeof raw === 'function' && raw.
   global.updateOrientationButtons = updateOrientationButtons;
   global.applyFullscreenOrientation = applyFullscreenOrientation;
   global.setOrientationMode = setOrientationMode;
+  global.resolveLandscapePreference = resolveLandscapePreference;
 
 export {
   computeViewerAvailableHeight,
@@ -220,7 +230,8 @@ export {
   refreshToolbarLabels,
   updateOrientationButtons,
   applyFullscreenOrientation,
-  setOrientationMode
+  setOrientationMode,
+  resolveLandscapePreference
 };
 
 state.computeViewerAvailableHeight = computeViewerAvailableHeight;
@@ -232,6 +243,7 @@ state.refreshToolbarLabels = refreshToolbarLabels;
 state.updateOrientationButtons = updateOrientationButtons;
 state.applyFullscreenOrientation = applyFullscreenOrientation;
 state.setOrientationMode = setOrientationMode;
+state.resolveLandscapePreference = resolveLandscapePreference;
 
 if (typeof window !== 'undefined') {
   window.computeViewerAvailableHeight = computeViewerAvailableHeight;
@@ -243,4 +255,5 @@ if (typeof window !== 'undefined') {
   window.updateOrientationButtons = updateOrientationButtons;
   window.applyFullscreenOrientation = applyFullscreenOrientation;
   window.setOrientationMode = setOrientationMode;
+  window.resolveLandscapePreference = resolveLandscapePreference;
 }

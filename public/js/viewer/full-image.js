@@ -103,12 +103,9 @@ const global = typeof canonicalGlobal !== 'undefined' ? canonicalGlobal : new Pr
       if (typeof global.updateComicInLibrary === 'function') {
         global.updateComicInLibrary(comic.id, { fullImageMode: newVal });
       }
-      const base = (typeof API_BASE_URL !== 'undefined' ? API_BASE_URL : '') || '';
-      fetch(`${base}/api/v1/comics/${encodeURIComponent(comic.id)}/full-image-mode`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ fullImageMode: newVal })
-      }).catch(() => {});
+      try {
+        localStorage.setItem(`full_image_pref_${comic.id}`, newVal ? 'true' : 'false');
+      } catch (_) { /* ignore */ }
     }
   }
 
@@ -137,10 +134,22 @@ const global = typeof canonicalGlobal !== 'undefined' ? canonicalGlobal : new Pr
     }
   }
 
+  function resolveFullImagePreference(comic) {
+    if (comic && comic.id != null) {
+      try {
+        const stored = localStorage.getItem(`full_image_pref_${comic.id}`);
+        if (stored === 'true') return true;
+        if (stored === 'false') return false;
+      } catch (_) { /* ignore */ }
+    }
+    return !!(comic && (comic.fullImageMode === true || comic.fullImageMode == 1));
+  }
+
   global.isFullImageMode = false;
   global.setFullImageMode = setFullImageMode;
   global.toggleFullImageMode = toggleFullImageMode;
   global.applyFullImageLayout = applyLayout;
+  global.resolveFullImagePreference = resolveFullImagePreference;
 
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', init);
@@ -156,17 +165,20 @@ export {
   setFullImageMode,
   toggleFullImageMode,
   bindButton,
-  init
+  init,
+  resolveFullImagePreference
 };
 
 state.isFullImageMode = false;
 state.setFullImageMode = setFullImageMode;
 state.toggleFullImageMode = toggleFullImageMode;
 state.applyFullImageLayout = applyLayout;
+state.resolveFullImagePreference = resolveFullImagePreference;
 
 if (typeof window !== 'undefined') {
   window.isFullImageMode = false;
   window.setFullImageMode = setFullImageMode;
   window.toggleFullImageMode = toggleFullImageMode;
   window.applyFullImageLayout = applyLayout;
+  window.resolveFullImagePreference = resolveFullImagePreference;
 }

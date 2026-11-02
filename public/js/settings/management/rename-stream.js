@@ -4,7 +4,22 @@
  * Server-Sent Events (SSE) stream listener and batch rename execution handler.
  */
 
+import { state } from '../../globals.js';
+
 let renameEventSource = null;
+
+/**
+ * Resolve the API base URL for stream/fetch calls. Callers (e.g. tab switches)
+ * may invoke startRenameStream with no argument, so fall back to the
+ * centralized store like the pre-modular implementation did.
+ * @param {string} apiBaseUrl
+ * @returns {string}
+ */
+function resolveApiBaseUrl(apiBaseUrl) {
+  if (apiBaseUrl) return apiBaseUrl;
+  return (typeof state !== 'undefined' && state.API_BASE_URL) ||
+         (typeof window !== 'undefined' && window.API_BASE_URL) || '';
+}
 
 /**
  * Setup rename output streaming
@@ -14,11 +29,12 @@ export function startRenameStream(apiBaseUrl = '') {
   if (renameEventSource) return;
   if (typeof EventSource === 'undefined') return;
 
+  const base = resolveApiBaseUrl(apiBaseUrl);
   const renameOutputDiv = document.getElementById('rename-output');
   if (renameOutputDiv) {
     renameOutputDiv.classList.remove('hidden');
   }
-  renameEventSource = new EventSource(`${apiBaseUrl}/api/v1/rename/stream`);
+  renameEventSource = new EventSource(`${base}/api/v1/rename/stream`);
 
   renameEventSource.onmessage = (event) => {
     try {

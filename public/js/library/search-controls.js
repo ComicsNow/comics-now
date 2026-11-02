@@ -35,6 +35,15 @@ export function initSearchControls() {
     global.librarySearchQuery.addEventListener('keydown', global.librarySearchQuery._enterListener);
   }
 
+  if (global.librarySearchField && !global.librarySearchField._changeListener) {
+    global.librarySearchField._changeListener = () => {
+      if (global.librarySearchQuery?.value?.trim()) {
+        runLibrarySearch();
+      }
+    };
+    global.librarySearchField.addEventListener('change', global.librarySearchField._changeListener);
+  }
+
   if (global.clearSearchBtn && !global.clearSearchBtn._clickListener) {
     global.clearSearchBtn._clickListener = (event) => {
       event.preventDefault();

@@ -1,5 +1,6 @@
 import { state, clearElement, render, html, raw } from '../../globals.js';
-import { getDeviceLibraries, getDeviceComics, removeDeviceLibrary, DEVICE_COMICS_STORE } from './storage.js';
+import { getDeviceLibraries, getDeviceComics, removeDeviceLibrary, scanDeviceLibrary, toPersistentBlob, DEVICE_COMICS_STORE } from './storage.js';
+import { updateDeviceScanProgress } from './progress.js';
 
 const clear = typeof clearElement === 'function' ? clearElement : (el) => {
   if (el) {
@@ -46,19 +47,28 @@ export async function appendDeviceLibraryCards(container) {
 
   for (const lib of libraries) {
     const comics = await getDeviceComics(lib.id);
+    const hasSavedBlobs = comics.length > 0 && comics.every(c => Boolean(c.file));
     const card = document.createElement('div');
-    card.className = 'bg-gray-800 rounded-lg overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-300 cursor-pointer group relative border border-gray-700 hover:border-purple-500';
+    card.className = 'device-library-card bg-gray-800 rounded-lg overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-300 cursor-pointer group relative border border-gray-700 hover:border-purple-500';
+    card.dataset.libraryId = String(lib.id || '');
+    card.dataset.libraryName = String(lib.name || '').toLowerCase();
     
-    let statusHtml = '';
+    let statusHtml = '<div class="device-lib-status mt-2 text-xs text-gray-400"></div>';
     let isDisconnected = false;
+    const scanState = state.deviceScanStatus?.[lib.id];
 
-    if (lib.isLegacy) {
+    if (scanState && scanState.status === 'scanning') {
+      const scanText = scanState.total > 0 ? `Syncing (${scanState.current} / ${scanState.total})...` : 'Scanning folder...';
+      statusHtml = `<div class="device-lib-status mt-2 text-xs text-purple-400 font-medium">${scanText}</div>`;
+    } else if (hasSavedBlobs) {
+      statusHtml = '<div class="device-lib-status mt-2 text-xs text-green-400">Saved on Device</div>';
+    } else if (lib.isLegacy) {
       const sampleComic = comics[0];
       isDisconnected = !sampleComic || !sampleComic.file;
       statusHtml = isDisconnected 
-        ? '<div class="mt-2 text-xs text-red-400">Disconnected (Click to re-attach)</div>'
-        : '<div class="mt-2 text-xs text-green-400">Connected</div>';
-    } else {
+        ? '<div class="device-lib-status mt-2 text-xs text-red-400">Disconnected (Click to re-attach)</div>'
+        : '<div class="device-lib-status mt-2 text-xs text-green-400">Connected</div>';
+    } else if (lib.handle) {
       let permissionStatus = 'prompt';
       try {
         permissionStatus = await lib.handle.queryPermission({ mode: 'read' });
@@ -66,7 +76,7 @@ export async function appendDeviceLibraryCards(container) {
         console.warn('Could not query permission', e);
       }
       if (permissionStatus !== 'granted') {
-        statusHtml = '<div class="mt-2 text-xs text-yellow-500">Permission Required</div>';
+        statusHtml = '<div class="device-lib-status mt-2 text-xs text-yellow-500">Permission Required</div>';
       }
     }
 
@@ -77,7 +87,7 @@ export async function appendDeviceLibraryCards(container) {
         </svg>
         <div class="text-white font-bold truncate w-full">${lib.name}</div>
         <div class="text-gray-400 text-sm mt-1">Local Device Library</div>
-        <div class="text-xs text-gray-500 mt-2">${comics.length} Comics</div>
+        <div class="device-lib-count text-xs text-gray-500 mt-2">${comics.length} Comics</div>
         ${safeRaw(statusHtml)}
       </div>
       <div class="absolute top-2 right-2 z-20">
@@ -90,7 +100,7 @@ export async function appendDeviceLibraryCards(container) {
     `);
 
     card.onclick = async (e) => {
-      if (e.target.closest('.remove-device-lib')) {
+      if (e.target && typeof e.target.closest === 'function' && e.target.closest('.remove-device-lib')) {
         const id = e.target.closest('.remove-device-lib').dataset.id;
         if (confirm('Remove this local library? It won\'t delete your files.')) {
           await removeDeviceLibrary(id);
@@ -98,17 +108,20 @@ export async function appendDeviceLibraryCards(container) {
         return;
       }
 
-      if (lib.isLegacy) {
-        const sampleComic = comics[0];
-        if (!sampleComic || !sampleComic.file) {
-          await reattachLegacyLibrary(lib.id);
-          return;
-        }
-      } else {
-        if (await lib.handle.queryPermission({ mode: 'read' }) !== 'granted') {
-          if (await lib.handle.requestPermission({ mode: 'read' }) !== 'granted') {
+      if (!hasSavedBlobs) {
+        if (lib.isLegacy) {
+          const sampleComic = comics[0];
+          if (!sampleComic || !sampleComic.file) {
+            await reattachLegacyLibrary(lib.id);
             return;
           }
+        } else if (lib.handle) {
+          if (await lib.handle.queryPermission({ mode: 'read' }) !== 'granted') {
+            if (await lib.handle.requestPermission({ mode: 'read' }) !== 'granted') {
+              return;
+            }
+          }
+          await scanDeviceLibrary(lib.id, lib.handle);
           const showRootFolderList = state.showRootFolderList || window.showRootFolderList;
           const applyFilterAndRender = state.applyFilterAndRender || window.applyFilterAndRender;
 
@@ -122,6 +135,13 @@ export async function appendDeviceLibraryCards(container) {
 
       showDeviceLibraryComics(lib.id, lib.name);
     };
+
+    // Prevent duplicate DOM cards if appendDeviceLibraryCards runs concurrently
+    container.querySelectorAll('.device-library-card').forEach(existing => {
+      if (existing.dataset.libraryId === card.dataset.libraryId || existing.dataset.libraryName === card.dataset.libraryName) {
+        existing.remove();
+      }
+    });
 
     const addButton = container.querySelector('.add-device-library-card');
     if (addButton) {
@@ -153,21 +173,37 @@ export async function reattachLegacyLibrary(libraryId) {
     const activeDb = await db.openOfflineDB();
 
     const comics = await getDeviceComics(libraryId);
-    
-    const tx = activeDb.transaction([DEVICE_COMICS_STORE], 'readwrite');
-    const store = tx.objectStore(DEVICE_COMICS_STORE);
+    const updatedComics = [];
 
     let reattachedCount = 0;
-    for (const comic of comics) {
+    for (let i = 0; i < comics.length; i++) {
+      const comic = comics[i];
       const matchingFile = files.find(f => (f.webkitRelativePath || f.name) === comic.path);
       if (matchingFile) {
-        comic.file = matchingFile;
-        store.put(comic);
+        updateDeviceScanProgress(libraryId, 'Local Files', {
+          status: 'scanning',
+          current: i + 1,
+          total: comics.length,
+          fileName: matchingFile.name
+        });
+        comic.file = await toPersistentBlob(matchingFile);
+        updatedComics.push(comic);
         reattachedCount++;
       }
     }
 
+    const tx = activeDb.transaction([DEVICE_COMICS_STORE], 'readwrite');
+    const store = tx.objectStore(DEVICE_COMICS_STORE);
+    for (const comic of updatedComics) {
+      store.put(comic);
+    }
+
     tx.oncomplete = () => {
+      updateDeviceScanProgress(libraryId, 'Local Files', {
+        status: 'ready',
+        current: reattachedCount,
+        total: reattachedCount
+      });
       console.log(`Re-attached ${reattachedCount} files to library ${libraryId}`);
       const showRootFolderList = state.showRootFolderList || window.showRootFolderList;
       const applyFilterAndRender = state.applyFilterAndRender || window.applyFilterAndRender;

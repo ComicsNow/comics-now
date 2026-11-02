@@ -215,8 +215,10 @@ export function renderSearchResultsAsFolders(comics) {
   });
 }
 
-export function searchLibraryLocally(query, field) {
-  const q = query.toLowerCase();
+export function searchLibraryLocally(query, field = 'all') {
+  const q = String(query || '').trim().toLowerCase();
+  if (!q) return [];
+  const normalizedField = String(field || 'all').toLowerCase().trim();
   const results = [];
   
   const activeComicIdMap = comicIdMap || state.comicIdMap || window.comicIdMap;
@@ -224,19 +226,56 @@ export function searchLibraryLocally(query, field) {
 
   for (const comic of activeComicIdMap.values()) {
     const meta = comic.metadata || {};
+    const titleVal = `${comic.name || ''} ${meta.Title || meta.title || ''}`;
+    const seriesVal = `${comic.series || ''} ${meta.Series || meta.series || ''}`;
+    const pubVal = `${comic.publisher || ''} ${meta.Publisher || meta.publisher || ''}`;
+    const charVal = `${meta.Characters || meta.characters || ''}`;
     const hay = {
-      title: comic.name || '',
-      series: comic.series || '',
-      publisher: comic.publisher || '',
-      character: meta.Characters || '',
-      all: `${comic.name} ${comic.series} ${comic.publisher} ${meta.Characters || ''} ${meta.Summary || ''}`
+      title: titleVal,
+      series: seriesVal,
+      publisher: pubVal,
+      character: charVal,
+      all: `${titleVal} ${seriesVal} ${pubVal} ${charVal} ${meta.Writer || meta.writer || ''} ${meta.Summary || meta.summary || ''}`
     };
     
-    const valueToSearch = (hay[field] || hay.all).toLowerCase();
+    const valueToSearch = (hay[normalizedField] ?? hay.all).toLowerCase();
     if (valueToSearch.includes(q)) {
       results.push(comic);
     }
   }
+
+  const escapedQ = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const wordRegex = new RegExp(`(?:^|[^a-z0-9])${escapedQ}(?:$|[^a-z0-9])`, 'i');
+  const scoreComic = (c) => {
+    const meta = c.metadata || {};
+    const series = String(c.series || meta.Series || meta.series || '').trim().toLowerCase();
+    const title = String(meta.Title || meta.title || '').trim().toLowerCase();
+    const rawName = String(c.name || '').trim().toLowerCase().replace(/\.(cbz|cbr|cb7|cbt|zip|rar|pdf)$/i, '');
+    const chars = String(meta.Characters || meta.characters || '').toLowerCase();
+    const pub = String(c.publisher || meta.Publisher || meta.publisher || '').toLowerCase();
+    let score = 0;
+    if (series === q || title === q || rawName === q) score += 1000;
+    else if (series.startsWith(q) || title.startsWith(q) || rawName.startsWith(q)) score += 700;
+    else if (wordRegex.test(series) || wordRegex.test(title) || wordRegex.test(rawName)) score += 500;
+    else if (series.includes(q) || title.includes(q) || rawName.includes(q)) score += 300;
+    if (chars.includes(q)) score += 150;
+    if (pub.includes(q)) score += 80;
+    return score || 20;
+  };
+
+  results.sort((a, b) => {
+    const diff = scoreComic(b) - scoreComic(a);
+    if (diff !== 0) return diff;
+    const sA = String(a.series || a.metadata?.Series || '');
+    const sB = String(b.series || b.metadata?.Series || '');
+    const sCmp = sA.localeCompare(sB, undefined, { sensitivity: 'base' });
+    if (sCmp !== 0) return sCmp;
+    const nA = parseFloat(a.metadata?.Number ?? a.metadata?.number);
+    const nB = parseFloat(b.metadata?.Number ?? b.metadata?.number);
+    if (!Number.isNaN(nA) && !Number.isNaN(nB) && nA !== nB) return nA - nB;
+    return String(a.name || '').localeCompare(String(b.name || ''), undefined, { numeric: true, sensitivity: 'base' });
+  });
+
   return results;
 }
 

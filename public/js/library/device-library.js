@@ -48,10 +48,10 @@ export async function requestDeviceLibrary() {
       if (!handle) return;
 
       const libraryId = 'device-' + Date.now();
-      await saveDeviceLibrary(libraryId, handle);
+      const targetId = (await saveDeviceLibrary(libraryId, handle)) || libraryId;
       
       // Start initial scan
-      await scanDeviceLibrary(libraryId, handle);
+      await scanDeviceLibrary(targetId, handle);
       
       // Refresh UI
       if (typeof showRootFolderList === 'function') {

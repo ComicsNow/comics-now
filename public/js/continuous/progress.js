@@ -84,10 +84,16 @@ export async function updateCurrentPageFromScroll() {
     }
 
     const getViewerPages = state.getViewerPages || window.getViewerPages;
+    const pages = getViewerPages?.() || [];
     const updateViewerPageCounter = state.updateViewerPageCounter || window.updateViewerPageCounter;
     if (typeof updateViewerPageCounter === 'function') {
-      const pages = getViewerPages?.() || [];
       updateViewerPageCounter(pages);
+    }
+
+    // Keep the page scrubber slider/readout in sync with scroll position.
+    const updateReaderScrubberStatus = state.updateReaderScrubberStatus || window.updateReaderScrubberStatus;
+    if (typeof updateReaderScrubberStatus === 'function') {
+      updateReaderScrubberStatus(closestPage + 1, pages.length);
     }
 
     const currentComic = state.currentComic || window.currentComic;

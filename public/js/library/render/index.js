@@ -38,7 +38,7 @@ import {
 
 import { updateBreadcrumb } from '../breadcrumb.js';
 import { renderAllComicsAsList, renderAlphaFilter, applyFilterAndRender } from '../alpha-list.js';
-import { showSearchView, rerenderSearchResults } from '../search.js';
+import { showSearchView, rerenderSearchResults, searchLibraryLocally } from '../search.js';
 import {
   setLatestButtonActive,
   setDownloadedButtonActive,
@@ -57,11 +57,8 @@ import {
   mountSmartFilterHostInto
 } from '../smart-filters.js';
 
-export function searchLibraryLocally(query, field) {
-  // Imported dynamically or handled by local search module
-}
-
 export {
+  searchLibraryLocally,
   isOrderBySeriesDate,
   getComicIssueNumber,
   getComicPublishedDate,

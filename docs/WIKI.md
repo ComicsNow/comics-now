@@ -535,7 +535,8 @@ Comics Now! supports direct one-click tagging from any web URL:
 
 ### Multi-Source Synthesis & Manual Staging Modal
 When tagging complex issues across divergent sources (e.g., ComicVine having full artist credits while GCD holds precise historical release dates and Goodreads provides graphic novel summaries):
-- **Weighted Field Synthesis**: Automatically combines the most authoritative metadata fields from multiple scraping passes into a cohesive ComicInfo dataset.
+- **Weighted Field Synthesis (Gemini & Non-Gemini)**: Automatically combines the most authoritative metadata fields from multiple scraping passes into a cohesive ComicInfo dataset. In the Manual Search Staging Modal, staging 2 or more candidates synthesizes fields via `POST /api/v1/metadata/synthesize` using Google Gemini AI when enabled, or deterministically via priority/union rules (`synthesizeMetadataDeterministic`) when Gemini is disabled.
+- **Visual Selection Feedback**: Selecting a candidate in manual search highlights the card with an **`✓ Applied`** badge and green ring, while cover preview clicks (`#cover-preview-modal`) are isolated from unsaved-changes warnings.
 - **Side-by-Side Staging Modal**: Preview proposed changes side-by-side with current file metadata. Inspect field differences before committing writes to your library.
 - **Target Selection**: Save synthesized tags to **Sidecar XML (`.ComicInfo.xml`)**, **Database Only**, or **Archive Write-Back** directly into the CBZ archive.
 
@@ -808,9 +809,10 @@ In the Metadata Editor:
 - Choose metadata destination: **Sidecar XML**, **Database Only**, or **Archive Write-Back**.
 
 ### Adding Local Comics (Client-Side Reader)
-- Navigate to the **Local** tab.
-- Drag-and-drop or select CBZ/CBR files directly from your phone, tablet, or PC.
-- Files are parsed entirely client-side using WebAssembly (`jszip` / `node-unrar-js`) with zero server uploading. Reading progress is stored locally in your browser.
+- Click the **Add Device Library** card on the **Libraries** root view to select a folder of `.cbz` / `.cbr` files from your phone, tablet, or PC.
+- Selected archives are cached directly in IndexedDB as persistent `Blob`s (**Saved on Device**) with a live background sync progress banner (`#device-library-sync-toast`) and in-place card counters, so the browser never re-prompts for file permissions on subsequent visits.
+- Same-named folders are automatically deduplicated, and when both a server library and a local Device Library are present, the app stays on the **Libraries** root view so both collections remain accessible.
+- Files are parsed entirely client-side using WebAssembly (`jszip` / `node-unrar-js`) with zero server uploading.
 
 ### The User Pill
 Located in the bottom-left corner of the interface:
@@ -824,7 +826,8 @@ Located in the bottom-left corner of the interface:
 # 12. Search, Filtering & Custom Publisher Logos
 
 ### Global Search & Smart Filters
-- **Global Search Bar**: Instant search across comic titles, series, publishers, writers, artists, and release years.
+- **Global Search Bar & Field Selector**: Instant search across your library with a field filter selector (**All Fields**, **Title**, **Series**, **Publisher**, or **Character**) enforced across both client and server (`GET /api/v1/search?query=...&field=...`).
+- **Multi-Tier Relevance Ranking**: Search results are automatically ordered by relevance tier (exact match $\rightarrow$ prefix match $\rightarrow$ whole-word match $\rightarrow$ series/title match $\rightarrow$ synopsis/character substring match) before alphabetical tie-breaking.
 - **Status Filters**: Filter by **Unread**, **In Progress**, or **Completed**.
 - **Publisher Filters**: Filter reading lists or library views by specific publishers.
 - **Sorting Options**: Sort by Alphabetical (A-Z / Z-A), Issue Number, Publication Date, or Date Added to Library.
