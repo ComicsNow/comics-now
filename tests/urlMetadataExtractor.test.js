@@ -147,6 +147,10 @@ describe('URL Metadata Extractor Service & Route (TDD)', () => {
       expect(result.Penciller).toBe('David Finch');
       expect(result.Characters).toContain('Batman');
       expect(result.Web).toBe('https://leagueofcomicgeeks.com/comic/12345/batman-1');
+
+      // Gemini request body requests maximum thinking level
+      const geminiPayload = JSON.parse(global.fetch.mock.calls[1][1].body);
+      expect(geminiPayload.generationConfig.thinkingConfig).toEqual({ thinkingLevel: 'high' });
     });
 
     test('extractMetadataFromUrl clears Title if it is identical to Series (Redundant Title Rule)', async () => {

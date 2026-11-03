@@ -201,6 +201,9 @@ async function extractMetadataFromUrl({
       contents: [{ parts: [{ text: prompt }] }],
       generationConfig: {
         responseMimeType: 'application/json',
+        thinkingConfig: {
+          thinkingLevel: 'high'
+        },
         temperature: 0.1
       }
     })

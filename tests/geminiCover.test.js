@@ -124,6 +124,9 @@ describe('Gemini Vision Cover Arbiter', () => {
       // Schema definition
       expect(payload.generationConfig.responseMimeType).toBe('application/json');
       expect(payload.generationConfig.responseSchema.required).toEqual(['bestIndex', 'confidence', 'reason']);
+
+      // Maximum thinking level for vision matching
+      expect(payload.generationConfig.thinkingConfig).toEqual({ thinkingLevel: 'high' });
     });
   });
 

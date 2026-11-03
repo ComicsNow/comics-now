@@ -25,6 +25,7 @@ describe('Gemini Metadata Synthesizer', () => {
     expect(payload.generationConfig.responseSchema.properties.Series).toBeDefined();
     expect(payload.generationConfig.responseSchema.properties.Volume).toBeDefined();
     expect(payload.generationConfig.responseSchema.properties.Writer).toBeDefined();
+    expect(payload.generationConfig.thinkingConfig).toEqual({ thinkingLevel: 'high' });
     expect(payload.contents[0].parts[0].text).toContain('Saga 01.cbz');
     expect(payload.contents[0].parts[0].text).toContain('CRITICAL SOURCE GROUNDING CONSTRAINT');
     expect(payload.contents[0].parts[0].text).toContain('NEVER use external pretraining knowledge');

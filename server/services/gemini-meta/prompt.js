@@ -156,6 +156,9 @@ Return a JSON object adhering exactly to the requested schema.
     ],
     generationConfig: {
       responseMimeType: 'application/json',
+      thinkingConfig: {
+        thinkingLevel: 'high'
+      },
       responseSchema: {
         type: 'OBJECT',
         properties: {
