@@ -1,0 +1,37 @@
+name: Sync Docker Hub Readme
+
+on:
+  workflow_dispatch:
+
+jobs:
+  update-readme:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Update Docker Hub Description via API
+        run: |
+          TOKEN=$(curl -s -X POST -H "Content-Type: application/json" \
+            -d '{"username": "comicsnowdev", "password": "${{ secrets.DOCKERHUB_TOKEN }}"}' \
+            https://hub.docker.com/v2/users/login/ | jq -r .token)
+          
+          if [ -z "$TOKEN" ] || [ "$TOKEN" = "null" ]; then
+            echo "Failed to authenticate with Docker Hub API"
+            exit 1
+          fi
+          
+          README_JSON=$(jq -Rs . README.md)
+          
+          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" -X PATCH \
+            -H "Authorization: JWT $TOKEN" \
+            -H "Content-Type: application/json" \
+            -d "{\"full_description\": $README_JSON}" \
+            https://hub.docker.com/v2/repositories/comicsnowdev/comics-now/)
+            
+          echo "Docker Hub PATCH response HTTP status: $HTTP_STATUS"
+          if [ "$HTTP_STATUS" -ne 200 ]; then
+            echo "Failed to update Docker Hub description (status $HTTP_STATUS)"
+            exit 1
+          fi
+          echo "Successfully synced README.md to Docker Hub without rebuilding!"
