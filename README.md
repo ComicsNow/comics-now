@@ -5,6 +5,7 @@
 </p>
 
 <p align="center">
+  <a href="https://comicsnow.github.io/"><img src="https://img.shields.io/badge/Website-Live%20Interactive%20Demo-blue?style=flat&logo=googlechrome&logoColor=white" alt="Live Demo & Website"></a>
   <a href="https://www.npmjs.com/package/comics-now"><img src="https://img.shields.io/npm/v/comics-now.svg?color=cb3837&logo=npm" alt="npm version"></a>
   <a href="#quick-start-60-seconds"><img src="https://img.shields.io/badge/docker-ready-blue.svg?logo=docker" alt="Docker Ready"></a>
   <a href="https://github.com/ComicsNow/comics-now/pkgs/container/comics-now"><img src="https://img.shields.io/badge/ghcr.io-comics--now-2496ED.svg?logo=github" alt="GHCR Image"></a>
@@ -38,11 +39,14 @@ Most digital comic servers were built a decade ago as basic file browsers. **Com
 
 ---
 
-## 🎬 Showcase
+## 🎬 Live Interactive Demo & Showcase
 
-| AI Smart Guided View | Multi-Device Reader |
-| :---: | :---: |
-| ![Guided View Demo](docs/assets/guided-view-demo.gif) | ![Feature Demo](docs/assets/f9404841b6094ed7b9f0bc1036d14360.gif) |
+Experience the full desktop, tablet, and mobile reader directly in your browser without installing anything:
+
+👉 **[Launch Live Interactive Demo (comicsnow.github.io)](https://comicsnow.github.io/)**
+
+* 📖 **[Manga & Western Reader Demo](https://comicsnow.github.io/demo-reader/)** — Test Manga Panel Zoom, Speech Bubble Zoom, Continuous Scrolling, and Anti-Ghosting E-Ink Modes on open-license titles.
+* ✏️ **[GVE Now! Editor Demo](https://comicsnow.github.io/demo-gve/)** — Test visual panel & dialogue bounding box authoring with zero-latency canvas rendering.
 
 <details>
 <summary>📸 <strong>Click to view UI Screenshots</strong></summary>
