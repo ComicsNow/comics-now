@@ -1,45 +1,45 @@
-# Comics Now! v3.1.0 Release Notes
+# Comics Now! v3.2.0 Release Notes
 
-Welcome to **Comics Now! v3.1.0** — introducing independent **CBR** and **PDF** source-file retention controls after `.cbz` conversion, defaulting safely to **Keep Originals** on new installations while allowing administrators to configure **Keep** or **Delete** per format directly in **Settings → Comics Defaults → Allowed Library Formats**.
-
----
-
-## 🌟 What's New in v3.1.0
-
-### 1. Independent CBR & PDF Post-Conversion Retention Settings (`Keep` by Default)
-* **Safe Non-Destructive Default (`Keep Originals`)**:
-  - Previously, `.cbr` conversion unconditionally deleted the source `.cbr` file after creating the `.cbz` archive, while `.pdf` conversion had no configurable retention toggle.
-  - Both `delete_cbr_after_conversion` and `delete_pdf_after_conversion` now default to `false` (**Keep Originals**) in `DEFAULT_CONFIG` (`server/config/store.js`) and `config.example.json`.
-* **Granular Format Controls in Web UI (`Settings → Comics Defaults → Allowed Library Formats`)**:
-  - **Original CBR Files After Conversion** (`#cbr-conversion-originals-select`): Choose between **Keep CBR Originals (Default)** and **Delete CBR After Conversion**.
-  - **Original PDF Files After Conversion** (`#pdf-conversion-originals-select`): Choose between **Keep PDF Originals (Default)** and **Delete PDF After Conversion**.
-  - Integrated with the **Comics Defaults** dirty-state indicator (`#comics-defaults-dirty-indicator`) and persisted to both `config.json` and the SQLite `settings` table via `GET /api/v1/settings` and `POST /api/v1/settings`.
-* **Conversion Pipeline & Scanner Idempotency**:
-  - Updated `server/services/library-conversion.js`, `scripts/convert_cbr_to_cbz.sh`, and `scripts/pdf2cbz.sh` to pass and honor `DELETE_ORIGINALS=true|false` independently for `.cbr` and `.pdf` conversions.
-  - Hardened `server/services/scan/crawler.js` to check if a sibling `.cbz` file already exists on disk before invoking `convertCbrToCbz` or `convertPdfToCbz`, preventing kept `.cbr` and `.pdf` originals from being re-converted on subsequent library scans.
+Welcome to **Comics Now! v3.2.0** — a minor release introducing a configurable **Page Cache Limit** under **Settings → General**. Administrators can now cap the rendered-page cache directly in the web UI, see current usage at a glance, and apply changes immediately without restarting the server.
 
 ---
 
-## 📦 v3.1.0 Changelog
-1. `feat(settings)`: add separate CBR and PDF keep/delete after conversion settings (default keep) (`b515eee`)
+## 🌟 What's New in v3.2.0
+
+### 1. Configurable Page Cache Limit (Default: 200 MB)
+* **Settings → General → Page Cache Limit (MB)** (`#page-cache-max-input`):
+  - Number input with a **50–10240 MB** range and a live usage summary (`#page-cache-usage`), for example: `Using 450 MB of 700 MB across 1,200 files`.
+  - Persisted to both `config.json` and the SQLite `settings` table through `POST /api/v1/settings`.
+* **Live changes — no restart required**:
+  - The cache cap is read from the live configuration on every prune. Lowering the limit immediately evicts the oldest cached pages down to 85% of the new cap; raising it applies to subsequent pruning.
+  - Prune requests are coalesced, so a limit change arriving during an in-flight prune triggers another pass with the new cap.
+* **New product default: 200 MB**:
+  - `DEFAULT_MAX_PAGE_CACHE_MB` and `DEFAULT_CONFIG.pageCacheMaxMb` are now `200`.
+  - Installations that have not configured a value adopt the 200 MB default on their first boot after upgrading.
+* **Statistics and validation**:
+  - `GET /api/v1/settings` now returns `pageCacheMaxMb`, `pageCacheUsageBytes`, and `pageCacheFileCount`.
+  - Cache measurements exclude in-flight `*.tmp.*` files (previously counted by the prune scan).
+  - The limit is validated (integer, 50–10240 MB) before any other setting is written. Partial settings payloads leave it untouched.
+
+### Upgrade note
+If you rely on a cache larger than 200 MB, set `pageCacheMaxMb` in `config.json` (or in **Settings → General**) before upgrading. Existing caches above the new cap are trimmed to 85% of the cap the first time the server prunes, including at startup.
+
+---
+
+## 📦 v3.2.0 Changelog
+1. `feat(settings)`: add configurable page cache limit with live pruning (`3205093`)
 
 ---
 
 ## 🧪 Verification & Test Results
-- **Conversion & Settings Unit Tests (`tests/conversionDeleteOriginalsSetting.test.js`, `tests/userSettings.test.js`, `tests/settings.test.js`, `tests/configExample.test.js`)**: `26 passed, 0 failed`.
-- **Architectural Ratchet & Tailwind Inventory (`tests/architectureRatchet.test.js`, `tests/style/tailwind-class-inventory.test.js`)**: `6 passed, 0 failed` (extracted `public/js/settings/library-pref-row.js` to keep all settings modules well below the 380-line ceiling).
-- **Production Asset Compilation**: Tailwind CSS (`npm run build:css`) and Vite client bundle (`npm run build`) compiled cleanly and deployed to `comics-now.service`.
+- **Full Jest suite**: `159 suites passed, 1285 tests passed`.
+- **Architecture ratchet**: all touched modules remain under the 380-line ceiling.
+- **Production build**: Tailwind CSS and the Vite client bundle compiled successfully and deployed to `comics-now.service`.
+- **Live no-restart verification**: changed the limit through `POST /api/v1/settings` and confirmed the service PID remained unchanged.
 
 ---
 
-# Previous Major Release: Comics Now! v3.0.0
+# Previous Release: Comics Now! v3.1.x
 
-Welcome to **Comics Now! v3.0.0** — a landmark major release defined by a complete **47-module architectural modernization** across the entire frontend, backend, Python tagger, and MCP server stack, alongside persistent local Device Libraries with live sync feedback, relevance-ranked library search, non-Gemini multi-source metadata synthesis, unified double-tap zoom and viewer ergonomics, and offline Service Worker shell isolation.
-
-### v3.0.0 Highlights
-1. **Complete Tier 1–8 Architecture Modernization (47 / 47 Monoliths Decomposed)**: Decomposed all Tier 1–4 monoliths across `public/js/`, `server/`, `tagger/tagger_app/`, and `mcp/comics_mcp/` under the 380-line Single Responsibility Ceiling enforced by `tests/architectureRatchet.test.js`.
-2. **Local Device Libraries**: Persistent IndexedDB `Blob` storage, automatic folder deduplication, multi-library root view preservation, and live background sync progress (`#device-library-sync-toast`).
-3. **Library Search Filtering & Relevance Ranking**: Strict field filtering (`Title`, `Series`, `Publisher`, `Character`, `All`) and multi-tier relevance ordering.
-4. **Manual Metadata Search Feedback & Non-Gemini Staged Synthesis**: Visual candidate selection feedback and deterministic multi-source synthesis (`POST /api/v1/metadata/synthesize`).
-5. **Interactive Tap-to-Zoom, Scrubber & Continuous Reader Ergonomics**: Unified double-tap zoom, fullscreen scrubber drag guard, and continuous reader lifecycle cleanup.
-6. **Offline Reading & PWA Service Worker (`v9.2`) Isolation**: Hardened app shell cache protection for offline cold-boots.
+- Independent CBR and PDF source-file retention controls after `.cbz` conversion, defaulting to **Keep Originals**.
+- See GitHub Releases for v3.1.0 and v3.1.1.
