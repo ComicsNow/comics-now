@@ -79,3 +79,6 @@ scripts/modal/tests/
 scripts/colab/
 *speaker_attribution*
 *paligemma*
+
+# Generated library audit reports
+/public/reports/
