@@ -4,9 +4,10 @@ const db = require('../../db');
 const metadata = require('../metadata');
 const { ctLog } = require('../../logger');
 const { createId, getMimeFromExt } = require('../../utils');
-const { getTaggerServiceUrl, getMetadataStorage } = require('../../config');
+const config = require('../../config');
 const { getComicPages, extractPageBuffer } = require('../library-pages');
 const { buildTaggedDbMeta, checkFileSuccess } = require('./persist');
+const companionSync = require('./companion-sync');
 
 let pendingMatchState = null;
 let userChoiceResolver = null;
@@ -37,7 +38,7 @@ function clearReviewState(cancelled) {
   userChoiceResolver = null;
 }
 
-function buildReviewState(entryName, filePath, resCandidates) {
+function buildReviewState(entryName, filePath, resCandidates, options = {}) {
   const absolutePath = path.isAbsolute(filePath) ? filePath : path.resolve(filePath);
   
   const formattedMatches = (resCandidates || []).map((c, index) => {
@@ -83,7 +84,10 @@ function buildReviewState(entryName, filePath, resCandidates) {
     isFinal: true,
     previewBuffer: null,
     previewMime: null,
-    waitingLogId: `ct-wait-${++waitingLogSeq}`
+    waitingLogId: `ct-wait-${++waitingLogSeq}`,
+    origin: options.source || 'scan',
+    comicId: options.comicId || null,
+    primaryMetadata: options.primaryMetadata || null
   };
 
   pendingMatchState = stateObj;
@@ -124,11 +128,12 @@ async function applyUserSelection(selections, onScanComplete) {
 
   ctLog(`✓ User selected candidate #${choiceStr}: ${match.title}`, { id: waitingLogId });
   
-  const serviceUrl = getTaggerServiceUrl() || 'http://127.0.0.1:5000';
+  const serviceUrl = config.getTaggerServiceUrl() || 'http://127.0.0.1:5000';
   const filePath = pendingMatchState.filePath;
   const fileName = pendingMatchState.fileName;
+  const reviewComicId = pendingMatchState.comicId || createId(filePath);
   const isCbr = path.extname(filePath).toLowerCase() === '.cbr';
-  const effectiveStorage = isCbr ? 'sidecar' : getMetadataStorage();
+  const effectiveStorage = isCbr ? 'sidecar' : config.getMetadataStorage();
 
   try {
     ctLog(`Applying tag via tagger engine...`);
@@ -193,10 +198,11 @@ async function applyUserSelection(selections, onScanComplete) {
     );
     if (isSuccessful) {
       ctLog(`✓ SUCCESS → Tag applied and database updated for ${fileName}`);
+      await companionSync.syncCompanionTag(reviewComicId);
     } else {
       ctLog(`⚠ WARNING → Tag applied but missing required tags in final file: ${fileName}`);
     }
-    
+
     pendingMatchState = null;
     userChoiceResolver = null;
 

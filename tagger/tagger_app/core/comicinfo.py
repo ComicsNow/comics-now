@@ -1,5 +1,5 @@
 # ARCHITECTURAL_EXEMPTION: Exhaustive ComicInfo XML v2.1 schema serialization
-"""ComicInfo.xml read/generate/write for CBZ archives.
+"""ComicInfo.xml read/generate/write for CBZ archives and adjacent sidecars.
 
 Extracted from the legacy tagger.py monolith (architecture review, step 1).
 """
@@ -19,73 +19,93 @@ from tagger_app.core.metadata import (
 )
 
 
-def read_comic_info_xml(cbz_path):
-    """
-    Reads the existing ComicInfo.xml metadata inside a CBZ archive
-    and returns a mapped dictionary of fields.
-    """
-    import zipfile
-    import xml.etree.ElementTree as ET
-    
-    if not os.path.exists(cbz_path):
+def _read_comic_info_source(file_path):
+    """Return raw ComicInfo.xml text/bytes from an adjacent sidecar or ZIP."""
+    if not os.path.exists(file_path):
         return None
-        
+
+    sidecar = sidecar_path_for(file_path)
+    if os.path.exists(sidecar):
+        try:
+            with open(sidecar, "r", encoding="utf-8") as handle:
+                return handle.read()
+        except Exception as e:
+            print(f"[-] Failed to read ComicInfo.xml sidecar: {e}")
+
+    if not zipfile.is_zipfile(file_path):
+        return None
+
     try:
-        with zipfile.ZipFile(cbz_path, 'r') as z:
-            if "ComicInfo.xml" in z.namelist():
-                xml_data = z.read("ComicInfo.xml")
-                root = ET.fromstring(xml_data)
-                
-                metadata = {}
-                
-                tag_mappings = {
-                    "Title": "title",
-                    "Series": "series",
-                    "Number": "number",
-                    "Publisher": "publisher",
-                    "Imprint": "imprint",
-                    "Summary": "description",
-                    "Year": "year",
-                    "Month": "month",
-                    "Day": "day",
-                    "PageCount": "pages",
-                    "LanguageISO": "language",
-                    "Genre": "genres",
-                    "Tags": "tags",
-                    "GTIN": "isbn",
-                    "Writer": "writer",
-                    "Penciller": "penciller",
-                    "Inker": "inker",
-                    "Colorist": "colorist",
-                    "Letterer": "letterer",
-                    "CoverArtist": "cover_artist",
-                    "Editor": "editor",
-                    "Volume": "volume",
-                    "Characters": "characters",
-                    "Teams": "teams",
-                    "Locations": "locations",
-                    "StoryArc": "story_arc",
-                    "StoryArcNumber": "story_arc_number",
-                    "Web": "web",
-                    "AgeRating": "age_rating"
-                }
-                
-                for xml_tag, meta_key in tag_mappings.items():
-                    elem = root.find(xml_tag)
-                    if elem is not None and elem.text:
-                        val = elem.text.strip()
-                        if meta_key == "genres":
-                            metadata[meta_key] = [g.strip() for g in val.split(",") if g.strip()]
-                        elif meta_key == "writer":
-                            metadata["authors"] = [a.strip() for a in val.split(",") if a.strip()]
-                        else:
-                            metadata[meta_key] = val
-                            
-                return normalize_metadata(metadata)
+        with zipfile.ZipFile(file_path, 'r') as archive:
+            if "ComicInfo.xml" in archive.namelist():
+                return archive.read("ComicInfo.xml")
     except Exception as e:
         print(f"[-] Failed to read existing ComicInfo.xml: {e}")
-        
+
     return None
+
+
+def read_comic_info_xml(cbz_path):
+    """
+    Reads existing ComicInfo.xml metadata, preferring the adjacent sidecar
+    and falling back to the CBZ archive contents.
+    """
+    xml_data = _read_comic_info_source(cbz_path)
+    if xml_data is None:
+        return None
+
+    try:
+        root = ET.fromstring(xml_data)
+        metadata = {}
+
+        tag_mappings = {
+            "Title": "title",
+            "Series": "series",
+            "Number": "number",
+            "Publisher": "publisher",
+            "Imprint": "imprint",
+            "Summary": "description",
+            "Year": "year",
+            "Month": "month",
+            "Day": "day",
+            "PageCount": "pages",
+            "LanguageISO": "language",
+            "Genre": "genres",
+            "Tags": "tags",
+            "GTIN": "isbn",
+            "Writer": "writer",
+            "Penciller": "penciller",
+            "Inker": "inker",
+            "Colorist": "colorist",
+            "Letterer": "letterer",
+            "CoverArtist": "cover_artist",
+            "Editor": "editor",
+            "Volume": "volume",
+            "Characters": "characters",
+            "Teams": "teams",
+            "Locations": "locations",
+            "StoryArc": "story_arc",
+            "StoryArcNumber": "story_arc_number",
+            "Web": "web",
+            "AgeRating": "age_rating"
+        }
+
+        for xml_tag, meta_key in tag_mappings.items():
+            elem = root.find(xml_tag)
+            if elem is not None and elem.text:
+                val = elem.text.strip()
+                if meta_key == "genres":
+                    metadata[meta_key] = [g.strip() for g in val.split(",") if g.strip()]
+                elif meta_key == "writer":
+                    metadata["authors"] = [a.strip() for a in val.split(",") if a.strip()]
+                else:
+                    metadata[meta_key] = val
+
+        return normalize_metadata(metadata)
+    except Exception as e:
+        print(f"[-] Failed to parse existing ComicInfo.xml: {e}")
+        return None
+
 
 def generate_comic_info_xml(metadata, enabled_fields=None):
     """
@@ -341,8 +361,9 @@ def write_comic_info(file_path, xml_str, storage_mode="archive"):
     Dispatch ComicInfo.xml writing based on the shared storage mode.
     'sidecar' -> external adjacent file only (archive untouched).
     anything else ('archive', etc.) -> embedded inside the CBZ.
+    Non-ZIP archives (CBR/RAR) always fall back to the sidecar.
     """
-    if storage_mode == "sidecar":
+    if storage_mode == "sidecar" or not zipfile.is_zipfile(file_path):
         write_comic_info_sidecar(file_path, xml_str)
     else:
         write_comic_info_to_cbz(file_path, xml_str)

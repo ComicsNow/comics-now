@@ -298,6 +298,49 @@ describe('Gemini Vision Cover Arbiter', () => {
       expect(await fetchImageAsBase64('http://172.16.0.1/')).toBeNull();
     });
 
+    test('fetchImageAsBase64 sniffs a JPEG when the server sends application/octet-stream', async () => {
+      const jpegBytes = Uint8Array.from([0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10, 0x4A, 0x46, 0x49, 0x46, 0x00, 0x01]);
+      global.fetch = jest.fn().mockResolvedValue({
+        ok: true,
+        headers: { get: () => 'application/octet-stream' },
+        arrayBuffer: async () => jpegBytes.buffer
+      });
+
+      const image = await fetchImageAsBase64('https://example.com/mock-cover.bin');
+
+      expect(image).not.toBeNull();
+      expect(image.mimeType).toBe('image/jpeg');
+    });
+
+    test('fetchImageAsBase64 drops candidate files that are not images', async () => {
+      const htmlBytes = new TextEncoder().encode('<html>blocked</html>');
+      global.fetch = jest.fn().mockResolvedValue({
+        ok: true,
+        headers: { get: () => 'application/octet-stream' },
+        arrayBuffer: async () => htmlBytes.buffer
+      });
+
+      expect(await fetchImageAsBase64('https://example.com/mock-cover.jpg')).toBeNull();
+    });
+
+    test('marks Gemini API HTTP failures as unavailable instead of a rejection', async () => {
+      global.fetch = jest.fn().mockResolvedValue({
+        ok: false,
+        status: 503,
+        text: async () => 'This model is currently experiencing high demand.'
+      });
+
+      const result = await matchCoverToCandidates({
+        localCoverPath: mockLocalPath,
+        candidates: [{ title: 'Mock Comic' }],
+        apiKey: 'mock-api-key-test-001'
+      });
+
+      expect(result.bestIndex).toBe(-1);
+      expect(result.unavailable).toBe(true);
+      expect(result.reason).toContain('503');
+    });
+
     test('automatically decrypts encrypted enc:v1: API key before calling Gemini endpoint', async () => {
       const cryptoVault = require('../server/utils/crypto-vault');
       const plainKey = 'AIzaSyMockKeyForTestingOnly00123';

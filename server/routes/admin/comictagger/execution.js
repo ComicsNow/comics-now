@@ -10,6 +10,7 @@ module.exports = function attachExecutionRoutes(router, deps) {
     getScanScopeCounts,
     cancelComicTagger,
     isTaggerRunning,
+    isFileTaggerRunning,
     applyUserSelection,
     skipCurrentMatch,
     getPendingMatch,
@@ -25,6 +26,13 @@ module.exports = function attachExecutionRoutes(router, deps) {
       const { force, mode } = req.body || {};
       if (mode !== undefined && !VALID_SCAN_MODES.includes(mode)) {
         return res.status(400).json({ ok: false, message: 'Invalid scan mode' });
+      }
+      if (typeof isFileTaggerRunning === 'function' && isFileTaggerRunning()) {
+        return res.status(409).json({
+          ok: false,
+          code: 'file_tagger_running',
+          message: 'A per-comic tag search is running. Try again when it finishes.'
+        });
       }
       const resolved = resolveScanMode
         ? resolveScanMode({ force, mode })
@@ -95,11 +103,12 @@ module.exports = function attachExecutionRoutes(router, deps) {
   router.get('/api/v1/tag-comics-now/pending', (req, res) => {
     const pending = getPendingMatch();
     const running = isTaggerRunning ? isTaggerRunning() : false;
+    const fileRunning = typeof isFileTaggerRunning === 'function' ? isFileTaggerRunning() : false;
     const { previewBuffer, waitingLogId, ...safePending } = pending || {};
     res.json({
       ...safePending,
       waitingForResponse: !!(pending && pending.waitingForResponse),
-      isRunning: running
+      isRunning: running || fileRunning
     });
   });
 

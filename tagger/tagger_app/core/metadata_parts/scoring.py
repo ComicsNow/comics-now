@@ -7,6 +7,7 @@ from tagger_app.core.metadata_parts.publishers import (
     clean_description,
 )
 from tagger_app.core.metadata_parts.titles import normalize_metadata
+from tagger_app.core.query import strip_comic_extension
 
 
 def calculate_similarity(string1, string2):
@@ -14,9 +15,7 @@ def calculate_similarity(string1, string2):
         return 0.0
 
     def clean(s):
-        s = s.lower()
-        if s.endswith('.cbz'):
-            s = s[:-4]
+        s = strip_comic_extension(s).lower()
         s = re.sub(r'[\(\[\{].*?[\)\]\}]', '', s)
         s = re.sub(r'\bv(ol|olume)?\.?\s*\d+\b', '', s)
         s = re.sub(r'#\d+\b', '', s)

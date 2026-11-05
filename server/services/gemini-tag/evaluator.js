@@ -48,6 +48,17 @@ async function evaluateWithGemini(ctx, originalFetch, logger, res, reqBody, conf
     return res;
   }
 
+  if (decision.unavailable) {
+    if (controller && textEncoder) {
+      controller.enqueue(textEncoder.encode(`data: ${JSON.stringify({
+        type: 'progress',
+        source: 'Gemini Vision',
+        message: `Gemini vision unavailable (${decision.reason}); using standard tagger ranking`
+      })}\n\n`));
+    }
+    return res;
+  }
+
   const { bestIndex, confidence, reason } = decision;
   const winner = (bestIndex >= 0 && bestIndex < candidates.length) ? candidates[bestIndex] : null;
   const winnerTitle = winner ? (winner.metadata?.title || winner.title || 'Unknown Title') : null;

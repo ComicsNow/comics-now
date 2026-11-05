@@ -79,6 +79,7 @@ def api_tag_file():
         force_reprocess = bool(data.get("force_reprocess", scheduler_config.get("force_reprocess", False)))
         metadata_storage = data.get("metadata_storage") or scheduler_config.get("metadata_storage", "archive")
         publisher_codex = data.get("publisher_codex")
+        cover_path = data.get("cover_path")
 
         res = process_single_cbz_file(
             file_path=file_path,
@@ -92,7 +93,8 @@ def api_tag_file():
             enabled_sources=enabled_sources,
             force_reprocess=force_reprocess,
             metadata_storage=metadata_storage,
-            publisher_codex=publisher_codex
+            publisher_codex=publisher_codex,
+            cover_path=cover_path
         )
 
         write_scan_log(
@@ -142,6 +144,7 @@ def api_tag_file_stream():
                 force_reprocess = bool(data.get("force_reprocess", scheduler_config.get("force_reprocess", False)))
                 metadata_storage = data.get("metadata_storage") or scheduler_config.get("metadata_storage", "archive")
                 publisher_codex = data.get("publisher_codex")
+                cover_path = data.get("cover_path")
 
                 res = process_single_cbz_file(
                     file_path=file_path,
@@ -156,7 +159,8 @@ def api_tag_file_stream():
                     enabled_sources=enabled_sources,
                     force_reprocess=force_reprocess,
                     metadata_storage=metadata_storage,
-                    publisher_codex=publisher_codex
+                    publisher_codex=publisher_codex,
+                    cover_path=cover_path
                 )
                 worker_res["result"] = res
 

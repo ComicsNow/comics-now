@@ -1,60 +1,51 @@
 """Metadata enrichment, completeness checking, and sequential source querying."""
 
 import os
-import zipfile
 import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
-import xml.etree.ElementTree as ET
 
 from tagger_app.core.metadata import (
     calculate_similarity,
     resolve_creator_roles,
     merge_best_metadata_fields,
 )
+from tagger_app.core.comicinfo import read_comic_info_xml
 from tagger_app.sources.registry import SOURCES, SourceContext
 
 
 def check_comic_info_completeness(cbz_path):
     """
-    Checks if ComicInfo.xml exists in the CBZ and contains Series, Number, Publisher, and Year.
+    Checks if ComicInfo.xml (sidecar or embedded) exists and contains
+    Series, Number, Publisher, and Year.
     Returns:
       is_incomplete: bool
       reason: str or None
     """
     if not os.path.exists(cbz_path):
         return True, "File not found"
-    if not zipfile.is_zipfile(cbz_path):
-        return True, "Invalid zip archive"
 
     try:
-        with zipfile.ZipFile(cbz_path, 'r') as zf:
-            if "ComicInfo.xml" not in zf.namelist():
-                return True, "No ComicInfo.xml found"
-
-            xml_data = zf.read("ComicInfo.xml")
-            root = ET.fromstring(xml_data)
-
-            missing_fields = []
-
-            def is_empty(tag_name):
-                elem = root.find(tag_name)
-                return elem is None or not elem.text or not elem.text.strip()
-
-            if is_empty("Series") and is_empty("Title"):
-                missing_fields.append("Series/Title")
-            if is_empty("Number"):
-                missing_fields.append("Issue Number")
-            if is_empty("Publisher"):
-                missing_fields.append("Publisher")
-            if is_empty("Year"):
-                missing_fields.append("Year")
-
-            if missing_fields:
-                return True, f"Missing: {', '.join(missing_fields)}"
-
-            return False, None
+        info = read_comic_info_xml(cbz_path)
     except Exception as e:
         return True, f"Error parsing ComicInfo.xml: {str(e)}"
+
+    if not info:
+        return True, "No ComicInfo.xml found"
+
+    missing_fields = []
+    if not (info.get("series") or info.get("title")):
+        missing_fields.append("Series/Title")
+    if not info.get("number"):
+        missing_fields.append("Issue Number")
+    if not info.get("publisher"):
+        missing_fields.append("Publisher")
+    if not info.get("year"):
+        missing_fields.append("Year")
+
+    if missing_fields:
+        return True, f"Missing: {', '.join(missing_fields)}"
+
+    return False, None
 
 
 def enrich_metadata_from_other_sources(primary_meta, all_candidates, lower_threshold, codex=None):

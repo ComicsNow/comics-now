@@ -114,7 +114,7 @@ _DESTRUCTIVE = [
     ("POST", re.compile(r"/api/v1/move-comics$")),
     ("POST", re.compile(r"/api/v1/move/")),
     ("POST", re.compile(r"/api/v1/rename-cbz$")),
-    ("POST", re.compile(r"/api/v1/tag-comics-now/(apply|run|match-covers|schedule|skip)$")),
+    ("POST", re.compile(r"/api/v1/tag-comics-now/(apply|run|run-file|match-covers|schedule|skip)$")),
     ("POST", re.compile(r"/api/v1/admin/metadata/migrate$")),
     ("POST", re.compile(r"/api/v1/guided/run")),
     # Config / bulk-mutating endpoints (not file-destroying, but high blast

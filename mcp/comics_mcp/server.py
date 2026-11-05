@@ -103,6 +103,7 @@ from comics_mcp.tools.tagging import (
     get_cover_image,
     get_tags,
     get_tags_bulk,
+    run_tag_search,
     set_tags,
     set_tags_bulk,
     tag_comic_from_url,

@@ -93,6 +93,28 @@ def set_tags(comic_id: str, fields: dict, storage: str = "sidecar") -> str:
 
 
 @mcp.tool()
+def run_tag_search(comic_id: str, force: bool = False) -> str:
+    """Run Tag Comics Now! against a single comic (CBZ or CBR).
+
+    Resolves the comic's cover, searches the enabled metadata sources, and then
+    either tags it automatically or returns review matches. Tagging writes the
+    ComicInfo metadata (sidecar/archive/DB) and mirrors it to a linked converted
+    companion. Admin-only, and serialized against library scans and other runs.
+
+    Args:
+        comic_id: Target comic id.
+        force: Re-run even when the existing metadata already looks complete.
+    """
+    return _dump(
+        _srv()._request(
+            "POST",
+            "/api/v1/tag-comics-now/run-file",
+            body={"comicId": comic_id, "force": force},
+        )
+    )
+
+
+@mcp.tool()
 def extract_metadata_from_url(url: str, filename: Optional[str] = None) -> str:
     """Extract and synthesize ComicInfo metadata from a web page URL (e.g. Comic Vine,
     League of Comic Geeks, DC/Marvel Fandom, Goodreads, publisher site) using Jina Reader and Gemini AI.

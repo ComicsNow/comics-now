@@ -63,6 +63,7 @@ import './js/context-menu/menu-builder.js';
 import './js/manga.js';
 import './js/continuous.js';
 import './js/context-menu/actions-shared.js';
+import './js/context-menu/actions-tag-search.js';
 import './js/context-menu/actions-comic.js';
 import './js/context-menu/actions-series.js';
 import './js/context-menu/actions-publisher.js';

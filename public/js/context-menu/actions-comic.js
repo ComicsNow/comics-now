@@ -1,5 +1,6 @@
 import { state } from '../globals.js';
 import { positionContextMenu, attachCloseHandler, closeContextMenu } from './menu-builder.js';
+import { createTagSearchItem } from './actions-tag-search.js';
 import {
   createDownloadItem,
   createReadStatusItem,
@@ -44,7 +45,11 @@ function showComicContextMenu(event, comic) {
   const guidedItem = createGuidedDetectionItem('comic', comic.id, comic.name || 'this comic', comic);
   if (guidedItem) menu.appendChild(guidedItem);
 
-  // 6. Reading List
+  // 6. Tag Search (admin only, writes metadata)
+  const tagSearchItem = createTagSearchItem(comic);
+  if (tagSearchItem) menu.appendChild(tagSearchItem);
+
+  // 7. Reading List
   menu.appendChild(createReadingListItem(comic));
 
   positionContextMenu(menu, event);

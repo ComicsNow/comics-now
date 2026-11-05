@@ -47,6 +47,27 @@ function getMimeType(filePath) {
   return 'image/jpeg';
 }
 
+/**
+ * Sniffs common image signatures so servers that return
+ * application/octet-stream still produce valid Gemini inlineData.
+ */
+function sniffImageMime(buffer) {
+  if (!buffer || buffer.length < 3) return null;
+  if (buffer[0] === 0xFF && buffer[1] === 0xD8 && buffer[2] === 0xFF) return 'image/jpeg';
+  if (
+    buffer.length >= 4 &&
+    buffer[0] === 0x89 && buffer[1] === 0x50 &&
+    buffer[2] === 0x4E && buffer[3] === 0x47
+  ) return 'image/png';
+  if (buffer[0] === 0x47 && buffer[1] === 0x49 && buffer[2] === 0x46) return 'image/gif';
+  if (
+    buffer.length >= 12 &&
+    buffer.toString('latin1', 0, 4) === 'RIFF' &&
+    buffer.toString('latin1', 8, 12) === 'WEBP'
+  ) return 'image/webp';
+  return null;
+}
+
 function isPrivateUrl(urlStr) {
   try {
     const parsed = new URL(urlStr);
@@ -100,14 +121,22 @@ async function fetchImageAsBase64(url, timeoutMs = 8000) {
       return null;
     }
 
-    const contentType = res.headers.get('content-type') || 'image/jpeg';
-    const mimeType = contentType.split(';')[0].trim() || 'image/jpeg';
-    const arrayBuffer = await res.arrayBuffer();
-    const base64Data = Buffer.from(arrayBuffer).toString('base64');
+    const declaredType = (res.headers.get('content-type') || '')
+      .split(';')[0]
+      .trim()
+      .toLowerCase();
+    const buffer = Buffer.from(await res.arrayBuffer());
+    const mimeType = declaredType.startsWith('image/')
+      ? declaredType
+      : sniffImageMime(buffer);
+
+    if (!mimeType) {
+      return null;
+    }
 
     return {
       mimeType,
-      data: base64Data
+      data: buffer.toString('base64')
     };
   } catch (err) {
     return null;
@@ -378,7 +407,8 @@ async function matchCoverToCandidates({
       return {
         bestIndex: -1,
         confidence: 0,
-        reason: `Gemini API HTTP ${res.status}: ${errText.slice(0, 200)}`
+        reason: `Gemini API HTTP ${res.status}: ${errText.slice(0, 200)}`,
+        unavailable: true
       };
     }
 
@@ -390,7 +420,8 @@ async function matchCoverToCandidates({
     return {
       bestIndex: -1,
       confidence: 0,
-      reason: `Gemini API request failed: ${err.message}`
+      reason: `Gemini API request failed: ${err.message}`,
+      unavailable: true
     };
   }
 }

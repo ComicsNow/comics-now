@@ -1,4 +1,4 @@
-"""Single CBZ file tagging and cover extraction."""
+"""Single comic file tagging and cover resolution."""
 
 import os
 import uuid
@@ -16,9 +16,23 @@ from tagger_app.persistence.tracking_db import mark_as_enhanced, is_already_enha
 from tagger_app.scheduler.state import scheduler_config
 
 
-def process_single_cbz_file(file_path, comicvine_api_key, google_books_api_key=None, metron_user=None, metron_pass=None, lower_threshold=0.80, upper_threshold=0.90, on_progress=None, enabled_fields=None, enabled_sources=None, force_reprocess=False, metadata_storage="archive", publisher_codex=None):
+def _is_readable_cover(file_path):
+    """Return True when a supplied cover exists, is readable, and is non-empty."""
+    if not file_path:
+        return False
+    try:
+        return (
+            os.path.isfile(file_path)
+            and os.access(file_path, os.R_OK)
+            and os.path.getsize(file_path) > 0
+        )
+    except OSError:
+        return False
+
+
+def process_single_cbz_file(file_path, comicvine_api_key, google_books_api_key=None, metron_user=None, metron_pass=None, lower_threshold=0.80, upper_threshold=0.90, on_progress=None, enabled_fields=None, enabled_sources=None, force_reprocess=False, metadata_storage="archive", publisher_codex=None, cover_path=None):
     filename = os.path.basename(file_path)
-    print(f"[*] Processing CBZ file: {filename}")
+    print(f"[*] Processing comic file: {filename}")
 
     if not force_reprocess and is_already_enhanced(file_path, enabled_sources, legacy_xml_fallback=scheduler_config.get("legacy_xml_fallback", True)):
         if on_progress:
@@ -81,8 +95,11 @@ def process_single_cbz_file(file_path, comicvine_api_key, google_books_api_key=N
                     src_label = source.split('/')[2] if (isinstance(source, str) and '://' in source) else source
                     on_progress(filename, src_label, f"Match found: {meta.get('title')} ({s_val}%)", score_val)
 
-    # Extract the cover so the resolver can verify candidates by image (pHash)
-    cover_path = None
+    # Resolve the cover so the resolver can verify candidates by image (pHash).
+    # Node supplies a thumbnail for CBR archives, which Python cannot extract.
+    resolved_cover_path = cover_path if _is_readable_cover(cover_path) else None
+    if resolved_cover_path:
+        print(f"[+] Using supplied cover for {filename}: {resolved_cover_path}")
     created_tmp_dir = False
     cover_tmp_dir = None
 
@@ -90,20 +107,20 @@ def process_single_cbz_file(file_path, comicvine_api_key, google_books_api_key=N
     persistent_cover_dir = os.path.join(UPLOAD_FOLDER, session_id)
     persistent_cover_path = os.path.join(persistent_cover_dir, f"cover_{filename}.jpg")
 
-    if os.path.exists(persistent_cover_path):
+    if not resolved_cover_path and os.path.exists(persistent_cover_path):
         try:
             if os.path.getmtime(persistent_cover_path) >= os.path.getmtime(file_path):
-                cover_path = persistent_cover_path
-                print(f"[+] Reusing persistent cover for {filename}: {cover_path}")
+                resolved_cover_path = persistent_cover_path
+                print(f"[+] Reusing persistent cover for {filename}: {resolved_cover_path}")
         except Exception:
             pass
 
-    if not cover_path:
+    if not resolved_cover_path:
         cover_tmp_dir = os.path.join(UPLOAD_FOLDER, f"cover_{uuid.uuid4().hex[:8]}")
         try:
             os.makedirs(cover_tmp_dir, exist_ok=True)
             created_tmp_dir = True
-            cover_path = extract_cover_from_cbz(file_path, output_dir=cover_tmp_dir)
+            resolved_cover_path = extract_cover_from_cbz(file_path, output_dir=cover_tmp_dir)
         except Exception as cov_err:
             print(f"[-] Cover extract failed for {filename}: {cov_err}")
 
@@ -113,7 +130,7 @@ def process_single_cbz_file(file_path, comicvine_api_key, google_books_api_key=N
             domain_limiter.set_thread_callback(lambda msg: on_progress(filename, "RateDefense", msg))
         consolidated_cands = query_all_sources_sequentially(
             filename,
-            cover_path=cover_path,
+            cover_path=resolved_cover_path,
             comicvine_api_key=comicvine_api_key,
             google_books_api_key=google_books_api_key,
             metron_user=metron_user,

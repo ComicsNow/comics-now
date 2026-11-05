@@ -26,13 +26,17 @@ const {
   getScanLogDetail,
   clearEnhancedTracking
 } = require('./tagger/engine-client');
+const { runSingleFileTagger } = require('./tagger/single-file');
+const { isFileTaggerRunning, getActiveFileRun } = require('./tagger/file-run-state');
 
 if (typeof setTaggerRunningCheck === 'function') {
-  setTaggerRunningCheck(isTaggerRunning);
+  setTaggerRunningCheck(() => isTaggerRunning() || isFileTaggerRunning());
 }
 
 function applyUserSelectionWrapper(selections) {
+  const origin = getPendingMatch()?.origin || 'scan';
   return applyUserSelection(selections, () => {
+    if (origin === 'file') return;
     if (!isTaggerRunning() && typeof scanLibrary === 'function') {
       scanLibrary();
     }
@@ -46,6 +50,9 @@ module.exports = {
   cancelComicTagger,
   isTaggerRunning,
   scheduleCtRun,
+  runSingleFileTagger,
+  isFileTaggerRunning,
+  getActiveFileRun,
   applyUserSelection: applyUserSelectionWrapper,
   skipCurrentMatch,
   getPendingMatch,
