@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const { isPathSafe: _isPathSafe } = require('../../../utils');
+const { isComicFormatAllowed } = require('../../../services/comic-formats');
 
 /**
  * Security: Check if a user has access to a specific file or folder path.
@@ -49,6 +50,7 @@ module.exports = function attachFoldersRoutes(router, deps) {
     formatErrorMessage,
     getComicsDirectories,
     getLibraryIdFromPath,
+    getAllowedFormats,
     resolvePath,
     generateVirtualMetadata,
     checkComicAccess,
@@ -67,6 +69,7 @@ module.exports = function attachFoldersRoutes(router, deps) {
       const userId = req.user.userId;
       const userRole = req.user.role;
       const directories = getComicsDirectories();
+      const allowedFormats = typeof getAllowedFormats === 'function' ? getAllowedFormats() : 'cbz';
 
       const userAccessList = userRole === 'admin' ? [] : await dbAll(
         `SELECT accessType, accessValue, direct_access, child_access
@@ -131,7 +134,7 @@ module.exports = function attachFoldersRoutes(router, deps) {
           rawFolders.push({ name: entry.name, path: fullPath });
         } else if (entry.isFile()) {
           const ext = path.extname(entry.name).toLowerCase();
-          if (['.cbz', '.cbr'].includes(ext)) {
+          if (['.cbz', '.cbr'].includes(ext) && isComicFormatAllowed(entry.name, allowedFormats)) {
             comicFiles.push({ name: entry.name, path: fullPath });
           }
         }

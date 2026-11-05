@@ -1,4 +1,5 @@
 const path = require('path');
+const { isComicFormatAllowed } = require('../../../services/comic-formats');
 
 /**
  * Attaches user library catalog and search routes.
@@ -13,6 +14,7 @@ module.exports = function attachCatalogRoutes(router, deps) {
     buildLibrary,
     getComicsDirectories,
     getLibraryIdFromPath,
+    getAllowedFormats,
     checkComicAccess,
     getReadingPrefMaps,
     resolveReadingModes,
@@ -51,13 +53,15 @@ module.exports = function attachCatalogRoutes(router, deps) {
       }
 
       const searchPattern = `%${q}%`;
-      const rows = await dbAll(
+      const allowedFormats = typeof getAllowedFormats === 'function' ? getAllowedFormats() : 'cbz';
+      const rawRows = await dbAll(
         `SELECT c.*, ucs.lastReadPage as userLastReadPage, ucs.totalPages as userTotalPages
          FROM comics c
          LEFT JOIN user_comic_status ucs ON c.id = ucs.comicId AND ucs.userId = ?
          WHERE (c.name LIKE ? OR c.series LIKE ? OR c.publisher LIKE ? OR c.metadata LIKE ?)`,
         [userId, searchPattern, searchPattern, searchPattern, searchPattern]
       );
+      const rows = rawRows.filter(r => isComicFormatAllowed(r.path || r.name, allowedFormats));
 
       const fieldFilteredRows = rows.filter((r) => {
         const meta = (() => { try { return JSON.parse(r.metadata || '{}'); } catch { return {}; } })();

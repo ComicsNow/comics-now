@@ -1,3 +1,6 @@
+const fs = require('fs');
+const os = require('os');
+const path = require('path');
 const attachLibraryRoutes = require('../../../../server/routes/user/library');
 
 describe('server/routes/user/library routes and access control', () => {
@@ -28,6 +31,7 @@ describe('server/routes/user/library routes and access control', () => {
 
     mockDeps = {
       log: jest.fn(),
+      getAllowedFormats: jest.fn(() => 'cbz'),
       dbGet: mockDbGet,
       dbAll: mockDbAll,
       formatErrorMessage: (e, req, fallback) => fallback,
@@ -252,6 +256,22 @@ describe('server/routes/user/library routes and access control', () => {
         'jimmys-1'
       ]);
     });
+
+    it('hides rows whose format is not allowed by the settings', async () => {
+      mockDeps.validateSearchQuery.mockReturnValueOnce({ valid: true, sanitized: 'green hornet' });
+      mockReq.query = { query: 'green hornet' };
+      mockDbAll
+        .mockResolvedValueOnce([
+          { id: 'cbz-1', name: 'mock-comic-001.cbz', path: '/media/comics/mock-comic-001.cbz', publisher: 'DC', series: 'Green Hornet', metadata: '{}' },
+          { id: 'cbr-1', name: 'mock-comic-002.cbr', path: '/media/comics/mock-comic-002.cbr', publisher: 'DC', series: 'Green Hornet', metadata: '{}' }
+        ])
+        .mockResolvedValueOnce([]);
+
+      await routes['GET /api/v1/search'](mockReq, mockRes);
+
+      const results = mockRes.json.mock.calls[0][0];
+      expect(results.map(r => r.id)).toEqual(['cbz-1']);
+    });
   });
 
   describe('GET /api/v1/folders/:path(*)?', () => {
@@ -273,6 +293,32 @@ describe('server/routes/user/library routes and access control', () => {
       await routes['GET /api/v1/folders/:path(*)?'](mockReq, mockRes);
       expect(mockRes.status).toHaveBeenCalledWith(403);
       expect(mockRes.json).toHaveBeenCalledWith(expect.objectContaining({ ok: false, message: 'Access denied' }));
+    });
+
+    it('hides file entries whose format is not allowed by the settings', async () => {
+      const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'comics-now-formats-'));
+      try {
+        fs.writeFileSync(path.join(dir, 'mock-comic-001.cbz'), 'synthetic');
+        fs.writeFileSync(path.join(dir, 'mock-comic-002.cbr'), 'synthetic');
+
+        mockGetComicsDirectories.mockReturnValue([dir]);
+        mockReq.user = { userId: 'test-admin', role: 'admin' };
+        mockReq.params = { path: Buffer.from(dir).toString('base64') };
+
+        await routes['GET /api/v1/folders/:path(*)?'](mockReq, mockRes);
+        let payload = mockRes.json.mock.calls[mockRes.json.mock.calls.length - 1][0];
+        expect(payload.comics.map(c => c.name)).toEqual(['mock-comic-001.cbz']);
+
+        mockDeps.getAllowedFormats.mockReturnValue('both');
+        await routes['GET /api/v1/folders/:path(*)?'](mockReq, mockRes);
+        payload = mockRes.json.mock.calls[mockRes.json.mock.calls.length - 1][0];
+        expect(payload.comics.map(c => c.name).sort()).toEqual([
+          'mock-comic-001.cbz',
+          'mock-comic-002.cbr'
+        ]);
+      } finally {
+        fs.rmSync(dir, { recursive: true, force: true });
+      }
     });
   });
 });

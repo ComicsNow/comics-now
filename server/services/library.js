@@ -3,10 +3,11 @@ const { resolveLogo } = require('./library-logos');
 const { extractPageBuffer, getComicPages } = require('./library-pages');
 const { generateVirtualMetadata } = require('./library-metadata');
 const { scanLibrary, scheduleNextScan, isScanning } = require('./library-scan');
+const { isComicFormatAllowed } = require('./comic-formats');
 
 const { dbGet, dbAll, getReadingPrefMaps, resolveReadingModes, checkComicAccess } = require('../db');
 const { log } = require('../logger');
-const { getComicsDirectories, getLibraries, getConfig, getLibraryIdFromPath } = require('../config');
+const { getComicsDirectories, getLibraries, getConfig, getLibraryIdFromPath, getAllowedFormats } = require('../config');
 const { safeDirName } = require('../utils');
 const { LOGOS_DIRECTORY } = require('../constants');
 
@@ -55,8 +56,10 @@ async function buildLibrary(userId = 'default-user') {
     return hasAccess ? r : null;
   });
   const accessibleRows = (await Promise.all(accessChecks)).filter(r => r !== null);
+  const allowedFormats = getAllowedFormats();
+  const visibleRows = accessibleRows.filter(r => isComicFormatAllowed(r.path || r.name, allowedFormats));
 
-  for (const r of accessibleRows) {
+  for (const r of visibleRows) {
 
     // User has access to this comic, include it in the library
     const absoluteRootDir = directories.find(d => r.path.startsWith(d));
