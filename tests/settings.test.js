@@ -40,8 +40,11 @@ describe('Admin Settings Routes', () => {
       scheduleNextScan: jest.fn(),
       formatErrorMessage: jest.fn((err) => err.message),
       validateScanInterval: jest.fn((val) => ({ valid: true, sanitized: val })),
+      validatePageCacheMaxMb: jest.fn((val) => ({ valid: true, sanitized: Number(val) })),
       validateApiKey: jest.fn((val) => ({ valid: true, sanitized: val })),
       setScanIntervalMinutes: jest.fn(),
+      setPageCacheMaxMb: jest.fn(),
+      prunePageCache: jest.fn().mockResolvedValue(),
       setComicVineApiKey: jest.fn(),
       setAllowedFormats: jest.fn(),
       setMetadataStorage: jest.fn(),
@@ -264,9 +267,86 @@ describe('Admin Settings Routes', () => {
       expect(res.status).toHaveBeenCalledWith(400);
       expect(res.json).toHaveBeenCalledWith({ ok: false, message: 'API Key must be hexadecimal' });
     });
+
+    it('should apply, persist, and prune the page cache limit', async () => {
+      attachSettingsRoutes(router, deps);
+
+      const req = {
+        body: {
+          interval: 10,
+          apiKey: '',
+          pageCacheMaxMb: '700'
+        }
+      };
+      const res = {
+        json: jest.fn(),
+        status: jest.fn().mockReturnThis()
+      };
+
+      await saveSettingsHandler(req, res);
+
+      expect(deps.validatePageCacheMaxMb).toHaveBeenCalledWith('700');
+      expect(deps.setPageCacheMaxMb).toHaveBeenCalledWith(700);
+      expect(deps.saveSetting).toHaveBeenCalledWith('pageCacheMaxMb', 700);
+      expect(deps.prunePageCache).toHaveBeenCalled();
+      expect(res.json).toHaveBeenCalledWith({ ok: true });
+    });
+
+    it('should leave the page cache limit untouched when omitted', async () => {
+      attachSettingsRoutes(router, deps);
+
+      const req = { body: { interval: 10, apiKey: '' } };
+      const res = {
+        json: jest.fn(),
+        status: jest.fn().mockReturnThis()
+      };
+
+      await saveSettingsHandler(req, res);
+
+      expect(deps.validatePageCacheMaxMb).not.toHaveBeenCalled();
+      expect(deps.setPageCacheMaxMb).not.toHaveBeenCalled();
+      expect(deps.prunePageCache).not.toHaveBeenCalled();
+      expect(deps.saveSetting).not.toHaveBeenCalledWith('pageCacheMaxMb', expect.anything());
+    });
+
+    it('should reject an invalid page cache limit before writing other settings', async () => {
+      deps.validatePageCacheMaxMb.mockReturnValue({ valid: false, error: 'Page cache limit too small' });
+      attachSettingsRoutes(router, deps);
+
+      const req = { body: { interval: 10, apiKey: '', pageCacheMaxMb: 10 } };
+      const res = {
+        json: jest.fn(),
+        status: jest.fn().mockReturnThis()
+      };
+
+      await saveSettingsHandler(req, res);
+
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(res.json).toHaveBeenCalledWith({ ok: false, message: 'Page cache limit too small' });
+      expect(deps.setScanIntervalMinutes).not.toHaveBeenCalled();
+      expect(deps.saveSetting).not.toHaveBeenCalled();
+      expect(deps.setPageCacheMaxMb).not.toHaveBeenCalled();
+      expect(deps.prunePageCache).not.toHaveBeenCalled();
+    });
   });
 
   describe('loadSettings', () => {
+    it('should load pageCacheMaxMb from DB into config', async () => {
+      const { loadSettings } = require('../server/settings');
+      const db = require('../server/db');
+      const config = require('../server/config');
+      const original = config.getPageCacheMaxMb();
+
+      jest.spyOn(db, 'dbAll').mockResolvedValueOnce([
+        { key: 'pageCacheMaxMb', value: JSON.stringify(700) }
+      ]);
+
+      await loadSettings();
+
+      expect(config.getPageCacheMaxMb()).toBe(700);
+      config.setPageCacheMaxMb(original, true);
+    });
+
     it('should load Gemini settings from DB into config', async () => {
       const { loadSettings } = require('../server/settings');
       const db = require('../server/db');

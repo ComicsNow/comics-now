@@ -40,7 +40,7 @@ describe('Separate CBR and PDF Delete Originals After Conversion Settings', () =
     expect(config.getDeletePdfAfterConversion()).toBe(true);
   });
 
-  test('GET /api/v1/settings returns deleteCbrAfterConversion and deletePdfAfterConversion', () => {
+  test('GET /api/v1/settings returns deleteCbrAfterConversion and deletePdfAfterConversion', async () => {
     let getHandler;
     const router = {
       get: jest.fn((p, h) => {
@@ -58,7 +58,7 @@ describe('Separate CBR and PDF Delete Originals After Conversion Settings', () =
     attachUserSettingsRoutes(router, deps);
 
     const res = { json: jest.fn() };
-    getHandler({ user: { role: 'admin' } }, res);
+    await getHandler({ user: { role: 'admin' } }, res);
     expect(res.json).toHaveBeenCalledWith(
       expect.objectContaining({
         deleteCbrAfterConversion: true,

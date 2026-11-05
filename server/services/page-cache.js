@@ -2,11 +2,10 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const { PAGE_CACHE_DIRECTORY, DEFAULT_MAX_PAGE_CACHE_MB } = require('../constants');
-const { getConfig } = require('../config');
+const { getPageCacheMaxMb } = require('../config');
 const { log } = require('../logger');
 
 let cacheDir = PAGE_CACHE_DIRECTORY;
-let isPruning = false;
 
 function setCustomCacheDir(dir) {
   cacheDir = dir;
@@ -18,11 +17,7 @@ function getCacheDir() {
 
 function getMaxCacheBytes() {
   try {
-    const config = getConfig ? getConfig() : null;
-    const maxMb = (config && typeof config.pageCacheMaxMb === 'number' && config.pageCacheMaxMb > 0)
-      ? config.pageCacheMaxMb
-      : DEFAULT_MAX_PAGE_CACHE_MB;
-    return maxMb * 1024 * 1024;
+    return getPageCacheMaxMb() * 1024 * 1024;
   } catch {
     return DEFAULT_MAX_PAGE_CACHE_MB * 1024 * 1024;
   }
@@ -84,7 +79,7 @@ async function setPageCacheBuffer(key, buffer) {
 
 let pruneTimeout = null;
 function schedulePruneIfNeeded() {
-  if (pruneTimeout || isPruning) return;
+  if (pruneTimeout || prunePromise) return;
   pruneTimeout = setTimeout(async () => {
     pruneTimeout = null;
     await pruneCacheIfNeeded().catch(() => {});
@@ -92,31 +87,38 @@ function schedulePruneIfNeeded() {
   if (pruneTimeout.unref) pruneTimeout.unref();
 }
 
-async function pruneCacheIfNeeded(overrideMaxBytes = null) {
-  if (isPruning) return;
-  isPruning = true;
+async function readCacheEntries() {
+  const result = { files: [], totalBytes: 0, fileCount: 0 };
+  if (!fs.existsSync(cacheDir)) return result;
+
+  const entries = await fs.promises.readdir(cacheDir, { withFileTypes: true });
+  for (const entry of entries) {
+    if (!entry.isFile() || entry.name.includes('.tmp.') || entry.name.endsWith('.tmp')) continue;
+    const fullPath = path.join(cacheDir, entry.name);
+    try {
+      const stat = await fs.promises.stat(fullPath);
+      result.totalBytes += stat.size;
+      result.fileCount += 1;
+      result.files.push({
+        path: fullPath,
+        size: stat.size,
+        time: Math.max(stat.atimeMs || 0, stat.mtimeMs || 0)
+      });
+    } catch {}
+  }
+  return result;
+}
+
+let prunePromise = null;
+let pruneAgain = false;
+
+async function pruneOnce(overrideMaxBytes = null) {
   try {
     if (!fs.existsSync(cacheDir)) return;
     const maxBytes = overrideMaxBytes || getMaxCacheBytes();
     const targetBytes = Math.floor(maxBytes * 0.85); // Prune down to 85% when the cap is breached.
 
-    const entries = await fs.promises.readdir(cacheDir, { withFileTypes: true });
-    let totalBytes = 0;
-    const files = [];
-
-    for (const entry of entries) {
-      if (!entry.isFile() || entry.name.endsWith('.tmp')) continue;
-      const fullPath = path.join(cacheDir, entry.name);
-      try {
-        const stat = await fs.promises.stat(fullPath);
-        totalBytes += stat.size;
-        files.push({
-          path: fullPath,
-          size: stat.size,
-          time: Math.max(stat.atimeMs || 0, stat.mtimeMs || 0)
-        });
-      } catch {}
-    }
+    const { files, totalBytes } = await readCacheEntries();
 
     if (totalBytes <= maxBytes) {
       return;
@@ -139,8 +141,45 @@ async function pruneCacheIfNeeded(overrideMaxBytes = null) {
     log('INFO', 'PAGE-CACHE', `Pruning complete: freed ${(bytesFreed / (1024 * 1024)).toFixed(1)}MB, remaining ${((totalBytes - bytesFreed) / (1024 * 1024)).toFixed(1)}MB`);
   } catch (err) {
     log('ERROR', 'PAGE-CACHE', `Prune failed: ${err.message}`);
-  } finally {
-    isPruning = false;
+  }
+}
+
+function pruneCacheIfNeeded(overrideMaxBytes = null) {
+  if (prunePromise) {
+    // A limit change or write arrived mid-prune: run one more pass with the live cap.
+    pruneAgain = true;
+    return prunePromise;
+  }
+
+  prunePromise = (async () => {
+    let override = overrideMaxBytes;
+    do {
+      pruneAgain = false;
+      await pruneOnce(override);
+      override = null; // Re-runs always use the live config cap.
+    } while (pruneAgain);
+  })().finally(() => {
+    prunePromise = null;
+  });
+
+  return prunePromise;
+}
+
+async function getPageCacheStats() {
+  const maxMb = getPageCacheMaxMb();
+  const maxBytes = maxMb * 1024 * 1024;
+  try {
+    const { totalBytes, fileCount } = await readCacheEntries();
+    return {
+      totalBytes,
+      fileCount,
+      maxBytes,
+      maxMb,
+      usagePercent: maxBytes > 0 ? Math.min(100, Math.round((totalBytes / maxBytes) * 100)) : 0
+    };
+  } catch (err) {
+    log('WARN', 'PAGE-CACHE', `Stats failed: ${err.message}`);
+    return { totalBytes: 0, fileCount: 0, maxBytes, maxMb, usagePercent: 0 };
   }
 }
 
@@ -165,5 +204,6 @@ module.exports = {
   getPageCacheBuffer,
   setPageCacheBuffer,
   pruneCacheIfNeeded,
+  getPageCacheStats,
   initPageCache
 };

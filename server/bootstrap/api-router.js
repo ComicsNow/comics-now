@@ -10,6 +10,8 @@ const {
   saveConfigToDisk,
   getScanIntervalMinutes,
   setScanIntervalMinutes,
+  getPageCacheMaxMb,
+  setPageCacheMaxMb,
   getComicVineApiKey,
   setComicVineApiKey,
   getGoogleBooksApiKey,
@@ -102,6 +104,7 @@ const {
 
 const { startTaggerWorker, stopTaggerWorker, isWorkerOnline } = require('../services/tagger-process');
 const guidedReader = require('../services/guided-reader');
+const { pruneCacheIfNeeded, getPageCacheStats } = require('../services/page-cache');
 const { saveMetadataToComic, getComicInfoFromArchive } = require('../services/metadata');
 const { cvFetchJson, normalizeCvId, COMICVINE_API_URL } = require('../services/comicvine');
 const { createId, getMimeFromExt, t0, ms, stripHtml, sanitizeHtml } = require('../utils');
@@ -137,6 +140,10 @@ function createConfiguredApiRouter() {
     guidedReader,
     getScanIntervalMinutes,
     setScanIntervalMinutes,
+    getPageCacheMaxMb,
+    setPageCacheMaxMb,
+    prunePageCache: pruneCacheIfNeeded,
+    getPageCacheStats,
     getComicVineApiKey,
     setComicVineApiKey,
     getGoogleBooksApiKey,

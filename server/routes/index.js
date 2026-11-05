@@ -12,6 +12,7 @@ const {
   validateLastReadPage,
   validateStatus,
   validateScanInterval,
+  validatePageCacheMaxMb,
   validateApiKey,
   validateSearchQuery,
   validateComicId
@@ -73,6 +74,7 @@ function createExtendedDeps(deps) {
     validateLastReadPage,
     validateStatus,
     validateScanInterval,
+    validatePageCacheMaxMb,
     validateApiKey,
     validateSearchQuery,
     validateComicId,

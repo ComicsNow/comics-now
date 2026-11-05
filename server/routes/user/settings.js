@@ -7,18 +7,32 @@ module.exports = function attach(router, deps) {
   const {
     getComicVineApiKey,
     getScanIntervalMinutes,
+    getPageCacheMaxMb,
+    getPageCacheStats,
     getAllowedFormats,
     getDeleteCbrAfterConversion,
     getDeletePdfAfterConversion,
     getMetadataStorage
   } = deps;
 
-  router.get('/api/v1/settings', (req, res) => {
+  router.get('/api/v1/settings', async (req, res) => {
     const apiKey = getComicVineApiKey();
     const isAdmin = req.user?.role === 'admin';
 
+    let pageCacheStats = null;
+    if (typeof getPageCacheStats === 'function') {
+      try {
+        pageCacheStats = await getPageCacheStats();
+      } catch {
+        pageCacheStats = null;
+      }
+    }
+
     res.json({
       scanInterval: getScanIntervalMinutes(),
+      pageCacheMaxMb: typeof getPageCacheMaxMb === 'function' ? getPageCacheMaxMb() : null,
+      pageCacheUsageBytes: pageCacheStats ? pageCacheStats.totalBytes : null,
+      pageCacheFileCount: pageCacheStats ? pageCacheStats.fileCount : null,
       allowedFormats: getAllowedFormats(),
       deleteCbrAfterConversion: getDeleteCbrAfterConversion ? getDeleteCbrAfterConversion() : false,
       deletePdfAfterConversion: getDeletePdfAfterConversion ? getDeletePdfAfterConversion() : false,

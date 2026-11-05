@@ -3,6 +3,7 @@
  * Prevents XSS, data integrity issues, and database bloat
  */
 const { sanitizeHtml } = require('./utils');
+const { PAGE_CACHE_MIN_MB, PAGE_CACHE_MAX_MB } = require('./constants');
 
 /**
  * Validate and sanitize device name
@@ -149,6 +150,27 @@ function validateScanInterval(interval) {
 }
 
 /**
+ * Validate page-cache limit (in MB)
+ * Must be an integer between PAGE_CACHE_MIN_MB and PAGE_CACHE_MAX_MB.
+ */
+function validatePageCacheMaxMb(value) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric) || !Number.isInteger(numeric)) {
+    return { valid: false, error: 'Page cache limit must be an integer' };
+  }
+
+  if (numeric < PAGE_CACHE_MIN_MB) {
+    return { valid: false, error: `Page cache limit must be at least ${PAGE_CACHE_MIN_MB} MB` };
+  }
+
+  if (numeric > PAGE_CACHE_MAX_MB) {
+    return { valid: false, error: `Page cache limit cannot exceed ${PAGE_CACHE_MAX_MB} MB` };
+  }
+
+  return { valid: true, sanitized: numeric };
+}
+
+/**
  * Validate ComicVine API key
  * Max 100 characters, alphanumeric
  */
@@ -218,6 +240,7 @@ module.exports = {
   validateLastReadPage,
   validateStatus,
   validateScanInterval,
+  validatePageCacheMaxMb,
   validateApiKey,
   validateSearchQuery,
   validateComicId

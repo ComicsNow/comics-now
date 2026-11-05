@@ -17,6 +17,9 @@ module.exports = function attach(router, deps) {
     scheduleNextScan,
     formatErrorMessage,
     validateScanInterval,
+    validatePageCacheMaxMb,
+    setPageCacheMaxMb,
+    prunePageCache,
     validateApiKey,
     requireAdmin,
     dbAll,
@@ -172,6 +175,7 @@ module.exports = function attach(router, deps) {
         apiKey = '',
         allowedFormats = 'cbz',
         metadataStorage = 'archive',
+        pageCacheMaxMb,
         deleteCbrAfterConversion,
         deletePdfAfterConversion
       } = req.body || {};
@@ -188,6 +192,17 @@ module.exports = function attach(router, deps) {
       const apiKeyValidation = validateApiKey(apiKey);
       if (!apiKeyValidation.valid) {
         return res.status(400).json({ ok: false, message: apiKeyValidation.error });
+      }
+
+      let sanitizedPageCacheMaxMb;
+      if (pageCacheMaxMb !== undefined) {
+        const pageCacheValidation = typeof validatePageCacheMaxMb === 'function'
+          ? validatePageCacheMaxMb(pageCacheMaxMb)
+          : { valid: false, error: 'Page cache limit is not available' };
+        if (!pageCacheValidation.valid) {
+          return res.status(400).json({ ok: false, message: pageCacheValidation.error });
+        }
+        sanitizedPageCacheMaxMb = pageCacheValidation.sanitized;
       }
 
       const minutes = intervalValidation.sanitized;
@@ -223,6 +238,16 @@ module.exports = function attach(router, deps) {
           deps.setDeletePdfAfterConversion(shouldDeletePdf);
         }
         await saveSetting('delete_pdf_after_conversion', shouldDeletePdf);
+      }
+
+      if (sanitizedPageCacheMaxMb !== undefined) {
+        if (typeof setPageCacheMaxMb === 'function') {
+          setPageCacheMaxMb(sanitizedPageCacheMaxMb);
+        }
+        await saveSetting('pageCacheMaxMb', sanitizedPageCacheMaxMb);
+        if (typeof prunePageCache === 'function') {
+          await prunePageCache();
+        }
       }
 
       if (apiKey !== undefined && !cryptoVault.isMasked(apiKey)) {

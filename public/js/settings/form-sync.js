@@ -51,6 +51,23 @@ export async function fetchSettings() {
       scanIntervalInput.value = data.scanInterval || 5;
     }
 
+    const pageCacheInput = document.getElementById('page-cache-max-input');
+    if (pageCacheInput && data.pageCacheMaxMb) {
+      pageCacheInput.value = data.pageCacheMaxMb;
+    }
+
+    const pageCacheUsage = document.getElementById('page-cache-usage');
+    if (pageCacheUsage) {
+      if (data.pageCacheUsageBytes === null || data.pageCacheUsageBytes === undefined) {
+        pageCacheUsage.textContent = 'Current usage unavailable.';
+      } else {
+        const usedMb = Math.round(data.pageCacheUsageBytes / (1024 * 1024));
+        const files = Number(data.pageCacheFileCount || 0).toLocaleString();
+        const limit = data.pageCacheMaxMb ? ` of ${data.pageCacheMaxMb} MB` : '';
+        pageCacheUsage.textContent = `Using ${usedMb} MB${limit} across ${files} files`;
+      }
+    }
+
     const allowedFormatsSelect = document.getElementById('allowed-formats-select');
     if (allowedFormatsSelect && data.allowedFormats) {
       allowedFormatsSelect.value = data.allowedFormats;
@@ -99,6 +116,10 @@ export function initSettingsFormEvents() {
       if (settingsStatusDiv) settingsStatusDiv.textContent = 'Saving...';
 
       const interval = scanIntervalInput ? scanIntervalInput.value : null;
+      const pageCacheInput = document.getElementById('page-cache-max-input');
+      const pageCacheMaxMb = pageCacheInput && pageCacheInput.value !== ''
+        ? Number(pageCacheInput.value)
+        : undefined;
       let apiKey = '';
       let allowedFormats = 'cbz';
       let metadataStorage = 'archive';
@@ -124,6 +145,7 @@ export function initSettingsFormEvents() {
             apiKey,
             allowedFormats,
             metadataStorage,
+            pageCacheMaxMb,
             deleteCbrAfterConversion,
             deletePdfAfterConversion
           })

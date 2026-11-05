@@ -20,12 +20,14 @@ describe('User Settings Routes', () => {
     deps = {
       getComicVineApiKey: jest.fn(() => 'api-key-value'),
       getScanIntervalMinutes: jest.fn(() => 15),
+      getPageCacheMaxMb: jest.fn(() => 700),
+      getPageCacheStats: jest.fn(async () => ({ totalBytes: 250 * 1024 * 1024, fileCount: 1234 })),
       getAllowedFormats: jest.fn(() => 'cbz'),
       getMetadataStorage: jest.fn(() => 'sidecar')
     };
   });
 
-  it('should return settings and the API key to admins', () => {
+  it('should return settings and the API key to admins', async () => {
     attachUserSettingsRoutes(router, deps);
 
     const req = { user: { role: 'admin' } };
@@ -33,14 +35,19 @@ describe('User Settings Routes', () => {
       json: jest.fn()
     };
 
-    getSettingsHandler(req, res);
+    await getSettingsHandler(req, res);
 
     expect(deps.getComicVineApiKey).toHaveBeenCalled();
     expect(deps.getScanIntervalMinutes).toHaveBeenCalled();
+    expect(deps.getPageCacheMaxMb).toHaveBeenCalled();
+    expect(deps.getPageCacheStats).toHaveBeenCalled();
     expect(deps.getAllowedFormats).toHaveBeenCalled();
     expect(deps.getMetadataStorage).toHaveBeenCalled();
     expect(res.json).toHaveBeenCalledWith({
       scanInterval: 15,
+      pageCacheMaxMb: 700,
+      pageCacheUsageBytes: 250 * 1024 * 1024,
+      pageCacheFileCount: 1234,
       allowedFormats: 'cbz',
       deleteCbrAfterConversion: false,
       deletePdfAfterConversion: false,
@@ -50,7 +57,7 @@ describe('User Settings Routes', () => {
     });
   });
 
-  it('should return settings but hide the API key for non-admins', () => {
+  it('should return settings but hide the API key for non-admins', async () => {
     attachUserSettingsRoutes(router, deps);
 
     const req = { user: { role: 'user' } };
@@ -58,10 +65,13 @@ describe('User Settings Routes', () => {
       json: jest.fn()
     };
 
-    getSettingsHandler(req, res);
+    await getSettingsHandler(req, res);
 
     expect(res.json).toHaveBeenCalledWith({
       scanInterval: 15,
+      pageCacheMaxMb: 700,
+      pageCacheUsageBytes: 250 * 1024 * 1024,
+      pageCacheFileCount: 1234,
       allowedFormats: 'cbz',
       deleteCbrAfterConversion: false,
       deletePdfAfterConversion: false,
@@ -71,7 +81,7 @@ describe('User Settings Routes', () => {
     });
   });
 
-  it('should return hasApiKey: false if API key is not configured or set to default', () => {
+  it('should return hasApiKey: false if API key is not configured or set to default', async () => {
     deps.getComicVineApiKey.mockReturnValue('YOUR_API_KEY_HERE');
     attachUserSettingsRoutes(router, deps);
 
@@ -80,7 +90,7 @@ describe('User Settings Routes', () => {
       json: jest.fn()
     };
 
-    getSettingsHandler(req, res);
+    await getSettingsHandler(req, res);
 
     expect(res.json).toHaveBeenCalledWith(
       expect.objectContaining({

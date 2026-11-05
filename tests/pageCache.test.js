@@ -10,18 +10,23 @@ const {
   getPageCacheBuffer,
   setPageCacheBuffer,
   pruneCacheIfNeeded,
+  getPageCacheStats,
   initPageCache
 } = require('../server/services/page-cache');
+const config = require('../server/config');
 
 describe('page-cache service', () => {
   let testCacheDir;
+  let originalMaxMb;
 
   beforeEach(() => {
+    originalMaxMb = config.getPageCacheMaxMb();
     testCacheDir = fs.mkdtempSync(path.join(os.tmpdir(), 'page-cache-test-'));
     setCustomCacheDir(testCacheDir);
   });
 
   afterEach(() => {
+    config.setPageCacheMaxMb(originalMaxMb, true);
     try {
       if (fs.existsSync(testCacheDir)) {
         fs.rmSync(testCacheDir, { recursive: true, force: true });
@@ -85,6 +90,39 @@ describe('page-cache service', () => {
     expect(await hasPageCache(keyOld)).toBe(false);
     expect(await hasPageCache(keyMid)).toBe(true);
     expect(await hasPageCache(keyNew)).toBe(true);
+  });
+
+  test('reports usage statistics and excludes in-flight temp files', async () => {
+    fs.writeFileSync(getPageCachePath('stats_a.bin'), Buffer.alloc(1024));
+    fs.writeFileSync(getPageCachePath('stats_b.bin'), Buffer.alloc(2048));
+    fs.writeFileSync(path.join(testCacheDir, 'inflight.tmp.123.abc'), Buffer.alloc(4096));
+
+    const stats = await getPageCacheStats();
+    expect(stats.fileCount).toBe(2);
+    expect(stats.totalBytes).toBe(3072);
+    expect(stats.maxMb).toBe(config.getPageCacheMaxMb());
+    expect(stats.maxBytes).toBe(config.getPageCacheMaxMb() * 1024 * 1024);
+  });
+
+  test('uses the live config cap when no override is supplied', async () => {
+    const now = Date.now();
+    const files = ['live_old.bin', 'live_mid.bin', 'live_new.bin'];
+    files.forEach((name, i) => {
+      const fullPath = path.join(testCacheDir, name);
+      fs.writeFileSync(fullPath, '');
+      fs.truncateSync(fullPath, 30 * 1024 * 1024);
+      const t = new Date(now - (files.length - i) * 60000);
+      fs.utimesSync(fullPath, t, t);
+    });
+
+    config.setPageCacheMaxMb(50, true); // 50 MiB cap -> 42.5 MiB target
+    await pruneCacheIfNeeded();
+
+    const stats = await getPageCacheStats();
+    expect(stats.totalBytes).toBeLessThanOrEqual(42.5 * 1024 * 1024);
+    expect(fs.existsSync(path.join(testCacheDir, 'live_old.bin'))).toBe(false);
+    expect(fs.existsSync(path.join(testCacheDir, 'live_mid.bin'))).toBe(false);
+    expect(fs.existsSync(path.join(testCacheDir, 'live_new.bin'))).toBe(true);
   });
 
   test('survives re-initialization (reboot persistence)', async () => {

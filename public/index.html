@@ -133,6 +133,12 @@
               <h4 class="text-lg font-semibold mb-2">Scan Interval (minutes)</h4>
               <input type="number" id="scan-interval-input" class="w-full bg-gray-700 text-white p-2 rounded-lg focus:outline-hidden focus:ring-2 focus:ring-red-500" min="1" value="5">
             </div>
+            <div>
+              <h4 class="text-lg font-semibold mb-2">Page Cache Limit (MB)</h4>
+              <input type="number" id="page-cache-max-input" class="w-full bg-gray-700 text-white p-2 rounded-lg focus:outline-hidden focus:ring-2 focus:ring-red-500" min="50" max="10240" step="10" value="200">
+              <p id="page-cache-usage" class="text-sm text-gray-400 mt-1"></p>
+              <p class="text-sm text-gray-400 mt-1">Maximum disk space for cached rendered pages. Lowering the limit immediately trims the cache.</p>
+            </div>
             <div id="admin-only-libraries" class="border-t border-gray-700 pt-4">
               <h4 class="text-lg font-semibold mb-2">Library Folders</h4>
               <p class="text-sm text-gray-400 mb-3">Root directories where your comics are stored.</p>
@@ -2111,7 +2117,7 @@
       <symbol id="icon-26" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16" /></symbol>
     </svg>
   </div>
-<script type="module" src="/app.js?v=8.9"></script>
+<script type="module" src="/app.js?v=8.10"></script>
   <script>
     // Show user badge if auth is enabled (invoked by sync.js)
     window.showUserBadge = function() {

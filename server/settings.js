@@ -2,6 +2,7 @@ const db = require('./db');
 const { log } = require('./logger');
 const {
   setScanIntervalMinutes,
+  setPageCacheMaxMb,
   setComicVineApiKey,
   setCtScheduleMinutes,
   setAllowedFormats,
@@ -39,6 +40,15 @@ async function loadSettings() {
           raw = row.value;
         }
         setScanIntervalMinutes(raw, true);
+      }
+      if (row.key === 'pageCacheMaxMb') {
+        let raw;
+        try {
+          raw = JSON.parse(row.value);
+        } catch {
+          raw = row.value;
+        }
+        setPageCacheMaxMb(raw, true);
       }
       if (row.key === 'comicVineApiKey') {
         try {

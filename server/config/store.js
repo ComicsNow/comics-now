@@ -1,6 +1,11 @@
 const fs = require('fs');
 const path = require('path');
-const { CONFIG_FILE } = require('../constants');
+const {
+  CONFIG_FILE,
+  DEFAULT_MAX_PAGE_CACHE_MB,
+  PAGE_CACHE_MIN_MB,
+  PAGE_CACHE_MAX_MB
+} = require('../constants');
 const { log } = require('../logger');
 const {
   normalizeDirectory,
@@ -18,6 +23,7 @@ const DEFAULT_CONFIG = {
   comicsLocation: '/comics',
   libraries: [],
   scanIntervalMinutes: 5,
+  pageCacheMaxMb: DEFAULT_MAX_PAGE_CACHE_MB,
   comicVineApiKey: '',
   ctScheduleMinutes: 60,
   allowed_formats: 'cbz',
@@ -193,6 +199,27 @@ function setScanIntervalMinutes(minutes, skipSave = false) {
   return sanitized * 60 * 1000;
 }
 
+function sanitizePageCacheMb(value) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric) || numeric <= 0) {
+    return DEFAULT_MAX_PAGE_CACHE_MB;
+  }
+  return Math.min(PAGE_CACHE_MAX_MB, Math.max(PAGE_CACHE_MIN_MB, Math.round(numeric)));
+}
+
+function getPageCacheMaxMb() {
+  return sanitizePageCacheMb(config.pageCacheMaxMb);
+}
+
+function setPageCacheMaxMb(value, skipSave = false) {
+  const sanitized = sanitizePageCacheMb(value);
+  config.pageCacheMaxMb = sanitized;
+  if (!skipSave) {
+    saveConfigToDisk();
+  }
+  return sanitized;
+}
+
 function getAllowedFormats() {
   return config.allowed_formats || 'cbz';
 }
@@ -311,6 +338,8 @@ module.exports = {
   getScanIntervalMs,
   getScanIntervalMinutes,
   setScanIntervalMinutes,
+  getPageCacheMaxMb,
+  setPageCacheMaxMb,
   getComicsLocation,
   setComicsLocation,
   getAllowedFormats,

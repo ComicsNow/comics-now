@@ -41,6 +41,7 @@
     }
   ],
   "scanIntervalMinutes": 5,
+  "pageCacheMaxMb": 200,
   "allowed_formats": "cbz",
   "delete_cbr_after_conversion": false,
   "delete_pdf_after_conversion": false,

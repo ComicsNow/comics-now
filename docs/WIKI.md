@@ -212,6 +212,7 @@ Settings are resolved in the following order:
 | `libraries[].hierarchyMode` | `string` | `"metadata"` | `"metadata"` organizes the UI by Publisher and Series extracted from ComicInfo.xml. `"folder"` mirrors the physical folder hierarchy on disk. |
 | `comicsLocation` | `string` | `"/comics"` | Ingestion/inbox workspace where Tag Comics Now! scans for untagged or newly downloaded CBZ files. |
 | `scanIntervalMinutes` | `number` | `5` | Frequency (in minutes) of background filesystem scans to discover new comics. |
+| `pageCacheMaxMb` | `number` | `200` | Maximum disk space (MB) for cached rendered pages. Allowed range: `50`–`10240`. Lowering the limit immediately evicts the oldest cached pages down to 85% of the new cap; no server restart is required. |
 | `allowed_formats` | `string` | `"cbz"` | Permitted archive formats (`"cbz"`, `"cbr"`, or `"both"`). Automatic conversion converts PDF and CBR to CBZ in `comicsLocation`. |
 | `delete_cbr_after_conversion` | `boolean` | `false` | Whether to delete (`true`) or keep (`false`, default) original `.cbr` files after converting them to `.cbz`. |
 | `delete_pdf_after_conversion` | `boolean` | `false` | Whether to delete (`true`) or keep (`false`, default) original `.pdf` files after converting them to `.cbz`. |
@@ -290,7 +291,7 @@ To keep server startup safe and predictable, Comics Now! divides configuration p
 | Category | Settings | Can Be Configured in UI? | Why / When to Update |
 |---|---|:---:|---|
 | **Boot Only (`[BOOT]`)** | `baseUrl`<br>`port`<br>`trustProxy`<br>`authentication` (`enabled`, `adminEmail`, `cloudflare`)<br>`cors` | ❌ **No** | **Server Initialization**: Express router paths, listening ports, reverse proxy headers, and authentication security middlewares are assembled on server boot before any web requests can be handled. Must be set in `config.json` or via environment variables before launch. |
-| **UI Configurable (`[UI]`)** | `libraries`<br>`comicsLocation`<br>`metadata_storage`<br>`scanIntervalMinutes`<br>`allowed_formats`<br>`comicVineApiKey`<br>`googleBooksApiKey`<br>`metronUser` / `metronPassword`<br>`gcdUser` / `gcdPassword`<br>`geminiApiKey` / `geminiModel`<br>`geminiCoverMatchEnabled`<br>`geminiCoverDailyCap`<br>`geminiTermsAccepted`<br>`taggerLowerThreshold`<br>`taggerUpperThreshold`<br>`taggerEnabledSources`<br>`ctScheduleMinutes`<br>`namingRules`<br>`folderRules`<br>User Accounts & Permissions | ✅ **Yes** | **Runtime Operation**: Can be set anytime directly in the web browser. The server automatically updates memory state, synchronizes the SQLite database, and persists the changes back to `data/config.json`. No server restart required! |
+| **UI Configurable (`[UI]`)** | `libraries`<br>`comicsLocation`<br>`metadata_storage`<br>`scanIntervalMinutes`<br>`pageCacheMaxMb`<br>`allowed_formats`<br>`comicVineApiKey`<br>`googleBooksApiKey`<br>`metronUser` / `metronPassword`<br>`gcdUser` / `gcdPassword`<br>`geminiApiKey` / `geminiModel`<br>`geminiCoverMatchEnabled`<br>`geminiCoverDailyCap`<br>`geminiTermsAccepted`<br>`taggerLowerThreshold`<br>`taggerUpperThreshold`<br>`taggerEnabledSources`<br>`ctScheduleMinutes`<br>`namingRules`<br>`folderRules`<br>User Accounts & Permissions | ✅ **Yes** | **Runtime Operation**: Can be set anytime directly in the web browser. The server automatically updates memory state, synchronizes the SQLite database, and persists the changes back to `data/config.json`. No server restart required! |
 
 ---
 
@@ -307,6 +308,7 @@ Administrators can configure all runtime settings directly in the browser:
    - Click **Add Library**. Comics Now! validates the path and begins background indexing.
 2. **Scan Intervals & Storage Strategy**:
    - In **Settings → General**, adjust the **Scan Interval** (minutes) for background filesystem discovery.
+   - Set the **Page Cache Limit (MB)**. Lowering it immediately trims the cache; changes apply without a restart.
    - Select **Metadata Storage Mode**:
      - `sidecar`: Writes an external `.ComicInfo.xml` beside each comic archive (ideal for read-only archives).
      - `archive`: Writes metadata directly inside the `.cbz` archive.
