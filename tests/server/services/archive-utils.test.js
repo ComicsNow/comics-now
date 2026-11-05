@@ -29,9 +29,9 @@ describe('archive-utils', () => {
             return Buffer.from('fake data');
         });
 
-        fs.promises.readFile.mockImplementation(async (path) => {
-            if (path.endsWith('.cbz')) {
-                return jest.requireActual('fs').promises.readFile(path);
+        fs.promises.readFile.mockImplementation(async (filePath) => {
+            if (filePath.endsWith('.cbz') || filePath.includes('comics-now-rar-')) {
+                return jest.requireActual('fs').promises.readFile(filePath);
             }
             return Buffer.from('fake data');
         });
@@ -92,22 +92,47 @@ describe('archive-utils', () => {
             expect(createExtractorFromFile).toHaveBeenCalled();
         });
 
-        test('readBuffer in a RAR file', async () => {
+        test('readBuffer in a RAR file extracts one entry to a temp dir', async () => {
+            let targetPath;
+            let filenameTransform;
             const mockExtractor = {
                 getFileList: jest.fn().mockReturnValue({
                     arcHeader: [],
-                    fileHeaders: [{ name: 'page1.jpg', flags: { directory: false } }]
+                    fileHeaders: [{ name: 'dir/page1.jpg', flags: { directory: false } }]
                 }),
-                extract: jest.fn().mockReturnValue({
-                    files: [{ extraction: Buffer.from('fake image data') }]
-                })
+                extract: jest.fn(({ files }) => ({
+                    files: (function* () {
+                        for (const name of files) {
+                            fs.writeFileSync(
+                                path.join(targetPath, filenameTransform(name)),
+                                'fake image data'
+                            );
+                            yield { fileHeader: { name, flags: { directory: false } } };
+                        }
+                    })()
+                }))
             };
-            createExtractorFromFile.mockResolvedValue(mockExtractor);
+            createExtractorFromFile.mockImplementation(async (options) => {
+                targetPath = options.targetPath;
+                filenameTransform = options.filenameTransform;
+                return mockExtractor;
+            });
 
             const archive = await openArchive('dummy.cbr');
-            const buffer = await archive.readBuffer('page1.jpg');
-            expect(buffer.toString()).toBe('fake image data');
-            expect(mockExtractor.extract).toHaveBeenCalledWith({ files: ['page1.jpg'] });
+            try {
+                expect(targetPath).toBeTruthy();
+                expect(filenameTransform('dir/page1.jpg')).toBe('page1.jpg');
+
+                const buffer = await archive.readBuffer('dir/page1.jpg');
+                expect(buffer.toString()).toBe('fake image data');
+                expect(mockExtractor.extract).toHaveBeenCalledWith({ files: ['dir/page1.jpg'] });
+                // Extracted page is deleted immediately after being read.
+                expect(fs.existsSync(path.join(targetPath, 'page1.jpg'))).toBe(false);
+            } finally {
+                const extractedDir = targetPath;
+                await archive.close();
+                expect(fs.existsSync(extractedDir)).toBe(false);
+            }
         });
     });
 
