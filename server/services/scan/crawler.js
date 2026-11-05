@@ -19,7 +19,7 @@ const {
 const { convertCbrToCbz, convertPdfToCbz } = require('../library-conversion');
 const { getComicPages, generateThumbnail } = require('../library-pages');
 const { generateVirtualMetadata } = require('../library-metadata');
-
+const { resolveLiveLinkedCbz, resolveOriginalLink } = require('./original-links');
 const { reconcileGuidedView } = require('./guided-reconcile');
 
 /**
@@ -105,6 +105,7 @@ async function walkLibraryDirectory({ dir, libraryMode, libraryRootPath, ctx }) 
     if (!fileName || fileName.startsWith('.')) return;
     let filePath = path.join(dir, fileName);
     let wasConverted = false;
+    let originalSourcePath = null;
     let stats;
     try {
       stats = await fs.promises.stat(filePath);
@@ -134,24 +135,42 @@ async function walkLibraryDirectory({ dir, libraryMode, libraryRootPath, ctx }) 
         if (ctx.allowedFormats === 'cbr' || ctx.allowedFormats === 'both') {
           log('INFO', 'SCAN', `📄 CBR (Native): ${path.basename(filePath)}`);
         } else if (ctx.conversionRoot && path.resolve(filePath).startsWith(ctx.conversionRoot)) {
+          if (resolveLiveLinkedCbz(ctx.originalLinks, filePath)) {
+            log('INFO', 'SCAN', `Skipping conversion (linked CBZ exists): ${file}`);
+            return;
+          }
           const siblingCbz = filePath.replace(/\.cbr$/i, '.cbz');
           if (fs.existsSync(siblingCbz)) return;
           log('INFO', 'SCAN', `Convert needed: ${file}`);
+          const sourcePath = filePath;
           const newCbz = await convertCbrToCbz(filePath);
-          if (newCbz) { filePath = newCbz; wasConverted = true; ctx.stats.totalConverted++; }
-          else { ctx.stats.errors++; return; }
+          if (newCbz) {
+            filePath = newCbz;
+            wasConverted = true;
+            originalSourcePath = sourcePath;
+            ctx.stats.totalConverted++;
+          } else { ctx.stats.errors++; return; }
         } else {
           log('INFO', 'SCAN', `Skipping CBR: ${file} (Not allowed and outside conversionRoot)`);
           return;
         }
       } else if (isPdf) {
         if (ctx.conversionRoot && path.resolve(filePath).startsWith(ctx.conversionRoot)) {
+          if (resolveLiveLinkedCbz(ctx.originalLinks, filePath)) {
+            log('INFO', 'SCAN', `Skipping conversion (linked CBZ exists): ${file}`);
+            return;
+          }
           const siblingCbz = filePath.replace(/\.pdf$/i, '.cbz');
           if (fs.existsSync(siblingCbz)) return;
           log('INFO', 'SCAN', `PDF convert needed: ${file}`);
+          const sourcePath = filePath;
           const newCbz = await convertPdfToCbz(filePath);
-          if (newCbz) { filePath = newCbz; wasConverted = true; ctx.stats.totalConverted++; }
-          else { ctx.stats.errors++; return; }
+          if (newCbz) {
+            filePath = newCbz;
+            wasConverted = true;
+            originalSourcePath = sourcePath;
+            ctx.stats.totalConverted++;
+          } else { ctx.stats.errors++; return; }
         } else {
           log('INFO', 'SCAN', `Skipping PDF convert outside comicsLocation: ${file}`);
           return;
@@ -171,7 +190,7 @@ async function walkLibraryDirectory({ dir, libraryMode, libraryRootPath, ctx }) 
 
       ctx.fileSystemComics.add(filePath);
       const id = createId(filePath);
-      const existing = await dbGet('SELECT updatedAt, thumbnailPath, metadata, lastReadPage, totalPages, convertedAt, guidedViewStatus, guidedViewPath, guidedViewError, tagStatus FROM comics WHERE id = ?', [id]);
+      const existing = await dbGet('SELECT updatedAt, thumbnailPath, metadata, lastReadPage, totalPages, convertedAt, originalPath, guidedViewStatus, guidedViewPath, guidedViewError, tagStatus FROM comics WHERE id = ?', [id]);
       const hasValidThumbnail = Boolean(existing?.thumbnailPath && fs.existsSync(path.join(THUMBNAILS_DIRECTORY, existing.thumbnailPath)));
 
       if (!ctx.force && !wasConverted && existing && existing.updatedAt === stats.mtimeMs && hasValidThumbnail) {
@@ -183,6 +202,11 @@ async function walkLibraryDirectory({ dir, libraryMode, libraryRootPath, ctx }) 
       const lastReadPage = existing?.lastReadPage || 0;
       let totalPages = existing?.totalPages || 0;
       const convertedAt = wasConverted ? Date.now() : (existing?.convertedAt || null);
+      const originalPath = resolveOriginalLink({
+        wasConverted,
+        sourcePath: originalSourcePath,
+        existingOriginalPath: existing?.originalPath || null
+      });
 
       const { guidedViewStatus, guidedViewPath, guidedViewError } = await reconcileGuidedView(id, filePath, existing, ctx.dbComicsMap);
 
@@ -241,8 +265,8 @@ async function walkLibraryDirectory({ dir, libraryMode, libraryRootPath, ctx }) 
       }
 
       await dbRun(
-        `INSERT OR REPLACE INTO comics (id, path, thumbnailPath, updatedAt, name, series, publisher, metadata, lastReadPage, totalPages, convertedAt, guidedViewStatus, guidedViewPath, guidedViewError, libraryMode, tagStatus)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT OR REPLACE INTO comics (id, path, thumbnailPath, updatedAt, name, series, publisher, metadata, lastReadPage, totalPages, convertedAt, originalPath, guidedViewStatus, guidedViewPath, guidedViewError, libraryMode, tagStatus)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           id,
           filePath,
@@ -255,6 +279,7 @@ async function walkLibraryDirectory({ dir, libraryMode, libraryRootPath, ctx }) 
           lastReadPage,
           totalPages,
           convertedAt,
+          originalPath,
           guidedViewStatus,
           guidedViewPath,
           guidedViewError,

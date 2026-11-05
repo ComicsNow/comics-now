@@ -3,6 +3,28 @@ const { log } = require('../logger');
 const { isTitleSameAsSeries, resolveCreatorRoles } = require('../services/metadata');
 const { migratePlaintextSecrets } = require('../services/secrets-migrator');
 
+/**
+ * Adds comics.originalPath to databases created before the column existed.
+ * New installs already have it via CREATE TABLE, so this is a no-op for them.
+ */
+async function ensureComicOriginalPathColumn(runners = {}) {
+  const all = typeof runners.all === 'function' ? runners.all : dbAll;
+  const run = typeof runners.run === 'function' ? runners.run : dbRun;
+
+  const cols = await all("PRAGMA table_info('comics')");
+  if (cols.some(c => c.name === 'originalPath')) return false;
+
+  try {
+    await run('ALTER TABLE comics ADD COLUMN originalPath TEXT');
+    log('INFO', 'DB', 'Added comics.originalPath column');
+    return true;
+  } catch (e) {
+    // Defensive: another startup won the race and added it first.
+    if (!/duplicate column name/i.test(e.message || '')) throw e;
+    return false;
+  }
+}
+
 async function initializeDatabase() {
   log('INFO', 'DB', 'Initializing database...');
   try {
@@ -23,6 +45,7 @@ async function initializeDatabase() {
       updatedAt INTEGER,
       thumbnailPath TEXT,
       convertedAt INTEGER,
+      originalPath TEXT,
       guidedViewStatus TEXT DEFAULT 'pending',
       guidedViewError TEXT,
       guidedViewPath TEXT,
@@ -31,6 +54,7 @@ async function initializeDatabase() {
       libraryMode TEXT DEFAULT 'metadata',
       tagStatus TEXT DEFAULT 'pending'
     )`);
+    await ensureComicOriginalPathColumn();
     await dbRun(`CREATE TABLE IF NOT EXISTS scan_dirs (
       dir TEXT PRIMARY KEY,
       mtimeMs REAL
@@ -171,6 +195,7 @@ async function initializeDatabase() {
     await dbRun(`CREATE INDEX IF NOT EXISTS idx_comics_series ON comics(series)`);
     await dbRun(`CREATE INDEX IF NOT EXISTS idx_comics_name ON comics(name COLLATE NOCASE)`);
     await dbRun(`CREATE INDEX IF NOT EXISTS idx_comics_updatedAt ON comics(updatedAt)`);
+    await dbRun(`CREATE INDEX IF NOT EXISTS idx_comics_originalPath ON comics(originalPath)`);
     await dbRun(`CREATE INDEX IF NOT EXISTS idx_comics_publisher_series ON comics(publisher, series)`);
     await dbRun(`CREATE INDEX IF NOT EXISTS idx_reading_list_items_comic ON reading_list_items(comicId)`);
     await dbRun(`CREATE INDEX IF NOT EXISTS idx_reading_list_items_list_sort ON reading_list_items(listId, sortOrder)`);
@@ -296,5 +321,6 @@ async function initializeDatabase() {
 }
 
 module.exports = {
-  initializeDatabase
+  initializeDatabase,
+  ensureComicOriginalPathColumn
 };

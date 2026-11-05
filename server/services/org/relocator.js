@@ -3,8 +3,30 @@ const path = require('path');
 const guidedReader = require('../guided-reader');
 const { dbAll } = require('../../db');
 
+async function moveFileWithExdevFallback(src, dest) {
+  try {
+    await fs.promises.rename(src, dest);
+  } catch (err) {
+    if (err.code !== 'EXDEV') throw err;
+    await fs.promises.copyFile(src, dest);
+    await fs.promises.unlink(src);
+  }
+}
+
+function sidecarPathFor(filePath) {
+  return path.join(
+    path.dirname(filePath),
+    path.basename(filePath, path.extname(filePath)) + '.ComicInfo.xml'
+  );
+}
+
 /**
  * Updates comic file, sidecar ComicInfo.xml, thumbnail, guided view sidecar, and DB references.
+ *
+ * `oldOriginalPath` / `newOriginalPath` control the kept source of a converted CBZ:
+ * - omitted entirely: leave the original and its link untouched (rename)
+ * - null: clear the link without moving anything (original already missing)
+ * - string: move the original (basename preserved) and store the new link
  */
 async function updateComicIdentity({
   dbRun,
@@ -14,7 +36,9 @@ async function updateComicIdentity({
   newPath,
   newName,
   thumbnailsDir,
-  guidedViewDir
+  guidedViewDir,
+  oldOriginalPath = null,
+  newOriginalPath = undefined
 }) {
   const existsAsync = async (p) => {
     try {
@@ -25,6 +49,40 @@ async function updateComicIdentity({
     }
   };
 
+  let originalMoved = false;
+  let originalMissing = false;
+  let originalLink = newOriginalPath;
+
+  // 0. Move the kept original alongside the comic (never renamed)
+  if (newOriginalPath === null) {
+    originalLink = null;
+  } else if (newOriginalPath !== undefined) {
+    if (!oldOriginalPath || !(await existsAsync(oldOriginalPath))) {
+      originalMissing = true;
+      originalLink = null;
+    } else if (path.resolve(oldOriginalPath) !== path.resolve(newOriginalPath)) {
+      const originalDestDir = path.dirname(newOriginalPath);
+      if (!(await existsAsync(originalDestDir))) {
+        await fs.promises.mkdir(originalDestDir, { recursive: true });
+      }
+      if (await existsAsync(newOriginalPath)) {
+        throw new Error(`Original file already exists at destination: ${newOriginalPath}`);
+      }
+      await moveFileWithExdevFallback(oldOriginalPath, newOriginalPath);
+      originalMoved = true;
+
+      const oldSidecar = sidecarPathFor(oldOriginalPath);
+      const newSidecar = sidecarPathFor(newOriginalPath);
+      if (await existsAsync(oldSidecar) && !(await existsAsync(newSidecar))) {
+        try {
+          await moveFileWithExdevFallback(oldSidecar, newSidecar);
+        } catch (sidecarErr) {
+          console.warn(`[ORGANIZATION] Failed to move original sidecar: ${sidecarErr.message}`);
+        }
+      }
+    }
+  }
+
   // 1. Move/Rename comic file if path changed
   if (oldPath !== newPath && await existsAsync(oldPath)) {
     const destDir = path.dirname(newPath);
@@ -32,14 +90,22 @@ async function updateComicIdentity({
       await fs.promises.mkdir(destDir, { recursive: true });
     }
     try {
-      await fs.promises.rename(oldPath, newPath);
+      await moveFileWithExdevFallback(oldPath, newPath);
     } catch (renameErr) {
-      if (renameErr.code === 'EXDEV') {
-        await fs.promises.copyFile(oldPath, newPath);
-        await fs.promises.unlink(oldPath);
-      } else {
-        throw renameErr;
+      if (originalMoved) {
+        try {
+          await moveFileWithExdevFallback(newOriginalPath, oldOriginalPath);
+          originalMoved = false;
+          const movedSidecar = sidecarPathFor(newOriginalPath);
+          const restoredSidecar = sidecarPathFor(oldOriginalPath);
+          if (await existsAsync(movedSidecar) && !(await existsAsync(restoredSidecar))) {
+            await moveFileWithExdevFallback(movedSidecar, restoredSidecar);
+          }
+        } catch (rollbackErr) {
+          console.warn(`[ORGANIZATION] Failed to roll back original move: ${rollbackErr.message}`);
+        }
       }
+      throw renameErr;
     }
   }
 
@@ -152,6 +218,10 @@ async function updateComicIdentity({
       );
     }
 
+    if (newOriginalPath !== undefined) {
+      await dbRun('UPDATE comics SET originalPath = ? WHERE id = ?', [originalLink, newId]);
+    }
+
     if (newGvStatus === 'pending') {
       try {
         guidedReader.startRunForScope('comic', newId).catch(() => {
@@ -177,6 +247,8 @@ async function updateComicIdentity({
     await updateIfTable('user_bookmarks', 'UPDATE user_bookmarks SET comicId = ? WHERE comicId = ?', [newId, oldId]);
     await updateIfTable('reading_mode_preferences', 'UPDATE reading_mode_preferences SET targetId = ? WHERE targetId = ? AND preferenceType = ?', [newId, oldId, 'comic']);
   }
+
+  return { originalMoved, originalMissing };
 }
 
 module.exports = {

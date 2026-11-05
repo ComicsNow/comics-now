@@ -102,5 +102,8 @@ describe('Admin Rename Route', () => {
       '/comics/Justice League.cbz',
       '/comics/01 Justice League: The Omega Act [DC Comics] (2025).cbz'
     );
+
+    // A kept original is intentionally not renamed, and its link is left untouched.
+    expect(deps.dbRun.mock.calls.some(c => /originalPath/.test(String(c[0])))).toBe(false);
   });
 });

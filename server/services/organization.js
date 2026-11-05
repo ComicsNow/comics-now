@@ -5,6 +5,7 @@ const {
   generateVirtualMetadataFromHierarchy
 } = require('./org/patterns');
 const { updateComicIdentity } = require('./org/relocator');
+const { planOriginalMove } = require('./org/companion-original');
 
 module.exports = {
   DEFAULT_NAMING_RULES,
@@ -12,5 +13,6 @@ module.exports = {
   formatComicFilename,
   formatFolderPath,
   generateVirtualMetadataFromHierarchy,
-  updateComicIdentity
+  updateComicIdentity,
+  planOriginalMove
 };

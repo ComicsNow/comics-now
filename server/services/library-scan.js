@@ -1,6 +1,6 @@
 const fs = require('fs');
 const path = require('path');
-const { dbAll } = require('../db');
+const { dbAll, dbRun } = require('../db');
 const { log } = require('../logger');
 const { getConfig, getLibraries } = require('../config');
 const { t0, ms, pMap } = require('../utils');
@@ -16,6 +16,7 @@ const {
 const { scheduleNextScan } = require('./scan/scheduler');
 const { cleanupStaleComics, repairMissingThumbnails } = require('./scan/cleanup');
 const { walkLibraryDirectory } = require('./scan/crawler');
+const { buildOriginalLinkMap, backfillOriginalLinks } = require('./scan/original-links');
 
 /**
  * Executes a full scan across all configured library folders.
@@ -51,8 +52,18 @@ async function scanLibrary(force = false) {
 
   const fileSystemComics = new Set();
   const newComicIds = [];
+
+  try {
+    const linked = await backfillOriginalLinks({ all: dbAll, run: dbRun });
+    if (linked > 0) log('INFO', 'SCAN', `Backfilled ${linked} kept-original link(s)`);
+  } catch (e) {
+    log('WARN', 'SCAN', `Original-link backfill failed: ${e.message}`);
+  }
+
   const dbComics = await dbAll('SELECT id, path, thumbnailPath, guidedViewPath FROM comics');
   const dbComicsMap = new Map(dbComics.map(c => [c.path, { id: c.id, thumbnailPath: c.thumbnailPath, guidedViewPath: c.guidedViewPath }]));
+  const originalLinkRows = await dbAll('SELECT path, originalPath FROM comics WHERE originalPath IS NOT NULL');
+  const originalLinks = buildOriginalLinkMap(originalLinkRows);
   const conversionRoot = config.comicsLocation ? path.resolve(config.comicsLocation) : null;
   const unreachableTopDirs = [];
 
@@ -63,6 +74,7 @@ async function scanLibrary(force = false) {
     fileSystemComics,
     newComicIds,
     dbComicsMap,
+    originalLinks,
     stats,
     force
   };

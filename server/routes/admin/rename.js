@@ -148,6 +148,8 @@ module.exports = function attach(router, deps) {
               newName,
               thumbnailsDir: THUMBNAILS_DIRECTORY,
               guidedViewDir: GUIDED_VIEW_DIR
+              // No originalPath params: a kept .pdf/.cbr is intentionally not renamed.
+              // The stored link stays valid and prevents scanner re-conversion.
             });
 
             renamed++;

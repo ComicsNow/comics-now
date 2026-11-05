@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const { THUMBNAILS_DIRECTORY, GUIDED_VIEW_DIR } = require('../../../constants');
-const { formatFolderPath, updateComicIdentity } = require('../../../services/organization');
+const { formatFolderPath, updateComicIdentity, planOriginalMove } = require('../../../services/organization');
 const { getFolderRules } = require('../../../config');
 
 module.exports = function attachMoveRoutes(router, deps) {
@@ -66,7 +66,7 @@ module.exports = function attachMoveRoutes(router, deps) {
       const allowedFormats = deps.getAllowedFormats ? deps.getAllowedFormats() : 'cbz';
 
       const comics = await dbAll(
-        `SELECT id, path, name, metadata FROM comics WHERE tagStatus = 'successful' AND path LIKE ?`,
+        `SELECT id, path, name, metadata, originalPath FROM comics WHERE tagStatus = 'successful' AND path LIKE ?`,
         [`${sourceDir}%`]
       );
 
@@ -132,6 +132,25 @@ module.exports = function attachMoveRoutes(router, deps) {
             continue;
           }
 
+          const originalPlan = planOriginalMove(comicRecord.originalPath, destDir);
+          if (originalPlan.action === 'collision') {
+            const message = `Original file already exists at destination: ${path.basename(originalPlan.newOriginalPath)}`;
+            moveLog(`✗ Error: ${file} - ${message}`);
+            results.push({ file, success: false, error: message });
+            errors++;
+            continue;
+          }
+          if (originalPlan.action === 'clear') {
+            moveLog(`⚠ Warning: original file missing for ${file}; clearing link`);
+            log('WARN', 'MOVE', `Original file missing for ${file}; clearing link`);
+          }
+          const originalArgs = originalPlan.action === 'none'
+            ? {}
+            : {
+                oldOriginalPath: originalPlan.oldOriginalPath,
+                newOriginalPath: originalPlan.newOriginalPath
+              };
+
           const oldId = comicRecord.id;
           const newId = createId(destPath);
           const newName = path.basename(destPath);
@@ -144,7 +163,8 @@ module.exports = function attachMoveRoutes(router, deps) {
             newPath: destPath,
             newName,
             thumbnailsDir: THUMBNAILS_DIRECTORY,
-            guidedViewDir: GUIDED_VIEW_DIR
+            guidedViewDir: GUIDED_VIEW_DIR,
+            ...originalArgs
           });
 
           let parent = path.dirname(filePath);

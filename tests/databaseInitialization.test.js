@@ -46,7 +46,7 @@ describe('Database Initialization & Schema Integrity', () => {
     const expectedCols = [
       'id', 'publisher', 'series', 'name', 'path', 'metadata',
       'lastReadPage', 'totalPages', 'updatedAt', 'thumbnailPath',
-      'convertedAt', 'guidedViewStatus', 'guidedViewError', 'guidedViewPath',
+      'convertedAt', 'originalPath', 'guidedViewStatus', 'guidedViewError', 'guidedViewPath',
       'guidedMode', 'bubbleMode', 'libraryMode', 'tagStatus'
     ];
 
@@ -105,6 +105,7 @@ describe('Database Initialization & Schema Integrity', () => {
       'idx_reading_list_items_list_sort',
       'idx_reading_lists_user_sort',
       'idx_comics_publisher_series',
+      'idx_comics_originalPath',
       'idx_user_comic_status_comic'
     ];
 
