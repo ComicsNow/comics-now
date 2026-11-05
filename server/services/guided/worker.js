@@ -68,7 +68,7 @@ async function runWorker() {
           const result = await processComic(comic, {
             isCancelled: () => state.isCancelled || activeItem.isCancelled
           });
-          if (!result || (result.panels === 0 && (result.pageCount > 0 || result.pagesProcessed > 0))) {
+          if (!result || !(result.panels > 0)) {
             throw new Error('Detection completed with 0 panels');
           }
           await dbRun(

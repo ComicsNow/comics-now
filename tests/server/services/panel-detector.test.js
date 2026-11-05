@@ -40,7 +40,8 @@ jest.mock('fs', () => {
     promises: {
       ...original.promises,
       mkdir: jest.fn().mockResolvedValue(),
-      writeFile: jest.fn().mockResolvedValue()
+      writeFile: jest.fn().mockResolvedValue(),
+      rename: jest.fn().mockResolvedValue()
     }
   };
 });
@@ -57,10 +58,20 @@ const {
 const archiveUtils = require('../../../server/services/archive-utils');
 
 jest.mock('../../../server/services/archive-utils', () => ({
+  openArchiveSession: jest.fn(),
   listPages: jest.fn(),
-  getEntryBuffer: jest.fn().mockResolvedValue(Buffer.from('fake image data')),
-  extractPageBuffer: jest.fn().mockResolvedValue(Buffer.from('fake image data'))
+  getEntryBuffer: jest.fn().mockResolvedValue(Buffer.from('fake image data'))
 }));
+
+function mockSession(pages) {
+  const session = {
+    pages,
+    readBuffer: jest.fn().mockResolvedValue(Buffer.from('fake image data')),
+    close: jest.fn()
+  };
+  archiveUtils.openArchiveSession.mockResolvedValue(session);
+  return session;
+}
 
 // Mock logger
 jest.mock('../../../server/logger', () => ({
@@ -76,60 +87,65 @@ describe('panel-detector', () => {
 
   describe('processComic', () => {
     it('throws error if no pages are found', async () => {
-      archiveUtils.listPages.mockResolvedValue([]);
+      const session = mockSession([]);
       await expect(processComic('test1', '/path.cbz', 'western')).rejects.toThrow('No pages found');
+      expect(session.close).toHaveBeenCalled();
     });
 
-    it('processes comic correctly', async () => {
-      archiveUtils.listPages.mockResolvedValue(['01.jpg', '02.jpg']);
-      archiveUtils.getEntryBuffer.mockResolvedValue(Buffer.from('fake image data'));
+    it('processes comic correctly and writes the sidecar atomically', async () => {
+      const session = mockSession(['01.jpg', '02.jpg']);
       const result = await processComic('test1', '/path.cbz', 'western');
 
       expect(result.pagesProcessed).toBe(2);
       expect(result.pageCount).toBe(2);
-      expect(fs.promises.writeFile).toHaveBeenCalled();
+      expect(result.outputPath).toContain('test1.json');
       const calls = fs.promises.writeFile.mock.calls;
       expect(calls.length).toBe(1);
-      expect(calls[0][0]).toContain('test1.json');
+      expect(calls[0][0]).toContain('test1.json.tmp');
+      expect(fs.promises.rename).toHaveBeenCalledTimes(1);
+      expect(session.close).toHaveBeenCalled();
     });
 
     it('processes comic manga type correctly', async () => {
-      archiveUtils.listPages.mockResolvedValue(['01.jpg', '02.jpg']);
-      archiveUtils.getEntryBuffer.mockResolvedValue(Buffer.from('fake image data'));
+      const session = mockSession(['01.jpg', '02.jpg']);
       const result = await processComic('test1', '/path.cbz', 'manga');
 
       expect(result.pagesProcessed).toBe(2);
       expect(result.pageCount).toBe(2);
       expect(fs.promises.writeFile).toHaveBeenCalled();
+      expect(session.close).toHaveBeenCalled();
     });
 
     it('respects cancellation', async () => {
-      archiveUtils.listPages.mockResolvedValue(['01.jpg', '02.jpg']);
-      archiveUtils.getEntryBuffer.mockResolvedValue(Buffer.from('fake image data'));
+      const session = mockSession(['01.jpg', '02.jpg']);
       await expect(processComic('test1', '/path.cbz', 'western', {
         isCancelled: () => true
       })).rejects.toThrow('Cancelled');
+      expect(session.close).toHaveBeenCalled();
     });
 
     it('handles maxPages correctly', async () => {
-      archiveUtils.listPages.mockResolvedValue(['01.jpg', '02.jpg', '03.jpg']);
-      archiveUtils.getEntryBuffer.mockResolvedValue(Buffer.from('fake image data'));
+      const session = mockSession(['01.jpg', '02.jpg', '03.jpg']);
       const result = await processComic('test1', '/path.cbz', 'western', {
         maxPages: 1
       });
       expect(result.pageCount).toBe(1);
       expect(result.pagesProcessed).toBe(1);
+      expect(fs.promises.writeFile).toHaveBeenCalled();
+      expect(session.close).toHaveBeenCalled();
     });
 
-    it('handles errors on page processing', async () => {
-      archiveUtils.listPages.mockResolvedValue(['01.jpg']);
-      archiveUtils.getEntryBuffer.mockRejectedValueOnce(new Error('Extraction failed'));
+    it('handles errors on page processing without writing a sidecar', async () => {
+      const session = mockSession(['01.jpg']);
+      session.readBuffer.mockRejectedValueOnce(new Error('Extraction failed'));
 
       const result = await processComic('test1', '/path.cbz', 'western');
 
       expect(result.pagesProcessed).toBe(0); // If it fails, it does not increment pagesProcessed
       expect(result.pageCount).toBe(1);
-      expect(fs.promises.writeFile).toHaveBeenCalled();
+      expect(result.outputPath).toBeNull();
+      expect(fs.promises.writeFile).not.toHaveBeenCalled();
+      expect(session.close).toHaveBeenCalled();
     });
   });
 

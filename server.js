@@ -18,6 +18,7 @@ const {
   PAGE_CACHE_DIRECTORY
 } = require('./server/constants');
 const { initPageCache } = require('./server/services/page-cache');
+const { cleanupStaleRarTempDirs } = require('./server/services/archive-utils');
 
 const {
   loadConfigFromDisk,
@@ -172,6 +173,13 @@ const dbReady = initializeDatabase();
 
   // Prime the on-disk WebP page cache (creates dir + prunes any over-cap leftovers).
   await initPageCache();
+
+  try {
+    const removed = cleanupStaleRarTempDirs();
+    if (removed > 0) log('INFO', 'SERVER', `Removed ${removed} stale RAR temp dir(s)`);
+  } catch (e) {
+    log('WARN', 'SERVER', `RAR temp cleanup failed: ${e.message}`);
+  }
 
   const server = app.listen(PORT, () => {
     log('INFO', 'SERVER', `Server is running on http://localhost:${PORT}`);

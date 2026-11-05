@@ -13,67 +13,14 @@ const {
 const { createId, pMap, trimObjectStrings } = require('../../utils');
 const {
   THUMBNAILS_DIRECTORY,
-  METADATA_MARKER_FILE,
-  GUIDED_VIEW_DIR
+  METADATA_MARKER_FILE
 } = require('../../constants');
 
 const { convertCbrToCbz, convertPdfToCbz } = require('../library-conversion');
 const { getComicPages, generateThumbnail } = require('../library-pages');
 const { generateVirtualMetadata } = require('../library-metadata');
 
-/**
- * Reconciles guided-view status and sidecar paths for a comic archive.
- */
-async function reconcileGuidedView(id, filePath, existing, dbComicsMap) {
-  let guidedViewStatus = existing?.guidedViewStatus || 'pending';
-  let guidedViewPath = existing?.guidedViewPath || null;
-  const guidedViewError = existing?.guidedViewError || null;
-  const sidecarPath = path.join(GUIDED_VIEW_DIR, `${id}.json`);
-
-  if (guidedViewStatus === 'completed') {
-    if (!fs.existsSync(sidecarPath)) {
-      guidedViewStatus = 'pending';
-      guidedViewPath = null;
-    }
-  } else if (fs.existsSync(sidecarPath)) {
-    guidedViewStatus = 'completed';
-    guidedViewPath = sidecarPath;
-    log('INFO', 'SCAN', `Reconnected guided-view sidecar: ${path.basename(filePath)}`);
-  } else {
-    // If moved outside the app, check if a missing comic record has an existing sidecar to migrate
-    const baseName = path.basename(filePath);
-    for (const [oldPath, oldRec] of dbComicsMap.entries()) {
-      if (path.basename(oldPath) === baseName && oldRec.id !== id && !fs.existsSync(oldPath)) {
-        const oldSidecar = path.join(GUIDED_VIEW_DIR, `${oldRec.id}.json`);
-        if (fs.existsSync(oldSidecar)) {
-          try {
-            try {
-              const raw = await fs.promises.readFile(oldSidecar, 'utf8');
-              const parsed = JSON.parse(raw);
-              if (parsed && typeof parsed === 'object' && parsed.pages) {
-                parsed.comicId = id;
-                await fs.promises.writeFile(sidecarPath, JSON.stringify(parsed, null, 2), 'utf8');
-                if (oldSidecar !== sidecarPath && fs.existsSync(oldSidecar)) {
-                  try { await fs.promises.unlink(oldSidecar); } catch (_) {}
-                }
-              } else {
-                await fs.promises.rename(oldSidecar, sidecarPath);
-              }
-            } catch (_) {
-              await fs.promises.rename(oldSidecar, sidecarPath);
-            }
-            guidedViewStatus = 'completed';
-            guidedViewPath = sidecarPath;
-            log('INFO', 'SCAN', `Migrated moved comic guided-view sidecar: ${baseName}`);
-            break;
-          } catch (_) {}
-        }
-      }
-    }
-  }
-
-  return { guidedViewStatus, guidedViewPath, guidedViewError };
-}
+const { reconcileGuidedView } = require('./guided-reconcile');
 
 /**
  * Normalizes metadata extracted from archive or folder hierarchy.

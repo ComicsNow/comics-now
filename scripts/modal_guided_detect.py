@@ -235,7 +235,9 @@ def process_comic(comic_id: str, comic_path: str, comic_type: str, output_dir: s
         "type": comic_type,
         "pages": pages_result
     }
-    sidecar_path.write_text(json.dumps(result_payload, indent=2))
+    tmp_path = sidecar_path.with_suffix(sidecar_path.suffix + ".tmp")
+    tmp_path.write_text(json.dumps(result_payload, indent=2))
+    os.replace(tmp_path, sidecar_path)
 
     return {
         "ok": True,

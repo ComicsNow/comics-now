@@ -1,6 +1,7 @@
 const yauzl = require('yauzl');
 const { createExtractorFromFile } = require('node-unrar-js');
 const fs = require('fs');
+const os = require('os');
 const path = require('path');
 const { Readable } = require('stream');
 const { spawn } = require('child_process');
@@ -189,9 +190,9 @@ async function createZipReader(filePath) {
 
 
 class RarReader {
-    constructor(extractor, data) {
+    constructor(extractor, targetPath) {
         this.extractor = extractor;
-        this.data = data;
+        this.targetPath = targetPath;
         this.entries = [];
         const list = this.extractor.getFileList();
         for (const fileHeader of list.fileHeaders) {
@@ -209,10 +210,21 @@ class RarReader {
         if (!isSafeEntry(name)) {
             throw new Error('Potential path traversal attempt: ' + name);
         }
+        if (!this.targetPath) {
+            throw new Error('RAR extraction target is not configured');
+        }
+        // The file-based extractor writes entries to targetPath and yields only
+        // file headers, so consume the iterator before reading from disk.
         const extracted = this.extractor.extract({ files: [name] });
         const files = Array.from(extracted.files);
         if (files.length === 0) throw new Error('Entry not found: ' + name);
-        return Buffer.from(files[0].extraction);
+
+        const extractedPath = path.join(this.targetPath, path.basename(name.replace(/\\/g, '/')));
+        try {
+            return await fs.promises.readFile(extractedPath);
+        } finally {
+            await fs.promises.rm(extractedPath, { force: true }).catch(() => {});
+        }
     }
 
     async readStream(name) {
@@ -221,14 +233,26 @@ class RarReader {
     }
 
     close() {
-        // extractor doesn't need closing, but we might want to nullify data if large
-        this.data = null;
+        if (this.targetPath) {
+            fs.rmSync(this.targetPath, { recursive: true, force: true });
+            this.targetPath = null;
+        }
     }
 }
 
 async function createRarReader(filePath) {
-    const extractor = await createExtractorFromFile({ filepath: filePath });
-    return new RarReader(extractor, null);
+    const targetPath = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'comics-now-rar-'));
+    try {
+        const extractor = await createExtractorFromFile({
+            filepath: filePath,
+            targetPath,
+            filenameTransform: (name) => path.basename(name.replace(/\\/g, '/'))
+        });
+        return new RarReader(extractor, targetPath);
+    } catch (err) {
+        await fs.promises.rm(targetPath, { recursive: true, force: true }).catch(() => {});
+        throw err;
+    }
 }
 
 async function openArchive(filePath) {
@@ -242,16 +266,97 @@ async function openArchive(filePath) {
     }
 }
 
-async function listPages(filePath) {
-    const archive = await openArchive(filePath);
-    try {
-        const entries = archive.listEntries();
-        return entries
-            .filter(e => isImage(e) && !e.split('/').some(part => part.startsWith('.') || part === '__MACOSX'))
-            .sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }));
-    } finally {
-        archive.close();
+/**
+ * Filters archive entries down to visible image pages in reading order.
+ * RAR entry names may use backslashes, so path parts are split on both separators.
+ */
+function selectImagePages(entries) {
+    return (entries || [])
+        .filter(e => typeof e === 'string' && isImage(e))
+        .filter(e => !e.split(/[\\/]/).some(part => part.startsWith('.') || part === '__MACOSX'))
+        .sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }));
+}
+
+function createArchiveSession(archive) {
+    const pages = selectImagePages(archive.listEntries());
+    let closed = false;
+    let inFlight = 0;
+    let idleResolve = null;
+    let idlePromise = null;
+    let chain = Promise.resolve();
+
+    function readBuffer(name) {
+        if (closed) return Promise.reject(new Error('Archive session is closed'));
+        inFlight++;
+        // Serialize reads: the extractor is stateful and entries are flattened
+        // to basenames on disk, so concurrent duplicate names would collide.
+        const run = chain.then(() => archive.readBuffer(name));
+        chain = run.then(() => {}, () => {});
+        return run.finally(() => {
+            inFlight--;
+            if (inFlight === 0 && idleResolve) {
+                const resolve = idleResolve;
+                idleResolve = null;
+                idlePromise = null;
+                resolve();
+            }
+        });
     }
+
+    function close() {
+        if (closed) return Promise.resolve();
+        closed = true;
+        if (inFlight === 0) {
+            archive.close();
+            return Promise.resolve();
+        }
+        if (!idlePromise) {
+            idlePromise = new Promise(resolve => { idleResolve = resolve; });
+        }
+        return new Promise(resolve => {
+            const timer = setTimeout(resolve, 2000);
+            idlePromise.then(() => { clearTimeout(timer); resolve(); });
+        }).then(() => archive.close());
+    }
+
+    return { pages, readBuffer, close };
+}
+
+async function openArchiveSession(filePath) {
+    const archive = await openArchive(filePath);
+    return createArchiveSession(archive);
+}
+
+async function listPages(filePath) {
+    const session = await openArchiveSession(filePath);
+    await session.close();
+    return session.pages;
+}
+
+/**
+ * Removes leftover RAR extraction directories from crashed or interrupted runs.
+ */
+function cleanupStaleRarTempDirs(maxAgeMs = 24 * 60 * 60 * 1000, baseDir = os.tmpdir()) {
+    let removed = 0;
+    let names = [];
+    try {
+        names = fs.readdirSync(baseDir);
+    } catch (_) {
+        return 0;
+    }
+    const cutoff = Date.now() - maxAgeMs;
+    for (const name of names) {
+        if (!name.startsWith('comics-now-rar-')) continue;
+        const dirPath = path.join(baseDir, name);
+        try {
+            const stat = fs.statSync(dirPath);
+            if (stat.isDirectory() && stat.mtimeMs <= cutoff) {
+                fs.rmSync(dirPath, { recursive: true, force: true });
+                removed++;
+            }
+        } catch (_) {}
+    }
+    return removed;
 }
 
 async function getEntryBuffer(filePath, entryName) {
@@ -265,6 +370,9 @@ async function getEntryBuffer(filePath, entryName) {
 
 module.exports = {
     openArchive,
+    openArchiveSession,
+    selectImagePages,
+    cleanupStaleRarTempDirs,
     listPages,
     getEntryBuffer
 };
