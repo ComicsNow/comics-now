@@ -22,10 +22,11 @@ import { syncSmartFilterButtons, mountSmartFilterHostInto } from '../smart-filte
 import { isOrderBySeriesDate, getSeriesPublishedInfo } from './series-sort.js';
 import { showComicList } from './comics.js';
 import { renderPublisherReadingLists } from './reading-lists.js';
+import { renderPublisherStoryArcs } from './story-arcs.js';
 import { getSeriesStatusBanner } from './series/banner.js';
 import { createSeriesCard } from './series/card.js';
 
-export { renderPublisherReadingLists, getSeriesStatusBanner, createSeriesCard };
+export { renderPublisherReadingLists, renderPublisherStoryArcs, getSeriesStatusBanner, createSeriesCard };
 
 const actionsRef = (typeof actions !== 'undefined' && actions?.navigation) ? actions : (typeof globalThis !== 'undefined' ? globalThis.__COMICS_STORE__?.actions : null);
 const clear = typeof clearElement === 'function' ? clearElement : (el) => { if (el) { if (typeof el.replaceChildren === 'function') el.replaceChildren(); else el.innerHTML = ''; } };
@@ -113,6 +114,11 @@ export function showSeriesList(publisherName, options = {}) {
   if (state.activeSmartFilter === 'reading-list') {
     if (sortContainer) sortContainer.classList.add('hidden');
     renderPublisherReadingLists(publisherName);
+    return;
+  }
+  if (state.activeSmartFilter === 'story-arc') {
+    if (sortContainer) sortContainer.classList.add('hidden');
+    renderPublisherStoryArcs(publisherName);
     return;
   }
   if (sortContainer) sortContainer.classList.remove('hidden');

@@ -6,6 +6,7 @@ import {
 import { LATEST_ADDED_DAYS } from './predicates.js';
 import { getDownloadedSmartListComics } from './downloaded.js';
 import { updateReadingListFilterButtonCount } from './publisher-match.js';
+import { updateStoryArcFilterButtonCount } from './story-arcs.js';
 
 let latestComics = [];
 let guidedComics = [];
@@ -90,6 +91,9 @@ export function updateLatestButtonCount() {
 
     updateMangaFilterButtonCount();
     updateReadingListFilterButtonCount();
+    if (typeof updateStoryArcFilterButtonCount === 'function') {
+      updateStoryArcFilterButtonCount();
+    }
 
     if (spanLatest) {
       spanLatest.textContent = latestComics.length.toString();

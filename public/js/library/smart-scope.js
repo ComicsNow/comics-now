@@ -5,7 +5,7 @@ const global = typeof canonicalGlobal !== 'undefined' ? canonicalGlobal : new Pr
   set: (t, p, v) => { if (typeof state !== 'undefined') state[p] = v; try { t[p] = v; } catch {} return true; }
 });
 
-const SMART_LIST_VIEWS = ['latest', 'downloaded', 'guided', 'manga', 'non-manga', 'reading-list'];
+const SMART_LIST_VIEWS = ['latest', 'downloaded', 'guided', 'manga', 'non-manga', 'reading-list', 'story-arc'];
 
 export function renderForActiveScope(scope) {
   if (scope && global.smartListViewMode === 'list') {
@@ -102,5 +102,14 @@ export function initSmartScopeControls() {
       setSmartScope(global.activeSmartFilter === 'reading-list' ? null : 'reading-list');
     };
     readingListFilterBtn.addEventListener('click', readingListFilterBtn._smartListListener);
+  }
+
+  const storyArcFilterBtn = document.getElementById('dynamic-story-arc-filter-btn');
+  if (storyArcFilterBtn && !storyArcFilterBtn._smartListListener) {
+    storyArcFilterBtn._smartListListener = (event) => {
+      event.preventDefault();
+      setSmartScope(global.activeSmartFilter === 'story-arc' ? null : 'story-arc');
+    };
+    storyArcFilterBtn.addEventListener('click', storyArcFilterBtn._smartListListener);
   }
 }

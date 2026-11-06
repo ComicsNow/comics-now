@@ -15,6 +15,7 @@ import { showPublisherList, renderPublisherCards } from './publishers.js';
 import {
   showSeriesList,
   renderPublisherReadingLists,
+  renderPublisherStoryArcs,
   renderSeriesCards,
   getSeriesStatusBanner
 } from './series.js';
@@ -71,6 +72,7 @@ export {
   renderPublisherCards,
   showSeriesList,
   renderPublisherReadingLists,
+  renderPublisherStoryArcs,
   renderSeriesCards,
   getSeriesStatusBanner,
   showComicList,

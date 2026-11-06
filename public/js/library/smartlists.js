@@ -44,6 +44,11 @@ import {
   rebuildLatestComics,
   getLatestComics
 } from './smartlists/counters.js';
+import {
+  fetchStoryArcsForPublisher,
+  getStoryArcsForPublisher,
+  updateStoryArcFilterButtonCount
+} from './smartlists/story-arcs.js';
 
 export {
   LATEST_ADDED_DAYS,
@@ -63,6 +68,9 @@ export {
   setCachedReadingLists,
   getReadingListsForPublisher,
   updateReadingListFilterButtonCount,
+  fetchStoryArcsForPublisher,
+  getStoryArcsForPublisher,
+  updateStoryArcFilterButtonCount,
   parseDownloadedTimestamp,
   findDownloadedComicById,
   updateDownloadedComicProgressData,
@@ -84,6 +92,10 @@ export {
   rebuildLatestComics,
   getLatestComics
 };
+
+const _fetchStoryArcs = typeof fetchStoryArcsForPublisher !== 'undefined' ? fetchStoryArcsForPublisher : () => Promise.resolve([]);
+const _getStoryArcs = typeof getStoryArcsForPublisher !== 'undefined' ? getStoryArcsForPublisher : () => [];
+const _updateStoryArcBtn = typeof updateStoryArcFilterButtonCount !== 'undefined' ? updateStoryArcFilterButtonCount : () => {};
 
 const LibrarySmartLists = {
   LATEST_ADDED_DAYS,
@@ -110,6 +122,9 @@ const LibrarySmartLists = {
   getDownloadedSmartListError,
   updateDownloadedSmartListComic,
   updateReadingListFilterButtonCount,
+  fetchStoryArcsForPublisher: _fetchStoryArcs,
+  getStoryArcsForPublisher: _getStoryArcs,
+  updateStoryArcFilterButtonCount: _updateStoryArcBtn,
   getReadingListsForPublisher,
   fetchAndCacheReadingLists,
   getCachedReadingLists,

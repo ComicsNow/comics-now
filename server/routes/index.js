@@ -37,6 +37,7 @@ const attachUserProgressRoutes = require('./user/progress');
 const attachUserLibraryRoutes = require('./user/library');
 const attachUserPagesRoutes = require('./user/pages');
 const attachUserMetadataRoutes = require('./user/metadata');
+const attachUserStoryArcsRoutes = require('./user/story-arcs');
 
 const attachAdminUsersRoutes = require('./admin/users');
 const attachAdminComictaggerRoutes = require('./admin/comictagger');
@@ -132,6 +133,7 @@ function setupUserRoutes(router, extendedDeps, requireUserAuth) {
   attachUserLibraryRoutes(userRouter, extendedDeps);
   attachUserPagesRoutes(userRouter, extendedDeps);
   attachUserMetadataRoutes(userRouter, extendedDeps);
+  attachUserStoryArcsRoutes(userRouter, extendedDeps);
   router.use(userRouter);
 }
 

@@ -3,6 +3,7 @@
  * Handles navigation to next comic in series or reading list when reaching the end
  */
 import { state, global as canonicalGlobal } from '../globals.js';
+import { getNextComicInStoryArc, renderStoryArcPrompt } from './end-story-arc.js';
 
 const global = typeof canonicalGlobal !== 'undefined' ? canonicalGlobal : new Proxy(typeof window !== 'undefined' ? window : globalThis, {
   get: (t, p) => (typeof state !== 'undefined' && p in state) ? state[p] : t[p],
@@ -231,12 +232,16 @@ const global = typeof canonicalGlobal !== 'undefined' ? canonicalGlobal : new Pr
       return;
     }
 
-    const [nextInList, nextInSeries] = await Promise.all([
+    const getNextArc = typeof getNextComicInStoryArc !== 'undefined' ? getNextComicInStoryArc : async () => null;
+    const renderArc = typeof renderStoryArcPrompt !== 'undefined' ? renderStoryArcPrompt : () => {};
+
+    const [nextInList, nextInSeries, arcContinuity] = await Promise.all([
       getNextComicInReadingList(),
-      getNextComicInSeries()
+      getNextComicInSeries(),
+      getNextArc(global.currentComic)
     ]);
 
-    if (!nextInList && !nextInSeries) {
+    if (!nextInList && !nextInSeries && !arcContinuity) {
       nav?.classList.add('hidden');
       fsNav?.classList.add('hidden');
       return;
@@ -244,6 +249,11 @@ const global = typeof canonicalGlobal !== 'undefined' ? canonicalGlobal : new Pr
 
     nav?.classList.remove('hidden');
     fsNav?.classList.remove('hidden');
+
+    renderArc(nav, arcContinuity, (comicId) => {
+      const nextComic = global.getComicById?.(comicId);
+      if (nextComic) navigateToNextComic(nextComic);
+    });
 
     // Next in Series button
     if (nextInSeries) {

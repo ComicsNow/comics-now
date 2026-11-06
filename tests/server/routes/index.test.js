@@ -48,6 +48,7 @@ jest.mock('../../../server/routes/user/progress', () => jest.fn());
 jest.mock('../../../server/routes/user/library', () => jest.fn());
 jest.mock('../../../server/routes/user/pages', () => jest.fn());
 jest.mock('../../../server/routes/user/metadata', () => jest.fn());
+jest.mock('../../../server/routes/user/story-arcs', () => jest.fn());
 jest.mock('../../../server/routes/admin/users', () => jest.fn());
 jest.mock('../../../server/routes/admin/comictagger', () => jest.fn());
 jest.mock('../../../server/routes/admin/guided', () => jest.fn());
