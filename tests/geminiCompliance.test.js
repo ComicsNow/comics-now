@@ -1,5 +1,13 @@
 const fs = require('fs');
 const express = require('express');
+
+jest.mock('../server/utils/crypto-vault', () => ({
+  encrypt: jest.fn(k => `enc_${k}`),
+  decrypt: jest.fn(k => k ? k.replace(/^enc_/, '') : ''),
+  isMasked: jest.fn(k => typeof k === 'string' && k.includes('•••')),
+  mask: jest.fn(k => k ? `${k.slice(0, 4)}••••` : '')
+}));
+
 const attachGeminiRoutes = require('../server/routes/admin/gemini');
 
 describe('Compliance & Config Endpoints', () => {

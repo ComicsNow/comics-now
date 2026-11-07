@@ -2033,6 +2033,53 @@ body.eink-color-mode #viewer-pages-continuous img {
     color: var(--cyan) !important;
 }
 
+/* Responsive Mobile Filters Layout: Top on 1 line, Smart Lists on 2 lines */
+@media (max-width: 640px) {
+    #filter-buttons {
+        flex-wrap: nowrap !important;
+        width: 100% !important;
+        max-width: 420px !important;
+        justify-content: space-between !important;
+        gap: 4px !important;
+    }
+    #filter-buttons .pill-button {
+        padding: 0.38rem 0.3rem !important;
+        font-size: 0.6875rem !important;
+        flex: 1 1 0px !important;
+        justify-content: center !important;
+        letter-spacing: 0.01em !important;
+    }
+    #filter-buttons .pill-button[data-filter="all"] {
+        flex: 0 0 52px !important;
+    }
+    #filter-buttons .pill-button .count-badge {
+        padding: 0.1rem 0.25rem !important;
+        font-size: 0.625rem !important;
+    }
+
+    #smart-list-buttons {
+        display: flex !important;
+        flex-wrap: wrap !important;
+        justify-content: center !important;
+        gap: 6px !important;
+        width: 100% !important;
+        max-width: 420px !important;
+    }
+    #smart-list-buttons .pill-button:not(.hidden) {
+        flex: 1 1 calc(33.333% - 6px) !important;
+        max-width: calc(33.333% - 4px) !important;
+        min-width: 90px !important;
+        padding: 0.42rem 0.25rem !important;
+        font-size: 0.65rem !important;
+        justify-content: center !important;
+        letter-spacing: 0.01em !important;
+    }
+    #smart-list-buttons .pill-button .count-badge {
+        padding: 0.1rem 0.25rem !important;
+        font-size: 0.625rem !important;
+    }
+}
+
 /* Alphabet Filter button style overrides */
 .alpha-filter-btn {
     width: 1.75rem !important;

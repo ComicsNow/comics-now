@@ -51,7 +51,7 @@ function createSmartFiltersSandbox() {
   vm.createContext(sandbox);
 
   function loadFile(relPath) {
-    const fullPath = path.resolve('/opt/comics-now', relPath);
+    const fullPath = path.resolve(__dirname, '../../../..', relPath);
     let content = fs.readFileSync(fullPath, 'utf8');
     content = content
       .replace(/import\s+[\s\S]*?from\s+['"][^'"]+['"];?/g, '')
@@ -106,6 +106,33 @@ describe('Smart Filters Module', () => {
     setMangaFilterButtonActive(true);
     const mangaBtn = document.getElementById('dynamic-manga-filter-btn');
     expect(mangaBtn.classList.contains('bg-purple-600')).toBe(true);
+  });
+
+  test('syncSmartFilterButtons hides smart-scope-mode-toggle for reading-list and story-arc scopes', () => {
+    env.loadFile('public/js/library/filters/buttons.js');
+    const { syncSmartFilterButtons } = env.sandbox;
+    const modeToggle = document.getElementById('smart-scope-mode-toggle');
+
+    // 1. scope = 'latest' -> mode toggle should be visible
+    env.state.activeSmartFilter = 'latest';
+    syncSmartFilterButtons();
+    expect(modeToggle.classList.contains('hidden')).toBe(false);
+
+    // 2. scope = 'reading-list' -> mode toggle should be hidden
+    env.state.activeSmartFilter = 'reading-list';
+    syncSmartFilterButtons();
+    expect(modeToggle.classList.contains('hidden')).toBe(true);
+
+    // 3. scope = 'story-arc' -> mode toggle should be hidden
+    env.state.activeSmartFilter = 'story-arc';
+    syncSmartFilterButtons();
+    expect(modeToggle.classList.contains('hidden')).toBe(true);
+
+    // 4. no scope and activeFilter = 'all' -> mode toggle should be hidden
+    env.state.activeSmartFilter = null;
+    env.state.activeFilter = 'all';
+    syncSmartFilterButtons();
+    expect(modeToggle.classList.contains('hidden')).toBe(true);
   });
 
   test('predicate collects drill-in ids and scopes comics correctly', () => {

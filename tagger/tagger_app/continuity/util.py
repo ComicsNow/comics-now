@@ -1,17 +1,25 @@
 """Continuity String & Issue Number Normalization Utilities."""
 import re
+import sqlite3
 from pathlib import Path
 from typing import Optional, Any, List
 
 
 def normalize_series(series: str, strip_article: bool = True) -> str:
-    """Normalize series name by removing volume indicators, years, punctuation, and optionally articles."""
+    """Normalize series name by removing volume indicators, years, punctuation, editions, and optionally articles."""
     if not series:
         return ""
     s = str(series).strip().replace("’", "'").replace("‘", "'")
     s = re.sub(r"\s*\(\d{4}\)", "", s)
     s = re.sub(r"^(?:dc\s*k\.?o\.?|civil\s*war|blackest\s*night)\s*[:\-–—]\s*", "", s, flags=re.IGNORECASE)
-    s = re.sub(r"\b(?:vol(?:ume)?\.?\s*\d+)\b", " ", s, flags=re.IGNORECASE)
+    # Strip edition and collection format keywords
+    s = re.sub(
+        r"\b(?:35th\s+anniversary|deluxe(?:\s+edition)?|omnibus|companion|special\s+edition|director's\s+cut)\b",
+        " ",
+        s,
+        flags=re.IGNORECASE,
+    )
+    s = re.sub(r"\b(?:vol(?:ume)?\.?\s*\d+|book\s*\d+|hc|tpb)\b", " ", s, flags=re.IGNORECASE)
     s = re.sub(r"[^a-zA-Z0-9']", " ", s)
     tokens = s.lower().split()
     if strip_article and tokens and tokens[0] == "the":
@@ -165,8 +173,54 @@ def expand_publisher_aliases(pub: str) -> List[str]:
     if not pub:
         return []
     p = pub.strip()
-    if "DC" in p:
-        return ["DC", "DC Comics", "Vertigo", "Black Label", "WildStorm", "Milestone"]
-    if "Marvel" in p:
-        return ["Marvel", "Marvel Comics", "MAX", "Icon", "Marvel Knights"]
+    if "DC" in p or p.lower() in ["dc", "vertigo", "black label", "wildstorm", "milestone"]:
+        return [
+            "DC",
+            "DC Comics",
+            "Vertigo",
+            "Black Label",
+            "WildStorm",
+            "Milestone",
+            "Americas Best Comics",
+            "America's Best Comics",
+            "Amalgam Comics",
+            "Paradox Press",
+            "Berger Books",
+        ]
+    if "Marvel" in p or p.lower() in ["marvel", "max", "icon", "knights"]:
+        return [
+            "Marvel",
+            "Marvel Comics",
+            "MAX",
+            "Icon",
+            "Icon Comics",
+            "Marvel Knights",
+            "Epic Graphic Novels",
+        ]
     return [p]
+
+
+def get_supported_publishers(ro_db_path: Path | str) -> List[str]:
+    """Return list of all supported publisher aliases represented in reading-orders.db."""
+    db_file = Path(ro_db_path)
+    if not db_file.exists():
+        # Fallback to standard DC and Marvel families
+        return expand_publisher_aliases("DC Comics") + expand_publisher_aliases("Marvel Comics")
+
+    try:
+        conn = sqlite3.connect(str(db_file), timeout=5.0)
+        cursor = conn.cursor()
+        cursor.execute("SELECT DISTINCT publisher FROM reading_orders WHERE publisher IS NOT NULL AND publisher != ''")
+        pubs = [r[0] for r in cursor.fetchall()]
+        conn.close()
+
+        aliases = set()
+        for p in pubs:
+            for a in expand_publisher_aliases(p):
+                aliases.add(a)
+        if not aliases:
+            aliases.update(expand_publisher_aliases("DC Comics"))
+            aliases.update(expand_publisher_aliases("Marvel Comics"))
+        return sorted(aliases)
+    except Exception:
+        return expand_publisher_aliases("DC Comics") + expand_publisher_aliases("Marvel Comics")

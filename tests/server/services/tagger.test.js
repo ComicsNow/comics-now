@@ -1,3 +1,5 @@
+const fs = require('fs');
+const path = require('path');
 const { buildTaggedDbMeta, resolveVolumeAndSeries } = require('../../../server/services/tagger/persist');
 const { resolveScanMode, SCAN_MODES } = require('../../../server/services/tagger/gates');
 const { formatDuration } = require('../../../server/services/tagger/engine-client');
@@ -102,5 +104,12 @@ describe('Tagger Submodules - Unit & Health Verification', () => {
       expect(isTaggerRunning()).toBe(false);
       expect(cancelComicTagger()).toBe(false);
     });
+
+    test('runner imports and resolves formatDuration from engine-client without ReferenceError', () => {
+      const runnerCode = fs.readFileSync(path.resolve(__dirname, '../../../server/services/tagger/runner.js'), 'utf8');
+      expect(runnerCode).toMatch(/formatDuration/);
+      expect(runnerCode).toMatch(/const\s*\{\s*formatDuration\b/);
+    });
   });
 });
+

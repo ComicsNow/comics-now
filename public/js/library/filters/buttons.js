@@ -5,11 +5,11 @@ import {
 } from '../../globals.js';
 
 function getLatestBtn() {
-  return latestAddedButton || (typeof document !== 'undefined' ? document.getElementById('latest-added-btn') : null);
+  return (typeof latestAddedButton !== 'undefined' ? latestAddedButton : null) || (typeof document !== 'undefined' ? document.getElementById('latest-added-btn') : null);
 }
 
 function getDownloadedBtn() {
-  return downloadedButton || (typeof document !== 'undefined' ? document.getElementById('downloaded-btn') : null);
+  return (typeof downloadedButton !== 'undefined' ? downloadedButton : null) || (typeof document !== 'undefined' ? document.getElementById('downloaded-btn') : null);
 }
 
 export function setLatestButtonActive(isActive) {
@@ -104,7 +104,12 @@ export function syncSmartFilterButtons() {
   if (modeToggle) {
     const activeFilter = state.activeFilter || (typeof window !== 'undefined' ? window.activeFilter : null);
     const isFilterActive = typeof activeFilter !== 'undefined' && activeFilter !== 'all';
-    modeToggle.classList.toggle('hidden', !scope && !isFilterActive);
+    const isCuratedList = scope === 'reading-list' || scope === 'story-arc';
+    if (isCuratedList || (!scope && !isFilterActive)) {
+      modeToggle.classList.add('hidden');
+    } else {
+      modeToggle.classList.remove('hidden');
+    }
   }
 }
 

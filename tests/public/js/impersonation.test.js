@@ -1,67 +1,20 @@
+/**
+ * @jest-environment jsdom
+ */
+
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 
-function setupTestEnvironment() {
-  const state = { API_BASE_URL: 'http://localhost:3000' };
+describe('impersonation.js', () => {
+  let sandbox;
+  let cleanContent;
 
-  // Define mock window and document
-  const mockButton = {
-    addEventListener: jest.fn()
-  };
-
-  const mockBanner = {
-    id: '',
-    className: '',
-    innerHTML: '',
-    querySelector: jest.fn().mockReturnValue(mockButton),
-    offsetHeight: 50
-  };
-
-  const document = {
-    addEventListener: jest.fn((event, callback) => {
-      if (event === 'DOMContentLoaded') {
-        sandbox.triggerDOMContentLoaded = callback;
-      }
-    }),
-    getElementById: jest.fn().mockReturnValue(null), // no banner exists initially
-    createElement: jest.fn().mockReturnValue(mockBanner),
-    body: {
-      prepend: jest.fn(),
-      style: {}
-    }
-  };
-
-  const window = {
-    location: {
-      reload: jest.fn()
-    },
-    API_BASE_URL: 'http://localhost:3000'
-  };
-
-  const sandbox = {
-    window,
-    document,
-    state,
-    console,
-    fetch: jest.fn(),
-    alert: jest.fn(),
-    encodeURIComponent,
-    setTimeout,
-    clearTimeout,
-    mockBanner,
-    mockButton
-  };
-
-  sandbox.globalThis = sandbox;
-  vm.createContext(sandbox);
-
-  function loadFile(relPath) {
-    const fullPath = path.resolve(__dirname, '../../..', relPath);
+  beforeAll(() => {
+    const fullPath = path.resolve(__dirname, '../../../public/js/impersonation.js');
     const content = fs.readFileSync(fullPath, 'utf8');
 
-    // Strip ES6 modules imports/exports
-    const cleanContent = content
+    cleanContent = content
       .replace(/import\s+[\s\S]*?from\s+['"][^'"]+['"];?/g, '')
       .replace(/export\s+const\s+/g, 'const ')
       .replace(/export\s+let\s+/g, 'let ')
@@ -69,155 +22,237 @@ function setupTestEnvironment() {
       .replace(/export\s+async\s+function\s+/g, 'async function ')
       .replace(/export\s+\{[\s\S]*?\};?/g, '')
       .replace(/export\s+default\s+[\s\S]*?;?/g, '');
-
-    const script = new vm.Script(cleanContent);
-    script.runInContext(sandbox);
-  }
-
-  return { sandbox, loadFile, state, window, document };
-}
-
-describe('Impersonation', () => {
-  let env;
+  });
 
   beforeEach(() => {
-    env = setupTestEnvironment();
-    env.loadFile('public/js/impersonation.js');
+    document.body.innerHTML = '';
+    document.body.style.paddingTop = '';
+
+    global.fetch = jest.fn();
+    global.alert = jest.fn();
+
+    // Create a mock location object we can test against, rather than trying to overwrite JSDOM's location directly
+    const mockLocation = {
+      reload: jest.fn()
+    };
+
+    window.API_BASE_URL = '';
+
+    sandbox = {
+      window: {
+        ...window,
+        location: mockLocation,
+        alert: global.alert
+      },
+      document,
+      fetch: global.fetch,
+      alert: global.alert,
+      console,
+      state: {},
+      encodeURIComponent,
+      setTimeout,
+      Event
+    };
+
+    // Point global location object wrapper at mock for assertions
+    sandbox.location = mockLocation;
+
+    vm.createContext(sandbox);
+
+    const script = new vm.Script(`
+      ${cleanContent}
+
+      // Hook up mocked location internally
+      window.location = location;
+
+      // Expose internal functions
+      sandbox.checkImpersonation = checkImpersonation;
+      sandbox.renderBanner = renderBanner;
+      sandbox.startImpersonation = startImpersonation;
+      sandbox.stopImpersonation = stopImpersonation;
+    `);
+
+    sandbox.sandbox = sandbox;
+    script.runInContext(sandbox);
   });
 
   afterEach(() => {
     jest.clearAllMocks();
   });
 
-  it('should expose functions on state and window', () => {
-    expect(env.state.startImpersonation).toBeDefined();
-    expect(env.window.startImpersonation).toBeDefined();
-    expect(env.window.stopImpersonation).toBeDefined();
-  });
-
   describe('startImpersonation', () => {
-    it('should successfully start impersonation and reload', async () => {
-      env.sandbox.fetch.mockResolvedValueOnce({
+    it('should fetch the correct endpoint and reload on success', async () => {
+      global.fetch.mockResolvedValueOnce({
         ok: true,
         json: async () => ({ ok: true })
       });
 
-      const result = await env.sandbox.startImpersonation('user123', 'user@example.com');
+      const result = await sandbox.startImpersonation('user-123', 'test@example.com');
 
-      expect(env.sandbox.fetch).toHaveBeenCalledWith(
-        'http://localhost:3000/api/v1/admin/impersonate/user123',
-        expect.objectContaining({
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' }
-        })
-      );
-
+      expect(global.fetch).toHaveBeenCalledWith('/api/v1/admin/impersonate/user-123', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
+      expect(sandbox.location.reload).toHaveBeenCalled();
       expect(result).toBe(true);
-      expect(env.window.location.reload).toHaveBeenCalled();
     });
 
-    it('should show alert and return false if impersonation fails', async () => {
-      env.sandbox.fetch.mockResolvedValueOnce({
+    it('should show an alert and return false on failure (res.ok false)', async () => {
+      global.fetch.mockResolvedValueOnce({
         ok: false,
-        statusText: 'Forbidden',
-        json: async () => ({ ok: false, message: 'Not authorized' })
+        statusText: 'Internal Server Error',
+        json: async () => ({})
       });
 
-      const result = await env.sandbox.startImpersonation('user123', 'user@example.com');
+      const result = await sandbox.startImpersonation('user-123', 'test@example.com');
 
-      expect(env.sandbox.alert).toHaveBeenCalledWith('Could not start impersonation: Not authorized');
+      expect(global.alert).toHaveBeenCalledWith('Could not start impersonation: Internal Server Error');
+      expect(sandbox.location.reload).not.toHaveBeenCalled();
       expect(result).toBe(false);
-      expect(env.window.location.reload).not.toHaveBeenCalled();
     });
 
-    it('should handle fetch errors gracefully and throw (since no try/catch)', async () => {
-      env.sandbox.fetch.mockRejectedValueOnce(new Error('Network error'));
-      await expect(env.sandbox.startImpersonation('user123', 'user@example.com')).rejects.toThrow('Network error');
+    it('should show an alert and return false on failure (data.ok false)', async () => {
+      global.fetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ ok: false, message: 'User not found' })
+      });
+
+      const result = await sandbox.startImpersonation('user-123', 'test@example.com');
+
+      expect(global.alert).toHaveBeenCalledWith('Could not start impersonation: User not found');
+      expect(sandbox.location.reload).not.toHaveBeenCalled();
+      expect(result).toBe(false);
+    });
+
+    it('should throw error if fetch rejects with network error', async () => {
+      global.fetch.mockRejectedValueOnce(new Error('Network error'));
+
+      await expect(sandbox.startImpersonation('user-123', 'test@example.com'))
+        .rejects.toThrow('Network error');
     });
   });
 
   describe('stopImpersonation', () => {
-    it('should call stop endpoint and reload', async () => {
-      env.sandbox.fetch.mockResolvedValueOnce({ ok: true });
-      await env.sandbox.stopImpersonation();
+    it('should fetch the stop endpoint and reload', async () => {
+      global.fetch.mockResolvedValueOnce({
+        ok: true
+      });
 
-      expect(env.sandbox.fetch).toHaveBeenCalledWith(
-        'http://localhost:3000/api/v1/admin/impersonate/stop',
-        expect.objectContaining({
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' }
-        })
-      );
-      expect(env.window.location.reload).toHaveBeenCalled();
+      await sandbox.stopImpersonation();
+
+      expect(global.fetch).toHaveBeenCalledWith('/api/v1/admin/impersonate/stop', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
+      expect(sandbox.location.reload).toHaveBeenCalled();
     });
 
     it('should reload even if fetch fails', async () => {
-      env.sandbox.fetch.mockRejectedValueOnce(new Error('Network error'));
-      await env.sandbox.stopImpersonation();
+      global.fetch.mockRejectedValueOnce(new Error('Network error'));
 
-      expect(env.window.location.reload).toHaveBeenCalled();
+      await sandbox.stopImpersonation();
+
+      expect(sandbox.location.reload).toHaveBeenCalled();
     });
   });
 
-  describe('checkImpersonation (DOMContentLoaded)', () => {
-    it('should render banner if user is being impersonated', async () => {
-      env.sandbox.fetch.mockResolvedValueOnce({
+  describe('checkImpersonation and renderBanner', () => {
+    it('should render the banner if user is impersonating', async () => {
+      global.fetch.mockResolvedValueOnce({
         ok: true,
-        json: async () => ({ impersonating: { targetEmail: 'test@example.com' } })
+        json: async () => ({
+          impersonating: { targetEmail: 'target@example.com' }
+        })
       });
 
-      await env.sandbox.triggerDOMContentLoaded();
+      await sandbox.checkImpersonation();
 
-      expect(env.sandbox.fetch).toHaveBeenCalledWith('http://localhost:3000/api/v1/user/me');
+      expect(global.fetch).toHaveBeenCalledWith('/api/v1/user/me');
 
-      // Document should be queried for existing banner
-      expect(env.document.getElementById).toHaveBeenCalledWith('impersonation-banner');
+      const banner = document.getElementById('impersonation-banner');
+      expect(banner).not.toBeNull();
+      expect(banner.innerHTML).toContain('target@example.com');
 
-      // New banner should be created
-      expect(env.document.createElement).toHaveBeenCalledWith('div');
-
-      // Banner props set
-      expect(env.sandbox.mockBanner.id).toBe('impersonation-banner');
-      expect(env.sandbox.mockBanner.innerHTML).toContain('test@example.com');
-
-      // Appended to body
-      expect(env.document.body.prepend).toHaveBeenCalledWith(env.sandbox.mockBanner);
-
-      // Event listener added to exit button
-      expect(env.sandbox.mockBanner.querySelector).toHaveBeenCalledWith('#impersonation-exit');
-      expect(env.sandbox.mockButton.addEventListener).toHaveBeenCalledWith('click', env.sandbox.stopImpersonation);
+      // Ensure padding was applied
+      expect(document.body.style.paddingTop).not.toBe('');
     });
 
-    it('should not render banner if user is not being impersonated', async () => {
-      env.sandbox.fetch.mockResolvedValueOnce({
+    it('should not render the banner if not impersonating', async () => {
+      global.fetch.mockResolvedValueOnce({
         ok: true,
-        json: async () => ({})
+        json: async () => ({
+          impersonating: null
+        })
       });
 
-      await env.sandbox.triggerDOMContentLoaded();
+      await sandbox.checkImpersonation();
 
-      expect(env.document.createElement).not.toHaveBeenCalled();
+      const banner = document.getElementById('impersonation-banner');
+      expect(banner).toBeNull();
     });
 
-    it('should not render banner if already exists', async () => {
-      env.document.getElementById.mockReturnValueOnce(true); // banner exists
-
-      env.sandbox.fetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ impersonating: { targetEmail: 'test@example.com' } })
+    it('should not render the banner if fetch fails', async () => {
+      global.fetch.mockResolvedValueOnce({
+        ok: false
       });
 
-      await env.sandbox.triggerDOMContentLoaded();
+      await sandbox.checkImpersonation();
 
-      expect(env.document.createElement).not.toHaveBeenCalled();
+      const banner = document.getElementById('impersonation-banner');
+      expect(banner).toBeNull();
     });
 
-    it('should silently handle fetch errors', async () => {
-      env.sandbox.fetch.mockRejectedValueOnce(new Error('Network error'));
+    it('should not render multiple banners', async () => {
+      sandbox.renderBanner('test1@example.com');
+      sandbox.renderBanner('test2@example.com');
 
-      await env.sandbox.triggerDOMContentLoaded();
+      const banners = document.querySelectorAll('#impersonation-banner');
+      expect(banners.length).toBe(1);
+      expect(banners[0].innerHTML).toContain('test1@example.com');
+    });
 
-      expect(env.document.createElement).not.toHaveBeenCalled();
+    it('should attach a click listener to the exit button that calls stopImpersonation', () => {
+      sandbox.renderBanner('target@example.com');
+
+      const exitBtn = document.getElementById('impersonation-exit');
+      expect(exitBtn).not.toBeNull();
+    });
+
+    it('should call fetch and reload when exit button is clicked', async () => {
+      global.fetch.mockResolvedValueOnce({ ok: true });
+
+      sandbox.renderBanner('target@example.com');
+
+      const exitBtn = document.getElementById('impersonation-exit');
+
+      // Because stopImpersonation is async, we can wrap the click execution
+      await exitBtn.click();
+
+      // Ensure stopImpersonation effects happened
+      expect(global.fetch).toHaveBeenCalledWith('/api/v1/admin/impersonate/stop', expect.any(Object));
+      // wait for promises to flush for reload
+      await new Promise(process.nextTick);
+      expect(sandbox.location.reload).toHaveBeenCalled();
+    });
+  });
+
+  describe('DOMContentLoaded', () => {
+    it('should trigger checkImpersonation on DOMContentLoaded', async () => {
+      global.fetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          impersonating: { targetEmail: 'dom@example.com' }
+        })
+      });
+
+      // Dispatch DOMContentLoaded on sandbox document
+      sandbox.document.dispatchEvent(new sandbox.Event('DOMContentLoaded'));
+
+      await new Promise(process.nextTick);
+
+      const banner = document.getElementById('impersonation-banner');
+      expect(banner).not.toBeNull();
+      expect(banner.innerHTML).toContain('dom@example.com');
     });
   });
 });

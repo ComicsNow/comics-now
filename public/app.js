@@ -32,7 +32,6 @@ import { showReadingListDetail } from './js/app/reading-list-detail.js';
 
 // Side-effect imports to load and register all other ES Modules in order
 import './js/reading-list-dag.js';
-import './js/dag/timeline.js';
 import './js/router.js';
 import './js/utils/device-detection.js';
 import './js/offline/db-core.js';

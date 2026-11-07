@@ -26,7 +26,8 @@ test.describe('ComicsNow! E2E Test Suite', () => {
     await settingsPromise;
     await page.waitForTimeout(500); // Allow JS to populate the values
 
-    // Switch to Comics Defaults tab
+    // Switch to Reader scope, then Comics Defaults tab
+    await page.click('#settings-scope-reader-btn');
     await page.click('#settings-tab-comics-defaults');
 
     // Submit the settings form directly to avoid tab-switch reset
@@ -35,7 +36,8 @@ test.describe('ComicsNow! E2E Test Suite', () => {
     // Wait for settings to save successfully
     await expect(page.locator('#settings-status')).toContainText('Settings saved!');
 
-    // Switch back to General tab so the Scan button becomes visible
+    // Switch back to Server Admin scope and Storage tab so the Scan button becomes visible
+    await page.click('#settings-scope-server-btn');
     await page.click('#settings-tab-general');
     
     // Trigger Library Scan
@@ -54,18 +56,18 @@ test.describe('ComicsNow! E2E Test Suite', () => {
     await page.waitForSelector('.folder-card');
     await page.locator('.folder-card', { hasText: 'library' }).first().click();
 
-    // Check that we see the publishers rendered (DC Comics, Marvel Comics)
+    // Check that we see the publishers rendered (DC Comics, Marvel)
     await page.waitForSelector('.series-card');
     const dcCard = page.locator('.series-card', { hasText: 'DC Comics' });
-    const marvelCard = page.locator('.series-card', { hasText: 'Marvel Comics' });
+    const marvelCard = page.locator('.series-card', { hasText: 'Marvel' });
 
     await expect(dcCard).toBeVisible();
     await expect(marvelCard).toBeVisible();
 
-    // Click Marvel Comics to drill down
+    // Click Marvel to drill down
     await marvelCard.click();
     
-    // Since Marvel Comics only has one series ("Amazing Spider-Man"), 
+    // Since Marvel only has one series ("Amazing Spider-Man"), 
     // the UI automatically drills down to the comic list view!
     // Let's verify "Amazing Spider-Man #1" is visible.
     const comicCard = page.locator('.comic-card', { hasText: 'Amazing Spider-Man #1' });
@@ -73,7 +75,7 @@ test.describe('ComicsNow! E2E Test Suite', () => {
 
     // Test breadcrumbs back up to the Series List view
     // (using force: true internally to display the series card)
-    await page.locator('#breadcrumb button', { hasText: 'Marvel Comics' }).click();
+    await page.locator('#breadcrumb button', { hasText: 'Marvel' }).click();
     
     // Check that the series card "Amazing Spider-Man" is now visible
     const seriesCard = page.locator('.series-card', { hasText: 'Amazing Spider-Man' });
@@ -135,6 +137,6 @@ test.describe('ComicsNow! E2E Test Suite', () => {
     expect(fs.existsSync(spidermanSidecar)).toBe(true);
     const sidecarContent = fs.readFileSync(spidermanSidecar, 'utf-8');
     expect(spidermanSidecar).toBeTruthy();
-    expect(sidecarContent).toContain('<Writer>Stan Lee &amp; Steve Ditko</Writer>');
+    expect(sidecarContent).toContain('<Writer>Stan Lee, Steve Ditko</Writer>');
   });
 });

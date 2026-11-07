@@ -55,17 +55,26 @@ def init_continuity_db(conn: sqlite3.Connection) -> None:
                 comic_vine_id TEXT,
                 part_number INTEGER,
                 notes TEXT,
+                cover_image_url TEXT,
+                cover_hash TEXT,
                 FOREIGN KEY (reading_order_id) REFERENCES reading_orders(id) ON DELETE CASCADE
             );
 
             CREATE TABLE IF NOT EXISTS reading_order_collections (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                id TEXT PRIMARY KEY,
                 reading_order_id TEXT NOT NULL,
                 position INTEGER NOT NULL,
                 title TEXT NOT NULL,
+                subtitle TEXT,
                 volume_number TEXT,
                 isbn TEXT,
                 issue_range TEXT,
+                page_count INTEGER,
+                release_year INTEGER,
+                description TEXT,
+                contents_raw TEXT,
+                cover_image_url TEXT,
+                cover_hash TEXT,
                 FOREIGN KEY (reading_order_id) REFERENCES reading_orders(id) ON DELETE CASCADE
             );
 
@@ -78,6 +87,8 @@ def init_continuity_db(conn: sqlite3.Connection) -> None:
             CREATE INDEX IF NOT EXISTS idx_ro_issues_order ON reading_order_issues(reading_order_id, position);
             CREATE INDEX IF NOT EXISTS idx_ro_issues_lookup ON reading_order_issues(series_name, issue_number);
             CREATE INDEX IF NOT EXISTS idx_ro_collections_order ON reading_order_collections(reading_order_id, position);
+            CREATE INDEX IF NOT EXISTS idx_roi_cover_hash ON reading_order_issues(cover_hash);
+            CREATE INDEX IF NOT EXISTS idx_roc_cover_hash ON reading_order_collections(cover_hash);
             """
         )
 
@@ -116,8 +127,8 @@ def upsert_reading_order_issues(conn: sqlite3.Connection, order_id: str, issues:
             conn.execute(
                 """
                 INSERT INTO reading_order_issues (
-                    reading_order_id, position, series_name, issue_number, publication_date, comic_vine_id, part_number, notes
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    reading_order_id, position, series_name, issue_number, publication_date, comic_vine_id, part_number, notes, cover_image_url, cover_hash
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     order_id,
@@ -128,6 +139,8 @@ def upsert_reading_order_issues(conn: sqlite3.Connection, order_id: str, issues:
                     iss.get("comic_vine_id") or iss.get("comicVineId"),
                     iss.get("part_number") or iss.get("partNumber"),
                     iss.get("notes"),
+                    iss.get("cover_image_url") or iss.get("coverImageUrl"),
+                    iss.get("cover_hash") or iss.get("coverHash"),
                 ),
             )
 
@@ -137,19 +150,28 @@ def upsert_reading_order_collections(conn: sqlite3.Connection, order_id: str, co
     with conn:
         conn.execute("DELETE FROM reading_order_collections WHERE reading_order_id = ?", (order_id,))
         for idx, col in enumerate(collections, start=1):
+            col_id = col.get("id") or f"{order_id}-col-{idx}"
             conn.execute(
                 """
                 INSERT INTO reading_order_collections (
-                    reading_order_id, position, title, volume_number, isbn, issue_range
-                ) VALUES (?, ?, ?, ?, ?, ?)
+                    id, reading_order_id, position, title, subtitle, volume_number, isbn, issue_range, page_count, release_year, description, contents_raw, cover_image_url, cover_hash
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
+                    col_id,
                     order_id,
                     col.get("position", idx),
                     col.get("title") or "",
+                    col.get("subtitle"),
                     col.get("volume_number") or col.get("volumeNumber"),
                     col.get("isbn"),
                     col.get("issue_range") or col.get("issueRange"),
+                    col.get("page_count"),
+                    col.get("release_year") or col.get("year"),
+                    col.get("description"),
+                    col.get("contents_raw"),
+                    col.get("cover_image_url"),
+                    col.get("cover_hash") or col.get("coverHash"),
                 ),
             )
 

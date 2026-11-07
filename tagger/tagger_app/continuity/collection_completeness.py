@@ -1,0 +1,134 @@
+"""Collection completeness calculation and trade paperback ownership resolution."""
+import re
+import sqlite3
+from typing import Optional, Dict, Any, List
+
+from tagger_app.continuity.util import normalize_series
+from tagger_app.continuity.three_gate_matcher import extract_volume_number
+
+
+def find_owned_collection(
+    col: Dict[str, Any],
+    direct_map: Dict[str, Any],
+    series_map: Dict[str, Any],
+    arc_tagged_map: Dict[str, Any],
+    clean_arc_title: str,
+) -> Optional[Dict[str, Any]]:
+    """Match a reading order collection against local library comics."""
+    pos_str = str(col.get("position", ""))
+    norm_arc = normalize_series(clean_arc_title)
+
+    # 1. Match by tagged StoryArc and StoryArcNumber (O(1) lookup)
+    tagged_key = f"{norm_arc}:::{pos_str}"
+    if tagged_key in arc_tagged_map:
+        return arc_tagged_map[tagged_key]
+
+    # 2. Match by series and volume alignment
+    cand_title = col.get("title") or ""
+    cand_sub = col.get("subtitle") or ""
+    vol_num = extract_volume_number(f"{cand_title} {cand_sub}")
+    norm_col_title = normalize_series(cand_title)
+
+    # Search in series_map
+    if norm_col_title in series_map and vol_num is not None:
+        for c in series_map[norm_col_title]:
+            c_vol = extract_volume_number(c.get("name") or "") or extract_volume_number(c.get("series") or "")
+            if c_vol == vol_num:
+                return c
+
+    # Fallback: check if cand_title or cand_sub matches series
+    combined = f"{norm_col_title} {normalize_series(cand_sub)}".strip()
+    for s_name, comics_list in series_map.items():
+        if s_name in combined or combined in s_name:
+            for c in comics_list:
+                c_vol = extract_volume_number(c.get("name") or "") or extract_volume_number(c.get("series") or "")
+                if c_vol is not None and vol_num is not None and c_vol == vol_num:
+                    return c
+
+    return None
+
+
+def calculate_collection_completeness(
+    ro_conn: sqlite3.Connection,
+    order_id: str,
+    clean_title: str,
+    direct_map: Dict[str, Any],
+    series_map: Dict[str, Any],
+    arc_tagged_map: Dict[str, Any],
+) -> Dict[str, Any]:
+    """Calculate library completeness and reading progress for an arc's collected editions."""
+    cursor = ro_conn.cursor()
+    cursor.execute(
+        "SELECT * FROM reading_order_collections WHERE reading_order_id = ? ORDER BY position ASC",
+        (order_id,),
+    )
+    collections = [dict(r) for r in cursor.fetchall()]
+    total = len(collections)
+
+    owned_count = 0
+    read_count = 0
+    reading_count = 0
+    unread_count = 0
+
+    first_cover = None
+    for col in collections:
+        if not first_cover and col.get("cover_image_url"):
+            first_cover = col["cover_image_url"]
+
+        owned = find_owned_collection(col, direct_map, series_map, arc_tagged_map, clean_title)
+        if owned:
+            owned_count += 1
+            status = owned.get("readStatus", "unread")
+            if status == "read":
+                read_count += 1
+            elif status == "reading":
+                reading_count += 1
+            else:
+                unread_count += 1
+
+    pct_owned = round((owned_count / total * 100), 1) if total > 0 else 0.0
+    pct_read = round((read_count / total * 100), 1) if total > 0 else 0.0
+
+    return {
+        "totalCollections": total,
+        "ownedCount": owned_count,
+        "missingCount": max(0, total - owned_count),
+        "readCount": read_count,
+        "completenessPercent": pct_owned,
+        "readPercent": pct_read,
+        "coverImage": first_cover,
+        "readStatusCounts": {
+            "read": read_count,
+            "reading": reading_count,
+            "unread": unread_count,
+            "missing": max(0, total - owned_count),
+        },
+    }
+
+
+def enrich_arc_collections(
+    collections: List[Dict[str, Any]],
+    direct_map: Dict[str, Any],
+    series_map: Dict[str, Any],
+    arc_tagged_map: Dict[str, Any],
+    clean_arc_title: str,
+) -> List[Dict[str, Any]]:
+    """Enrich collection rows with library ownership and read progress."""
+    enriched = []
+    for col in collections:
+        owned = find_owned_collection(col, direct_map, series_map, arc_tagged_map, clean_arc_title)
+        enriched.append({
+            "id": col["id"],
+            "position": col["position"],
+            "title": col.get("title") or "",
+            "subtitle": col.get("subtitle") or "",
+            "releaseYear": col.get("release_year"),
+            "pageCount": col.get("page_count") or (owned.get("pageCount") if owned else None),
+            "coverImageUrl": col.get("cover_image_url"),
+            "contentsRaw": col.get("contents_raw"),
+            "owned": owned is not None,
+            "comicId": owned["id"] if owned else None,
+            "readStatus": owned.get("readStatus", "missing") if owned else "missing",
+            "lastReadPage": owned.get("lastReadPage", 0) if owned else 0,
+        })
+    return enriched

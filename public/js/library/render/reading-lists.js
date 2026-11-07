@@ -47,6 +47,11 @@ export function renderPublisherReadingLists(publisherName) {
   container.className = 'grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4';
   clear(container);
 
+  const modeToggle = document.getElementById('smart-scope-mode-toggle');
+  if (modeToggle) {
+    modeToggle.classList.add('hidden');
+  }
+
   const seriesAlphaFilter = document.getElementById('series-alpha-filter');
   if (seriesAlphaFilter) {
     clear(seriesAlphaFilter);

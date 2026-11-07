@@ -2,8 +2,11 @@
 
 Extracted from the legacy tagger.py monolith (architecture review, step 1).
 """
+import io
 import os
 import zipfile
+import sqlite3
+from PIL import Image
 
 import requests
 
@@ -44,8 +47,6 @@ def extract_cover_from_cbz(cbz_path, output_dir="temp_covers"):
         # but measurably increase the model's "thinking" (and thus latency). 1024px keeps
         # identification accuracy with a wide safety margin while halving thinking tokens.
         try:
-            from PIL import Image
-            import io
             TARGET_WIDTH = 1024
             img = Image.open(io.BytesIO(cover_data)).convert("RGB")
             w, h = img.size
@@ -165,3 +166,50 @@ def compare_covers_python(local_image_path, candidate_image_url, hash_size=16):
     except Exception as e:
         print(f"[-] Cover comparison failed: {e}")
         return 0.0
+
+
+def get_comics_now_cover(file_path):
+    """
+    Lookup cover art in the Comics-Now sqlite database.
+    Match by absolute path first, and fallback to matching by filename.
+    """
+    repo_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+    db_path = os.environ.get("COMICS_NOW_DB", os.path.join(repo_root, "comics-now.db"))
+    thumbnails_dir = os.environ.get("COMICS_NOW_THUMBNAILS", os.path.join(repo_root, "thumbnails"))
+
+    if not os.path.exists(db_path):
+        print(f"[-] Comics-Now database not found at {db_path}")
+        return None
+
+    conn = None
+    try:
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+
+        # 1. Match by absolute path
+        cursor.execute("SELECT thumbnailPath FROM comics WHERE path = ?", (file_path,))
+        row = cursor.fetchone()
+        if row and row[0]:
+            thumb_path = os.path.join(thumbnails_dir, row[0])
+            if os.path.exists(thumb_path):
+                print(f"[+] Found Comics-Now cover by path: {thumb_path}")
+                return thumb_path
+
+        # 2. Fallback to match by filename (basename)
+        filename = os.path.basename(file_path)
+        cursor.execute("SELECT path, thumbnailPath FROM comics WHERE path LIKE ?", (f"%{filename}",))
+        rows = cursor.fetchall()
+        for r_path, r_thumb in rows:
+            if os.path.basename(r_path) == filename and r_thumb:
+                thumb_path = os.path.join(thumbnails_dir, r_thumb)
+                if os.path.exists(thumb_path):
+                    print(f"[+] Found Comics-Now cover by filename fallback: {thumb_path}")
+                    return thumb_path
+
+    except Exception as e:
+        print(f"[-] Error querying Comics-Now database: {e}")
+    finally:
+        if conn:
+            conn.close()
+
+    return None

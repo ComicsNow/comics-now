@@ -94,6 +94,12 @@ Welcome to **Comics Now! v3.4.0** — introducing the **Story Arcs & Narrative C
 * **Publisher Family Guard**: Cross-company false positives are rejected at the matcher boundary (e.g. *Europe Comics* vs *Marvel*, *DC Comics* vs *Marvel*).
 * **Collected Editions Overlap Matching**: Correctly matches trade paperbacks and volumes by checking issue collection spans extracted from comic summaries against reading order issue spans.
 
+### 17. Clean Reading List & Story Arc Views, Publisher Separation & Three-Gate Matching
+* **Streamlined Scope & View Modes**: Permanently removed redundant List/Folder view mode toggles (`#smart-scope-mode-toggle`) when viewing Reading Lists and Story Arcs, ensuring clean and consistent card presentation.
+* **Modular Story Arc Views**: Split Story Arc details into dedicated, maintainable modules (`story-arcs-issues.js`, `story-arcs-collections.js`). Collected edition cards accurately compute ownership and completeness against collected volume targets rather than single issues.
+* **Publisher Classification & Three-Gate Matcher**: Hardened publisher detection in `parser.py` to prevent cross-publisher misclassifications, and integrated a three-gate matcher with cover service heuristics and collection completeness tracking.
+* **Portable Test Harness**: Hardened test fixtures to use dynamic relative root resolution, ensuring zero exposure of host paths or personal identifiers across the test suite.
+
 ---
 
 ## ⬆️ Upgrade Notes
@@ -101,21 +107,6 @@ Welcome to **Comics Now! v3.4.0** — introducing the **Story Arcs & Narrative C
 * Existing user reading lists, custom sort orders, and reading progress records are completely untouched.
 * All log entries and on-disk scan logs older than 21 days are automatically pruned.
 * Optional `config.json` settings `readingOrdersIntervalDays` (default: `7`) and `readingOrdersMode` (default: `"both"`) are supported out of the box.
-
-### 9. Tag Comics Now! Admin Rearchitecture & Complete Story Arcs Python Migration
-* **3-Scope Segmented Switcher in Tag Comics Now! (`#ct-modal`)**:
-  - Replaced double-stacked, cluttered subnav tabs with 3 clean administrative scopes: `🔍 Scanner & Review`, `⚙️ Sources & AI`, and `🗂️ File Organization`.
-  - Promoted nested management subtabs (`Inbox Operations`, `Naming Rules`, `Folder Rules`, `Session Errors`) into a single contextual subnav row under `🗂️ File Organization`.
-  - Re-structured 11 metadata sources into 3 clear Editorial Tiers: Primary (ComicVine, Grand Comics Database, Metron), Specialized (MangaUpdates, AniList, Marvel Unlimited, ReadingOrders), and Secondary (ComicBookRoundup, League of Comic Geeks, Bedetheque, Kitsu).
-  - Added confidence threshold indicator gauge (High Confidence ≥ 85%, Auto-apply Threshold 60-84%, Low Confidence < 60%).
-* **Complete Story Arcs Removal from Main Settings**:
-  - Completely removed Story Arcs from `#settings-modal`, dedicating Scope 3 in main settings strictly to `⚡ Guided View AI`.
-  - Relocated Story Arcs & Continuity administration exclusively into Tag Comics Now! (`#ct-modal`) under `⚙️ Sources & AI → Story Arcs & Continuity`.
-* **100% Python Continuity Engine Migration (`tagger_app.continuity`)**:
-  - Migrated crawler, parser, SQLite store (`data/reading-orders.db`), continuity matcher, and batch `ComicInfo.xml` tagger entirely into the Python `tagger` subsystem (`tagger/tagger_app/continuity/`).
-  - Clean Flask blueprint (`story_arcs_bp`) providing REST and SSE streaming endpoints.
-  - Node.js acts as an authenticated reverse proxy (`server/routes/user/story-arcs.js`) forwarding `/api/v1/story-arcs/*` requests to the local Python service, matching the architecture used for all other Tag Comics Now endpoints.
-  - Permanently removed 1,407 lines of redundant scraping, crawling, and matching code from Node.js backend (`readingOrdersParser.js`, `reading-orders-runner.js`, `story-arcs-batch-tagger.js`, `continuityMatcher.js`, `readingOrdersDb.js`, `reading-orders-limiter.js`).
 
 ---
 
@@ -132,12 +123,13 @@ Welcome to **Comics Now! v3.4.0** — introducing the **Story Arcs & Narrative C
 10. `feat(story-arcs)`: migrate continuity crawler, matcher, and batch tagger 100% into Python tagger subsystem and proxy via Node.js
 11. `feat(continuity)`: strip false-positive story arcs, mandate sidecar-only tagging, and enforce year and series matching guards
 12. `feat(continuity)`: add dry-run simulation mode, O(1) indexed matcher, reading order era boundaries, and publisher guards
+13. `feat(library)`: streamline reading list and story arc views, separate issue/collection views, and integrate three-gate matcher
 
 ---
 
 ## 🧪 Verification & Test Results
-- **Full Jest suite**: `190 suites passed, 1478 tests passed (100% pass rate)`.
-- **Python tagger pytest suite**: `209 tests passed (100% pass rate)`.
+- **Full Jest suite**: `189 suites passed, 1470 tests passed (100% pass rate)`.
+- **Python tagger pytest suite**: `232 tests passed (100% pass rate)`.
 - **Production build**: Tailwind CSS v4 and Vite client bundle compiled cleanly.
 - **Architecture ratchet**: all new and modified modules remain strictly under the 380-line ceiling.
 

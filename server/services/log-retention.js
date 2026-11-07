@@ -31,8 +31,15 @@ function pruneScanLogFiles(logsDir = SCAN_LOGS_DIR, maxAgeDays = LOG_RETENTION_D
 
 async function pruneAuditLogs(dbInstance, maxAgeDays = LOG_RETENTION_DAYS) {
   if (!dbInstance || typeof dbInstance.dbRun !== 'function') return 0;
-  const sql = `DELETE FROM impersonation_audit WHERE timestamp < datetime('now', '-${maxAgeDays} days')`;
   try {
+    const cols = typeof dbInstance.dbAll === 'function'
+      ? await dbInstance.dbAll("PRAGMA table_info(impersonation_audit)")
+      : [];
+    const hasTs = Array.isArray(cols) && cols.some(c => c.name === 'ts');
+    const cutoffMs = Date.now() - (maxAgeDays * 86400 * 1000);
+    const sql = hasTs
+      ? `DELETE FROM impersonation_audit WHERE ts < ${cutoffMs}`
+      : `DELETE FROM impersonation_audit WHERE timestamp < datetime('now', '-${maxAgeDays} days')`;
     await dbInstance.dbRun(sql);
     return 1;
   } catch (_) {

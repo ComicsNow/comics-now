@@ -1,53 +1,68 @@
 /**
  * Story Arcs Smart List & Cache Service
  *
- * Manages fetching, caching, and button count updates for Story Arcs.
+ * Manages fetching, caching, and button count updates for Story Arcs,
+ * supporting edition filtering ('both', 'issues', 'collections').
  */
 import { state } from '../../globals.js';
-import { isPubMatch } from './publisher-match.js';
+import { getStoryArcEditionPreference } from '../../settings/story-arc-reader-settings.js';
 
 let storyArcsCache = new Map();
 let fetchInFlight = new Map();
 
-export async function fetchStoryArcsForPublisher(publisherName) {
-  if (!publisherName) return [];
-  if (storyArcsCache.has(publisherName)) {
-    return storyArcsCache.get(publisherName);
+function resolveEdition(edition) {
+  if (edition && ['both', 'issues', 'collections'].includes(edition)) {
+    return edition;
   }
-  if (fetchInFlight.has(publisherName)) {
-    return fetchInFlight.get(publisherName);
+  return typeof getStoryArcEditionPreference === 'function' ? getStoryArcEditionPreference() : 'both';
+}
+
+export async function fetchStoryArcsForPublisher(publisherName, edition = null) {
+  if (!publisherName) return [];
+  const ed = resolveEdition(edition);
+  const cacheKey = `${publisherName}:${ed}`;
+
+  if (storyArcsCache.has(cacheKey)) {
+    return storyArcsCache.get(cacheKey);
+  }
+  if (fetchInFlight.has(cacheKey)) {
+    return fetchInFlight.get(cacheKey);
   }
 
   const baseUrl = state?.API_BASE_URL || (typeof window !== 'undefined' ? window.API_BASE_URL : '') || '';
   const promise = (async () => {
     try {
-      const res = await fetch(`${baseUrl}/api/v1/story-arcs?publisher=${encodeURIComponent(publisherName)}`);
+      const url = `${baseUrl}/api/v1/story-arcs?publisher=${encodeURIComponent(publisherName)}&edition=${encodeURIComponent(ed)}`;
+      const res = await fetch(url);
       if (res.ok) {
         const data = await res.json();
         const arcs = (data && data.ok && Array.isArray(data.storyArcs)) ? data.storyArcs : [];
-        storyArcsCache.set(publisherName, arcs);
+        storyArcsCache.set(cacheKey, arcs);
         updateStoryArcFilterButtonCount();
         return arcs;
       }
     } catch (err) {
       console.warn('[StoryArcs] Failed to fetch story arcs:', err);
     } finally {
-      fetchInFlight.delete(publisherName);
+      fetchInFlight.delete(cacheKey);
     }
     return [];
   })();
 
-  fetchInFlight.set(publisherName, promise);
+  fetchInFlight.set(cacheKey, promise);
   return promise;
 }
 
-export function getStoryArcsForPublisher(publisherName) {
+export function getStoryArcsForPublisher(publisherName, edition = null) {
   if (!publisherName) return [];
-  if (storyArcsCache.has(publisherName)) {
-    return storyArcsCache.get(publisherName);
+  const ed = resolveEdition(edition);
+  const cacheKey = `${publisherName}:${ed}`;
+
+  if (storyArcsCache.has(cacheKey)) {
+    return storyArcsCache.get(cacheKey);
   }
   // Trigger background fetch if not yet loaded
-  fetchStoryArcsForPublisher(publisherName);
+  fetchStoryArcsForPublisher(publisherName, ed);
   return [];
 }
 

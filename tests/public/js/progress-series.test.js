@@ -104,10 +104,10 @@ describe('Progress Tracking System', () => {
         .replace(/export\s+default\s+[\s\S]*?;?/g, '');
     };
 
-    const cleanDb = cleanFile('../public/js/progress/db.js');
-    const cleanSync = cleanFile('../public/js/progress/library-sync.js');
-    const cleanUi = cleanFile('../public/js/progress/ui.js');
-    const cleanContent = cleanFile('../public/js/progress.js');
+    const cleanDb = cleanFile('../../../public/js/progress/db.js');
+    const cleanSync = cleanFile('../../../public/js/progress/library-sync.js');
+    const cleanUi = cleanFile('../../../public/js/progress/ui.js');
+    const cleanContent = cleanFile('../../../public/js/progress.js');
 
     // Add globals that the file relies on from globals.js
     const globalsWrapper = `

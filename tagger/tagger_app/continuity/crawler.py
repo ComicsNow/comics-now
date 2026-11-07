@@ -27,6 +27,7 @@ from tagger_app.continuity.parser import (
     parse_reading_order_soup,
     parse_collected_editions_soup,
 )
+from tagger_app.continuity.cover_service import backfill_missing_covers
 
 SITEMAP_URL = "https://www.readingorders.com/sitemap-0.xml"
 BASE_URL = "https://readingorders.com"
@@ -216,6 +217,12 @@ class ContinuityCrawler:
             self.status = "idle"
             self.is_syncing = False
             self.last_sync_time = int(time.time())
+            if scraped > 0:
+                try:
+                    self.log("INFO", "Backfilling cover images and dHashes for newly indexed reading orders...")
+                    backfill_missing_covers(max_workers=6)
+                except Exception as cover_err:
+                    self.log("WARN", f"Cover backfill notice: {cover_err}")
             self.log("INFO", f"Sync completed: {scraped} reading orders updated.")
             return {"skipped": False, "scrapedCount": scraped}
         except Exception as e:

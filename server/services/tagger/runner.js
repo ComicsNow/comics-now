@@ -8,6 +8,7 @@ const taggerProcess = require('../tagger-process');
 const { scanLibrary } = require('../library-scan');
 const persist = require('./persist');
 const engineClient = require('./engine-client');
+const { formatDuration } = engineClient;
 const { resolveScanMode, evaluateFileGates } = require('./gates');
 const review = require('./review');
 const companionSync = require('./companion-sync');

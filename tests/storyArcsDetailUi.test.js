@@ -22,8 +22,8 @@ describe('Story Arcs Detail & Banner UI View', () => {
       setTimeout,
       clearTimeout,
       state,
+      getStoryArcEditionPreference: jest.fn().mockReturnValue('issues'),
       launchComicReader: jest.fn(),
-      renderTimelineIntoContainer: jest.fn(),
       escapeHtml: str => String(str || '').replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m])),
       fetch: jest.fn().mockImplementation((url) => {
         if (url.includes('/api/v1/story-arcs/court-of-owls')) {
@@ -98,18 +98,23 @@ describe('Story Arcs Detail & Banner UI View', () => {
 
     vm.createContext(sandbox);
 
-    const filePath = path.resolve(__dirname, '../public/js/library/story-arcs-detail.js');
-    const content = fs.readFileSync(filePath, 'utf8')
-      .replace(/^\s*import\s+[\s\S]*?from\s+['"][^'"]+['"];?/gm, '')
-      .replace(/^\s*import\s+['"][^'"]+['"];?/gm, '')
-      .replace(/export\s+const\s+/g, 'const ')
-      .replace(/export\s+let\s+/g, 'let ')
-      .replace(/export\s+function\s+/g, 'function ')
-      .replace(/export\s+async\s+function\s+/g, 'async function ')
-      .replace(/export\s+\{[\s\S]*?\};?/g, '')
-      .replace(/export\s+default\s+[\s\S]*?;?/g, '');
+    const loadModule = (relPath) => {
+      const fullPath = path.resolve(__dirname, relPath);
+      const code = fs.readFileSync(fullPath, 'utf8')
+        .replace(/^\s*import\s+[\s\S]*?from\s+['"][^'"]+['"];?/gm, '')
+        .replace(/^\s*import\s+['"][^'"]+['"];?/gm, '')
+        .replace(/export\s+const\s+/g, 'const ')
+        .replace(/export\s+let\s+/g, 'let ')
+        .replace(/export\s+function\s+/g, 'function ')
+        .replace(/export\s+async\s+function\s+/g, 'async function ')
+        .replace(/export\s+\{[\s\S]*?\};?/g, '')
+        .replace(/export\s+default\s+[\s\S]*?;?/g, '');
+      vm.runInContext(code, sandbox);
+    };
 
-    vm.runInContext(content, sandbox);
+    loadModule('../public/js/library/story-arcs-collections.js');
+    loadModule('../public/js/library/story-arcs-issues.js');
+    loadModule('../public/js/library/story-arcs-detail.js');
   });
 
   test('showStoryArcDetail mounts modal with Gold/Amber trade dress and title', async () => {
@@ -126,31 +131,27 @@ describe('Story Arcs Detail & Banner UI View', () => {
     expect(publisherBadge.textContent).toBe('DC Comics');
 
     const ownedBadge = document.getElementById('story-arc-owned-badge');
-    expect(ownedBadge.textContent).toContain('2/3 Owned');
+    expect(ownedBadge.textContent).toContain('2/3 In Library');
   });
 
-  test('view mode switcher switches between grid, checklist, and dag', async () => {
+  test('view mode switcher switches between grid and checklist', async () => {
     await sandbox.showStoryArcDetail('court-of-owls', 'Batman: The Court of Owls', 'grid');
 
     const gridContainer = document.getElementById('story-arc-grid-view');
     const checklistContainer = document.getElementById('story-arc-checklist-view');
-    const dagContainer = document.getElementById('story-arc-dag-view');
 
     expect(gridContainer.classList.contains('hidden')).toBe(false);
     expect(checklistContainer.classList.contains('hidden')).toBe(true);
-    expect(dagContainer.classList.contains('hidden')).toBe(true);
 
     const checklistBtn = document.getElementById('story-arc-view-checklist-btn');
     checklistBtn.click();
     expect(gridContainer.classList.contains('hidden')).toBe(true);
     expect(checklistContainer.classList.contains('hidden')).toBe(false);
-    expect(dagContainer.classList.contains('hidden')).toBe(true);
 
-    const dagBtn = document.getElementById('story-arc-view-dag-btn');
-    dagBtn.click();
-    expect(gridContainer.classList.contains('hidden')).toBe(true);
+    const gridBtn = document.getElementById('story-arc-view-grid-btn');
+    gridBtn.click();
+    expect(gridContainer.classList.contains('hidden')).toBe(false);
     expect(checklistContainer.classList.contains('hidden')).toBe(true);
-    expect(dagContainer.classList.contains('hidden')).toBe(false);
   });
 
   test('grid view renders owned issue cards and missing gap cards', async () => {
@@ -162,12 +163,12 @@ describe('Story Arcs Detail & Banner UI View', () => {
     // First card: owned
     expect(cards[0].textContent).toContain('Batman');
     expect(cards[0].textContent).toContain('#1');
-    expect(cards[0].textContent).toContain('Owned');
+    expect(cards[0].textContent).toContain('In Library');
 
     // Second card: missing gap
     expect(cards[1].textContent).toContain('Nightwing');
     expect(cards[1].textContent).toContain('#1');
-    expect(cards[1].textContent).toContain('Missing from Library');
+    expect(cards[1].textContent).toContain('Missing');
   });
 
   test('checklist view renders chronological table of issues', async () => {

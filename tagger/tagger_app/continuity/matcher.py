@@ -11,6 +11,14 @@ from pathlib import Path
 from typing import Optional, List, Dict, Any, Tuple
 
 from tagger_app.continuity.db import init_continuity_db
+from tagger_app.continuity.collection_completeness import (
+    calculate_collection_completeness,
+    enrich_arc_collections,
+)
+from tagger_app.continuity.library_store import (
+    _load_library_comics,
+    find_owned_comic,
+)
 from tagger_app.continuity.util import (
     normalize_series,
     normalize_issue_num,
@@ -28,88 +36,15 @@ DEFAULT_RO_DB = REPO_ROOT / "data" / "reading-orders.db"
 DEFAULT_CN_DB = REPO_ROOT / "comics-now.db"
 
 
-def _load_library_comics(cn_db_path: Path | str) -> Tuple[Dict[str, Dict[str, Any]], Dict[str, List[Dict[str, Any]]], Dict[str, Dict[str, Any]]]:
-    """Read library comics from comics-now.db and build lookup maps."""
-    direct_map = {}
-    series_map = {}
-    by_id = {}
-
-    p = Path(cn_db_path)
-    if not p.exists():
-        return direct_map, series_map, by_id
-
-    conn = sqlite3.connect(str(p), timeout=5.0)
-    conn.row_factory = sqlite3.Row
-    try:
-        cursor = conn.cursor()
-        cursor.execute("SELECT id, name, series, publisher, metadata FROM comics")
-        for row in cursor.fetchall():
-            c = dict(row)
-            by_id[c["id"]] = c
-            meta = {}
-            if c.get("metadata"):
-                try:
-                    meta = json.loads(c["metadata"]) if isinstance(c["metadata"], str) else c["metadata"]
-                except Exception:
-                    pass
-
-            series = c.get("series") or meta.get("Series") or ""
-            num = extract_issue_number(c.get("name") or "", meta.get("Number"))
-            year = extract_year(meta.get("Year") or c.get("name") or "")
-
-            norm_s = normalize_series(series)
-            norm_n = normalize_issue_num(num)
-
-            c_info = {**c, "issueNum": num, "year": year, "normSeries": norm_s, "normNum": norm_n}
-            key = f"{norm_s}:::{norm_n}"
-            if key not in direct_map:
-                direct_map[key] = c_info
-            if norm_s not in series_map:
-                series_map[norm_s] = []
-            series_map[norm_s].append(c_info)
-    finally:
-        conn.close()
-
-    return direct_map, series_map, by_id
-
-
-def find_owned_comic(
-    issue: Dict[str, Any],
-    direct_map: Dict[str, Any],
-    series_map: Dict[str, Any],
-    ro_era_window: Optional[Any] = None,
-) -> Optional[Dict[str, Any]]:
-    """Match an issue record against local library comics with strict series, era, and year validation."""
-    s_name = issue.get("series_name") or issue.get("seriesName") or ""
-    i_num = issue.get("issue_number") or issue.get("issueNumber") or ""
-    pub_date = issue.get("publication_date") or issue.get("publicationDate") or ""
-    norm_s = normalize_series(s_name)
-    norm_n = normalize_issue_num(i_num)
-
-    # 1. Direct match with year validation
-    direct_key = f"{norm_s}:::{norm_n}"
-    if direct_key in direct_map:
-        cand = direct_map[direct_key]
-        if is_year_compatible(cand.get("year"), pub_date, ro_era_window=ro_era_window):
-            return cand
-
-    # 2. Candidate match with range and year validation
-    if norm_s in series_map:
-        for c in series_map[norm_s]:
-            if is_issue_in_range(c.get("issueNum"), i_num):
-                if is_year_compatible(c.get("year"), pub_date, ro_era_window=ro_era_window):
-                    return c
-    return None
-
-
 def get_story_arcs_with_completeness(
     comics_now_db_path: Path | str = DEFAULT_CN_DB,
     reading_orders_db_path: Path | str = DEFAULT_RO_DB,
     publisher: Optional[str] = None,
     search: Optional[str] = None,
+    edition: Optional[str] = "both",
 ) -> List[Dict[str, Any]]:
-    """Calculate completeness percentages for all reading orders matching query."""
-    direct_map, series_map, _ = _load_library_comics(comics_now_db_path)
+    """Calculate library completeness and read percentages for reading orders matching query."""
+    direct_map, series_map, _, arc_tagged_map = _load_library_comics(comics_now_db_path)
 
     ro_p = Path(reading_orders_db_path)
     if not ro_p.exists():
@@ -136,33 +71,96 @@ def get_story_arcs_with_completeness(
         orders = [dict(r) for r in cursor.fetchall()]
 
         results = []
+        target_edition = (edition or "both").lower()
+
         for order in orders:
             order_id = order["id"]
-            cursor.execute(
-                "SELECT * FROM reading_order_issues WHERE reading_order_id = ? ORDER BY position ASC",
-                (order_id,),
-            )
-            issues = [dict(r) for r in cursor.fetchall()]
-            total = len(issues)
-            order_yrs = [extract_year(iss.get("publication_date")) for iss in issues if extract_year(iss.get("publication_date"))]
-            order_era = (min(order_yrs), max(order_yrs)) if order_yrs else None
-            owned_count = sum(1 for iss in issues if find_owned_comic(iss, direct_map, series_map, ro_era_window=order_era) is not None)
-            pct = round((owned_count / total * 100), 1) if total > 0 else 0.0
+            clean_title = re.sub(r"\s+Reading\s+Order.*$", "", order["title"], flags=re.IGNORECASE).strip()
 
-            clean_title = re.sub(r"\s+Reading\s+Order$", "", order["title"], flags=re.IGNORECASE).strip()
-            results.append({
-                "id": order["id"],
-                "title": clean_title,
-                "publisher": order.get("publisher"),
-                "description": order.get("description"),
-                "category": order.get("category", "Event"),
-                "coverImage": order.get("cover_image"),
-                "url": order.get("url"),
-                "totalIssues": total,
-                "ownedCount": owned_count,
-                "missingCount": max(0, total - owned_count),
-                "completenessPercent": pct,
-            })
+            # 1. Single Issues Edition
+            if target_edition in ("issues", "both", "all"):
+                cursor.execute(
+                    "SELECT * FROM reading_order_issues WHERE reading_order_id = ? ORDER BY position ASC",
+                    (order_id,),
+                )
+                issues = [dict(r) for r in cursor.fetchall()]
+                total_iss = len(issues)
+                if total_iss > 0 or target_edition == "issues":
+                    order_yrs = [extract_year(iss.get("publication_date")) for iss in issues if extract_year(iss.get("publication_date"))]
+                    order_era = (min(order_yrs), max(order_yrs)) if order_yrs else None
+                    owned_iss = 0
+                    read_iss = 0
+                    reading_iss = 0
+                    unread_iss = 0
+                    first_cover = order.get("cover_image")
+                    for iss in issues:
+                        if not first_cover and iss.get("cover_image_url"):
+                            first_cover = iss["cover_image_url"]
+                        owned = find_owned_comic(iss, direct_map, series_map, ro_era_window=order_era)
+                        if owned:
+                            owned_iss += 1
+                            st = owned.get("readStatus", "unread")
+                            if st == "read":
+                                read_iss += 1
+                            elif st == "reading":
+                                reading_iss += 1
+                            else:
+                                unread_iss += 1
+
+                    pct_owned = round((owned_iss / total_iss * 100), 1) if total_iss > 0 else 0.0
+                    pct_read = round((read_iss / total_iss * 100), 1) if total_iss > 0 else 0.0
+                    results.append({
+                        "id": order_id,
+                        "arcId": order_id,
+                        "edition": "issue",
+                        "title": clean_title,
+                        "publisher": order.get("publisher"),
+                        "description": order.get("description"),
+                        "category": order.get("category", "Event"),
+                        "coverImage": first_cover,
+                        "url": order.get("url"),
+                        "totalIssues": total_iss,
+                        "totalCollections": order.get("total_collections", 0),
+                        "ownedCount": owned_iss,
+                        "missingCount": max(0, total_iss - owned_iss),
+                        "readCount": read_iss,
+                        "completenessPercent": pct_owned,
+                        "readPercent": pct_read,
+                        "readStatusCounts": {
+                            "read": read_iss,
+                            "reading": reading_iss,
+                            "unread": unread_iss,
+                            "missing": max(0, total_iss - owned_iss),
+                        },
+                    })
+
+            # 2. Collected Editions
+            if target_edition in ("collections", "both", "all"):
+                col_res = calculate_collection_completeness(
+                    conn, order_id, clean_title, direct_map, series_map, arc_tagged_map
+                )
+                total_col = col_res["totalCollections"]
+                if total_col > 0 or target_edition == "collections":
+                    results.append({
+                        "id": f"{order_id}__collections" if target_edition == "both" else order_id,
+                        "arcId": order_id,
+                        "edition": "collection",
+                        "title": clean_title,
+                        "publisher": order.get("publisher"),
+                        "description": order.get("description"),
+                        "category": order.get("category", "Event"),
+                        "coverImage": col_res.get("coverImage") or order.get("cover_image"),
+                        "url": order.get("url"),
+                        "totalIssues": order.get("total_issues", 0),
+                        "totalCollections": total_col,
+                        "ownedCount": col_res["ownedCount"],
+                        "missingCount": col_res["missingCount"],
+                        "readCount": col_res["readCount"],
+                        "completenessPercent": col_res["completenessPercent"],
+                        "readPercent": col_res["readPercent"],
+                        "readStatusCounts": col_res["readStatusCounts"],
+                    })
+
         return results
     finally:
         conn.close()
@@ -174,7 +172,7 @@ def get_story_arc_detail(
     reading_orders_db_path: Path | str = DEFAULT_RO_DB,
 ) -> Optional[Dict[str, Any]]:
     """Return full story arc details, ordered sequential checklist, and DAG spine/spurs."""
-    direct_map, series_map, _ = _load_library_comics(comics_now_db_path)
+    direct_map, series_map, _, arc_tagged_map = _load_library_comics(comics_now_db_path)
 
     ro_p = Path(reading_orders_db_path)
     if not ro_p.exists():
@@ -201,14 +199,24 @@ def get_story_arc_detail(
             "SELECT * FROM reading_order_collections WHERE reading_order_id = ? ORDER BY position ASC",
             (arc_id,),
         )
-        collections = [dict(r) for r in cursor.fetchall()]
+        raw_collections = [dict(r) for r in cursor.fetchall()]
 
         arc_yrs = [extract_year(iss.get("publication_date")) for iss in raw_issues if extract_year(iss.get("publication_date"))]
         arc_era = (min(arc_yrs), max(arc_yrs)) if arc_yrs else None
 
+        clean_title = re.sub(r"\s+Reading\s+Order.*$", "", order["title"], flags=re.IGNORECASE).strip()
+
         issues = []
+        owned_iss = 0
+        read_iss = 0
         for iss in raw_issues:
             owned = find_owned_comic(iss, direct_map, series_map, ro_era_window=arc_era)
+            is_owned = owned is not None
+            st = owned.get("readStatus", "unread") if is_owned else "missing"
+            if is_owned:
+                owned_iss += 1
+                if st == "read":
+                    read_iss += 1
             issues.append({
                 "id": iss["id"],
                 "position": iss["position"],
@@ -216,17 +224,36 @@ def get_story_arc_detail(
                 "issueNumber": iss["issue_number"],
                 "partNumber": iss.get("part_number"),
                 "comicVineId": iss.get("comic_vine_id"),
-                "owned": owned is not None,
-                "comicId": owned["id"] if owned else None,
+                "coverImageUrl": iss.get("cover_image_url"),
+                "publicationDate": iss.get("publication_date"),
+                "storyParts": iss.get("story_parts"),
+                "owned": is_owned,
+                "comicId": owned["id"] if is_owned else None,
+                "readStatus": st,
+                "lastReadPage": owned.get("lastReadPage", 0) if is_owned else 0,
+                "pageCount": owned.get("pageCount", 0) if is_owned else 0,
             })
 
-        clean_title = re.sub(r"\s+Reading\s+Order$", "", order["title"], flags=re.IGNORECASE).strip()
+        collections = enrich_arc_collections(
+            raw_collections, direct_map, series_map, arc_tagged_map, clean_title
+        )
+        owned_col = sum(1 for c in collections if c["owned"])
+        read_col = sum(1 for c in collections if c["readStatus"] == "read")
+
         return {
             "id": order["id"],
             "title": clean_title,
             "publisher": order.get("publisher"),
             "description": order.get("description"),
             "url": order.get("url"),
+            "totalIssues": len(issues),
+            "ownedCount": owned_iss,
+            "readCount": read_iss,
+            "completenessPercent": round((owned_iss / len(issues) * 100), 1) if issues else 0.0,
+            "totalCollections": len(collections),
+            "ownedCollectionsCount": owned_col,
+            "readCollectionsCount": read_col,
+            "collectionsCompletenessPercent": round((owned_col / len(collections) * 100), 1) if collections else 0.0,
             "issues": issues,
             "collections": collections,
         }
@@ -240,7 +267,7 @@ def get_next_continuity_issue(
     reading_orders_db_path: Path | str = DEFAULT_RO_DB,
 ) -> Optional[Dict[str, Any]]:
     """Find the next chronological issue in an active story arc for in-reader prompt."""
-    direct_map, series_map, by_id = _load_library_comics(comics_now_db_path)
+    direct_map, series_map, by_id, _ = _load_library_comics(comics_now_db_path)
     comic = by_id.get(comic_id)
     if not comic:
         return None

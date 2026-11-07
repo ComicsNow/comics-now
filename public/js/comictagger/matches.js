@@ -219,6 +219,7 @@ export function getCtMatchHtml(match) {
             <div class="text-xs text-gray-300 space-y-1">
               <div><span class="text-gray-500">Publisher:</span> <span class="font-medium text-gray-200">${escape(match.publisher)}</span> ${match.year ? `• <span class="text-gray-400">Year: ${escape(match.year)}</span>` : ''} • <span class="text-gray-400">Issue #${escape(match.issue || '?')}</span></div>
               ${creators ? `<div><span class="text-gray-500">Creators:</span> <span class="text-gray-300">${escape(creators)}</span></div>` : ''}
+              ${meta.story_arc ? `<div class="mt-1 flex items-center gap-1.5 flex-wrap"><span class="px-2 py-0.5 rounded text-[11px] font-semibold bg-indigo-950/80 text-indigo-300 border border-indigo-700/60 inline-flex items-center gap-1">📖 Arc: ${escape(meta.story_arc)}${meta.story_arc_number ? ` #${escape(meta.story_arc_number)}` : ''}</span>${meta.continuity_gemini_verified ? `<span class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-teal-950/80 text-teal-300 border border-teal-600/60 inline-flex items-center gap-1">✦ Gemini Verified Cover</span>` : ''}</div>` : ''}
               ${match.extra ? `<div class="italic text-gray-400 line-clamp-2 mt-1">${escape(match.extra)}</div>` : ''}
             </div>
           </label>

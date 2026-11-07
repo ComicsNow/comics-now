@@ -55,6 +55,7 @@ function attachUserStoryArcsRoutes(router, deps) {
       const url = new URL('/api/story-arcs', baseUrl);
       if (req.query.publisher) url.searchParams.set('publisher', req.query.publisher);
       if (req.query.search) url.searchParams.set('search', req.query.search);
+      if (req.query.edition) url.searchParams.set('edition', req.query.edition);
       const upstream = await fetch(url.toString(), { signal: AbortSignal.timeout(5000) });
       const data = await upstream.json();
       const storyArcs = Array.isArray(data) ? data : (data.storyArcs || []);

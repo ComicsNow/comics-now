@@ -111,13 +111,16 @@ export function showSeriesList(publisherName, options = {}) {
   ]);
 
   const sortContainer = document.getElementById('series-sort-container');
+  const modeToggle = document.getElementById('smart-scope-mode-toggle');
   if (state.activeSmartFilter === 'reading-list') {
     if (sortContainer) sortContainer.classList.add('hidden');
+    if (modeToggle) modeToggle.classList.add('hidden');
     renderPublisherReadingLists(publisherName);
     return;
   }
   if (state.activeSmartFilter === 'story-arc') {
     if (sortContainer) sortContainer.classList.add('hidden');
+    if (modeToggle) modeToggle.classList.add('hidden');
     renderPublisherStoryArcs(publisherName);
     return;
   }

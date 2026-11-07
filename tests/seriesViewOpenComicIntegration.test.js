@@ -114,7 +114,7 @@ describe('Series View -> Comic View Integration', () => {
   });
 
   function loadFile(relPath) {
-    const fullPath = path.resolve('/opt/comics-now', relPath);
+    const fullPath = path.resolve(__dirname, '..', relPath);
     let content = fs.readFileSync(fullPath, 'utf8');
     const cleanContent = content
       .replace(/import\s+[\s\S]*?from\s+['"][^'"]+['"];?/g, '')

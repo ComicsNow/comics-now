@@ -27,7 +27,8 @@ def api_list_story_arcs():
     """List story arcs with calculated library completeness."""
     publisher = request.args.get("publisher")
     search = request.args.get("search")
-    arcs = get_story_arcs_with_completeness(publisher=publisher, search=search)
+    edition = request.args.get("edition", "both")
+    arcs = get_story_arcs_with_completeness(publisher=publisher, search=search, edition=edition)
     return jsonify(arcs)
 
 

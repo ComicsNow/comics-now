@@ -81,6 +81,11 @@ def test_detect_publisher():
     assert detect_publisher(["DC Comics", "Events"], []) == "DC Comics"
     assert detect_publisher([], ["https://readingorders.com/publisher/marvel-comics/"]) == "Marvel Comics"
     assert detect_publisher([], []) == "Other"
+    # Authoritative description extraction
+    assert detect_publisher([], [], description="Reading Order for Secret Wars (1984) by Marvel Comics: Heroes and villains...") == "Marvel Comics"
+    assert detect_publisher([], [], description="Reading Order for Batman: Court of Owls by DC Comics: The Court of Owls is a chilling...") == "DC Comics"
+    # Global footer links presence does NOT cause misclassification
+    assert detect_publisher([], ["https://www.dc.com/", "https://www.marvel.com/"], slug="secret-wars", description="Reading Order for Secret Wars (1984) by Marvel Comics: Heroes...") == "Marvel Comics"
 
 
 def test_parse_reading_order_soup():

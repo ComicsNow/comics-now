@@ -22,6 +22,7 @@ from tagger_app.core.comicinfo import (
 from tagger_app.persistence.tracking_db import mark_as_enhanced
 from tagger_app.persistence.scan_logs import write_scan_log
 from tagger_app.core.tagger import process_single_cbz_file
+from tagger_app.continuity.enricher import enrich_with_continuity
 
 manual_tagger_bp = Blueprint('manual_tagger', __name__)
 
@@ -100,9 +101,11 @@ def search_metadata():
             unique_candidates.sort(key=lambda x: x["score"], reverse=True)
 
             if unique_candidates:
+                cbz_p = session_info.get("cbz_path", "")
                 for i in range(len(unique_candidates)):
                     cand_meta = unique_candidates[i]["metadata"]
                     cand_meta = enrich_metadata_from_other_sources(cand_meta, unique_candidates, lower_threshold)
+                    enrich_with_continuity(cand_meta, cbz_p, cover_path=cover_path)
                     unique_candidates[i]["metadata"] = cand_meta
 
                 best_candidate = unique_candidates[0]
@@ -150,6 +153,8 @@ def tag_comic():
     is_local = session_info.get("is_local", False)
 
     try:
+        if not edited_metadata.get("story_arc"):
+            enrich_with_continuity(edited_metadata, cbz_path)
         xml_str = generate_comic_info_xml(edited_metadata, enabled_fields=scheduler_config.get("selected_fields"))
         write_comic_info_to_cbz(cbz_path, xml_str)
         mark_as_enhanced(cbz_path, [edited_metadata.get("source_url") or "Unknown"])

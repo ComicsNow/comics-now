@@ -5,6 +5,7 @@ and enriches external ComicInfo.xml sidecars with StoryArc, StoryArcNumber, and 
 """
 import re
 import os
+import time
 import json
 import sqlite3
 import threading
@@ -23,7 +24,9 @@ from tagger_app.continuity.util import (
     extract_collected_issues,
     is_issue_in_range,
     expand_publisher_aliases,
+    get_supported_publishers,
 )
+from tagger_app.continuity.three_gate_matcher import ThreeGateMatcher
 from tagger_app.core.comicinfo import (
     read_comic_info_xml,
     write_comic_info,
@@ -155,61 +158,23 @@ class ContinuityBatchTagger:
             cn_conn.row_factory = sqlite3.Row
             cursor = cn_conn.cursor()
 
-            query = "SELECT id, name, series, publisher, path, metadata FROM comics WHERE 1=1"
-            params = []
             if target_publisher and target_publisher != "all":
                 aliases = expand_publisher_aliases(target_publisher)
-                placeholders = ",".join("?" for _ in aliases)
-                query += f" AND publisher IN ({placeholders})"
-                params.extend(aliases)
+            else:
+                aliases = get_supported_publishers(self.ro_db_path)
 
-            cursor.execute(query, params)
+            placeholders = ",".join("?" for _ in aliases)
+            query = f"SELECT id, name, series, publisher, path, metadata FROM comics WHERE publisher IN ({placeholders})"
+            cursor.execute(query, aliases)
             comics = [dict(r) for r in cursor.fetchall()]
             cn_conn.close()
 
             self.progress["total"] = len(comics)
             self.log("INFO", f"Found {len(comics)} candidate comics to inspect.")
 
-            # 2. Connect to reading orders and precompute era windows & series index
-            ro_conn = sqlite3.connect(self.ro_db_path, timeout=10.0)
-            ro_conn.row_factory = sqlite3.Row
-            ro_cursor = ro_conn.cursor()
-
-            ro_cursor.execute(
-                """
-                SELECT reading_order_id, publication_date
-                FROM reading_order_issues
-                WHERE publication_date IS NOT NULL AND publication_date != ''
-                """
-            )
-            ro_issue_dates = defaultdict(list)
-            for r_id, p_date in ro_cursor.fetchall():
-                yr = extract_year(p_date)
-                if yr:
-                    ro_issue_dates[r_id].append(yr)
-
-            ro_era_windows = {}
-            for r_id, title, desc in ro_cursor.execute("SELECT id, title, description FROM reading_orders").fetchall():
-                dates = ro_issue_dates.get(r_id, [])
-                if dates:
-                    ro_era_windows[r_id] = (min(dates), max(dates))
-                else:
-                    ty = extract_year(title) or extract_year(desc)
-                    if ty:
-                        ro_era_windows[r_id] = (ty, ty)
-
-            ro_issues_by_series = defaultdict(list)
-            ro_cursor.execute(
-                """
-                SELECT i.*, o.title as arc_title, o.publisher as arc_publisher
-                FROM reading_order_issues i
-                JOIN reading_orders o ON i.reading_order_id = o.id
-                """
-            )
-            for r in ro_cursor.fetchall():
-                row_dict = dict(r)
-                row_dict["era_window"] = ro_era_windows.get(row_dict["reading_order_id"])
-                ro_issues_by_series[normalize_series(row_dict["series_name"])].append(row_dict)
+            # 2. Initialize 3-Gate Matcher (Gate 1 Cover -> Gate 2 Title -> Gate 3 Volume/Issue)
+            three_gate_matcher = ThreeGateMatcher(ro_db_path=self.ro_db_path)
+            three_gate_matcher.load_indices()
 
             for idx, comic in enumerate(comics, start=1):
                 if self.is_cancelled:
@@ -219,51 +184,17 @@ class ContinuityBatchTagger:
                 self.progress["current"] = idx
                 self.progress["currentComic"] = comic.get("name") or comic.get("id")
 
+                match = three_gate_matcher.match_comic(comic, max_cover_distance=10)
+                if not match:
+                    self.progress["skipped"] += 1
+                    continue
+
+                clean_arc = match["matchedArc"]
+                pos_str = match["storyArcNumber"]
+                series_group = match["seriesGroup"]
                 series = comic.get("series") or ""
-                meta = {}
-                if comic.get("metadata"):
-                    try:
-                        meta = json.loads(comic["metadata"]) if isinstance(comic["metadata"], str) else comic["metadata"]
-                    except Exception:
-                        pass
-
-                num = extract_issue_number(comic.get("name") or "", meta.get("Number"))
-                if not num:
-                    self.progress["skipped"] += 1
-                    continue
-
-                year = extract_year(meta.get("Year") or comic.get("name") or "")
-                c_pub = comic.get("publisher") or ""
-                collected_range = extract_collected_issues(meta.get("Summary") or meta.get("Description") or "")
-
-                norm_s = normalize_series(series)
-                candidates = ro_issues_by_series.get(norm_s, [])
-                if not candidates:
-                    candidates = ro_issues_by_series.get(normalize_series(series, strip_article=False), [])
-
-                if not candidates:
-                    self.progress["skipped"] += 1
-                    continue
-
-                matches = [
-                    cand for cand in candidates
-                    if is_publisher_compatible(c_pub, cand.get("arc_publisher"))
-                    and is_issue_in_range(num, cand["issue_number"], collected_range=collected_range)
-                    and is_year_compatible(
-                        year,
-                        cand.get("publication_date") or cand["arc_title"],
-                        ro_era_window=cand.get("era_window"),
-                    )
-                ]
-
-                if not matches:
-                    self.progress["skipped"] += 1
-                    continue
-
-                match = matches[0]
-                clean_arc = re.sub(r"\s+Reading\s+Order$", "", match["arc_title"], flags=re.IGNORECASE).strip()
-                pos_str = str(match["position"])
-                series_group = f"{match['arc_publisher'] or 'Comic'} Events"
+                num = extract_issue_number(comic.get("name") or "")
+                year = extract_year(comic.get("name") or "")
 
                 file_path = comic.get("path") or ""
 
@@ -277,10 +208,11 @@ class ContinuityBatchTagger:
                         "matchedArc": clean_arc,
                         "storyArcNumber": pos_str,
                         "seriesGroup": series_group,
+                        "coverDistance": match.get("coverDistance", 0),
                         "filePath": file_path,
                     })
                     self.progress["updated"] += 1
-                    self.log("INFO", f"[DRY-RUN] Would tag {os.path.basename(file_path or comic.get('name', ''))} -> {clean_arc} #{pos_str}")
+                    self.log("INFO", f"[DRY-RUN] Would tag {os.path.basename(file_path or comic.get('name', ''))} -> {clean_arc} #{pos_str} (dHash: {match.get('coverDistance', 0)})")
                     continue
 
                 if file_path and os.path.exists(file_path):
@@ -307,10 +239,11 @@ class ContinuityBatchTagger:
                         write_comic_info(file_path, xml_str, storage_mode="sidecar")
 
                         # Update DB metadata
+                        now_ms = int(time.time() * 1000)
                         cn_write = sqlite3.connect(self.cn_db_path, timeout=5.0)
                         cn_write.execute(
-                            "UPDATE comics SET metadata = ?, updatedAt = datetime('now') WHERE id = ?",
-                            (json.dumps(meta_to_write), comic["id"]),
+                            "UPDATE comics SET metadata = ?, updatedAt = ? WHERE id = ?",
+                            (json.dumps(meta_to_write), now_ms, comic["id"]),
                         )
                         cn_write.commit()
                         cn_write.close()
@@ -323,7 +256,6 @@ class ContinuityBatchTagger:
                 else:
                     self.progress["skipped"] += 1
 
-            ro_conn.close()
             self.status = "complete"
             self.is_running = False
             self.last_run_time = int(datetime.now().timestamp())

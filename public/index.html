@@ -351,6 +351,45 @@
               </div>
             </div>
 
+            <!-- Story Arcs & Continuity Editions Section -->
+            <div class="border border-amber-500/30 rounded-xl p-5 bg-amber-950/10 border-2 mt-8">
+              <div class="flex items-center gap-3 mb-4">
+                <div class="bg-amber-600/20 p-2 rounded-lg text-amber-400">
+                  <span class="text-xl">⚡</span>
+                </div>
+                <div>
+                  <h5 class="text-md font-bold text-white uppercase tracking-wider">Story Arcs & Continuity Editions</h5>
+                  <p class="text-xs text-gray-400 mt-0.5">Choose which reading order formats to display when browsing Story Arcs in your library.</p>
+                </div>
+              </div>
+
+              <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <label class="story-arc-edition-option flex flex-col p-3.5 rounded-xl border border-gray-700 bg-gray-900/80 hover:border-amber-400/80 cursor-pointer transition-all">
+                  <div class="flex items-center justify-between mb-1.5">
+                    <span class="font-bold text-white text-xs">⚡ Both Formats</span>
+                    <input type="radio" name="story-arc-edition-pref" value="both" class="accent-amber-500 w-4 h-4 cursor-pointer">
+                  </div>
+                  <p class="text-[11px] text-gray-400 leading-relaxed">Display both Single Issue and Collected Edition reading lists side-by-side.</p>
+                </label>
+
+                <label class="story-arc-edition-option flex flex-col p-3.5 rounded-xl border border-gray-700 bg-gray-900/80 hover:border-amber-400/80 cursor-pointer transition-all">
+                  <div class="flex items-center justify-between mb-1.5">
+                    <span class="font-bold text-white text-xs">📖 Single Issues Only</span>
+                    <input type="radio" name="story-arc-edition-pref" value="issues" class="accent-amber-500 w-4 h-4 cursor-pointer">
+                  </div>
+                  <p class="text-[11px] text-gray-400 leading-relaxed">Only show chronological issue-by-issue reading orders.</p>
+                </label>
+
+                <label class="story-arc-edition-option flex flex-col p-3.5 rounded-xl border border-gray-700 bg-gray-900/80 hover:border-amber-400/80 cursor-pointer transition-all">
+                  <div class="flex items-center justify-between mb-1.5">
+                    <span class="font-bold text-white text-xs">📚 Collected Editions Only</span>
+                    <input type="radio" name="story-arc-edition-pref" value="collections" class="accent-amber-500 w-4 h-4 cursor-pointer">
+                  </div>
+                  <p class="text-[11px] text-gray-400 leading-relaxed">Only show collected Trade Paperback & Hardcover reading orders.</p>
+                </label>
+              </div>
+            </div>
+
             <!-- Save Bar -->
             <div class="flex flex-col sm:flex-row sm:items-center sm:justify-end gap-3 pt-4 border-t border-gray-700">
               <span id="comics-defaults-dirty-indicator" class="hidden text-sm text-yellow-400 flex items-center gap-1.5">
@@ -576,75 +615,75 @@
     </div>
 
   <!-- Tag Comics Now! Modal -->
-  <div id="ct-modal" class="hidden fixed inset-0 bg-gray-900/75 flex items-center justify-center z-40 p-4" role="dialog" aria-modal="true" aria-labelledby="ct-modal-title">
+  <div id="ct-modal" class="hidden fixed inset-0 bg-gray-900/75 flex items-center justify-center z-40 p-2 sm:p-4" role="dialog" aria-modal="true" aria-labelledby="ct-modal-title">
     <div class="bg-gray-800 rounded-lg w-full h-full sm:h-auto sm:max-h-[90vh] max-w-4xl shadow-lg flex flex-col overflow-hidden">
-      <div class="flex justify-between items-center p-4 sm:p-6 border-b border-gray-700">
-        <div class="flex items-center gap-3">
-          <h3 id="ct-modal-title" class="text-2xl font-bold">Tag Comics Now!</h3>
+      <div class="flex justify-between items-center p-3 sm:p-6 border-b border-gray-700">
+        <div class="flex items-center gap-2 sm:gap-3">
+          <h3 id="ct-modal-title" class="text-xl sm:text-2xl font-bold">Tag Comics Now!</h3>
           <span id="ct-engine-status" class="text-xs px-2.5 py-1 rounded-full bg-green-900/60 text-green-300 border border-green-700 font-medium">● Engine Ready</span>
         </div>
         <button id="ct-close-btn" class="modal-close-btn text-2xl font-bold hover:text-gray-300 transition-colors" aria-label="Close Tag Comics Now modal" title="Close Tag Comics Now modal">&times;</button>
       </div>
       <!-- Scope Bar (Approach A - Segmented Workflows) -->
-      <div class="px-4 sm:px-6 pt-3 pb-2 border-b border-gray-700 bg-gray-900/60">
-        <div id="ct-scope-bar" class="flex items-center gap-1.5 p-1 bg-gray-900/80 rounded-lg border border-gray-700/80 overflow-x-auto scrollbar-none" role="tablist" aria-label="Tag Comics Now scopes">
-          <button type="button" id="ct-scope-scanner-btn" data-ct-scope="scanner" class="ct-scope-btn flex-1 py-1.5 px-2.5 sm:px-3 text-xs sm:text-sm rounded-md transition-all font-bold bg-amber-500 text-black shadow-xs whitespace-nowrap flex items-center justify-center gap-1.5" role="tab" aria-selected="true">
+      <div class="px-2 sm:px-6 pt-2 sm:pt-3 pb-2 border-b border-gray-700 bg-gray-900/60">
+        <div id="ct-scope-bar" class="flex items-center gap-1 p-1 bg-gray-900/80 rounded-lg border border-gray-700/80 w-full" role="tablist" aria-label="Tag Comics Now scopes">
+          <button type="button" id="ct-scope-scanner-btn" data-ct-scope="scanner" class="ct-scope-btn flex-1 py-1.5 px-1.5 sm:px-3 text-[11px] sm:text-sm rounded-md transition-all font-bold bg-amber-500 text-black shadow-xs whitespace-nowrap flex items-center justify-center gap-1 sm:gap-1.5" role="tab" aria-selected="true">
             <span>🔍</span>
-            <span>Scanner & Review</span>
+            <span>Scanner<span class="hidden sm:inline"> & Review</span></span>
           </button>
-          <button type="button" id="ct-scope-sources-btn" data-ct-scope="sources" class="ct-scope-btn flex-1 py-1.5 px-2.5 sm:px-3 text-xs sm:text-sm rounded-md transition-all text-gray-300 hover:text-white hover:bg-gray-800 whitespace-nowrap flex items-center justify-center gap-1.5" role="tab" aria-selected="false">
+          <button type="button" id="ct-scope-sources-btn" data-ct-scope="sources" class="ct-scope-btn flex-1 py-1.5 px-1.5 sm:px-3 text-[11px] sm:text-sm rounded-md transition-all text-gray-300 hover:text-white hover:bg-gray-800 whitespace-nowrap flex items-center justify-center gap-1 sm:gap-1.5" role="tab" aria-selected="false">
             <span>⚙️</span>
             <span>Sources & AI</span>
           </button>
-          <button type="button" id="ct-scope-organize-btn" data-ct-scope="organize" class="ct-scope-btn flex-1 py-1.5 px-2.5 sm:px-3 text-xs sm:text-sm rounded-md transition-all text-gray-300 hover:text-white hover:bg-gray-800 whitespace-nowrap flex items-center justify-center gap-1.5" role="tab" aria-selected="false">
+          <button type="button" id="ct-scope-organize-btn" data-ct-scope="organize" class="ct-scope-btn flex-1 py-1.5 px-1.5 sm:px-3 text-[11px] sm:text-sm rounded-md transition-all text-gray-300 hover:text-white hover:bg-gray-800 whitespace-nowrap flex items-center justify-center gap-1 sm:gap-1.5" role="tab" aria-selected="false">
             <span>🗂️</span>
-            <span>File Organization</span>
+            <span><span class="hidden sm:inline">File </span>Organization</span>
           </button>
         </div>
       </div>
 
       <!-- Subnav Rows (Scope Contextual) -->
-      <div id="ct-tabs-row" class="border-b border-gray-700 px-4 sm:px-6 shrink-0 bg-gray-800">
+      <div id="ct-tabs-row" class="border-b border-gray-700 px-2 sm:px-6 shrink-0 bg-gray-800">
         <!-- Scanner Scope Tabs -->
-        <div id="ct-scope-scanner-tabs" class="ct-scope-tabs-group flex items-center gap-2 overflow-x-auto scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-gray-800">
-          <button id="ct-tab-output" class="tab-button active py-2.5 px-2.5 sm:px-4 text-xs sm:text-sm whitespace-nowrap">
-            <span>Scan & Output</span>
+        <div id="ct-scope-scanner-tabs" class="ct-scope-tabs-group flex items-center justify-between w-full">
+          <button id="ct-tab-output" class="tab-button active flex-1 text-center py-2 sm:py-2.5 px-1 sm:px-4 text-[11px] sm:text-sm whitespace-nowrap">
+            <span>Scan<span class="hidden sm:inline"> & Output</span></span>
           </button>
-          <button id="ct-tab-matches" class="tab-button py-2.5 px-2.5 sm:px-4 text-xs sm:text-sm whitespace-nowrap relative">
-            <span>Matches & Review</span>
+          <button id="ct-tab-matches" class="tab-button flex-1 text-center py-2 sm:py-2.5 px-1 sm:px-4 text-[11px] sm:text-sm whitespace-nowrap relative">
+            <span>Matches<span class="hidden sm:inline"> & Review</span></span>
             <span id="ct-matches-badge" class="hidden absolute top-1 right-1 w-2 h-2 bg-yellow-500 rounded-full"></span>
           </button>
-          <button id="ct-tab-logs" class="tab-button py-2.5 px-2.5 sm:px-4 text-xs sm:text-sm whitespace-nowrap">
-            <span>Scan History</span>
+          <button id="ct-tab-logs" class="tab-button flex-1 text-center py-2 sm:py-2.5 px-1 sm:px-4 text-[11px] sm:text-sm whitespace-nowrap">
+            <span><span class="hidden sm:inline">Scan </span>History</span>
           </button>
         </div>
 
         <!-- Sources & AI Scope Tabs -->
-        <div id="ct-scope-sources-tabs" class="ct-scope-tabs-group hidden items-center gap-2 overflow-x-auto scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-gray-800" style="display: none;">
-          <button id="ct-tab-settings" class="tab-button py-2.5 px-2.5 sm:px-4 text-xs sm:text-sm whitespace-nowrap">
-            <span>Metadata Sources & Rules</span>
+        <div id="ct-scope-sources-tabs" class="ct-scope-tabs-group hidden items-center justify-between w-full" style="display: none;">
+          <button id="ct-tab-settings" class="tab-button flex-1 text-center py-2 sm:py-2.5 px-1 sm:px-4 text-[11px] sm:text-sm whitespace-nowrap">
+            <span>Sources<span class="hidden sm:inline"> & Rules</span></span>
           </button>
-          <button id="ct-tab-story-arcs" class="tab-button py-2.5 px-2.5 sm:px-4 text-xs sm:text-sm whitespace-nowrap flex items-center gap-1.5">
-            <span>Story Arcs & Continuity</span>
+          <button id="ct-tab-story-arcs" class="tab-button flex-1 text-center py-2 sm:py-2.5 px-1 sm:px-4 text-[11px] sm:text-sm whitespace-nowrap flex items-center justify-center gap-1">
+            <span>Story Arcs<span class="hidden sm:inline"> & Continuity</span></span>
           </button>
-          <button id="ct-tab-gemini" class="tab-button py-2.5 px-2.5 sm:px-4 text-xs sm:text-sm whitespace-nowrap flex items-center gap-1.5">
-            <span>Gemini Vision AI</span>
+          <button id="ct-tab-gemini" class="tab-button flex-1 text-center py-2 sm:py-2.5 px-1 sm:px-4 text-[11px] sm:text-sm whitespace-nowrap flex items-center justify-center gap-1">
+            <span>Gemini<span class="hidden sm:inline"> Vision</span> AI</span>
           </button>
         </div>
 
         <!-- File Organization Scope Tabs (Promoted from double-stacked sub-tabs) -->
-        <div id="ct-scope-organize-tabs" class="ct-scope-tabs-group hidden items-center gap-2 overflow-x-auto scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-gray-800" style="display: none;">
-          <button id="mgmt-tab-operations" class="tab-button active py-2.5 px-2.5 sm:px-4 text-xs sm:text-sm whitespace-nowrap">
-            <span>Inbox Operations</span>
+        <div id="ct-scope-organize-tabs" class="ct-scope-tabs-group hidden items-center justify-between w-full" style="display: none;">
+          <button id="mgmt-tab-operations" class="tab-button active flex-1 text-center py-2 sm:py-2.5 px-1 sm:px-3 text-[11px] sm:text-sm whitespace-nowrap">
+            <span>Inbox<span class="hidden sm:inline"> Operations</span></span>
           </button>
-          <button id="mgmt-tab-name" class="tab-button py-2.5 px-2.5 sm:px-4 text-xs sm:text-sm whitespace-nowrap">
-            <span>Naming Rules</span>
+          <button id="mgmt-tab-name" class="tab-button flex-1 text-center py-2 sm:py-2.5 px-1 sm:px-3 text-[11px] sm:text-sm whitespace-nowrap">
+            <span>Naming<span class="hidden sm:inline"> Rules</span></span>
           </button>
-          <button id="mgmt-tab-folder" class="tab-button py-2.5 px-2.5 sm:px-4 text-xs sm:text-sm whitespace-nowrap">
-            <span>Folder Rules</span>
+          <button id="mgmt-tab-folder" class="tab-button flex-1 text-center py-2 sm:py-2.5 px-1 sm:px-3 text-[11px] sm:text-sm whitespace-nowrap">
+            <span>Folder<span class="hidden sm:inline"> Rules</span></span>
           </button>
-          <button id="mgmt-tab-errors" class="tab-button py-2.5 px-2.5 sm:px-4 text-xs sm:text-sm whitespace-nowrap">
-            <span>Session Errors</span>
+          <button id="mgmt-tab-errors" class="tab-button flex-1 text-center py-2 sm:py-2.5 px-1 sm:px-3 text-[11px] sm:text-sm whitespace-nowrap">
+            <span><span class="hidden sm:inline">Session </span>Errors</span>
           </button>
         </div>
 
@@ -655,24 +694,40 @@
       <div class="flex-1 overflow-y-auto p-4 sm:p-6">
         <!-- Live Output Tab -->
         <div id="ct-content-output">
-          <div class="flex flex-wrap justify-between items-center gap-2 mb-3">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
             <div class="flex items-center gap-3">
-              <div id="ct-scan-status-text" class="text-sm font-medium text-gray-300">Ready to scan comic library</div>
+              <div id="ct-scan-status-text" class="text-xs sm:text-sm font-medium text-gray-300 truncate">Ready to scan comic library</div>
             </div>
-            <div class="flex flex-wrap gap-2">
-              <button id="ct-rescan-unmatched-btn" class="bg-gray-800 hover:bg-gray-700 text-gray-200 border border-gray-700 hover:border-gray-600 font-semibold py-2 px-3.5 rounded-full transition-all text-sm flex items-center gap-1.5 shadow-xs disabled:opacity-50 disabled:cursor-not-allowed" title="Re-search comics previously recorded as having no match">
-                <svg class="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg> Rescan Unmatched <span id="ct-unmatched-count"></span>
+            <div class="flex flex-nowrap items-stretch gap-1 sm:gap-2 w-full sm:w-auto shrink-0">
+              <button id="ct-rescan-unmatched-btn" class="bg-gray-800 hover:bg-gray-700 text-gray-200 border border-gray-700 hover:border-gray-600 font-bold py-1.5 px-2 rounded-xl text-[10.5px] sm:text-xs flex flex-col items-center justify-center leading-tight shadow-xs whitespace-nowrap flex-1 disabled:opacity-50 disabled:cursor-not-allowed" title="Re-search comics previously recorded as having no match">
+                <span class="flex items-center gap-1 text-[10px] text-gray-400">
+                  <svg class="w-3 h-3 text-amber-400 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                  Rescan
+                </span>
+                <span>Unmatched <span id="ct-unmatched-count"></span></span>
               </button>
-              <button id="ct-rescan-xml-btn" class="bg-gray-800 hover:bg-gray-700 text-gray-200 border border-gray-700 hover:border-gray-600 font-semibold py-2 px-3.5 rounded-full transition-all text-sm flex items-center gap-1.5 shadow-xs" title="Force re-scan comics that already have ComicInfo.xml">
-                <svg class="w-4 h-4 text-purple-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg> Rescan Existing XML
+              <button id="ct-rescan-xml-btn" class="bg-gray-800 hover:bg-gray-700 text-gray-200 border border-gray-700 hover:border-gray-600 font-bold py-1.5 px-2 rounded-xl text-[10.5px] sm:text-xs flex flex-col items-center justify-center leading-tight shadow-xs whitespace-nowrap flex-1" title="Force re-scan comics that already have ComicInfo.xml">
+                <span class="flex items-center gap-1 text-[10px] text-gray-400">
+                  <svg class="w-3 h-3 text-purple-400 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                  Rescan
+                </span>
+                <span>XML</span>
               </button>
-              <button id="ct-run-btn" class="bg-blue-600 hover:bg-blue-500 text-white font-bold py-2 px-4 rounded-full transition-all text-sm flex items-center gap-1.5 shadow-lg hover:shadow-blue-900/50 ring-2 ring-blue-500/30">
-                <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M4 4l12 6-12 6z"/></svg> Run Library Scan
+              <button id="ct-run-btn" class="bg-blue-600 hover:bg-blue-500 text-white font-bold py-1.5 px-2 sm:px-3 rounded-xl text-[10.5px] sm:text-xs flex flex-col items-center justify-center leading-tight shadow-lg hover:shadow-blue-900/50 ring-1 ring-blue-500/30 whitespace-nowrap flex-1">
+                <span class="flex items-center gap-1 text-[10px] text-blue-200">
+                  <svg class="w-3 h-3 shrink-0" fill="currentColor" viewBox="0 0 20 20"><path d="M4 4l12 6-12 6z"/></svg>
+                  Run
+                </span>
+                <span>Library Scan</span>
               </button>
-              <button id="ct-cancel-btn" class="hidden bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-full transition-colors text-sm flex items-center gap-1 shadow-md">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg> Cancel Scan
+              <button id="ct-cancel-btn" class="hidden bg-red-600 hover:bg-red-700 text-white font-bold py-1.5 px-2 sm:px-3 rounded-xl text-[10.5px] sm:text-xs flex flex-col items-center justify-center leading-tight shadow-md whitespace-nowrap flex-1">
+                <span class="flex items-center gap-1 text-[10px] text-red-200">
+                  <svg class="w-3 h-3 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+                  Cancel
+                </span>
+                <span>Scan</span>
               </button>
-              <button id="ct-clear-output" class="bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-gray-200 border border-gray-700 hover:border-gray-600 font-medium py-2 px-3.5 rounded-full transition-all text-sm">Clear</button>
+              <button id="ct-clear-output" class="bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-gray-200 border border-gray-700 hover:border-gray-600 font-medium py-1.5 px-2.5 sm:px-3 rounded-xl text-[11px] sm:text-xs whitespace-nowrap flex items-center justify-center shrink-0">Clear</button>
             </div>
           </div>
           <!-- Live Progress & Activity Card -->

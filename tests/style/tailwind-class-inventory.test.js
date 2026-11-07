@@ -33,7 +33,7 @@ const VALID_TOKEN = /^[-\w[\]#/:%.()]+$/;
 function sourceFiles() {
   return execFileSync('git', ['ls-files', 'public'], { cwd: ROOT, encoding: 'utf8' })
     .split('\n')
-    .filter((f) => f && /\.(html|js)$/.test(f) && !EXCLUDED_FILES.has(path.basename(f)))
+    .filter((f) => f && /\.(html|js)$/.test(f) && !EXCLUDED_FILES.has(path.basename(f)) && fs.existsSync(path.join(ROOT, f)))
     .sort();
 }
 

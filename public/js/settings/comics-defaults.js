@@ -2,6 +2,7 @@ import { state, clearElement } from '../globals.js';
 import { html, raw, render } from '../ui/template.js';
 import { showSettingsMessage } from './shared.js';
 import { buildLibraryPrefRow } from './library-pref-row.js';
+import { initStoryArcReaderSettings } from './story-arc-reader-settings.js';
 
 const clear = typeof clearElement === 'function' ? clearElement : (el) => { if (el) { if (typeof el.replaceChildren === 'function') el.replaceChildren(); else el.innerHTML = ''; } };
 const renderContent = (typeof render === 'function' && render.length >= 2) ? render : (el, content) => {
@@ -338,6 +339,7 @@ export function initComicsDefaults() {
   $('master-manga-toggle')?.addEventListener('change', onMasterMangaChange);
   $('master-continuous-toggle')?.addEventListener('change', onMasterContinuousChange);
   $('comics-defaults-save-btn')?.addEventListener('click', saveAll);
+  initStoryArcReaderSettings();
 
   $('settings-tab-comics-defaults')?.addEventListener('click', () => {
     reloadAll();

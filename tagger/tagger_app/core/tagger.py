@@ -8,12 +8,13 @@ import sqlite3
 
 from tagger_app.config import UPLOAD_FOLDER
 from tagger_app.core.metadata import normalize_metadata
-from tagger_app.core.covers import extract_cover_from_cbz
+from tagger_app.core.covers import extract_cover_from_cbz, get_comics_now_cover
 from tagger_app.core.limiter import domain_limiter
 from tagger_app.core.comicinfo import read_comic_info_xml, generate_comic_info_xml, write_comic_info
 from tagger_app.core.enrichment import check_comic_info_completeness, enrich_metadata_from_other_sources, query_all_sources_sequentially
 from tagger_app.persistence.tracking_db import mark_as_enhanced, is_already_enhanced
 from tagger_app.scheduler.state import scheduler_config
+from tagger_app.continuity.enricher import enrich_with_continuity
 
 
 def _is_readable_cover(file_path):
@@ -157,12 +158,14 @@ def process_single_cbz_file(file_path, comicvine_api_key, google_books_api_key=N
     if metadata and score >= lower_threshold:
         metadata = enrich_metadata_from_other_sources(metadata, candidates, lower_threshold)
         metadata = normalize_metadata(metadata, codex=publisher_codex)
+        enrich_with_continuity(metadata, file_path, cover_path=resolved_cover_path)
         if existing_notes:
             metadata["notes"] = existing_notes
 
         for cand in candidates:
             if cand.get("metadata"):
                 cand["metadata"] = normalize_metadata(cand["metadata"], codex=publisher_codex)
+                enrich_with_continuity(cand["metadata"], file_path, cover_path=resolved_cover_path)
 
         if score >= upper_threshold:
             try:
@@ -221,47 +224,4 @@ def process_single_cbz_file(file_path, comicvine_api_key, google_books_api_key=N
     return final_res
 
 
-def get_comics_now_cover(file_path):
-    """
-    Lookup cover art in the Comics-Now sqlite database at /opt/comics-now/comics-now.db.
-    Match by absolute path first, and fallback to matching by filename.
-    """
-    db_path = "/opt/comics-now/comics-now.db"
-    thumbnails_dir = "/opt/comics-now/thumbnails"
 
-    if not os.path.exists(db_path):
-        print(f"[-] Comics-Now database not found at {db_path}")
-        return None
-
-    conn = None
-    try:
-        conn = sqlite3.connect(db_path)
-        cursor = conn.cursor()
-
-        # 1. Match by absolute path
-        cursor.execute("SELECT thumbnailPath FROM comics WHERE path = ?", (file_path,))
-        row = cursor.fetchone()
-        if row and row[0]:
-            thumb_path = os.path.join(thumbnails_dir, row[0])
-            if os.path.exists(thumb_path):
-                print(f"[+] Found Comics-Now cover by path: {thumb_path}")
-                return thumb_path
-
-        # 2. Fallback to match by filename (basename)
-        filename = os.path.basename(file_path)
-        cursor.execute("SELECT path, thumbnailPath FROM comics WHERE path LIKE ?", (f"%{filename}",))
-        rows = cursor.fetchall()
-        for r_path, r_thumb in rows:
-            if os.path.basename(r_path) == filename and r_thumb:
-                thumb_path = os.path.join(thumbnails_dir, r_thumb)
-                if os.path.exists(thumb_path):
-                    print(f"[+] Found Comics-Now cover by filename fallback: {thumb_path}")
-                    return thumb_path
-
-    except Exception as e:
-        print(f"[-] Error querying Comics-Now database: {e}")
-    finally:
-        if conn:
-            conn.close()
-
-    return None

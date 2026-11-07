@@ -54,7 +54,7 @@ function createSettingsSandbox() {
   vm.createContext(sandbox);
 
   function loadFile(relPath) {
-    const fullPath = path.resolve('/opt/comics-now', relPath);
+    const fullPath = path.resolve(__dirname, '../../..', relPath);
     let content = fs.readFileSync(fullPath, 'utf8');
     content = content
       .replace(/import\s+[\s\S]*?from\s+['"][^'"]+['"];?/g, '')

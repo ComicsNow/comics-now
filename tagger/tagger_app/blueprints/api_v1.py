@@ -13,6 +13,7 @@ from tagger_app.persistence.scan_logs import write_scan_log
 from tagger_app.persistence.tracking_db import mark_as_enhanced
 from tagger_app.core.comicinfo import generate_comic_info_xml, write_comic_info
 from tagger_app.core.tagger import process_single_cbz_file
+from tagger_app.continuity.enricher import enrich_with_continuity
 
 from tagger_app.core.metadata import normalize_metadata
 from tagger_app.sources.comicvine import search_comicvine_multi
@@ -214,6 +215,8 @@ def api_apply_tag():
 
     metadata_storage = data.get("metadata_storage") or scheduler_config.get("metadata_storage", "archive")
     try:
+        if not metadata.get("story_arc"):
+            enrich_with_continuity(metadata, file_path)
         xml_str = generate_comic_info_xml(metadata, enabled_fields=scheduler_config.get("selected_fields"))
         write_comic_info(file_path, xml_str, metadata_storage)
         mark_as_enhanced(file_path, [metadata.get("source_url") or "Unknown"])

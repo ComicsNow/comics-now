@@ -39,14 +39,45 @@ def parse_sitemap_slugs(xml_or_html: str) -> List[str]:
     return slugs
 
 
-def detect_publisher(breadcrumbs: Optional[List[str]] = None, links: Optional[List[str]] = None, title: str = "", slug: str = "") -> str:
+def detect_publisher(
+    breadcrumbs: Optional[List[str]] = None,
+    links: Optional[List[str]] = None,
+    title: str = "",
+    slug: str = "",
+    description: str = "",
+) -> str:
     """Infer publisher (DC Comics, Marvel Comics, Image Comics, Other)."""
-    text_corpus = " ".join((breadcrumbs or []) + (links or []) + [title, slug]).lower()
-    if any(k in text_corpus for k in ["dc comics", "dc.com", "timeline/dc", "/publisher/dc", "batman", "superman", "crisis-on"]):
-        return "DC Comics"
-    if any(k in text_corpus for k in ["marvel comics", "marvel.com", "timeline/marvel", "/publisher/marvel", "avengers", "spider-man", "secret-wars"]):
+    # 1. Authoritative check: ReadingOrders.com meta descriptions always format as:
+    # "Reading Order for <Title> by <Publisher>: <Summary>"
+    if description:
+        m = re.search(r"\bby\s+(Marvel(?:\s+Comics)?|DC(?:\s+Comics)?|Image(?:\s+Comics)?|Dark\s+Horse(?:\s+Comics)?|IDW(?:\s+Publishing)?)\b", description, re.IGNORECASE)
+        if m:
+            pub_raw = m.group(1).lower()
+            if "marvel" in pub_raw:
+                return "Marvel Comics"
+            if "dc" in pub_raw:
+                return "DC Comics"
+            if "image" in pub_raw:
+                return "Image Comics"
+            if "dark horse" in pub_raw:
+                return "Dark Horse Comics"
+            if "idw" in pub_raw:
+                return "IDW Publishing"
+
+    # 2. Filter out site-wide global footer/nav links (e.g. www.dc.com, www.marvel.com)
+    clean_links = [
+        l for l in (links or [])
+        if not re.search(r"^https?://(www\.)?(dc|marvel)\.com/?$", l.lower().strip())
+    ]
+
+    text_corpus = " ".join((breadcrumbs or []) + clean_links + [title, slug]).lower()
+
+    # 3. Targeted slug/title keyword checks
+    if any(k in text_corpus for k in ["marvel comics", "timeline/marvel", "/publisher/marvel", "avengers", "spider-man", "secret-wars", "x-men", "dawn-of-x", "reign-of-x", "fall-of-x", "empyre", "king-in-black"]):
         return "Marvel Comics"
-    if "image" in text_corpus:
+    if any(k in text_corpus for k in ["dc comics", "timeline/dc", "/publisher/dc", "batman", "superman", "crisis-on", "flashpoint", "knightfall", "dark-nights"]):
+        return "DC Comics"
+    if "image" in text_corpus or "/publisher/image" in text_corpus:
         return "Image Comics"
     return "Other"
 
@@ -71,7 +102,7 @@ def parse_reading_order_soup(soup: BeautifulSoup, slug: str) -> Dict[str, Any]:
     # Breadcrumbs & links for publisher detection
     breadcrumbs = [a.get_text(strip=True) for a in soup.select(".breadcrumb a, nav a")]
     links = [a.get("href", "") for a in soup.find_all("a", href=True)]
-    publisher = detect_publisher(breadcrumbs, links, title=title, slug=slug)
+    publisher = detect_publisher(breadcrumbs, links, title=title, slug=slug, description=desc)
 
     issues = []
     # Cards: either .issue-item or generic border card
