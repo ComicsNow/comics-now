@@ -210,8 +210,12 @@ export function initStoryArcsTab() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ mode, force })
         });
+        const contentType = res.headers.get('content-type') || '';
+        if (!contentType.includes('application/json')) {
+          throw new Error(`Server returned HTTP ${res.status} (${res.statusText || 'Non-JSON response'})`);
+        }
         const data = await res.json();
-        if (!data.ok) {
+        if (!res.ok || !data.ok) {
           alert(`Sync error: ${data.error || 'Failed to start sync'}`);
         }
       } catch (err) {

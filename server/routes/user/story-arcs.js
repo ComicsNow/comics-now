@@ -62,24 +62,6 @@ function attachUserStoryArcsRoutes(router, deps) {
     }
   });
 
-  // GET /api/v1/story-arcs/:arcId
-  router.get('/api/v1/story-arcs/:arcId', async (req, res) => {
-    try {
-      const matcher = getMatcher();
-      if (!matcher) {
-        return res.status(503).json({ ok: false, error: 'Continuity database not available' });
-      }
-      const storyArc = await matcher.getStoryArcDetails(req.params.arcId);
-      if (!storyArc) {
-        return res.status(404).json({ ok: false, error: 'Story arc not found' });
-      }
-      return res.json({ ok: true, storyArc });
-    } catch (err) {
-      console.error('[StoryArcsRoute] Error fetching story arc detail:', err);
-      return res.status(500).json({ ok: false, error: 'Failed to fetch story arc detail' });
-    }
-  });
-
   // GET /api/v1/story-arcs/continuity/lookup
   router.get('/api/v1/story-arcs/continuity/lookup', async (req, res) => {
     try {
@@ -103,6 +85,24 @@ function attachUserStoryArcsRoutes(router, deps) {
   // GET /api/v1/story-arcs/sync/status
   router.get('/api/v1/story-arcs/sync/status', (req, res) => {
     return res.json({ ok: true, ...runner.getStatus() });
+  });
+
+  // POST /api/v1/story-arcs/sync
+  router.post('/api/v1/story-arcs/sync', ...syncMiddlewares, async (req, res) => {
+    try {
+      const { mode, force } = req.body || {};
+      const status = runner.getStatus();
+      if (status.isSyncing) {
+        return res.status(409).json({ ok: false, error: 'Synchronization is already in progress' });
+      }
+      runner.startSync({ mode: mode || 'both', force: !!force }).catch(err => {
+        console.error('[StoryArcsRoute] Background sync error:', err);
+      });
+      return res.json({ ok: true, message: 'Sync started' });
+    } catch (err) {
+      console.error('[StoryArcsRoute] Error triggering sync:', err);
+      return res.status(500).json({ ok: false, error: 'Failed to start sync' });
+    }
   });
 
   // POST /api/v1/story-arcs/sync/cancel
@@ -142,6 +142,24 @@ function attachUserStoryArcsRoutes(router, deps) {
   router.delete('/api/v1/story-arcs/logs', ...syncMiddlewares, (req, res) => {
     clearStoryArcsLogs();
     return res.json({ ok: true });
+  });
+
+  // GET /api/v1/story-arcs/:arcId (parameterized fallback, must remain after all static routes)
+  router.get('/api/v1/story-arcs/:arcId', async (req, res) => {
+    try {
+      const matcher = getMatcher();
+      if (!matcher) {
+        return res.status(503).json({ ok: false, error: 'Continuity database not available' });
+      }
+      const storyArc = await matcher.getStoryArcDetails(req.params.arcId);
+      if (!storyArc) {
+        return res.status(404).json({ ok: false, error: 'Story arc not found' });
+      }
+      return res.json({ ok: true, storyArc });
+    } catch (err) {
+      console.error('[StoryArcsRoute] Error fetching story arc detail:', err);
+      return res.status(500).json({ ok: false, error: 'Failed to fetch story arc detail' });
+    }
   });
 }
 

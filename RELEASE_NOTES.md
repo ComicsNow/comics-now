@@ -55,12 +55,12 @@ Welcome to **Comics Now! v3.4.0** — introducing the **Story Arcs & Narrative C
 ## 📦 v3.4.0 Changelog
 1. `feat(continuity)`: add ReadingOrders scraper, Story Arcs smart filter, and narrative timeline (`d53f862`)
 2. `feat(continuity)`: add ReadingOrders MCP tools, selectable tagger source, runner and docs (`e9b06cf`)
-3. `feat(settings)`: add dedicated Story Arcs settings tab, smart streaming logs, crawler engine, and 21-day log retention
+3. `feat(settings)`: add dedicated Story Arcs settings tab, smart streaming logs, crawler engine, route contract integrity test, and 21-day log retention
 
 ---
 
 ## 🧪 Verification & Test Results
-- **Full Jest suite**: `187 suites passed, 1471 tests passed (100% pass rate)`.
+- **Full Jest suite**: `189 suites passed, 1477 tests passed (100% pass rate)`.
 - **MCP suite**: `47 passed`.
 - **Python tagger source suite**: `6 passed`.
 - **Production build**: Tailwind CSS v4 and Vite client bundle compiled cleanly.
