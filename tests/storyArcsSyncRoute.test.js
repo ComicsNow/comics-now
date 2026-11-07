@@ -104,4 +104,33 @@ describe('Story Arcs Sync API Endpoints Integration', () => {
     expect(res.status).toBe(200);
     expect(res.body).toEqual({ ok: true });
   });
+
+  it('GET /api/v1/story-arcs/batch-tag/publishers returns publisher list', async () => {
+    const res = await executeRequest('GET', '/api/v1/story-arcs/batch-tag/publishers');
+    expect(res.status).toBe(200);
+    expect(res.body).toHaveProperty('ok', true);
+    expect(Array.isArray(res.body.publishers)).toBe(true);
+  });
+
+  it('GET /api/v1/story-arcs/batch-tag/status returns batch tagger status', async () => {
+    const res = await executeRequest('GET', '/api/v1/story-arcs/batch-tag/status');
+    expect(res.status).toBe(200);
+    expect(res.body).toHaveProperty('ok', true);
+    expect(res.body).toHaveProperty('isRunning');
+  });
+
+  it('POST /api/v1/story-arcs/batch-tag triggers batch enrichment and returns JSON', async () => {
+    const res = await executeRequest('POST', '/api/v1/story-arcs/batch-tag', { publisher: 'all' });
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual(expect.objectContaining({
+      ok: true,
+      message: 'Batch enrichment started'
+    }));
+  });
+
+  it('POST /api/v1/story-arcs/batch-tag/cancel returns cancellation JSON', async () => {
+    const res = await executeRequest('POST', '/api/v1/story-arcs/batch-tag/cancel');
+    expect(res.status).toBe(200);
+    expect(res.body).toHaveProperty('ok', true);
+  });
 });

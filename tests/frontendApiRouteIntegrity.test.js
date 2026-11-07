@@ -68,4 +68,25 @@ describe('Frontend API Route Contract Integrity', () => {
       expect(registeredRoutes.has(key)).toBe(true);
     }
   });
+
+  test('Story Arcs Batch Tagger frontend (/public/js/settings/story-arcs-batch-tagger.js) calls only registered backend endpoints', () => {
+    const filePath = path.join(__dirname, '../public/js/settings/story-arcs-batch-tagger.js');
+    const content = fs.readFileSync(filePath, 'utf8');
+
+    const fetchMatches = [...content.matchAll(/fetch\s*\(\s*`?\${?[^`]*?}?(\/api\/v1\/[^`"'\s?]+)[^)]*\)/g)];
+    expect(fetchMatches.length).toBeGreaterThan(0);
+
+    for (const match of fetchMatches) {
+      const fullCall = match[0];
+      const routePath = match[1];
+
+      let method = 'GET';
+      if (/method:\s*['"]POST['"]/i.test(fullCall)) method = 'POST';
+      else if (/method:\s*['"]DELETE['"]/i.test(fullCall)) method = 'DELETE';
+      else if (/method:\s*['"]PUT['"]/i.test(fullCall)) method = 'PUT';
+
+      const key = `${method} ${routePath}`;
+      expect(registeredRoutes.has(key)).toBe(true);
+    }
+  });
 });

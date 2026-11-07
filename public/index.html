@@ -643,6 +643,61 @@
             </div>
           </div>
 
+          <!-- Batch ComicInfo.xml Story Arc Enrichment Section -->
+          <div class="border border-gray-700/80 bg-gray-800/40 rounded-xl p-5 shadow-xs">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3">
+              <div>
+                <h5 class="text-base font-bold flex items-center gap-2 text-white">
+                  <span class="text-amber-400">🏷️</span> ComicInfo.xml Story Arc Enrichment
+                </h5>
+                <p class="text-xs text-gray-400 mt-0.5">
+                  Updates <span class="text-amber-300 font-mono">&lt;StoryArc&gt;</span>, <span class="text-amber-300 font-mono">&lt;StoryArcNumber&gt;</span>, and <span class="text-amber-300 font-mono">&lt;SeriesGroup&gt;</span> in ComicInfo.xml for all library comics matching canonical reading orders. Strictly preserves all creator, character, date, and description metadata.
+                </p>
+              </div>
+              <span id="story-arcs-batch-status-badge" class="text-xs px-2.5 py-1 rounded-full bg-gray-700/60 text-gray-300 border border-gray-600 font-semibold self-start sm:self-center">
+                Idle
+              </span>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+              <div>
+                <label for="story-arcs-batch-publisher-select" class="block text-xs font-medium text-gray-300 mb-1">
+                  Target Publisher Scope
+                </label>
+                <select id="story-arcs-batch-publisher-select"
+                  class="w-full bg-gray-700 text-white p-2 rounded-lg text-xs focus:outline-hidden focus:ring-2 focus:ring-amber-500">
+                  <option value="all">All Publishers in Story Arcs DB</option>
+                </select>
+                <span class="text-[11px] text-gray-400 mt-0.5 block">Matches comics belonging to publishers present in reading-orders.db.</span>
+              </div>
+              <div class="flex flex-col justify-end">
+                <div class="flex items-center gap-3">
+                  <button type="button" id="start-story-arcs-batch-btn"
+                    class="bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-white text-xs font-semibold py-2.5 px-4 rounded-lg transition-colors flex items-center gap-2 shadow-xs cursor-pointer">
+                    <span>🏷️</span>
+                    <span id="story-arcs-batch-btn-text">Batch Update ComicInfo.xml</span>
+                  </button>
+                  <button type="button" id="cancel-story-arcs-batch-btn"
+                    class="hidden bg-red-600/80 hover:bg-red-600 text-white text-xs font-semibold py-2.5 px-3.5 rounded-lg transition-colors flex items-center gap-1.5 shadow-xs cursor-pointer">
+                    <span>⏹</span>
+                    <span>Cancel</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Batch Progress Bar -->
+            <div id="story-arcs-batch-progress-card" class="hidden p-3 bg-gray-900/60 rounded-lg border border-amber-500/30">
+              <div class="flex justify-between text-xs text-gray-300 mb-1">
+                <span id="story-arcs-batch-progress-label">Preparing enrichment...</span>
+                <span id="story-arcs-batch-progress-percent" class="font-bold text-amber-400">0%</span>
+              </div>
+              <div class="w-full bg-gray-700 rounded-full h-2 overflow-hidden">
+                <div id="story-arcs-batch-progress-bar" class="bg-amber-500 h-2 rounded-full transition-all duration-300" style="width: 0%"></div>
+              </div>
+            </div>
+          </div>
+
           <!-- Live Streaming Crawler Logs -->
           <div class="border border-gray-700/80 bg-gray-800/40 rounded-xl p-5 shadow-xs">
             <div class="flex items-center justify-between mb-3">

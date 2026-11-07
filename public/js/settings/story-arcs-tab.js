@@ -6,6 +6,11 @@ import {
   global as canonicalGlobal
 } from '../globals.js';
 import { smartScrollToBottom } from '../comictagger/logging.js';
+import {
+  fetchBatchTagPublishers,
+  refreshBatchTagStatus,
+  initBatchTaggerListeners
+} from './story-arcs-batch-tagger.js';
 
 const global = typeof canonicalGlobal !== 'undefined' ? canonicalGlobal : new Proxy(typeof window !== 'undefined' ? window : globalThis, {
   get: (t, p) => (typeof state !== 'undefined' && p in state) ? state[p] : t[p],
@@ -165,10 +170,15 @@ export function connectStoryArcsStream() {
 export function openStoryArcsTab() {
   fetchStoryArcsSettings();
   refreshStoryArcsStatus();
+  fetchBatchTagPublishers();
+  refreshBatchTagStatus();
   connectStoryArcsStream();
 
   if (pollStatusInterval) clearInterval(pollStatusInterval);
-  pollStatusInterval = setInterval(refreshStoryArcsStatus, 2000);
+  pollStatusInterval = setInterval(() => {
+    refreshStoryArcsStatus();
+    refreshBatchTagStatus();
+  }, 2000);
 }
 
 export function initStoryArcsTab() {
@@ -284,6 +294,8 @@ export function initStoryArcsTab() {
       } catch (_) {}
     });
   }
+
+  initBatchTaggerListeners();
 
   if (typeof window !== 'undefined') {
     window.openStoryArcsTab = openStoryArcsTab;

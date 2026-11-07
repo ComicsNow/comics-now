@@ -4,6 +4,7 @@
 const { initReadingOrdersDb } = require('../../readingOrdersDb');
 const { createContinuityMatcher } = require('../../services/continuityMatcher');
 const { getReadingOrdersRunner } = require('../../services/reading-orders-runner');
+const { getStoryArcsBatchTagger } = require('../../services/story-arcs-batch-tagger');
 const {
   registerStoryArcsClient,
   unregisterStoryArcsClient,
@@ -18,6 +19,7 @@ function attachUserStoryArcsRoutes(router, deps) {
   let readingOrdersDbInstance = null;
   let matcherInstance = null;
   const runner = getReadingOrdersRunner();
+  const batchTagger = getStoryArcsBatchTagger();
 
   function getMatcher() {
     if (!matcherInstance) {
@@ -142,6 +144,40 @@ function attachUserStoryArcsRoutes(router, deps) {
   router.delete('/api/v1/story-arcs/logs', ...syncMiddlewares, (req, res) => {
     clearStoryArcsLogs();
     return res.json({ ok: true });
+  });
+
+  // GET /api/v1/story-arcs/batch-tag/publishers
+  router.get('/api/v1/story-arcs/batch-tag/publishers', (req, res) => {
+    return res.json({ ok: true, publishers: batchTagger.getStoryArcPublishers() });
+  });
+
+  // GET /api/v1/story-arcs/batch-tag/status
+  router.get('/api/v1/story-arcs/batch-tag/status', (req, res) => {
+    return res.json({ ok: true, ...batchTagger.getStatus() });
+  });
+
+  // POST /api/v1/story-arcs/batch-tag
+  router.post('/api/v1/story-arcs/batch-tag', ...syncMiddlewares, async (req, res) => {
+    try {
+      const { publisher } = req.body || {};
+      const status = batchTagger.getStatus();
+      if (status.isRunning) {
+        return res.status(409).json({ ok: false, error: 'Batch enrichment is already in progress' });
+      }
+      batchTagger.startBatchTag({ publisher: publisher || 'all' }).catch(err => {
+        console.error('[StoryArcsRoute] Batch tagger background error:', err);
+      });
+      return res.json({ ok: true, message: 'Batch enrichment started' });
+    } catch (err) {
+      console.error('[StoryArcsRoute] Error starting batch enrichment:', err);
+      return res.status(500).json({ ok: false, error: 'Failed to start batch enrichment' });
+    }
+  });
+
+  // POST /api/v1/story-arcs/batch-tag/cancel
+  router.post('/api/v1/story-arcs/batch-tag/cancel', ...syncMiddlewares, (req, res) => {
+    const cancelled = batchTagger.cancelBatchTag();
+    return res.json({ ok: true, cancelled });
   });
 
   // GET /api/v1/story-arcs/:arcId (parameterized fallback, must remain after all static routes)

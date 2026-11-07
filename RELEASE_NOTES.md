@@ -42,6 +42,12 @@ Welcome to **Comics Now! v3.4.0** — introducing the **Story Arcs & Narrative C
   - `get_story_arc_next(comic_id)`
   - `trigger_story_arcs_sync(mode)`
 
+### 8. Batch ComicInfo.xml Story Arc Enrichment (Option C Override)
+* **Targeted Metadata Enrichment**: Added batch ComicInfo.xml metadata enrichment directly within the Story Arcs settings tab. Allows administrators to run batch updates across all library comics or target specific publishers present in `reading-orders.db` (e.g. `DC Comics`, `Marvel Comics`).
+* **Canonical Story Arc Override (Option C)**: Always enriches `<StoryArc>`, `<StoryArcNumber>`, and `<SeriesGroup>` with canonical continuity data from the Story Arcs database, while strictly preserving all other existing ComicInfo.xml fields (creators, characters, summaries, genres, dates, page lists, and cover coordinates).
+* **Storage-Aware & Redundant Write Protection**: Respects existing storage modes (`archive` zip updates, `sidecar` `.ComicInfo.xml`, and `db` metadata). Automatically skips comics where existing Story Arc tags already match canonical values, avoiding unnecessary disk I/O and modified timestamps.
+* **Live SSE Progress Tracking & Cancellation**: Features a live progress bar with percentage, current comic indicator, updated/skipped counters, and a responsive cancel button.
+
 ---
 
 ## ⬆️ Upgrade Notes
@@ -56,6 +62,7 @@ Welcome to **Comics Now! v3.4.0** — introducing the **Story Arcs & Narrative C
 1. `feat(continuity)`: add ReadingOrders scraper, Story Arcs smart filter, and narrative timeline (`d53f862`)
 2. `feat(continuity)`: add ReadingOrders MCP tools, selectable tagger source, runner and docs (`e9b06cf`)
 3. `feat(settings)`: add dedicated Story Arcs settings tab, smart streaming logs, crawler engine, route contract integrity test, and 21-day log retention
+4. `feat(story-arcs)`: add batch ComicInfo.xml metadata enrichment with Option C override and target publisher scope
 
 ---
 
