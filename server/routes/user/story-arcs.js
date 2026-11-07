@@ -14,8 +14,8 @@ const {
 
 function attachUserStoryArcsRoutes(router, deps) {
   if (!router || typeof router.get !== 'function') return;
-  const { dbAll, requireAdminAuth } = deps || {};
-  const syncMiddlewares = typeof requireAdminAuth === 'function' ? [requireAdminAuth] : [];
+  const adminGuard = deps?.requireAdminAuth || deps?.requireAdmin;
+  const syncMiddlewares = typeof adminGuard === 'function' ? [adminGuard] : [];
   let readingOrdersDbInstance = null;
   let matcherInstance = null;
   const runner = getReadingOrdersRunner();

@@ -73,6 +73,12 @@ Welcome to **Comics Now! v3.4.0** — introducing the **Story Arcs & Narrative C
 * **Personal vs. Admin Separation**: Non-admin readers see only their 3 personal reading tabs (`Reading Experience`, `Offline Downloads`, `Synced Devices`) without horizontal scrolling or disabled admin clutter.
 * **Streamlined Admin Hub**: Server administrative tools and background automation engines are grouped logically into dedicated, high-contrast tab scopes.
 
+### 14. Tag Comics Now! Settings & Navigation Re-Architecture
+* **3-Scope Workflow Navigation**: Re-architected `#ct-modal` into 3 admin-focused scopes (`🔍 Scanner & Review`, `⚙️ Sources & AI`, `🗂️ File Organization`) with compact `text-xs` subnav pills and zero horizontal scrolling on mobile.
+* **Elimination of Double-Stacked Tabs**: Promoted the 4 nested management sub-views (`Inbox Operations`, `Naming Rules`, `Folder Rules`, `Session Errors`) directly into the single primary subnav row, completely eliminating nested tab bars.
+* **3-Tier Metadata Editorial Hierarchy**: Structured 11 metadata sources into Tier 1 (Primary Issue DBs: ComicVine, Metron, GCD, LCG), Tier 2 (Retail & ISBN Catalogs: Google Books, Amazon, Goodreads, Forbidden Planet, Blackwell's, Waterstones), and Tier 3 (Continuity & AI Synthesis: ReadingOrders, Gemini Vision).
+* **Decoupled Save Actions & CSS Uniformity**: Independent save handlers for tagger sources/thresholds vs. Gemini AI to prevent configuration overwrites, fixed tab underline indicators, and styled dark numeric and password inputs.
+
 ---
 
 ## ⬆️ Upgrade Notes

@@ -779,26 +779,68 @@
         </div>
         <button id="ct-close-btn" class="modal-close-btn text-2xl font-bold hover:text-gray-300 transition-colors" aria-label="Close Tag Comics Now modal" title="Close Tag Comics Now modal">&times;</button>
       </div>
-      <div class="flex overflow-x-auto border-b border-gray-600 px-4 sm:px-6 scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-gray-800 shrink-0">
-        <button id="ct-tab-output" class="tab-button active py-3 px-2 sm:px-4 text-xs sm:text-base whitespace-nowrap">
-          <span>Scan & Output</span>
-        </button>
-        <button id="ct-tab-matches" class="tab-button py-3 px-2 sm:px-4 text-xs sm:text-base whitespace-nowrap relative">
-          <span>Matches & Review</span>
-          <span id="ct-matches-badge" class="hidden absolute top-1 right-1 w-2 h-2 bg-yellow-500 rounded-full"></span>
-        </button>
-        <button id="ct-tab-settings" class="tab-button py-3 px-2 sm:px-4 text-xs sm:text-base whitespace-nowrap">
-          <span>Settings & Sources</span>
-        </button>
-        <button id="ct-tab-gemini" class="tab-button py-3 px-2 sm:px-4 text-xs sm:text-base whitespace-nowrap flex items-center gap-1.5">
-          <span>Gemini AI</span>
-        </button>
-        <button id="ct-tab-logs" class="tab-button py-3 px-2 sm:px-4 text-xs sm:text-base whitespace-nowrap">
-          <span>Scan Logs</span>
-        </button>
-        <button id="ct-tab-management" class="tab-button py-3 px-2 sm:px-4 text-xs sm:text-base whitespace-nowrap">
-          <span>Management</span>
-        </button>
+      <!-- Scope Bar (Approach A - Segmented Workflows) -->
+      <div class="px-4 sm:px-6 pt-3 pb-2 border-b border-gray-700 bg-gray-900/60">
+        <div id="ct-scope-bar" class="flex items-center gap-1.5 p-1 bg-gray-900/80 rounded-lg border border-gray-700/80 overflow-x-auto scrollbar-none" role="tablist" aria-label="Tag Comics Now scopes">
+          <button type="button" id="ct-scope-scanner-btn" data-ct-scope="scanner" class="ct-scope-btn flex-1 py-1.5 px-2.5 sm:px-3 text-xs sm:text-sm rounded-md transition-all font-bold bg-amber-500 text-black shadow-xs whitespace-nowrap flex items-center justify-center gap-1.5" role="tab" aria-selected="true">
+            <span>🔍</span>
+            <span>Scanner & Review</span>
+          </button>
+          <button type="button" id="ct-scope-sources-btn" data-ct-scope="sources" class="ct-scope-btn flex-1 py-1.5 px-2.5 sm:px-3 text-xs sm:text-sm rounded-md transition-all text-gray-300 hover:text-white hover:bg-gray-800 whitespace-nowrap flex items-center justify-center gap-1.5" role="tab" aria-selected="false">
+            <span>⚙️</span>
+            <span>Sources & AI</span>
+          </button>
+          <button type="button" id="ct-scope-organize-btn" data-ct-scope="organize" class="ct-scope-btn flex-1 py-1.5 px-2.5 sm:px-3 text-xs sm:text-sm rounded-md transition-all text-gray-300 hover:text-white hover:bg-gray-800 whitespace-nowrap flex items-center justify-center gap-1.5" role="tab" aria-selected="false">
+            <span>🗂️</span>
+            <span>File Organization</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Subnav Rows (Scope Contextual) -->
+      <div id="ct-tabs-row" class="border-b border-gray-700 px-4 sm:px-6 shrink-0 bg-gray-800">
+        <!-- Scanner Scope Tabs -->
+        <div id="ct-scope-scanner-tabs" class="ct-scope-tabs-group flex items-center gap-2 overflow-x-auto scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-gray-800">
+          <button id="ct-tab-output" class="tab-button active py-2.5 px-2.5 sm:px-4 text-xs sm:text-sm whitespace-nowrap">
+            <span>Scan & Output</span>
+          </button>
+          <button id="ct-tab-matches" class="tab-button py-2.5 px-2.5 sm:px-4 text-xs sm:text-sm whitespace-nowrap relative">
+            <span>Matches & Review</span>
+            <span id="ct-matches-badge" class="hidden absolute top-1 right-1 w-2 h-2 bg-yellow-500 rounded-full"></span>
+          </button>
+          <button id="ct-tab-logs" class="tab-button py-2.5 px-2.5 sm:px-4 text-xs sm:text-sm whitespace-nowrap">
+            <span>Scan History</span>
+          </button>
+        </div>
+
+        <!-- Sources & AI Scope Tabs -->
+        <div id="ct-scope-sources-tabs" class="ct-scope-tabs-group hidden items-center gap-2 overflow-x-auto scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-gray-800" style="display: none;">
+          <button id="ct-tab-settings" class="tab-button py-2.5 px-2.5 sm:px-4 text-xs sm:text-sm whitespace-nowrap">
+            <span>Metadata Sources & Rules</span>
+          </button>
+          <button id="ct-tab-gemini" class="tab-button py-2.5 px-2.5 sm:px-4 text-xs sm:text-sm whitespace-nowrap flex items-center gap-1.5">
+            <span>Gemini Vision AI</span>
+          </button>
+        </div>
+
+        <!-- File Organization Scope Tabs (Promoted from double-stacked sub-tabs) -->
+        <div id="ct-scope-organize-tabs" class="ct-scope-tabs-group hidden items-center gap-2 overflow-x-auto scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-gray-800" style="display: none;">
+          <button id="mgmt-tab-operations" class="tab-button active py-2.5 px-2.5 sm:px-4 text-xs sm:text-sm whitespace-nowrap">
+            <span>Inbox Operations</span>
+          </button>
+          <button id="mgmt-tab-name" class="tab-button py-2.5 px-2.5 sm:px-4 text-xs sm:text-sm whitespace-nowrap">
+            <span>Naming Rules</span>
+          </button>
+          <button id="mgmt-tab-folder" class="tab-button py-2.5 px-2.5 sm:px-4 text-xs sm:text-sm whitespace-nowrap">
+            <span>Folder Rules</span>
+          </button>
+          <button id="mgmt-tab-errors" class="tab-button py-2.5 px-2.5 sm:px-4 text-xs sm:text-sm whitespace-nowrap">
+            <span>Session Errors</span>
+          </button>
+        </div>
+
+        <!-- Hidden legacy anchor for backwards compatibility -->
+        <button id="ct-tab-management" class="hidden" aria-hidden="true"></button>
       </div>
 
       <div class="flex-1 overflow-y-auto p-4 sm:p-6">
@@ -935,6 +977,15 @@
               <input type="number" id="ct-tagger-port-input" class="w-full bg-gray-700 text-white p-2 rounded-lg text-sm" min="1" max="65535" value="5000">
               <p class="text-xs text-gray-500 mt-1">Port used by the local Tag Comics Now! service (default 5000). Change it if another app is using that port.</p>
             </div>
+            <div class="flex items-center">
+              <div class="w-full p-2.5 bg-gray-900/60 rounded-lg border border-gray-700/50 text-xs flex items-center justify-between gap-1">
+                <span class="text-gray-400">&lt; 80%: <strong class="text-red-400">Skip</strong></span>
+                <span class="text-gray-500">|</span>
+                <span class="text-gray-400">80%–89%: <strong class="text-amber-400">Queue Review</strong></span>
+                <span class="text-gray-500">|</span>
+                <span class="text-gray-400">≥ 90%: <strong class="text-green-400">Auto-Tag</strong></span>
+              </div>
+            </div>
             <div class="md:col-span-2 pt-2 border-t border-gray-700/60">
               <label class="flex items-center gap-2 cursor-pointer text-sm">
                 <input type="checkbox" id="ct-force-setting-cb" class="rounded bg-gray-700 text-blue-600 focus:ring-0 focus:ring-offset-0">
@@ -944,85 +995,138 @@
             </div>
           </div>
 
-          <div class="border border-gray-700 rounded-lg p-4 mb-4 bg-gray-900/50">
-            <h4 class="font-semibold text-white mb-3 text-sm">Metadata Sources (11 Available)</h4>
-            <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4 text-sm">
-              <label class="flex items-center gap-2 cursor-pointer">
-                <input type="checkbox" id="src-cb-comicvine" class="rounded bg-gray-700 text-blue-600">
-                <span>ComicVine</span>
-              </label>
-              <label class="flex items-center gap-2 cursor-pointer">
-                <input type="checkbox" id="src-cb-metron" class="rounded bg-gray-700 text-blue-600">
-                <span>Metron</span>
-              </label>
-              <label class="flex items-center gap-2 cursor-pointer">
-                <input type="checkbox" id="src-cb-gcd" class="rounded bg-gray-700 text-blue-600">
-                <span>GCD</span>
-              </label>
-              <label class="flex items-center gap-2 cursor-pointer">
-                <input type="checkbox" id="src-cb-lcg" class="rounded bg-gray-700 text-blue-600">
-                <span>LCG</span>
-              </label>
-              <label class="flex items-center gap-2 cursor-pointer">
-                <input type="checkbox" id="src-cb-goodreads" class="rounded bg-gray-700 text-blue-600">
-                <span>Goodreads</span>
-              </label>
-              <label class="flex items-center gap-2 cursor-pointer">
-                <input type="checkbox" id="src-cb-blackwells" class="rounded bg-gray-700 text-blue-600">
-                <span>Blackwell's</span>
-              </label>
-              <label class="flex items-center gap-2 cursor-pointer">
-                <input type="checkbox" id="src-cb-waterstones" class="rounded bg-gray-700 text-blue-600">
-                <span>Waterstones</span>
-              </label>
-              <label class="flex items-center gap-2 cursor-pointer">
-                <input type="checkbox" id="src-cb-googlebooks" class="rounded bg-gray-700 text-blue-600">
-                <span>Google Books</span>
-              </label>
-              <label class="flex items-center gap-2 cursor-pointer">
-                <input type="checkbox" id="src-cb-amazon" class="rounded bg-gray-700 text-blue-600">
-                <span>Amazon</span>
-              </label>
-              <label class="flex items-center gap-2 cursor-pointer">
-                <input type="checkbox" id="src-cb-forbiddenplanet" class="rounded bg-gray-700 text-blue-600">
-                <span>Forbidden Planet</span>
-              </label>
-              <label class="flex items-center gap-2 cursor-pointer">
-                <input type="checkbox" id="src-cb-readingorders" class="rounded bg-gray-700 text-blue-600">
-                <span class="text-amber-400 font-medium">ReadingOrders</span>
-                <button type="button" id="bridge-to-story-arcs-settings-btn" class="ml-1 text-[11px] text-amber-400/90 hover:text-amber-300 underline underline-offset-2 transition-colors cursor-pointer" title="Configure crawler schedule and manual sync in Settings">
-                  (Settings →)
-                </button>
-              </label>
+          <div class="border border-gray-700 rounded-lg p-4 mb-4 bg-gray-900/50 space-y-5">
+            <div>
+              <div class="flex items-center justify-between mb-3 border-b border-gray-700/80 pb-2">
+                <h4 class="font-bold text-white text-sm flex items-center gap-2">
+                  <span class="text-amber-400">⚡</span>
+                  <span>Tier 1: Canonical Issue Databases</span>
+                </h4>
+                <span class="text-[11px] text-gray-400 font-mono">Primary Periodic Single Issues</span>
+              </div>
+              <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-3 text-sm">
+                <label class="flex items-center gap-2 cursor-pointer bg-gray-800/80 hover:bg-gray-800 px-3 py-2 rounded-md border border-gray-700/80 transition-colors">
+                  <input type="checkbox" id="src-cb-comicvine" class="rounded bg-gray-700 text-blue-600">
+                  <span class="font-medium text-gray-200">ComicVine</span>
+                </label>
+                <label class="flex items-center gap-2 cursor-pointer bg-gray-800/80 hover:bg-gray-800 px-3 py-2 rounded-md border border-gray-700/80 transition-colors">
+                  <input type="checkbox" id="src-cb-metron" class="rounded bg-gray-700 text-blue-600">
+                  <span class="font-medium text-gray-200">Metron</span>
+                </label>
+                <label class="flex items-center gap-2 cursor-pointer bg-gray-800/80 hover:bg-gray-800 px-3 py-2 rounded-md border border-gray-700/80 transition-colors">
+                  <input type="checkbox" id="src-cb-gcd" class="rounded bg-gray-700 text-blue-600">
+                  <span class="font-medium text-gray-200">GCD</span>
+                </label>
+                <label class="flex items-center gap-2 cursor-pointer bg-gray-800/80 hover:bg-gray-800 px-3 py-2 rounded-md border border-gray-700/80 transition-colors">
+                  <input type="checkbox" id="src-cb-lcg" class="rounded bg-gray-700 text-blue-600">
+                  <span class="font-medium text-gray-200">LCG</span>
+                </label>
+              </div>
+
+              <!-- Tier 1 Credentials -->
+              <div class="grid grid-cols-1 md:grid-cols-3 gap-3 p-3 bg-gray-800/40 rounded-lg border border-gray-700/50">
+                <div>
+                  <label for="ct-cv-key-input" class="block text-xs text-gray-400 mb-1">ComicVine API Key</label>
+                  <input type="password" id="ct-cv-key-input" class="w-full bg-gray-800 text-white p-2 rounded text-xs border border-gray-700" placeholder="API Key for ComicVine...">
+                </div>
+                <div class="flex gap-2">
+                  <div class="flex-1">
+                    <label for="ct-metron-user-input" class="block text-xs text-gray-400 mb-1">Metron Username</label>
+                    <input type="text" id="ct-metron-user-input" class="w-full bg-gray-800 text-white p-2 rounded text-xs border border-gray-700" placeholder="Optional">
+                  </div>
+                  <div class="flex-1">
+                    <label for="ct-metron-pass-input" class="block text-xs text-gray-400 mb-1">Metron Password</label>
+                    <input type="password" id="ct-metron-pass-input" class="w-full bg-gray-800 text-white p-2 rounded text-xs border border-gray-700" placeholder="Optional">
+                  </div>
+                </div>
+                <div class="flex gap-2">
+                  <div class="flex-1">
+                    <label for="ct-gcd-user-input" class="block text-xs text-gray-400 mb-1">GCD Username / Email</label>
+                    <input type="text" id="ct-gcd-user-input" class="w-full bg-gray-800 text-white p-2 rounded text-xs border border-gray-700" placeholder="Optional (GCD)">
+                  </div>
+                  <div class="flex-1">
+                    <label for="ct-gcd-pass-input" class="block text-xs text-gray-400 mb-1">GCD Password</label>
+                    <input type="password" id="ct-gcd-pass-input" class="w-full bg-gray-800 text-white p-2 rounded text-xs border border-gray-700" placeholder="Optional">
+                  </div>
+                </div>
+              </div>
             </div>
 
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-3 pt-2 border-t border-gray-700">
-              <div>
-                <label for="ct-cv-key-input" class="block text-xs text-gray-400 mb-1">ComicVine API Key</label>
-                <input type="password" id="ct-cv-key-input" class="w-full bg-gray-800 text-white p-2 rounded text-xs border border-gray-700" placeholder="API Key for ComicVine...">
+            <div>
+              <div class="flex items-center justify-between mb-3 border-b border-gray-700/80 pb-2">
+                <h4 class="font-bold text-white text-sm flex items-center gap-2">
+                  <span class="text-sky-400">📚</span>
+                  <span>Tier 2: Retail & ISBN Catalogs</span>
+                </h4>
+                <span class="text-[11px] text-gray-400 font-mono">TPBs, Omnibuses & Graphic Novels</span>
               </div>
-              <div>
+              <div class="grid grid-cols-2 sm:grid-cols-3 gap-2.5 mb-3 text-sm">
+                <label class="flex items-center gap-2 cursor-pointer bg-gray-800/80 hover:bg-gray-800 px-3 py-2 rounded-md border border-gray-700/80 transition-colors">
+                  <input type="checkbox" id="src-cb-googlebooks" class="rounded bg-gray-700 text-blue-600">
+                  <span class="font-medium text-gray-200">Google Books</span>
+                </label>
+                <label class="flex items-center gap-2 cursor-pointer bg-gray-800/80 hover:bg-gray-800 px-3 py-2 rounded-md border border-gray-700/80 transition-colors">
+                  <input type="checkbox" id="src-cb-amazon" class="rounded bg-gray-700 text-blue-600">
+                  <span class="font-medium text-gray-200">Amazon</span>
+                </label>
+                <label class="flex items-center gap-2 cursor-pointer bg-gray-800/80 hover:bg-gray-800 px-3 py-2 rounded-md border border-gray-700/80 transition-colors">
+                  <input type="checkbox" id="src-cb-goodreads" class="rounded bg-gray-700 text-blue-600">
+                  <span class="font-medium text-gray-200">Goodreads</span>
+                </label>
+                <label class="flex items-center gap-2 cursor-pointer bg-gray-800/80 hover:bg-gray-800 px-3 py-2 rounded-md border border-gray-700/80 transition-colors">
+                  <input type="checkbox" id="src-cb-forbiddenplanet" class="rounded bg-gray-700 text-blue-600">
+                  <span class="font-medium text-gray-200">Forbidden Planet</span>
+                </label>
+                <label class="flex items-center gap-2 cursor-pointer bg-gray-800/80 hover:bg-gray-800 px-3 py-2 rounded-md border border-gray-700/80 transition-colors">
+                  <input type="checkbox" id="src-cb-blackwells" class="rounded bg-gray-700 text-blue-600">
+                  <span class="font-medium text-gray-200">Blackwell's</span>
+                </label>
+                <label class="flex items-center gap-2 cursor-pointer bg-gray-800/80 hover:bg-gray-800 px-3 py-2 rounded-md border border-gray-700/80 transition-colors">
+                  <input type="checkbox" id="src-cb-waterstones" class="rounded bg-gray-700 text-blue-600">
+                  <span class="font-medium text-gray-200">Waterstones</span>
+                </label>
+              </div>
+
+              <!-- Tier 2 Credentials -->
+              <div class="p-3 bg-gray-800/40 rounded-lg border border-gray-700/50">
                 <label for="ct-gb-key-input" class="block text-xs text-gray-400 mb-1">Google Books API Key</label>
                 <input type="password" id="ct-gb-key-input" class="w-full bg-gray-800 text-white p-2 rounded text-xs border border-gray-700" placeholder="API Key for Google Books...">
               </div>
-              <div class="flex gap-2">
-                <div class="flex-1">
-                  <label for="ct-metron-user-input" class="block text-xs text-gray-400 mb-1">Metron Username</label>
-                  <input type="text" id="ct-metron-user-input" class="w-full bg-gray-800 text-white p-2 rounded text-xs border border-gray-700" placeholder="Optional">
-                </div>
-                <div class="flex-1">
-                  <label for="ct-metron-pass-input" class="block text-xs text-gray-400 mb-1">Metron Password</label>
-                  <input type="password" id="ct-metron-pass-input" class="w-full bg-gray-800 text-white p-2 rounded text-xs border border-gray-700" placeholder="Optional">
-                </div>
+            </div>
+
+            <div>
+              <div class="flex items-center justify-between mb-3 border-b border-gray-700/80 pb-2">
+                <h4 class="font-bold text-white text-sm flex items-center gap-2">
+                  <span class="text-purple-400">🌌</span>
+                  <span>Tier 3: Continuity & AI Synthesis</span>
+                </h4>
+                <span class="text-[11px] text-gray-400 font-mono">Story Arcs, Timeline & Vision Matching</span>
               </div>
-              <div class="flex gap-2">
-                <div class="flex-1">
-                  <label for="ct-gcd-user-input" class="block text-xs text-gray-400 mb-1">GCD Username / Email</label>
-                  <input type="text" id="ct-gcd-user-input" class="w-full bg-gray-800 text-white p-2 rounded text-xs border border-gray-700" placeholder="Optional (Grand Comics Database)">
-                </div>
-                <div class="flex-1">
-                  <label for="ct-gcd-pass-input" class="block text-xs text-gray-400 mb-1">GCD Password</label>
-                  <input type="password" id="ct-gcd-pass-input" class="w-full bg-gray-800 text-white p-2 rounded text-xs border border-gray-700" placeholder="Optional">
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <label class="flex items-center justify-between cursor-pointer bg-gray-800/80 hover:bg-gray-800 p-3 rounded-md border border-gray-700/80 transition-colors">
+                  <div class="flex items-center gap-2">
+                    <input type="checkbox" id="src-cb-readingorders" class="rounded bg-gray-700 text-blue-600">
+                    <div>
+                      <span class="text-amber-400 font-semibold text-sm">ReadingOrders Continuity Engine</span>
+                      <p class="text-xs text-gray-400">Enriches Story Arc tags, crossover events & reading order numbers</p>
+                    </div>
+                  </div>
+                  <button type="button" id="bridge-to-story-arcs-settings-btn" class="text-xs text-amber-400/90 hover:text-amber-300 underline underline-offset-2 transition-colors cursor-pointer shrink-0 ml-2" title="Configure crawler schedule and manual sync in Settings">
+                    Settings →
+                  </button>
+                </label>
+
+                <div class="flex items-center justify-between bg-gray-800/80 p-3 rounded-md border border-gray-700/80">
+                  <div class="flex items-center gap-2.5">
+                    <span class="text-lg">✨</span>
+                    <div>
+                      <span class="text-white font-semibold text-sm">Gemini Multimodal Vision</span>
+                      <p class="text-xs text-gray-400">AI cover OCR & barcode matching fallback</p>
+                    </div>
+                  </div>
+                  <button type="button" id="ct-jump-to-gemini-btn" onclick="document.getElementById('ct-tab-gemini')?.click()" class="text-xs text-blue-400 hover:text-blue-300 underline underline-offset-2 transition-colors cursor-pointer shrink-0 ml-2">
+                    Configure AI →
+                  </button>
                 </div>
               </div>
             </div>
@@ -1118,24 +1222,8 @@
           </div>
         </div>
 
-        <!-- Management Tab -->
+        <!-- Management Tab (Promoted File Organization Panels) -->
         <div id="ct-content-management" class="hidden">
-          <!-- Management sub-tabs: Operations, Errors, Name, Folder -->
-          <div class="flex overflow-x-auto border-b border-gray-700 mb-4 scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-gray-800 shrink-0">
-            <button id="mgmt-tab-operations" class="tab-button active py-2 px-4 text-xs sm:text-sm whitespace-nowrap">
-              <span>Operations</span>
-            </button>
-            <button id="mgmt-tab-errors" class="tab-button py-2 px-4 text-xs sm:text-sm whitespace-nowrap">
-              <span>Errors</span>
-            </button>
-            <button id="mgmt-tab-name" class="tab-button py-2 px-4 text-xs sm:text-sm whitespace-nowrap">
-              <span>Name</span>
-            </button>
-            <button id="mgmt-tab-folder" class="tab-button py-2 px-4 text-xs sm:text-sm whitespace-nowrap">
-              <span>Folder</span>
-            </button>
-          </div>
-
           <!-- Operations panel -->
           <div id="mgmt-content-operations">
             <div class="space-y-6">

@@ -159,18 +159,6 @@ export async function saveCtSettings() {
     }
   });
 
-  const geminiToggle = document.getElementById('ct-gemini-enabled-toggle');
-  const geminiKeyInput = document.getElementById('ct-gemini-key-input');
-  const geminiVal = geminiKeyInput ? geminiKeyInput.value.trim() : '';
-  const geminiEnabled = geminiToggle ? geminiToggle.checked : false;
-  const state = (typeof window !== 'undefined' && window._geminiState) ? window._geminiState : geminiState;
-
-  if (geminiEnabled && (geminiVal || state.hasApiKey) && !state.termsAccepted) {
-    initGeminiComplianceModal();
-    openGeminiComplianceModal(geminiVal);
-    return;
-  }
-
   const saveBtn = document.getElementById('ct-save-btn');
   if (saveBtn) {
     saveBtn.disabled = true;
@@ -201,25 +189,6 @@ export async function saveCtSettings() {
       })
     });
     if (res.ok) {
-      if (state.termsAccepted || !geminiEnabled) {
-        state._loaded = true;
-        state.enabled = geminiEnabled;
-        const geminiPayload = {
-          geminiCoverMatchEnabled: geminiEnabled
-        };
-        if (state.termsAccepted) {
-          geminiPayload.geminiTermsAccepted = true;
-        }
-        if (geminiVal && geminiEnabled) {
-          geminiPayload.geminiApiKey = geminiVal;
-        }
-        await fetch(`${global.API_BASE_URL}/api/v1/gemini/config`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(geminiPayload)
-        }).catch(function() {});
-      }
-
       if (saveBtn) {
         saveBtn.textContent = '✓ Saved';
         setTimeout(() => {

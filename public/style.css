@@ -2820,6 +2820,8 @@ body.modal-open {
 #reading-list-modal select,
 #add-to-list-modal input[type="text"],
 #ct-modal input[type="text"],
+#ct-modal input[type="number"],
+#ct-modal input[type="password"],
 #ct-modal select,
 #ct-modal textarea {
     background-color: var(--ink-3) !important;
@@ -2838,6 +2840,8 @@ body.modal-open {
 #reading-list-modal select:focus,
 #add-to-list-modal input[type="text"]:focus,
 #ct-modal input[type="text"]:focus,
+#ct-modal input[type="number"]:focus,
+#ct-modal input[type="password"]:focus,
 #ct-modal select:focus,
 #ct-modal textarea:focus {
     border-color: var(--yellow) !important;
@@ -2930,7 +2934,7 @@ body.modal-open {
 #settings-modal button:not(.modal-close-btn):not(.remove-library-btn):not(.hidden):not([hidden]),
 #reading-list-modal button:not(.modal-close-btn):not(.hidden):not([hidden]):not(.segmented-btn):not(#back-to-lists-btn):not([id^="view-mode-"]),
 #add-to-list-modal button:not(.modal-close-btn):not(.hidden):not([hidden]),
-#ct-modal button:not(.modal-close-btn):not(.hidden):not([hidden]) {
+#ct-modal button:not(.modal-close-btn):not(.hidden):not([hidden]):not(.tab-button):not(.scope-btn):not(.ct-scope-btn) {
     display: inline-flex !important;
     align-items: center !important;
     justify-content: center !important;

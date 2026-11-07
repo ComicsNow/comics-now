@@ -24,6 +24,7 @@ describe('ReadingOrdersRunner', () => {
       etag: '"test-etag-123"',
     });
     runner.lastSitemapEtag = '"test-etag-123"';
+    runner.getOrderCount = jest.fn().mockReturnValue(200);
 
     const result = await runner.startSync({ mode: 'both' });
     expect(result.skipped).toBe(true);

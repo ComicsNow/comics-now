@@ -18,6 +18,7 @@ import {
   clearDownloadsBtn
 } from '../globals.js';
 import { initSettingsScopeSwitcher, syncScopeWithActiveTab } from '../settings/scope-switcher.js';
+import { initCtScopeSwitcher, syncCtScopeWithActiveTab } from '../comictagger/scope-switcher.js';
 
 // Helper to switch settings tabs and update UI
 export function switchSettingsTab(tabName) {
@@ -65,7 +66,11 @@ export function switchCtTab(activeTab, activeContent, routePath) {
     typeof ctTabSettings !== 'undefined' ? ctTabSettings : null,
     typeof ctTabGemini !== 'undefined' ? ctTabGemini : null,
     typeof ctTabLogs !== 'undefined' ? ctTabLogs : null,
-    typeof ctTabManagement !== 'undefined' ? ctTabManagement : null
+    typeof ctTabManagement !== 'undefined' ? ctTabManagement : null,
+    document.getElementById('mgmt-tab-operations'),
+    document.getElementById('mgmt-tab-name'),
+    document.getElementById('mgmt-tab-folder'),
+    document.getElementById('mgmt-tab-errors')
   ].forEach(t => t?.classList.remove('active'));
 
   [
@@ -80,9 +85,16 @@ export function switchCtTab(activeTab, activeContent, routePath) {
   activeTab?.classList.add('active');
   activeContent?.classList.remove('hidden');
 
+  if (activeTab?.id && typeof syncCtScopeWithActiveTab === 'function') {
+    const tabKey = activeTab.id.replace(/^ct-tab-/, '').replace(/^mgmt-tab-/, '');
+    syncCtScopeWithActiveTab(tabKey);
+  }
+
   const stopRenameFn = state.stopRenameStream || window.stopRenameStream;
   const stopMoveFn = state.stopMoveStream || window.stopMoveStream;
-  if (activeTab !== (typeof ctTabManagement !== 'undefined' ? ctTabManagement : null)) {
+  const isMgmt = activeTab === (typeof ctTabManagement !== 'undefined' ? ctTabManagement : null) ||
+                 activeTab?.id?.startsWith('mgmt-tab-');
+  if (!isMgmt) {
     if (typeof stopRenameFn === 'function') stopRenameFn();
     if (typeof stopMoveFn === 'function') stopMoveFn();
   }
@@ -254,6 +266,10 @@ export function initSettingsTabListeners() {
  * Initializes ComicTagger tab listeners and grab button animation.
  */
 export function initCtTabListeners() {
+  if (typeof initCtScopeSwitcher === 'function') {
+    initCtScopeSwitcher();
+  }
+
   ctButton?.addEventListener('click', () => {
     const openCTFn = state.openCTModal || window.openCTModal;
     if (typeof openCTFn === 'function') openCTFn();

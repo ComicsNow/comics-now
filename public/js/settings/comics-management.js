@@ -111,6 +111,17 @@ export function initComicsManagement() {
 
   mgmtTabs.forEach(({ tab, panel, onShow }) => {
     tab.addEventListener('click', () => {
+      const ctContentMgmt = document.getElementById('ct-content-management');
+      if (ctContentMgmt) {
+        ['ct-content-output', 'ct-content-matches', 'ct-content-settings', 'ct-content-gemini', 'ct-content-logs'].forEach(id => {
+          document.getElementById(id)?.classList.add('hidden');
+        });
+        ctContentMgmt.classList.remove('hidden');
+      }
+      ['ct-tab-output', 'ct-tab-matches', 'ct-tab-settings', 'ct-tab-gemini', 'ct-tab-logs'].forEach(id => {
+        document.getElementById(id)?.classList.remove('active');
+      });
+
       mgmtTabs.forEach(other => {
         const isActive = other.tab === tab;
         other.tab.classList.toggle('active', isActive);

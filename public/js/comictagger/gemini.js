@@ -180,10 +180,6 @@ export function initGeminiComplianceModal() {
         }
 
         modal.classList.add('hidden');
-
-        if (typeof global.saveCtSettings === 'function') {
-          global.saveCtSettings();
-        }
       } else {
         const errData = await res.json().catch(function() { return {}; });
         alert('Failed to save configuration: ' + (errData.error || 'Server error'));
