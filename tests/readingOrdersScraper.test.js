@@ -75,9 +75,10 @@ describe('ReadingOrders Parser Service', () => {
       </html>
     `;
 
-    it('extracts structured issue orders from HTML', () => {
+    it('extracts structured issue orders from HTML and detects publisher', () => {
       const result = parseReadingOrderPage(sampleHtml, 'civil-war');
       expect(result.slug).toBe('civil-war');
+      expect(result.publisher).toBe('Marvel Comics');
       expect(result.issues).toHaveLength(1);
       const issue = result.issues[0];
       expect(issue.position).toBe(53);
@@ -88,6 +89,24 @@ describe('ReadingOrders Parser Service', () => {
       expect(issue.storyParts).toBe('Embedded: Part 5; Accused: Part 5');
       expect(issue.collectedIn).toBe('Civil War: Front Line');
       expect(issue.coverImageUrl).toBe('https://readingorders.com/images/issues/4228.png');
+    });
+
+    it('detects DC Comics for DC story arcs like DC K.O.', () => {
+      const dcHtml = `
+        <!DOCTYPE html>
+        <html>
+        <body>
+          <a href="/timeline/dc-comic-events">DC Comics Events timeline</a>
+          <h1>DC K.O. Reading Order</h1>
+          <div class="rounded-xl border">
+            <h3>DC All In Special #1</h3>
+          </div>
+        </body>
+        </html>
+      `;
+      const result = parseReadingOrderPage(dcHtml, 'dc-ko');
+      expect(result.publisher).toBe('DC Comics');
+      expect(result.title).toBe('DC K.O. Reading Order');
     });
   });
 

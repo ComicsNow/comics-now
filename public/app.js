@@ -108,6 +108,7 @@ import './js/settings/comics-defaults.js';
 import './js/settings/comics-management.js';
 import './js/settings.js';
 import './js/guided-reader.js';
+import './js/settings/story-arcs-tab.js';
 import './js/comictagger.js';
 import './js/events.js';
 import './js/comicvine.js';

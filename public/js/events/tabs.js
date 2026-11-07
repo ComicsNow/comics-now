@@ -20,7 +20,7 @@ import {
 
 // Helper to switch settings tabs and update UI
 export function switchSettingsTab(tabName) {
-  const tabs = ['general', 'logs', 'downloads', 'comics-defaults', 'devices', 'users', 'guided-reader'];
+  const tabs = ['general', 'logs', 'downloads', 'comics-defaults', 'devices', 'users', 'guided-reader', 'story-arcs'];
 
   tabs.forEach(tab => {
     const tabEl = document.getElementById(`settings-tab-${tab}`);
@@ -216,6 +216,18 @@ export function initSettingsTabListeners() {
     const openGuidedFn = state.openGuidedReaderTab || window.openGuidedReaderTab;
     if (typeof openGuidedFn === 'function') {
       openGuidedFn();
+    }
+  });
+
+  document.getElementById('settings-tab-story-arcs')?.addEventListener('click', () => {
+    if (!state._isNavigatingFromRouter && state.router) {
+      state.router.navigate('/settings/story-arcs', true);
+    }
+    switchSettingsTab('story-arcs');
+
+    const openArcsFn = state.openStoryArcsTab || window.openStoryArcsTab;
+    if (typeof openArcsFn === 'function') {
+      openArcsFn();
     }
   });
 

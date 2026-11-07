@@ -36,6 +36,7 @@ const { initializeDatabase, dbGet, dbRun, dbAll, closeDb } = require('./server/d
 const { loadSettings } = require('./server/settings');
 const { scanLibrary, scheduleNextScan } = require('./server/services/library');
 const { scheduleCtRun } = require('./server/services/tagger');
+const { scheduleRetentionSweep } = require('./server/services/log-retention');
 const { startTaggerWorker } = require('./server/services/tagger-process');
 const guidedReader = require('./server/services/guided-reader');
 
@@ -203,6 +204,7 @@ const dbReady = initializeDatabase();
   }
 
   scheduleCtRun();
+  scheduleRetentionSweep(24);
   await guidedReader.initialize();
 
   (async () => {

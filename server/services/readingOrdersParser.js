@@ -50,6 +50,50 @@ function parseCollectedContents(rawContents) {
   return results;
 }
 
+function detectPublisher($, title = '', slug = '', issues = []) {
+  const dcLinks = $('a[href*="/timeline/dc"], a[href*="dc.com"], a[href*="all-in"]');
+  const marvelLinks = $('a[href*="/timeline/marvel"], a[href*="marvel.com"]');
+  if (dcLinks.length > 0) return 'DC Comics';
+  if (marvelLinks.length > 0) return 'Marvel Comics';
+
+  let hasDcText = false;
+  let hasMarvelText = false;
+  $('a, span.badge, div').slice(0, 40).each((_, el) => {
+    const t = $(el).text().trim();
+    if (t === 'DC' || t === 'DC Comics' || t === 'DC Comics Events timeline') hasDcText = true;
+    if (t === 'Marvel' || t === 'Marvel Comics' || t === 'Marvel Comics Events timeline') hasMarvelText = true;
+  });
+  if (hasDcText && !hasMarvelText) return 'DC Comics';
+  if (hasMarvelText && !hasDcText) return 'Marvel Comics';
+
+  const lowerSlug = String(slug || '').toLowerCase();
+  const lowerTitle = String(title || '').toLowerCase();
+  if (/^(dc-|batman|superman|crisis|flash|green-lantern|justice-league|dark-nights|all-in|dc\b)/.test(lowerSlug) ||
+      /\b(dc|batman|superman|justice league|darkseid|flashpoint|all in)\b/i.test(lowerTitle)) {
+    return 'DC Comics';
+  }
+  if (/^(marvel|spider-man|x-men|avengers|secret-wars|civil-war|hulk|thor|iron-man)/.test(lowerSlug) ||
+      /\b(marvel|spider-man|avengers|x-men|secret wars|civil war)\b/i.test(lowerTitle)) {
+    return 'Marvel Comics';
+  }
+
+  // Check issue series
+  let dcCount = 0;
+  let marvelCount = 0;
+  const dcKeywords = /\b(batman|superman|action comics|detective comics|wonder woman|flash|green lantern|justice league|dc |titans|nightwing|darkseid)\b/i;
+  const marvelKeywords = /\b(spider-man|avengers|x-men|iron man|captain america|thor|hulk|wolverine|fantastic four|daredevil|deadpool)\b/i;
+
+  for (const iss of issues.slice(0, 15)) {
+    const name = iss.seriesName || '';
+    if (dcKeywords.test(name)) dcCount++;
+    if (marvelKeywords.test(name)) marvelCount++;
+  }
+  if (dcCount > marvelCount) return 'DC Comics';
+  if (marvelCount > dcCount) return 'Marvel Comics';
+
+  return 'Other';
+}
+
 /**
  * Parses reading order single-issues HTML page.
  */
@@ -116,9 +160,12 @@ function parseReadingOrderPage(html, slug) {
     });
   });
 
+  const publisher = detectPublisher($, title, slug, issues);
+
   return {
     slug,
     title,
+    publisher,
     description,
     issues
   };
@@ -188,6 +235,7 @@ function parseCollectedEditionsPage(html, slug) {
 }
 
 module.exports = {
+  detectPublisher,
   parseIssueTitleAndNumber,
   parseCollectedContents,
   parseReadingOrderPage,

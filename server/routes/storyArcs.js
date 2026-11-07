@@ -86,6 +86,14 @@ function createStoryArcsRouter(routerInstance, deps = {}) {
     }
   });
 
+  // POST /api/v1/story-arcs/sync/cancel
+  router.post('/sync/cancel', (req, res) => {
+    const runner = deps.runner || (deps.getRunner ? deps.getRunner() : null);
+    if (!runner) return res.json({ ok: false, message: 'Runner not available' });
+    const cancelled = runner.cancelSync();
+    return res.json({ ok: true, cancelled });
+  });
+
   return router;
 }
 

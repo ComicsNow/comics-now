@@ -55,5 +55,25 @@ def write_scan_log(scan_type, target, total_files, tagged_count, skipped_count, 
         with open(filepath, 'w') as f:
             json.dump(log_data, f, indent=4)
         print(f"[+] Saved scan log to {filepath}")
+        prune_scan_logs(21)
     except Exception as e:
         print(f"[-] Failed to write scan log: {e}")
+
+
+def prune_scan_logs(max_age_days=21):
+    """Deletes scan log JSON files older than max_age_days (21 days default)."""
+    import time
+    if not os.path.exists(LOGS_DIR):
+        return 0
+    cutoff = time.time() - (max_age_days * 86400)
+    pruned = 0
+    for fname in os.listdir(LOGS_DIR):
+        if fname.startswith("scan_log_") and fname.endswith(".json"):
+            fpath = os.path.join(LOGS_DIR, fname)
+            try:
+                if os.path.getmtime(fpath) < cutoff:
+                    os.remove(fpath)
+                    pruned += 1
+            except Exception:
+                pass
+    return pruned

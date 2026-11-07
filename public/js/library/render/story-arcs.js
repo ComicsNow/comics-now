@@ -82,16 +82,12 @@ export async function renderPublisherStoryArcs(publisherName) {
     const settingsBtn = toolbar.querySelector('#open-story-arcs-settings-btn');
     if (settingsBtn) {
       settingsBtn.addEventListener('click', () => {
-        if (typeof window.openStoryArcsSettingsModal === 'function') {
-          window.openStoryArcsSettingsModal();
+        if (state.router) {
+          state.router.navigate('/settings/story-arcs');
         } else if (typeof window.openSettingsModal === 'function') {
           window.openSettingsModal();
-          const card = document.getElementById('story-arcs-scheduling-card');
-          if (card) {
-            card.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            card.classList.add('ring-2', 'ring-amber-500');
-            setTimeout(() => card.classList.remove('ring-2', 'ring-amber-500'), 2500);
-          }
+          const tab = document.getElementById('settings-tab-story-arcs');
+          if (tab) tab.click();
         }
       });
     }

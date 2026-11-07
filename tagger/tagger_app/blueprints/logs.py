@@ -8,6 +8,7 @@ from flask import Blueprint, jsonify
 from werkzeug.utils import secure_filename
 
 from tagger_app.config import LOGS_DIR, DB_TRACKING_PATH
+from tagger_app.persistence.scan_logs import prune_scan_logs
 from tagger_app.scheduler.state import scheduler_config, save_scheduler_data
 
 logs_bp = Blueprint('logs', __name__)
@@ -15,6 +16,7 @@ logs_bp = Blueprint('logs', __name__)
 
 @logs_bp.route('/api/logs', methods=['GET'])
 def get_logs():
+    prune_scan_logs(21)
     logs = []
     if os.path.exists(LOGS_DIR):
         for f in os.listdir(LOGS_DIR):

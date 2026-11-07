@@ -41,6 +41,7 @@ export function hideAdminUI() {
     'settings-tab-logs',
     'settings-tab-users',
     'settings-tab-guided-reader',
+    'settings-tab-story-arcs',
     'metadata-tab'
   ];
 
@@ -57,6 +58,7 @@ export function hideAdminUI() {
     'settings-content-logs',
     'settings-content-users',
     'settings-content-guided-reader',
+    'settings-content-story-arcs',
     'metadata-content'
   ];
 

@@ -12,7 +12,8 @@ import {
   seenLogEntries,
   ctLogLineElements,
   applyCtLogEntry,
-  loadCtSavedLogs
+  loadCtSavedLogs,
+  smartScrollToBottom
 } from './logging.js';
 import {
   updateCtProgressFromLog,
@@ -66,7 +67,7 @@ export async function ctSyncLogsAndState() {
         }
       });
       if (appended) {
-        ctOutputDiv.scrollTop = ctOutputDiv.scrollHeight;
+        smartScrollToBottom(ctOutputDiv);
       }
     }
 
@@ -148,7 +149,7 @@ export function openCTModal() {
       const msg = data.message;
 
       if (applyCtLogEntry(data) && ctOutputDiv) {
-        ctOutputDiv.scrollTop = ctOutputDiv.scrollHeight;
+        smartScrollToBottom(ctOutputDiv);
       }
 
       updateCtProgressFromLog(msg);

@@ -4,10 +4,17 @@
 const { initReadingOrdersDb } = require('../../readingOrdersDb');
 const { createContinuityMatcher } = require('../../services/continuityMatcher');
 const { getReadingOrdersRunner } = require('../../services/reading-orders-runner');
+const {
+  registerStoryArcsClient,
+  unregisterStoryArcsClient,
+  getStoryArcsLogs,
+  clearStoryArcsLogs
+} = require('../../logger');
 
 function attachUserStoryArcsRoutes(router, deps) {
   if (!router || typeof router.get !== 'function') return;
   const { dbAll, requireAdminAuth } = deps || {};
+  const syncMiddlewares = typeof requireAdminAuth === 'function' ? [requireAdminAuth] : [];
   let readingOrdersDbInstance = null;
   let matcherInstance = null;
   const runner = getReadingOrdersRunner();
@@ -98,17 +105,43 @@ function attachUserStoryArcsRoutes(router, deps) {
     return res.json({ ok: true, ...runner.getStatus() });
   });
 
-  // POST /api/v1/story-arcs/sync
-  const syncMiddlewares = typeof requireAdminAuth === 'function' ? [requireAdminAuth] : [];
-  router.post('/api/v1/story-arcs/sync', ...syncMiddlewares, async (req, res) => {
-    try {
-      const { mode = 'both', force = false } = req.body || {};
-      const result = await runner.startSync({ mode, force });
-      return res.json({ ok: true, result });
-    } catch (err) {
-      console.error('[StoryArcsRoute] Error triggering sync:', err);
-      return res.status(500).json({ ok: false, error: err.message });
+  // POST /api/v1/story-arcs/sync/cancel
+  router.post('/api/v1/story-arcs/sync/cancel', ...syncMiddlewares, (req, res) => {
+    const cancelled = runner.cancelSync();
+    return res.json({ ok: true, cancelled });
+  });
+
+  // GET /api/v1/story-arcs/stream
+  router.get('/api/v1/story-arcs/stream', ...syncMiddlewares, (req, res) => {
+    res.writeHead(200, {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      'Connection': 'keep-alive',
+      'X-Accel-Buffering': 'no'
+    });
+    res.write(': keepalive\n\n');
+
+    // Send existing recent logs
+    const existing = getStoryArcsLogs();
+    for (const entry of existing) {
+      res.write(`data: ${JSON.stringify(entry)}\n\n`);
     }
+
+    registerStoryArcsClient(res);
+    req.on('close', () => {
+      unregisterStoryArcsClient(res);
+    });
+  });
+
+  // GET /api/v1/story-arcs/logs
+  router.get('/api/v1/story-arcs/logs', ...syncMiddlewares, (req, res) => {
+    return res.json({ ok: true, logs: getStoryArcsLogs() });
+  });
+
+  // DELETE /api/v1/story-arcs/logs
+  router.delete('/api/v1/story-arcs/logs', ...syncMiddlewares, (req, res) => {
+    clearStoryArcsLogs();
+    return res.json({ ok: true });
   });
 }
 

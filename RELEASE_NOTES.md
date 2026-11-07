@@ -23,15 +23,19 @@ Welcome to **Comics Now! v3.4.0** — introducing the **Story Arcs & Narrative C
 * **11th Metadata Source**: `ReadingOrders (Story Arcs)` (`src-readingorders`) is now available as a selectable checkbox in **Tag Comics Now! → Settings → Metadata Sources**.
 * **ComicInfo v2.0/v2.1 Enrichment**: When enabled, matched comics are automatically enriched with `<StoryArc>`, `<StoryArcNumber>`, and `<SeriesGroup>` tags via sub-millisecond local SQLite lookups with zero outbound network requests during tagging.
 
-### 5. Polite Delta Scraper & Admin Scheduling & Sync Controls
-* **Admin Settings Scheduling Card**: A dedicated **Story Arcs & Reading Orders** card in General Settings allows configuring the auto-sync interval (`readingOrdersIntervalDays`, default: 7 days, 0 = disabled), choosing the ingestion mode (`both`, `issues`, or `collected`), viewing live sync status/last-sync timestamps, and triggering manual syncs.
-* **Story Arcs Toolbar Shortcut**: A direct **⚙ Settings** button in the Story Arcs toolbar navigates straight to the scheduling card with smooth scrolling and highlight animation.
-* **Admin-Only Sync**: Administrators can trigger delta syncs from either the Settings modal or the Story Arcs toolbar (`↻ Sync Reading Orders` / `POST /api/v1/story-arcs/sync`), while sync controls remain hidden from standard users.
-* **3-Tier Rescrape Prevention & Rate Limiting**:
-  - **Tier 1 (Sitemap ETag `HTTP 304`)**: Conditional `If-None-Match` check completes in ~150ms with zero page downloads when the upstream site has not changed.
-  - **Tier 2 & 3 (Slug Delta & Content Hash)**: Fetches only newly added or modified reading orders with a 1.2s per-request delay, 150–350ms randomized jitter, and a 5-error circuit breaker.
+### 5. Dedicated Story Arcs Settings Tab & Live Streaming Crawler
+* **Dedicated Settings Tab**: Replaced the nested general settings card with a top-level **Story Arcs** tab (`#settings-tab-story-arcs`) featuring:
+  - Configuration of auto-sync intervals (`readingOrdersIntervalDays`, default: 7 days, 0 = disabled) and ingestion modes (`both`, `issues`, `collected`).
+  - Strict user-initiated synchronization: `[ ▷ Start Initial Scan / Sync ]` button with optional `Force Re-Scrape` cache bypass.
+  - Live progress card showing currently scraped slug, percentage bar, and cancel controls (`[ ⏹ Cancel Sync ]`).
+  - Live SSE streaming log output (`GET /api/v1/story-arcs/stream`) with log line counter and clear action.
+* **Resilient Crawler Engine**: Auto-detects publishers (`DC Comics`, `Marvel Comics`) from timeline breadcrumbs and links, supports HTTP 308 redirects, and indexes storylines into `data/reading-orders.db`.
 
-### 6. Comics Now! MCP Server Continuity Tools
+### 6. Universal 21-Day Log Retention Policy & Smart Auto-Scroll
+* **Universal 21-Day Retention**: Enforced across all logging layers in Comics Now! — in-memory log streams (`storyArcsLogs`, `guidedLogs`, general logs), on-disk Tag Comics Now scan logs (`data/scan_logs/scan_log_*.json`), and audit records are automatically pruned after 21 days. Includes a daily scheduled retention sweep.
+* **Smart Auto-Scroll in Log Viewers**: Fixed aggressive auto-scrolling across live streaming log viewers (both in Tag Comics Now! / Comic Tagger and Story Arcs). When users scroll up to inspect previous log lines, scroll position is strictly preserved; scrolling back to the bottom (within 35px) resumes auto-scroll, paired with a floating `[ ↓ Jump to latest ]` button.
+
+### 7. Comics Now! MCP Server Continuity Tools
 * Added 4 new FastMCP tools in `comics_mcp`:
   - `list_story_arcs(publisher, search)`
   - `get_story_arc(arc_id)`
@@ -43,6 +47,7 @@ Welcome to **Comics Now! v3.4.0** — introducing the **Story Arcs & Narrative C
 ## ⬆️ Upgrade Notes
 * `data/reading-orders.db` is initialized automatically in WAL mode on first access.
 * Existing user reading lists, custom sort orders, and reading progress records are completely untouched.
+* All log entries and on-disk scan logs older than 21 days are automatically pruned.
 * Optional `config.json` settings `readingOrdersIntervalDays` (default: `7`) and `readingOrdersMode` (default: `"both"`) are supported out of the box.
 
 ---
@@ -50,13 +55,14 @@ Welcome to **Comics Now! v3.4.0** — introducing the **Story Arcs & Narrative C
 ## 📦 v3.4.0 Changelog
 1. `feat(continuity)`: add ReadingOrders scraper, Story Arcs smart filter, and narrative timeline (`d53f862`)
 2. `feat(continuity)`: add ReadingOrders MCP tools, selectable tagger source, runner and docs (`e9b06cf`)
+3. `feat(settings)`: add dedicated Story Arcs settings tab, smart streaming logs, crawler engine, and 21-day log retention
 
 ---
 
 ## 🧪 Verification & Test Results
-- **Full Jest suite**: `184 suites passed, 1460 tests passed`.
+- **Full Jest suite**: `187 suites passed, 1471 tests passed (100% pass rate)`.
 - **MCP suite**: `47 passed`.
-- **Python tagger source suite**: `3 passed`.
+- **Python tagger source suite**: `6 passed`.
 - **Production build**: Tailwind CSS v4 and Vite client bundle compiled cleanly.
 - **Architecture ratchet**: all new and modified modules remain strictly under the 380-line ceiling.
 

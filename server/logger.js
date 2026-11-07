@@ -1,4 +1,4 @@
-const { MAX_LOG_ENTRIES } = require('./constants');
+const { MAX_LOG_ENTRIES, LOG_RETENTION_DAYS } = require('./constants');
 
 const rawConsole = {
   log: console.log.bind(console),
@@ -15,6 +15,8 @@ const moveLogs = [];
 const moveClients = new Set();
 const guidedLogs = [];
 const guidedClients = new Set();
+const storyArcsLogs = [];
+const storyArcsClients = new Set();
 
 function pushWithLimit(collection, entry) {
   collection.push(entry);
@@ -186,8 +188,81 @@ function clearGuidedLogs() {
   guidedLogs.length = 0;
 }
 
+// Story Arcs crawler operations logging
+function storyArcsLog(level, message) {
+  const timestamp = new Date().toISOString();
+  const entry = { timestamp, level: level || 'INFO', message };
+  pushWithLimit(storyArcsLogs, entry);
+  for (const res of storyArcsClients) {
+    try {
+      res.write(`data: ${JSON.stringify(entry)}\n\n`);
+      if (typeof res.flush === 'function') res.flush();
+    } catch (_) {
+      storyArcsClients.delete(res);
+    }
+  }
+}
+
+function registerStoryArcsClient(res) {
+  storyArcsClients.add(res);
+}
+
+function unregisterStoryArcsClient(res) {
+  storyArcsClients.delete(res);
+}
+
+function getStoryArcsLogs() {
+  return storyArcsLogs;
+}
+
+function clearStoryArcsLogs() {
+  storyArcsLogs.length = 0;
+}
+
+function logWithTimestamp(level, category, message, timestamp) {
+  const entry = { timestamp, level, category, message };
+  pushWithLimit(logs, entry);
+}
+
+function pruneCollectionByAge(collection, cutoffMs) {
+  let pruned = 0;
+  for (let i = collection.length - 1; i >= 0; i--) {
+    const entry = collection[i];
+    if (entry && entry.timestamp) {
+      const entryTime = new Date(entry.timestamp).getTime();
+      if (!Number.isNaN(entryTime) && entryTime < cutoffMs) {
+        collection.splice(i, 1);
+        pruned++;
+      }
+    }
+  }
+  return pruned;
+}
+
+function pruneOldLogs(maxAgeDays = LOG_RETENTION_DAYS || 21) {
+  const cutoffMs = Date.now() - (maxAgeDays * 24 * 60 * 60 * 1000);
+  let totalPruned = 0;
+  totalPruned += pruneCollectionByAge(logs, cutoffMs);
+  totalPruned += pruneCollectionByAge(ctLogs, cutoffMs);
+  totalPruned += pruneCollectionByAge(renameLogs, cutoffMs);
+  totalPruned += pruneCollectionByAge(moveLogs, cutoffMs);
+  totalPruned += pruneCollectionByAge(guidedLogs, cutoffMs);
+  totalPruned += pruneCollectionByAge(storyArcsLogs, cutoffMs);
+  return totalPruned;
+}
+
+function clearAllLogsForTesting() {
+  logs.length = 0;
+  ctLogs.length = 0;
+  renameLogs.length = 0;
+  moveLogs.length = 0;
+  guidedLogs.length = 0;
+  storyArcsLogs.length = 0;
+}
+
 module.exports = {
   log,
+  logWithTimestamp,
   ctLog,
   registerCtClient,
   unregisterCtClient,
@@ -208,5 +283,12 @@ module.exports = {
   registerGuidedClient,
   unregisterGuidedClient,
   getGuidedLogs,
-  clearGuidedLogs
+  clearGuidedLogs,
+  storyArcsLog,
+  registerStoryArcsClient,
+  unregisterStoryArcsClient,
+  getStoryArcsLogs,
+  clearStoryArcsLogs,
+  pruneOldLogs,
+  clearAllLogsForTesting
 };

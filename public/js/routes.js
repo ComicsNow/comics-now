@@ -151,6 +151,14 @@ function registerRoutes() {
       if (guidedTab) guidedTab.click();
     });
 
+    global.router.addRoute('/settings/story-arcs', () => {
+      if (typeof global.openSettingsModal === 'function') {
+        global.openSettingsModal();
+      }
+      const storyArcsTab = document.getElementById('settings-tab-story-arcs');
+      if (storyArcsTab) storyArcsTab.click();
+    });
+
     global.router.addRoute('/folder', (params, query) => {
       const folderPath = query.get('path');
       if (folderPath && typeof global.showFolderView === 'function') {

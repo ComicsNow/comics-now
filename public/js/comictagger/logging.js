@@ -198,12 +198,20 @@ export function upsertRateDefenseLine(entry) {
   return false;
 }
 
+export function smartScrollToBottom(container, threshold = 35) {
+  if (!container) return;
+  const isAtBottom = container.scrollHeight - container.clientHeight <= container.scrollTop + threshold;
+  if (isAtBottom) {
+    container.scrollTop = container.scrollHeight;
+  }
+}
+
 export function appendLocalCtLogLine(message) {
   if (!ctOutputDiv) return;
   const line = formatCtLogMessage(new Date().toISOString(), message);
   line.dataset.local = 'true';
   ctOutputDiv.appendChild(line);
-  ctOutputDiv.scrollTop = ctOutputDiv.scrollHeight;
+  smartScrollToBottom(ctOutputDiv);
 }
 
 export function applyCtLogEntry(entry) {
@@ -235,6 +243,7 @@ export async function loadCtSavedLogs(onProgress) {
   } catch (error) {}
 }
 
+global.smartScrollToBottom = smartScrollToBottom;
 global.isRateDefenseMessage = isRateDefenseMessage;
 global.ctLogEntryKey = ctLogEntryKey;
 global.formatLogTime = formatLogTime;
