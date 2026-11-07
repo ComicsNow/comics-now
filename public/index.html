@@ -1074,11 +1074,15 @@
                 <span class="text-[11px] text-gray-400 mt-0.5 block">Matches comics belonging to publishers present in reading-orders.db.</span>
               </div>
               <div class="flex flex-col justify-end">
+                <label class="flex items-center gap-1.5 text-xs text-amber-400 font-medium cursor-pointer mb-2 select-none">
+                  <input type="checkbox" id="story-arcs-batch-dry-run-checkbox" class="accent-amber-500 rounded" checked>
+                  <span>Dry Run (Simulate only, no files or DB updated)</span>
+                </label>
                 <div class="flex items-center gap-3">
                   <button type="button" id="start-story-arcs-batch-btn"
                     class="bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-white text-xs font-semibold py-2.5 px-4 rounded-lg transition-colors flex items-center gap-2 shadow-xs cursor-pointer">
                     <span>🏷️</span>
-                    <span id="story-arcs-batch-btn-text">Batch Update ComicInfo.xml</span>
+                    <span id="story-arcs-batch-btn-text">Run Simulation (Dry Run)</span>
                   </button>
                   <button type="button" id="cancel-story-arcs-batch-btn"
                     class="hidden bg-red-600/80 hover:bg-red-600 text-white text-xs font-semibold py-2.5 px-3.5 rounded-lg transition-colors flex items-center gap-1.5 shadow-xs cursor-pointer">

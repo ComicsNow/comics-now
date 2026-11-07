@@ -106,3 +106,70 @@ def test_batch_tagger_creates_sidecar_and_preserves_archive(tmp_path, mock_ro_db
         assert "ComicInfo.xml" not in zf.namelist()
     assert cbz_file.stat().st_mtime == initial_mtime
 
+
+def test_batch_tagger_dry_run_mode_creates_zero_files_and_zero_db_writes(tmp_path, mock_ro_db):
+    import zipfile
+    # 1. Dummy comic archive
+    cbz_file = tmp_path / "Crisis on Infinite Earths #1 (1985).cbz"
+    with zipfile.ZipFile(cbz_file, "w") as zf:
+        zf.writestr("001.jpg", b"fake image bytes")
+    initial_mtime = cbz_file.stat().st_mtime
+
+    # 2. Setup mock comics-now.db
+    cn_path = tmp_path / "comics-now.db"
+    cn_conn = sqlite3.connect(str(cn_path))
+    cn_conn.row_factory = sqlite3.Row
+    with cn_conn:
+        cn_conn.execute(
+            """
+            CREATE TABLE comics (
+                id TEXT PRIMARY KEY,
+                name TEXT,
+                series TEXT,
+                publisher TEXT,
+                path TEXT,
+                metadata TEXT,
+                updatedAt TEXT
+            )
+            """
+        )
+        cn_conn.execute(
+            """
+            INSERT INTO comics (id, name, series, publisher, path, metadata)
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (
+                "c1",
+                "Crisis on Infinite Earths #1 (1985).cbz",
+                "Crisis on Infinite Earths",
+                "DC Comics",
+                str(cbz_file),
+                '{"Year": 1985, "Number": "1"}',
+            ),
+        )
+    cn_conn.close()
+
+    # 3. Run batch tagger in DRY RUN mode
+    tagger = ContinuityBatchTagger(cn_db_path=str(cn_path), ro_db_path=mock_ro_db)
+    res = tagger.start_batch_tag(target_publisher="DC Comics", run_async=False, dry_run=True)
+    assert res.get("completed") is True
+    assert res.get("dryRun") is True
+    assert res["progress"]["updated"] == 1
+
+    # 4. Verify dry-run results were recorded
+    results = tagger.get_dry_run_results()
+    assert len(results) == 1
+    assert results[0]["matchedArc"] == "Crisis on Infinite Earths"
+    assert results[0]["storyArcNumber"] == "1"
+
+    # 5. STRICT VERIFICATION: NO sidecar created, NO archive modified, NO DB updated!
+    sidecar_path = tmp_path / "Crisis on Infinite Earths #1 (1985).ComicInfo.xml"
+    assert not sidecar_path.exists(), "Dry run must NOT create sidecars!"
+    assert cbz_file.stat().st_mtime == initial_mtime
+
+    cn_check = sqlite3.connect(str(cn_path))
+    row = cn_check.execute("SELECT metadata FROM comics WHERE id = 'c1'").fetchone()
+    assert "StoryArc" not in row[0], "Dry run must NOT update database metadata!"
+    cn_check.close()
+
+

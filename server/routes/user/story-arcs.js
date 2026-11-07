@@ -115,6 +115,11 @@ function attachUserStoryArcsRoutes(router, deps) {
     return proxyJson(req, res, '/api/story-arcs/batch-tag/status', 'GET');
   });
 
+  // GET /api/v1/story-arcs/batch-tag/results
+  router.get('/api/v1/story-arcs/batch-tag/results', (req, res) => {
+    return proxyJson(req, res, '/api/story-arcs/batch-tag/results', 'GET');
+  });
+
   // POST /api/v1/story-arcs/batch-tag
   router.post('/api/v1/story-arcs/batch-tag', ...syncMiddlewares, async (req, res) => {
     return proxyJson(req, res, '/api/story-arcs/batch-tag', 'POST', req.body || {});

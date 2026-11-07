@@ -116,11 +116,16 @@ def api_sync_stream():
 
 @story_arcs_bp.route("/api/story-arcs/batch-tag", methods=["POST"])
 def api_start_batch_tag():
-    """Trigger batch StoryArc ComicInfo.xml metadata enrichment."""
+    """Trigger batch StoryArc ComicInfo.xml metadata enrichment (supports dryRun simulation)."""
     data = request.get_json(silent=True) or {}
     target = data.get("targetPublisher")
+    dry_run = bool(data.get("dryRun", False))
     try:
-        res = continuity_batch_tagger.start_batch_tag(target_publisher=target, run_async=True)
+        res = continuity_batch_tagger.start_batch_tag(
+            target_publisher=target,
+            run_async=True,
+            dry_run=dry_run,
+        )
         return jsonify({"ok": True, **res})
     except RuntimeError as e:
         return jsonify({"ok": False, "error": str(e)}), 409
@@ -130,6 +135,15 @@ def api_start_batch_tag():
 def api_batch_tag_status():
     """Return batch tagger status and comic count progress."""
     return jsonify(continuity_batch_tagger.get_status())
+
+
+@story_arcs_bp.route("/api/story-arcs/batch-tag/results", methods=["GET"])
+def api_batch_tag_results():
+    """Return structured results from the most recent batch tagging or dry run simulation."""
+    return jsonify({
+        "ok": True,
+        "results": continuity_batch_tagger.get_dry_run_results(),
+    })
 
 
 @story_arcs_bp.route("/api/story-arcs/batch-tag/cancel", methods=["POST"])

@@ -8,7 +8,9 @@ from tagger_app.continuity.util import (
     expand_publisher_aliases,
     extract_year,
     is_year_compatible,
+    is_publisher_compatible,
     extract_issue_number,
+    extract_collected_issues,
 )
 from tagger_app.continuity.matcher import (
     get_story_arcs_with_completeness,
@@ -104,6 +106,41 @@ def test_year_compatibility_guard():
     # Unknown year should not fail
     assert is_year_compatible(None, "Nov 2024") is True
     assert is_year_compatible(2024, None) is True
+    # Reading order overall era window fallback
+    assert is_year_compatible(2005, None, ro_era_window=(2024, 2026)) is False
+    assert is_year_compatible(2025, None, ro_era_window=(2024, 2026)) is True
+    assert is_year_compatible(2026, None, ro_era_window=(2009, 2010)) is False
+
+
+def test_publisher_compatibility_guard():
+    assert is_publisher_compatible("DC Comics", "DC Comics") is True
+    assert is_publisher_compatible("Vertigo", "DC Comics") is True
+    assert is_publisher_compatible("Marvel", "Marvel Comics") is True
+    assert is_publisher_compatible("DC Comics", "Marvel Comics") is False
+    assert is_publisher_compatible("Europe Comics", "Marvel Comics") is False
+    assert is_publisher_compatible(None, "DC Comics") is True
+
+
+def test_normalize_series_strips_volume_and_article():
+    assert normalize_series("The Amazing Spider-Man") == "amazing spider man"
+    assert normalize_series("Batman (Vol. 3)") == "batman"
+    assert normalize_series("The Flash Vol 5") == "flash"
+    assert normalize_series("Superman (2018)") == "superman"
+
+
+def test_collected_issues_range_matching():
+    summary_v3 = "Collects Batman/Superman: World’s Finest (2022) issues 12 – 17."
+    range_v3 = extract_collected_issues(summary_v3)
+    assert range_v3 == (12.0, 17.0)
+    # Lazarus planet has issues 1-6 -> should NOT match
+    assert is_issue_in_range("3", "1-6", collected_range=range_v3) is False
+
+    summary_v1 = "Collects issues 1-5."
+    range_v1 = extract_collected_issues(summary_v1)
+    assert range_v1 == (1.0, 5.0)
+    # Lazarus planet has issues 1-6 -> should match!
+    assert is_issue_in_range("1", "1-6", collected_range=range_v1) is True
+
 
 
 def test_extract_issue_number():

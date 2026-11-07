@@ -12,6 +12,7 @@ exports[`Tailwind class inventory (public/**/*.{html,js}) snapshots the sorted u
   "[background-size:20px_20px]",
   "[background-size:24px_24px]",
   "absolute",
+  "accent-amber-500",
   "accent-blue-500",
   "accent-blue-600",
   "acct",

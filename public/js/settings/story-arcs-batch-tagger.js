@@ -85,8 +85,10 @@ export async function refreshBatchTagStatus() {
         if (cancelBtn) cancelBtn.classList.add('hidden');
         if (startBtn) {
           startBtn.disabled = false;
+          const dryRunCb = document.getElementById('story-arcs-batch-dry-run-checkbox');
+          const isDry = dryRunCb ? dryRunCb.checked : true;
           const txt = document.getElementById('story-arcs-batch-btn-text');
-          if (txt) txt.textContent = 'Batch Update ComicInfo.xml';
+          if (txt) txt.textContent = isDry ? 'Run Simulation (Dry Run)' : 'Batch Update ComicInfo.xml';
         }
       }
     }
@@ -101,17 +103,28 @@ export function initBatchTaggerListeners() {
   const startBtn = document.getElementById('start-story-arcs-batch-btn');
   const cancelBtn = document.getElementById('cancel-story-arcs-batch-btn');
   const publisherSelect = document.getElementById('story-arcs-batch-publisher-select');
+  const dryRunCheckbox = document.getElementById('story-arcs-batch-dry-run-checkbox');
+
+  if (dryRunCheckbox) {
+    dryRunCheckbox.addEventListener('change', () => {
+      const txt = document.getElementById('story-arcs-batch-btn-text');
+      if (txt) {
+        txt.textContent = dryRunCheckbox.checked ? 'Run Simulation (Dry Run)' : 'Batch Update ComicInfo.xml';
+      }
+    });
+  }
 
   if (startBtn) {
     startBtn.addEventListener('click', async () => {
       const publisher = publisherSelect ? publisherSelect.value : 'all';
+      const dryRun = dryRunCheckbox ? dryRunCheckbox.checked : false;
       startBtn.disabled = true;
 
       try {
         const res = await fetch(`${global.API_BASE_URL}/api/v1/story-arcs/batch-tag`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ publisher })
+          body: JSON.stringify({ publisher, dryRun })
         });
         const contentType = res.headers.get('content-type') || '';
         if (!contentType.includes('application/json')) {

@@ -8,7 +8,9 @@ import sqlite3
 from pathlib import Path
 from typing import Optional, List, Dict, Any
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
+REPO_ROOT = Path(__file__).resolve().parents[3]
+if not (REPO_ROOT / "comics-now.db").exists() and (Path(__file__).resolve().parents[2] / "comics-now.db").exists():
+    REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_DB_PATH = REPO_ROOT / "data" / "reading-orders.db"
 DB_PATH = Path(os.environ.get("READING_ORDERS_DB_PATH", str(DEFAULT_DB_PATH)))
 

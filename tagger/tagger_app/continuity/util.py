@@ -4,15 +4,19 @@ from pathlib import Path
 from typing import Optional, Any, List
 
 
-def normalize_series(series: str) -> str:
-    """Normalize series name by removing years, punctuation, and event prefixes."""
+def normalize_series(series: str, strip_article: bool = True) -> str:
+    """Normalize series name by removing volume indicators, years, punctuation, and optionally articles."""
     if not series:
         return ""
     s = str(series).strip().replace("’", "'").replace("‘", "'")
     s = re.sub(r"\s*\(\d{4}\)", "", s)
-    s = re.sub(r"^(?:dc\s*k\.?o\.?|civil\s*war|blackest\s*night)\s*[:\-–—]?\s*", "", s, flags=re.IGNORECASE)
+    s = re.sub(r"^(?:dc\s*k\.?o\.?|civil\s*war|blackest\s*night)\s*[:\-–—]\s*", "", s, flags=re.IGNORECASE)
+    s = re.sub(r"\b(?:vol(?:ume)?\.?\s*\d+)\b", " ", s, flags=re.IGNORECASE)
     s = re.sub(r"[^a-zA-Z0-9']", " ", s)
-    return " ".join(s.lower().split())
+    tokens = s.lower().split()
+    if strip_article and tokens and tokens[0] == "the":
+        tokens = tokens[1:]
+    return " ".join(tokens)
 
 
 def normalize_issue_num(num: Any) -> str:
@@ -31,14 +35,54 @@ def extract_year(text_or_date: Any) -> Optional[int]:
     return int(m.group(1)) if m else None
 
 
-def is_year_compatible(comic_year: Optional[int], ro_date_or_year: Any, max_gap: int = 2) -> bool:
-    """Return True if comic year and reading order publication year are within max_gap or unknown."""
+def is_year_compatible(
+    comic_year: Optional[int],
+    ro_date_or_year: Any,
+    ro_era_window: Optional[Any] = None,
+    max_gap: int = 2,
+) -> bool:
+    """Return True if comic year matches issue publication year or falls within reading order era window."""
     if comic_year is None:
         return True
     ro_yr = extract_year(ro_date_or_year)
-    if ro_yr is None:
+    if ro_yr is not None:
+        return abs(comic_year - ro_yr) <= max_gap
+    if ro_era_window and isinstance(ro_era_window, (tuple, list)) and len(ro_era_window) == 2:
+        min_yr, max_yr = ro_era_window
+        if min_yr is not None and max_yr is not None:
+            return (min_yr - max_gap) <= comic_year <= (max_yr + max_gap)
+    return True
+
+
+def is_publisher_compatible(comic_pub: Optional[str], arc_pub: Optional[str]) -> bool:
+    """Validate publisher family to prevent cross-company false positives (e.g. Marvel vs DC)."""
+    if not comic_pub or not arc_pub:
         return True
-    return abs(comic_year - ro_yr) <= max_gap
+    cp = comic_pub.strip().lower()
+    ap = arc_pub.strip().lower()
+
+    def _family(p: str) -> Optional[str]:
+        if any(k in p for k in ["dc", "vertigo", "black label", "wildstorm", "milestone"]):
+            return "dc"
+        if any(k in p for k in ["marvel", "max", "icon", "knights"]):
+            return "marvel"
+        if "image" in p or "skybound" in p:
+            return "image"
+        if "dark horse" in p:
+            return "dark horse"
+        if "idw" in p:
+            return "idw"
+        if "boom" in p:
+            return "boom"
+        if "europe" in p:
+            return "europe"
+        return None
+
+    cf = _family(cp)
+    af = _family(ap)
+    if cf and af:
+        return cf == af
+    return True
 
 
 def extract_issue_number(name: str, meta_number: Any = None) -> str:
@@ -64,16 +108,27 @@ def extract_issue_number(name: str, meta_number: Any = None) -> str:
     return ""
 
 
-def is_issue_in_range(comic_num: Any, arc_num_str: Any) -> bool:
+def extract_collected_issues(text: str) -> Optional[tuple[float, float]]:
+    """Extract collected issue span from summary or title (e.g. 'Collects issues 12-17')."""
+    if not text:
+        return None
+    pat = r"collects?\s*.*?\b(?:issues?|#)?\s*#?\s*(\d+(?:\.\d+)?)\s*[-–—]\s*#?\s*(\d+(?:\.\d+)?)"
+    m = re.search(pat, text, re.IGNORECASE)
+    if m:
+        try:
+            return float(m.group(1)), float(m.group(2))
+        except ValueError:
+            pass
+    return None
+
+
+def is_issue_in_range(
+    comic_num: Any,
+    arc_num_str: Any,
+    collected_range: Optional[tuple[float, float]] = None,
+) -> bool:
     """Determine if a comic issue matches an exact number or falls within a span (e.g. 1-5)."""
-    if comic_num is None or arc_num_str is None:
-        return False
-    c_match = re.search(r"\d+(?:\.\d+)?", str(comic_num).strip())
-    if not c_match:
-        return False
-    try:
-        c_val = float(c_match.group(0))
-    except ValueError:
+    if (comic_num is None and collected_range is None) or arc_num_str is None:
         return False
 
     arc_str = str(arc_num_str).strip()
@@ -83,19 +138,26 @@ def is_issue_in_range(comic_num: Any, arc_num_str: Any) -> bool:
         high_match = re.search(r"\d+(?:\.\d+)?", parts[1])
         if low_match and high_match:
             try:
-                low = float(low_match.group(0))
-                high = float(high_match.group(0))
-                return low <= c_val <= high
+                a_low, a_high = float(low_match.group(0)), float(high_match.group(0))
+                if collected_range:
+                    c_low, c_high = collected_range
+                    return max(c_low, a_low) <= min(c_high, a_high)
+                c_val = float(str(comic_num).strip())
+                return a_low <= c_val <= a_high
             except ValueError:
-                pass
-
-    a_match = re.search(r"\d+(?:\.\d+)?", arc_str)
-    if not a_match:
-        return False
-    try:
-        return c_val == float(a_match.group(0))
-    except ValueError:
-        return False
+                return False
+    else:
+        a_match = re.search(r"\d+(?:\.\d+)?", arc_str)
+        if a_match:
+            try:
+                a_val = float(a_match.group(0))
+                if collected_range:
+                    c_low, c_high = collected_range
+                    return c_low <= a_val <= c_high
+                return float(str(comic_num).strip()) == a_val
+            except ValueError:
+                return False
+    return False
 
 
 def expand_publisher_aliases(pub: str) -> List[str]:

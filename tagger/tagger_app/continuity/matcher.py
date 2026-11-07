@@ -21,7 +21,9 @@ from tagger_app.continuity.util import (
     expand_publisher_aliases,
 )
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
+REPO_ROOT = Path(__file__).resolve().parents[3]
+if not (REPO_ROOT / "comics-now.db").exists() and (Path(__file__).resolve().parents[2] / "comics-now.db").exists():
+    REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_RO_DB = REPO_ROOT / "data" / "reading-orders.db"
 DEFAULT_CN_DB = REPO_ROOT / "comics-now.db"
 
@@ -71,8 +73,13 @@ def _load_library_comics(cn_db_path: Path | str) -> Tuple[Dict[str, Dict[str, An
     return direct_map, series_map, by_id
 
 
-def find_owned_comic(issue: Dict[str, Any], direct_map: Dict[str, Any], series_map: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-    """Match an issue record against local library comics with strict series and year validation."""
+def find_owned_comic(
+    issue: Dict[str, Any],
+    direct_map: Dict[str, Any],
+    series_map: Dict[str, Any],
+    ro_era_window: Optional[Any] = None,
+) -> Optional[Dict[str, Any]]:
+    """Match an issue record against local library comics with strict series, era, and year validation."""
     s_name = issue.get("series_name") or issue.get("seriesName") or ""
     i_num = issue.get("issue_number") or issue.get("issueNumber") or ""
     pub_date = issue.get("publication_date") or issue.get("publicationDate") or ""
@@ -83,14 +90,14 @@ def find_owned_comic(issue: Dict[str, Any], direct_map: Dict[str, Any], series_m
     direct_key = f"{norm_s}:::{norm_n}"
     if direct_key in direct_map:
         cand = direct_map[direct_key]
-        if is_year_compatible(cand.get("year"), pub_date):
+        if is_year_compatible(cand.get("year"), pub_date, ro_era_window=ro_era_window):
             return cand
 
     # 2. Candidate match with range and year validation
     if norm_s in series_map:
         for c in series_map[norm_s]:
             if is_issue_in_range(c.get("issueNum"), i_num):
-                if is_year_compatible(c.get("year"), pub_date):
+                if is_year_compatible(c.get("year"), pub_date, ro_era_window=ro_era_window):
                     return c
     return None
 
@@ -137,7 +144,9 @@ def get_story_arcs_with_completeness(
             )
             issues = [dict(r) for r in cursor.fetchall()]
             total = len(issues)
-            owned_count = sum(1 for iss in issues if find_owned_comic(iss, direct_map, series_map) is not None)
+            order_yrs = [extract_year(iss.get("publication_date")) for iss in issues if extract_year(iss.get("publication_date"))]
+            order_era = (min(order_yrs), max(order_yrs)) if order_yrs else None
+            owned_count = sum(1 for iss in issues if find_owned_comic(iss, direct_map, series_map, ro_era_window=order_era) is not None)
             pct = round((owned_count / total * 100), 1) if total > 0 else 0.0
 
             clean_title = re.sub(r"\s+Reading\s+Order$", "", order["title"], flags=re.IGNORECASE).strip()
@@ -194,9 +203,12 @@ def get_story_arc_detail(
         )
         collections = [dict(r) for r in cursor.fetchall()]
 
+        arc_yrs = [extract_year(iss.get("publication_date")) for iss in raw_issues if extract_year(iss.get("publication_date"))]
+        arc_era = (min(arc_yrs), max(arc_yrs)) if arc_yrs else None
+
         issues = []
         for iss in raw_issues:
-            owned = find_owned_comic(iss, direct_map, series_map)
+            owned = find_owned_comic(iss, direct_map, series_map, ro_era_window=arc_era)
             issues.append({
                 "id": iss["id"],
                 "position": iss["position"],

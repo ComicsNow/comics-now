@@ -87,6 +87,13 @@ Welcome to **Comics Now! v3.4.0** — introducing the **Story Arcs & Narrative C
   - Added publication year and era cross-validation (`abs(comic_year - ro_year) <= 2`), preventing modern events (e.g. 2024 *DC K.O.*) from erroneously matching legacy classic runs (e.g. 2005 *Justice League Unlimited*).
   - Hardened issue number extraction to prioritize `#Number` and strip leading file track indices (`01 `, `06 `) and parenthesized publication years (`(2005)`).
 
+### 16. Story Arc Dry-Run Simulation Engine & Precision Matcher
+* **Strict Dry-Run Simulation Mode**: Administrators can preview proposed Story Arc tags across the entire library with zero side effects. In dry-run mode, no `.ComicInfo.xml` sidecars or `.cbz` archives are modified, and `comics-now.db` remains 100% untouched. Proposed matches are accumulated in memory and streamed live to the UI via SSE.
+* **O(1) Pre-Indexed Series Lookups**: Replaced $O(N \times M)$ nested iteration with in-memory series indexing, slashing full library batch scan times across 5,600+ comics from ~45 seconds down to under 1 second.
+* **Storyline Era Window Fallback**: If an individual issue row in ReadingOrders.com lacks an explicit publication date, the matcher cross-references against the overall reading order's era window ($\pm 2$ years). Prevents legacy runs (e.g. 2005 *Justice League Unlimited*) from erroneously matching modern event tie-in spans (e.g. 2024-2026 *DC K.O.*).
+* **Publisher Family Guard**: Cross-company false positives are rejected at the matcher boundary (e.g. *Europe Comics* vs *Marvel*, *DC Comics* vs *Marvel*).
+* **Collected Editions Overlap Matching**: Correctly matches trade paperbacks and volumes by checking issue collection spans extracted from comic summaries against reading order issue spans.
+
 ---
 
 ## ⬆️ Upgrade Notes
@@ -124,12 +131,13 @@ Welcome to **Comics Now! v3.4.0** — introducing the **Story Arcs & Narrative C
 9. `feat(comictagger)`: re-architect Tag Comics Now settings into 3 admin scopes, eliminate double-stacked tabs, and structure 3-tier metadata sources (`ba75bc8`)
 10. `feat(story-arcs)`: migrate continuity crawler, matcher, and batch tagger 100% into Python tagger subsystem and proxy via Node.js
 11. `feat(continuity)`: strip false-positive story arcs, mandate sidecar-only tagging, and enforce year and series matching guards
+12. `feat(continuity)`: add dry-run simulation mode, O(1) indexed matcher, reading order era boundaries, and publisher guards
 
 ---
 
 ## 🧪 Verification & Test Results
 - **Full Jest suite**: `190 suites passed, 1478 tests passed (100% pass rate)`.
-- **Python tagger pytest suite**: `205 tests passed (100% pass rate)`.
+- **Python tagger pytest suite**: `209 tests passed (100% pass rate)`.
 - **Production build**: Tailwind CSS v4 and Vite client bundle compiled cleanly.
 - **Architecture ratchet**: all new and modified modules remain strictly under the 380-line ceiling.
 
