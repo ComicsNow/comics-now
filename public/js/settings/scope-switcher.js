@@ -74,8 +74,10 @@ export function setSettingsScope(scopeId, opts = {}) {
     if (groupEl) {
       if (id === scopeId) {
         groupEl.classList.remove('hidden');
+        groupEl.style.display = 'flex';
       } else {
         groupEl.classList.add('hidden');
+        groupEl.style.display = 'none';
       }
     }
   });

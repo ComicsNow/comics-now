@@ -86,9 +86,6 @@ function currentState() {
 
 function isDirty() {
   const cur = currentState();
-  if (cur.allowedFormats !== baseline.allowedFormats) return true;
-  if (cur.deleteCbrAfterConversion !== baseline.deleteCbrAfterConversion) return true;
-  if (cur.deletePdfAfterConversion !== baseline.deletePdfAfterConversion) return true;
   if (cur.masterManga !== baseline.masterManga) return true;
   if (cur.masterContinuous !== baseline.masterContinuous) return true;
   const paths = new Set([

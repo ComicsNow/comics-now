@@ -86,8 +86,11 @@ describe('Settings Scope Switcher (Approach A)', () => {
     const enginesTabs = document.getElementById('settings-scope-engines-tabs');
 
     expect(readerTabs.classList.contains('hidden')).toBe(true);
+    expect(readerTabs.style.display).toBe('none');
     expect(serverTabs.classList.contains('hidden')).toBe(false);
+    expect(serverTabs.style.display).toBe('flex');
     expect(enginesTabs.classList.contains('hidden')).toBe(true);
+    expect(enginesTabs.style.display).toBe('none');
 
     const serverBtn = document.getElementById('settings-scope-server-btn');
     expect(serverBtn.classList.contains('bg-amber-500')).toBe(true);

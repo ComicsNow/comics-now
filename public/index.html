@@ -121,39 +121,39 @@
         </div>
 
         <!-- Scope Tabs Container -->
-        <div id="settings-tabs-row" class="border-b border-gray-600 px-4 sm:px-6 shrink-0 bg-gray-800">
+        <div id="settings-tabs-row" class="border-b border-gray-600 px-3 sm:px-6 shrink-0 bg-gray-800">
           <!-- 1. My Reader Scope Tabs -->
-          <div id="settings-scope-reader-tabs" class="scope-tabs-group flex overflow-x-auto scrollbar-thin scrollbar-thumb-gray-600 gap-1 sm:gap-2">
-            <button id="settings-tab-comics-defaults" data-text="Reading Experience" class="tab-button active py-2.5 px-3 sm:px-4 text-xs sm:text-sm font-semibold whitespace-nowrap">
-              <span>Reading Experience</span>
+          <div id="settings-scope-reader-tabs" class="scope-tabs-group flex items-center gap-1 sm:gap-2">
+            <button id="settings-tab-comics-defaults" data-text="Reading" class="tab-button active py-2 px-2.5 sm:px-3 text-xs font-semibold whitespace-nowrap">
+              <span>Reading</span>
             </button>
-            <button id="settings-tab-downloads" data-text="Downloads" class="tab-button py-2.5 px-3 sm:px-4 text-xs sm:text-sm font-semibold whitespace-nowrap">
-              <span>Offline Downloads</span>
+            <button id="settings-tab-downloads" data-text="Downloads" class="tab-button py-2 px-2.5 sm:px-3 text-xs font-semibold whitespace-nowrap">
+              <span>Downloads</span>
             </button>
-            <button id="settings-tab-devices" data-text="Devices" class="tab-button py-2.5 px-3 sm:px-4 text-xs sm:text-sm font-semibold whitespace-nowrap">
-              <span>Synced Devices</span>
+            <button id="settings-tab-devices" data-text="Devices" class="tab-button py-2 px-2.5 sm:px-3 text-xs font-semibold whitespace-nowrap">
+              <span>Devices</span>
             </button>
           </div>
 
           <!-- 2. Server Admin Scope Tabs -->
-          <div id="settings-scope-server-tabs" class="scope-tabs-group hidden flex overflow-x-auto scrollbar-thin scrollbar-thumb-gray-600 gap-1 sm:gap-2">
-            <button id="settings-tab-general" data-text="Storage & Paths" class="tab-button py-2.5 px-3 sm:px-4 text-xs sm:text-sm font-semibold whitespace-nowrap">
-              <span>Storage & Paths</span>
+          <div id="settings-scope-server-tabs" class="scope-tabs-group hidden flex items-center gap-1 sm:gap-2" style="display: none;">
+            <button id="settings-tab-general" data-text="Storage" class="tab-button py-2 px-2.5 sm:px-3 text-xs font-semibold whitespace-nowrap">
+              <span>Storage & Formats</span>
             </button>
-            <button id="settings-tab-users" data-text="Users & Access" class="tab-button py-2.5 px-3 sm:px-4 text-xs sm:text-sm font-semibold whitespace-nowrap">
-              <span>Users & Access</span>
+            <button id="settings-tab-users" data-text="Users" class="tab-button py-2 px-2.5 sm:px-3 text-xs font-semibold whitespace-nowrap">
+              <span>Users</span>
             </button>
-            <button id="settings-tab-logs" data-text="Diagnostics Logs" class="tab-button py-2.5 px-3 sm:px-4 text-xs sm:text-sm font-semibold whitespace-nowrap">
+            <button id="settings-tab-logs" data-text="Logs" class="tab-button py-2 px-2.5 sm:px-3 text-xs font-semibold whitespace-nowrap">
               <span>Diagnostics Logs</span>
             </button>
           </div>
 
           <!-- 3. AI Engines Scope Tabs -->
-          <div id="settings-scope-engines-tabs" class="scope-tabs-group hidden flex overflow-x-auto scrollbar-thin scrollbar-thumb-gray-600 gap-1 sm:gap-2">
-            <button id="settings-tab-story-arcs" data-text="Story Arcs & Continuity" class="tab-button py-2.5 px-3 sm:px-4 text-xs sm:text-sm font-semibold whitespace-nowrap">
-              <span>Story Arcs & Continuity</span>
+          <div id="settings-scope-engines-tabs" class="scope-tabs-group hidden flex items-center gap-1 sm:gap-2" style="display: none;">
+            <button id="settings-tab-story-arcs" data-text="Story Arcs" class="tab-button py-2 px-2.5 sm:px-3 text-xs font-semibold whitespace-nowrap">
+              <span>Story Arcs</span>
             </button>
-            <button id="settings-tab-guided-reader" data-text="Guided View AI" class="tab-button py-2.5 px-3 sm:px-4 text-xs sm:text-sm font-semibold whitespace-nowrap">
+            <button id="settings-tab-guided-reader" data-text="Guided View" class="tab-button py-2 px-2.5 sm:px-3 text-xs font-semibold whitespace-nowrap">
               <span>Guided View AI</span>
             </button>
           </div>
@@ -190,6 +190,57 @@
                 </div>
               </div>
             </div>
+            <!-- Allowed Formats & Conversion Section (Admin) -->
+            <div id="settings-defaults-formats" class="border-t border-gray-700 pt-4">
+              <h4 class="text-lg font-semibold mb-1 flex items-center">
+                <svg class="w-5 h-5 mr-2 text-green-400" fill="none" stroke="currentColor" stroke-width="2"><use href="#icon-4"></use></svg>
+                Allowed Library Formats
+              </h4>
+              <p class="text-xs text-gray-400 mb-3">Choose which comic file formats to include in your library scans and manage converted source files.</p>
+
+              <div class="bg-gray-800/80 border border-gray-700 rounded-xl p-4 space-y-3">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div class="grow">
+                    <p class="text-white text-xs sm:text-sm font-medium">Select Formats</p>
+                    <p class="text-[11px] text-gray-400">Library scanner will only include files with these extensions</p>
+                  </div>
+                  <div class="w-full sm:w-auto">
+                    <select id="allowed-formats-select" class="bg-gray-700 border border-gray-600 text-white text-xs rounded-lg focus:ring-green-500 focus:border-green-500 block w-full sm:w-48 p-2">
+                      <option value="cbz">CBZ Only</option>
+                      <option value="cbr">CBR Only</option>
+                      <option value="both">Both (CBZ & CBR)</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-3 border-t border-gray-700/60">
+                  <div class="grow">
+                    <p class="text-white text-xs sm:text-sm font-medium">Original CBR Files After Conversion</p>
+                    <p class="text-[11px] text-gray-400">Choose whether to keep or delete source .cbr files after converting them to .cbz</p>
+                  </div>
+                  <div class="w-full sm:w-auto">
+                    <select id="cbr-conversion-originals-select" class="bg-gray-700 border border-gray-600 text-white text-xs rounded-lg focus:ring-green-500 focus:border-green-500 block w-full sm:w-48 p-2">
+                      <option value="keep">Keep CBR Originals (Default)</option>
+                      <option value="delete">Delete CBR After Conversion</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-3 border-t border-gray-700/60">
+                  <div class="grow">
+                    <p class="text-white text-xs sm:text-sm font-medium">Original PDF Files After Conversion</p>
+                    <p class="text-[11px] text-gray-400">Choose whether to keep or delete source .pdf files after converting them to .cbz</p>
+                  </div>
+                  <div class="w-full sm:w-auto">
+                    <select id="pdf-conversion-originals-select" class="bg-gray-700 border border-gray-600 text-white text-xs rounded-lg focus:ring-green-500 focus:border-green-500 block w-full sm:w-48 p-2">
+                      <option value="keep">Keep PDF Originals (Default)</option>
+                      <option value="delete">Delete PDF After Conversion</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+            </div>
+
             <div class="flex flex-col sm:flex-row justify-end gap-2 sm:space-x-2 pt-4">
               <button type="button" id="scan-button" class="bg-yellow-600 hover:bg-yellow-700 text-white font-bold py-2 px-4 rounded-full transition-colors">Scan Now</button>
               <button type="button" id="full-scan-button" class="bg-orange-600 hover:bg-orange-700 text-white font-bold py-2 px-4 rounded-full transition-colors">Full Scan</button>
@@ -299,57 +350,6 @@
                     <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                     <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                   </svg>
-                </div>
-              </div>
-            </div>
-
-            <!-- Allowed Formats Section -->
-            <div id="settings-defaults-formats" class="border border-gray-700 rounded-lg p-4">
-              <h5 class="text-md font-semibold mb-3 flex items-center">
-                <svg class="w-5 h-5 mr-2 text-green-400" fill="none" stroke="currentColor" stroke-width="2"><use href="#icon-4"></use></svg>
-                Allowed Library Formats
-              </h5>
-              <p class="text-sm text-gray-400 mb-4">Choose which comic file formats to include in your library scans:</p>
-
-              <div class="bg-linear-to-r from-green-900/30 to-emerald-900/30 border-2 border-green-700/50 rounded-xl p-6 shadow-lg hover:shadow-green-900/20 transition-all duration-300 space-y-4">
-                <div class="flex flex-col md:flex-row items-center justify-between gap-4">
-                  <div class="grow">
-                    <p class="text-white font-medium">Select Formats</p>
-                    <p class="text-xs text-gray-400">Library scanner will only include files with these extensions</p>
-                  </div>
-                  <div class="flex items-center space-x-2">
-                    <select id="allowed-formats-select" class="bg-gray-900 border border-gray-600 text-white text-sm rounded-lg focus:ring-green-500 focus:border-green-500 block w-full p-2.5">
-                      <option value="cbz">CBZ Only</option>
-                      <option value="cbr">CBR Only</option>
-                      <option value="both">Both (CBZ & CBR)</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div class="flex flex-col md:flex-row items-center justify-between gap-4 pt-4 border-t border-green-700/50">
-                  <div class="grow">
-                    <p class="text-white font-medium">Original CBR Files After Conversion</p>
-                    <p class="text-xs text-gray-400">Choose whether to keep or delete source .cbr files after converting them to .cbz</p>
-                  </div>
-                  <div class="flex items-center space-x-2">
-                    <select id="cbr-conversion-originals-select" class="bg-gray-900 border border-gray-600 text-white text-sm rounded-lg focus:ring-green-500 focus:border-green-500 block w-full p-2.5">
-                      <option value="keep">Keep CBR Originals (Default)</option>
-                      <option value="delete">Delete CBR After Conversion</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div class="flex flex-col md:flex-row items-center justify-between gap-4 pt-4 border-t border-green-700/50">
-                  <div class="grow">
-                    <p class="text-white font-medium">Original PDF Files After Conversion</p>
-                    <p class="text-xs text-gray-400">Choose whether to keep or delete source .pdf files after converting them to .cbz</p>
-                  </div>
-                  <div class="flex items-center space-x-2">
-                    <select id="pdf-conversion-originals-select" class="bg-gray-900 border border-gray-600 text-white text-sm rounded-lg focus:ring-green-500 focus:border-green-500 block w-full p-2.5">
-                      <option value="keep">Keep PDF Originals (Default)</option>
-                      <option value="delete">Delete PDF After Conversion</option>
-                    </select>
-                  </div>
                 </div>
               </div>
             </div>
