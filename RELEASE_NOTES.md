@@ -79,6 +79,14 @@ Welcome to **Comics Now! v3.4.0** — introducing the **Story Arcs & Narrative C
 * **3-Tier Metadata Editorial Hierarchy**: Structured 11 metadata sources into Tier 1 (Primary Issue DBs: ComicVine, Metron, GCD, LCG), Tier 2 (Retail & ISBN Catalogs: Google Books, Amazon, Goodreads, Forbidden Planet, Blackwell's, Waterstones), and Tier 3 (Continuity & AI Synthesis: ReadingOrders, Gemini Vision).
 * **Decoupled Save Actions & CSS Uniformity**: Independent save handlers for tagger sources/thresholds vs. Gemini AI to prevent configuration overwrites, fixed tab underline indicators, and styled dark numeric and password inputs.
 
+### 15. Safe Story Arc Stripping, Sidecar-Only Tagging & Strict Matcher Guards
+* **Safe Backup & False-Positive Stripping**: Safely backed up all candidate metadata files with a cryptographic manifest to `data/backups/` and cleanly stripped false-positive `<StoryArc>` and `<StoryArcNumber>` tags from XML sidecars and SQLite database records.
+* **Sidecar-Only Tagging Guarantee**: Batch Story Arc enrichment is strictly configured to write exclusively to external `.ComicInfo.xml` sidecars (`storage_mode="sidecar"`). The underlying `.cbz` archives are never unpacked or rewritten, completely eliminating multi-gigabyte disk copying and ensuring instantaneous sub-millisecond updates.
+* **Strict Matcher Precision Guards**:
+  - Replaced broad substring queries with exact normalized series matching.
+  - Added publication year and era cross-validation (`abs(comic_year - ro_year) <= 2`), preventing modern events (e.g. 2024 *DC K.O.*) from erroneously matching legacy classic runs (e.g. 2005 *Justice League Unlimited*).
+  - Hardened issue number extraction to prioritize `#Number` and strip leading file track indices (`01 `, `06 `) and parenthesized publication years (`(2005)`).
+
 ---
 
 ## ⬆️ Upgrade Notes
@@ -115,12 +123,13 @@ Welcome to **Comics Now! v3.4.0** — introducing the **Story Arcs & Narrative C
 8. `feat(settings)`: add Approach A segmented scope settings architecture and role-aware navigation
 9. `feat(comictagger)`: re-architect Tag Comics Now settings into 3 admin scopes, eliminate double-stacked tabs, and structure 3-tier metadata sources (`ba75bc8`)
 10. `feat(story-arcs)`: migrate continuity crawler, matcher, and batch tagger 100% into Python tagger subsystem and proxy via Node.js
+11. `feat(continuity)`: strip false-positive story arcs, mandate sidecar-only tagging, and enforce year and series matching guards
 
 ---
 
 ## 🧪 Verification & Test Results
 - **Full Jest suite**: `190 suites passed, 1478 tests passed (100% pass rate)`.
-- **Python tagger pytest suite**: `201 tests passed (100% pass rate)`.
+- **Python tagger pytest suite**: `205 tests passed (100% pass rate)`.
 - **Production build**: Tailwind CSS v4 and Vite client bundle compiled cleanly.
 - **Architecture ratchet**: all new and modified modules remain strictly under the 380-line ceiling.
 

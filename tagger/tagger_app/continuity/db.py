@@ -49,6 +49,7 @@ def init_continuity_db(conn: sqlite3.Connection) -> None:
                 position INTEGER NOT NULL,
                 series_name TEXT NOT NULL,
                 issue_number TEXT,
+                publication_date TEXT,
                 comic_vine_id TEXT,
                 part_number INTEGER,
                 notes TEXT,
@@ -113,14 +114,15 @@ def upsert_reading_order_issues(conn: sqlite3.Connection, order_id: str, issues:
             conn.execute(
                 """
                 INSERT INTO reading_order_issues (
-                    reading_order_id, position, series_name, issue_number, comic_vine_id, part_number, notes
-                ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                    reading_order_id, position, series_name, issue_number, publication_date, comic_vine_id, part_number, notes
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     order_id,
                     iss.get("position", idx),
                     iss.get("series_name") or iss.get("seriesName") or "",
                     str(iss.get("issue_number") or iss.get("issueNumber") or ""),
+                    iss.get("publication_date") or iss.get("publicationDate"),
                     iss.get("comic_vine_id") or iss.get("comicVineId"),
                     iss.get("part_number") or iss.get("partNumber"),
                     iss.get("notes"),

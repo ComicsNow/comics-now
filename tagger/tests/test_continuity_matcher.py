@@ -1,14 +1,20 @@
-"""Unit tests for tagger_app.continuity.matcher."""
+"""Unit tests for tagger_app.continuity.matcher and tagger_app.continuity.util."""
 import sqlite3
 import pytest
 from tagger_app.continuity.db import init_continuity_db, upsert_reading_order, upsert_reading_order_issues
-from tagger_app.continuity.matcher import (
+from tagger_app.continuity.util import (
     normalize_series,
     is_issue_in_range,
     expand_publisher_aliases,
+    extract_year,
+    is_year_compatible,
+    extract_issue_number,
+)
+from tagger_app.continuity.matcher import (
     get_story_arcs_with_completeness,
     get_story_arc_detail,
     get_next_continuity_issue,
+    find_owned_comic,
 )
 
 
@@ -27,9 +33,20 @@ def mock_dbs(tmp_path):
         "issue_count": 3,
     })
     upsert_reading_order_issues(ro_conn, "crisis-on-infinite-earths", [
-        {"series_name": "Crisis on Infinite Earths", "issue_number": "1", "position": 1, "part_number": 1},
-        {"series_name": "All-Star Squadron", "issue_number": "50", "position": 2, "part_number": 2},
-        {"series_name": "Crisis on Infinite Earths", "issue_number": "2", "position": 3, "part_number": 3},
+        {"series_name": "Crisis on Infinite Earths", "issue_number": "1", "position": 1, "part_number": 1, "publication_date": "Apr 1985"},
+        {"series_name": "All-Star Squadron", "issue_number": "50", "position": 2, "part_number": 2, "publication_date": "May 1985"},
+        {"series_name": "Crisis on Infinite Earths", "issue_number": "2", "position": 3, "part_number": 3, "publication_date": "May 1985"},
+    ])
+
+    # Event from 2024
+    upsert_reading_order(ro_conn, {
+        "id": "dc-ko",
+        "title": "DC K.O.",
+        "publisher": "DC Comics",
+        "issue_count": 1,
+    })
+    upsert_reading_order_issues(ro_conn, "dc-ko", [
+        {"series_name": "Justice League Unlimited", "issue_number": "6", "position": 1, "part_number": 1, "publication_date": "Nov 2024"},
     ])
     ro_conn.close()
 
@@ -42,7 +59,7 @@ def mock_dbs(tmp_path):
             """
             CREATE TABLE comics (
                 id TEXT PRIMARY KEY,
-                title TEXT,
+                name TEXT,
                 series TEXT,
                 publisher TEXT,
                 metadata TEXT,
@@ -52,10 +69,11 @@ def mock_dbs(tmp_path):
         )
         cn_conn.execute(
             """
-            INSERT INTO comics (id, title, series, publisher, metadata)
+            INSERT INTO comics (id, name, series, publisher, metadata)
             VALUES
-            ('c1', 'Crisis #1', 'Crisis on Infinite Earths', 'DC Comics', '{"Series": "Crisis on Infinite Earths", "Number": "1"}'),
-            ('c2', 'Crisis #2', 'Crisis on Infinite Earths', 'DC Comics', '{"Series": "Crisis on Infinite Earths", "Number": "2"}');
+            ('c1', 'Crisis on Infinite Earths (1985) #01.cbz', 'Crisis on Infinite Earths', 'DC Comics', '{"Series": "Crisis on Infinite Earths", "Number": "1", "Year": "1985"}'),
+            ('c2', 'Crisis on Infinite Earths (1985) #02.cbz', 'Crisis on Infinite Earths', 'DC Comics', '{"Series": "Crisis on Infinite Earths", "Number": "2", "Year": "1985"}'),
+            ('c_jlu_2005', '06 Justice League Unlimited - In the Dimming Light [DC Comics] (2005) #20.cbz', 'Justice League Unlimited', 'DC Comics', '{"Series": "Justice League Unlimited", "Number": "20", "Year": "2005"}');
             """
         )
     cn_conn.close()
@@ -76,6 +94,54 @@ def test_is_issue_in_range():
     assert is_issue_in_range("1.5", "1.5") is True
 
 
+def test_year_compatibility_guard():
+    # 2005 comic vs 2024 reading order issue should fail
+    assert is_year_compatible(2005, "Nov 2024") is False
+    assert is_year_compatible(2005, "2024") is False
+    # Same or close year should succeed
+    assert is_year_compatible(1985, "Apr 1985") is True
+    assert is_year_compatible(2024, "Jan 2025") is True
+    # Unknown year should not fail
+    assert is_year_compatible(None, "Nov 2024") is True
+    assert is_year_compatible(2024, None) is True
+
+
+def test_extract_issue_number():
+    # Ignore leading track number and grab explicit '#20'
+    name1 = "06 Justice League Unlimited - In the Dimming Light [DC Comics] (2005) #20.cbz"
+    assert extract_issue_number(name1) == "20"
+
+    # Explicit metadata number takes priority
+    assert extract_issue_number(name1, meta_number="20") == "20"
+
+    # Unnumbered title without '#'
+    name2 = "01 Absolute Power Omnibus [DC Comics] (2026).cbz"
+    assert extract_issue_number(name2) == ""
+
+
+def test_false_positive_rejection_for_jlu_2005(mock_dbs):
+    # JLU #6 in DC K.O. (2024) must NOT match JLU (2005) #20
+    jlu_issue_2024 = {
+        "series_name": "Justice League Unlimited",
+        "issue_number": "6",
+        "publication_date": "Nov 2024"
+    }
+    direct_map = {
+        "justice league unlimited:::20": {
+            "id": "c_jlu_2005",
+            "issueNum": "20",
+            "year": 2005,
+            "normSeries": "justice league unlimited",
+            "normNum": "20"
+        }
+    }
+    series_map = {
+        "justice league unlimited": [direct_map["justice league unlimited:::20"]]
+    }
+    match = find_owned_comic(jlu_issue_2024, direct_map, series_map)
+    assert match is None, "Justice League Unlimited (2005) #20 was falsely matched to DC K.O. (2024) issue #6!"
+
+
 def test_expand_publisher_aliases():
     dc_aliases = expand_publisher_aliases("DC Comics")
     assert "DC" in dc_aliases
@@ -92,13 +158,16 @@ def test_get_story_arcs_with_completeness(mock_dbs):
         comics_now_db_path=mock_dbs["cn_path"],
         reading_orders_db_path=mock_dbs["ro_path"],
     )
-    assert len(arcs) == 1
-    arc = arcs[0]
-    assert arc["id"] == "crisis-on-infinite-earths"
-    assert arc["totalCount"] == 3
-    assert arc["ownedCount"] == 2
-    assert arc["missingCount"] == 1
-    assert arc["completenessPercent"] == 67
+    assert len(arcs) == 2
+    crisis = [a for a in arcs if a["id"] == "crisis-on-infinite-earths"][0]
+    assert crisis["totalIssues"] == 3
+    assert crisis["ownedCount"] == 2
+    assert crisis["missingCount"] == 1
+    assert crisis["completenessPercent"] == 66.7
+
+    # DC K.O. has 0 owned because JLU 2005 is not a match!
+    dcko = [a for a in arcs if a["id"] == "dc-ko"][0]
+    assert dcko["ownedCount"] == 0
 
 
 def test_get_story_arc_detail(mock_dbs):
@@ -116,7 +185,6 @@ def test_get_story_arc_detail(mock_dbs):
 
 
 def test_get_next_continuity_issue(mock_dbs):
-    # From issue 1 ('c1'), next chronological issue in arc is All-Star Squadron #50 (missing)
     next_info = get_next_continuity_issue(
         "c1",
         comics_now_db_path=mock_dbs["cn_path"],
