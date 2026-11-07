@@ -109,6 +109,12 @@ from comics_mcp.tools.tagging import (
     tag_comic_from_url,
     tag_workflow,
 )
+from comics_mcp.tools.story_arcs import (
+    get_story_arc,
+    get_story_arc_next,
+    list_story_arcs,
+    trigger_story_arcs_sync,
+)
 
 
 def main() -> None:

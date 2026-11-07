@@ -29,6 +29,12 @@ export function hideAdminUI() {
     ctButton.style.display = 'none';
   }
 
+  // Hide Story Arcs Sync toolbar button (admin only)
+  const storyArcSyncBtn = document.getElementById('sync-story-arcs-toolbar-btn');
+  if (storyArcSyncBtn) {
+    storyArcSyncBtn.style.display = 'none';
+  }
+
   // Hide admin-only tabs in settings modal
   const adminTabs = [
     'settings-tab-general',

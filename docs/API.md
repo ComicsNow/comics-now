@@ -277,6 +277,17 @@ Used by the bundled MCP server for AI-assisted guided-view authoring and metadat
 - **POST `/comics/:id/tags`**: Writes ComicInfo metadata for a comic.
   - **Body:** `{ fields, storage? }`
 
+### Story Arcs & Continuity (ReadingOrders.com)
+- **GET `/api/v1/story-arcs`**: Returns all indexed story arcs with library completeness metrics (`ownedCount`, `missingCount`, `totalIssues`, `completenessPercent`).
+  - **Query:** `?publisher=Marvel+Comics` (optional)
+- **GET `/api/v1/story-arcs/:arcId`**: Returns full story arc details, ordered reading sequence, collected edition volumes, and local library matches.
+- **GET `/api/v1/story-arcs/continuity/lookup`**: Looks up story arc membership and next-issue continuity for a series and issue number.
+  - **Query:** `?series=Civil+War&issue=1`
+- **GET `/api/v1/story-arcs/continuity/next/:comicId`**: Returns the next chronological issue in the arc for the reader continuity prompt.
+- **GET `/api/v1/story-arcs/sync/status`**: Returns the current status of the ReadingOrders crawler runner.
+- **POST `/api/v1/story-arcs/sync`**: *(Admin Only)* Triggers an autonomous delta sync with rate limiting and ETag 304 conditional validation.
+  - **Body:** `{ mode?: "both" | "issues" | "collected", force?: boolean }`
+
 ### System
 - **GET `/settings`**: Retrieves global server settings.
 - **POST `/settings`**: Updates global settings (ComicVine API key, scan interval).

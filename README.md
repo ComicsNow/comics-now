@@ -216,6 +216,17 @@ For massive multi-title crossover events (*Crisis on Infinite Earths*, *Absolute
 
 ---
 
+## ⚡ Story Arcs & Continuity Engine (ReadingOrders.com Integration)
+
+Never lose track of where to read next in complex multi-series crossover events (*Civil War*, *Crisis on Infinite Earths*, *Blackest Night*, *Absolute Universe*):
+- 🏆 **Dedicated Story Arcs View (Gold Box-Set Design)**: Instant Smart Filter separating canonical multi-series crossovers (`#F59E0B`/`#EF4444`) from personal reading lists.
+- ⏱️ **Narrative Timeline DAG Visualizer**: Visual timeline displaying chronological reading flow, issue importance tags (Core, Essential, Companion), and local library collection gaps.
+- 📖 **In-Reader Continuity Prompts**: Automatically alerts you upon finishing an issue with an *"Up Next in Arc"* prompt leading directly to the next chronological issue.
+- 🏷️ **Tag Comics Now! ComicInfo Standard**: Selectable metadata source enriching files with ComicInfo v2.0/v2.1 `<StoryArc>`, `<StoryArcNumber>`, and `<SeriesGroup>` tags.
+- 🛡️ **Polite Scraping & 3-Tier Rescrape Prevention**: High-performance periodic runner with rate limiting (1.2s delay + anti-bot jitter) and Sitemap ETag conditional validation (`HTTP 304`), skipping unmodified pages in < 150ms.
+
+---
+
 ## 🎨 Companion App: GVE Now! (Guided View Editor)
 
 Looking to visually fine-tune, re-sequence, or author panel coordinates from scratch? Meet **[GVE Now!](https://github.com/ComicsNow/gve-now-editor)** — the dedicated visual editor companion for Comics Now!:
@@ -243,6 +254,7 @@ npm run mcp
 ```
 
 **What your AI agent can do:**
+- ⚡ *"List all indexed story arcs for Marvel Comics and show which issues I am missing from Civil War."*
 - 🔍 *"Create a chronological reading list for the Infinity Gauntlet event across all my comics."*
 - 🌐 *"Tag comic #412 using this League of Comic Geeks / Comic Vine web URL."*
 - 🤖 *"Use Gemini AI Vision to inspect the cover of comic #412 and identify its canonical publisher, series, and year."*

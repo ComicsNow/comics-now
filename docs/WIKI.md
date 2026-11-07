@@ -58,6 +58,12 @@ For the complete REST endpoint reference — every route under `/api/v1` with pa
    - [Reordering Comics & Lists](#reordering-comics--lists)
    - [Syncing Lists to All Users (`syncToAll`)](#syncing-lists-to-all-users-synctoall)
    - [Bulk Operations & Import](#bulk-operations--import)
+   - [Story Arcs & Continuity Engine (ReadingOrders.com)](#story-arcs--continuity-engine-readingorderscom)
+     - [Reading Lists vs. Story Arcs (Design Distinction)](#reading-lists-vs-story-arcs-design-distinction)
+     - [Narrative Timeline DAG Visualizer](#narrative-timeline-dag-visualizer)
+     - [In-Reader Continuity Prompts](#in-reader-continuity-prompts)
+     - [Scraper Politeness & 3-Tier Rescrape Prevention](#scraper-politeness--3-tier-rescrape-prevention)
+     - [Role-Based Access Control (RBAC)](#role-based-access-control-rbac)
 10. [Devices, Progress Syncing & Offline PWA](#10-devices-progress-syncing--offline-pwa)
     - [How Device Tracking Works](#how-device-tracking-works)
     - [Cross-Device Reading Progress](#cross-device-reading-progress)
@@ -237,6 +243,8 @@ Settings are resolved in the following order:
 | `metronPassword` | `string` | `""` | Metron comic database account password. |
 | `gcdUser` | `string` | `""` | Grand Comics Database (GCD) login email/username. |
 | `gcdPassword` | `string` | `""` | Grand Comics Database (GCD) password. |
+| `readingOrdersIntervalDays` | `number` | `7` | Auto-refresh interval in days for checking readingorders.com for continuity updates. Set to `0` to disable automatic scheduled runs. |
+| `readingOrdersMode` | `string` | `"both"` | Ingestion scope: `"both"` (single issues and collected editions), `"issues"`, or `"collected"`. |
 
 ##### 5. Google Gemini AI Cover Matching & OCR
 | Key | Type | Default | Description |
@@ -732,6 +740,41 @@ Every reading list features an instant 3-way segmented control at the top of the
 - **Bulk Add / Remove**: Add entire series to a list with one click.
 - **Mark List Read/Unread**: Toggle read status for all issues in the list simultaneously.
 - **Import**: Import reading lists from JSON definitions or external community guides.
+
+### Story Arcs & Continuity Engine (ReadingOrders.com)
+
+While Reading Lists allow you to assemble custom personal reading orders, **Story Arcs** provide an autonomous, canonical continuity bridge across comic book history powered by [ReadingOrders.com](https://www.readingorders.com/).
+
+#### Reading Lists vs. Story Arcs (Design Distinction)
+To eliminate duplicate navigation and preserve cognitive clarity:
+- **Reading Lists (Purple `#8B5CF6`)**: Curated by you or server administrators. Freely created, modified, reordered, and deleted.
+- **Story Arcs (Gold Box-Set `#F59E0B`/`#EF4444`)**: Canonical multi-series events (e.g. *Civil War*, *Crisis on Infinite Earths*, *Blackest Night*, *Absolute Universe*) indexed from ReadingOrders.com into an isolated database (`data/reading-orders.db`). Users cannot accidentally alter or delete canonical storylines.
+- **Library Completeness Bar**: Every Story Arc card displays a real-time completeness percentage and owned/missing issue count (`85 / 109 Issues (78%)`) against your local collection.
+
+#### Narrative Timeline DAG Visualizer
+Every Story Arc features an interactive DC comic trade-dress timeline visualizer:
+- **Publication & Reading Chronology**: Maps out reading order with direct visual links between issues.
+- **Importance Hierarchy**: Clearly demarcates **Core / Essential** storyline issues from **Companion / Tie-in** issues.
+- **Dual View Modes**: Switch between **Single Issues** and **Collected Editions (TPBs/Omnibuses)** with one click.
+- **Collection Gap Highlighting**: Owned issues are styled with a vibrant gold border and click-to-read action; missing issues are displayed in semi-transparent muted card framing with a "Missing from library" indicator.
+
+#### In-Reader Continuity Prompts ("Up Next in Arc")
+When reading an issue that belongs to an active story arc, reaching the final page automatically renders an **"Up Next in Arc"** overlay:
+- Displays the next issue title, cover, and publication date according to canonical continuity.
+- If the next issue is in your library, one tap immediately launches the next issue without returning to the library grid.
+- If the next issue is missing, it alerts you with a friendly gap warning showing where the story continues.
+
+#### Scraper Politeness & 3-Tier Rescrape Prevention
+The background crawler incorporates adaptive rate-limiting and conditional caching from `tagger_app`:
+1. **Per-Domain Throttling & Jitter**: Enforces a minimum 1.2s delay between requests plus 150ms–350ms of randomized anti-bot jitter to prevent WAF bans.
+2. **Circuit Breaker**: Automatically trips and halts crawling after 5 consecutive 429 or 5xx errors.
+3. **Tier 1 (Sitemap ETag Check)**: Queries `sitemap-0.xml` with `If-None-Match`. If Vercel responds with `HTTP 304 Not Modified`, crawling finishes in ~150ms consuming 0 page downloads.
+4. **Tier 2 (Slug Delta)**: Compares local DB against sitemap URLs to only request newly added or modified reading orders.
+5. **Tier 3 (Content Fingerprint)**: Computes a SHA-256 hash of issue sequences to prevent database write churn for identical issues.
+
+#### Role-Based Access Control (RBAC)
+- **Standard Users**: Can browse story arcs, open the Timeline DAG, view library completeness, and receive in-reader continuity prompts.
+- **Administrators**: Possess exclusive rights to configure scrape intervals in Settings, adjust ingestion modes, or click the **"↻ Sync Reading Orders"** button in the UI. For standard users, sync buttons are automatically stripped from the DOM via `hideAdminUI()`.
 
 ---
 

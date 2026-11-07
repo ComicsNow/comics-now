@@ -3,12 +3,14 @@
  */
 const { initReadingOrdersDb } = require('../../readingOrdersDb');
 const { createContinuityMatcher } = require('../../services/continuityMatcher');
+const { getReadingOrdersRunner } = require('../../services/reading-orders-runner');
 
 function attachUserStoryArcsRoutes(router, deps) {
   if (!router || typeof router.get !== 'function') return;
-  const { dbAll } = deps || {};
+  const { dbAll, requireAdminAuth } = deps || {};
   let readingOrdersDbInstance = null;
   let matcherInstance = null;
+  const runner = getReadingOrdersRunner();
 
   function getMatcher() {
     if (!matcherInstance) {
@@ -88,6 +90,24 @@ function attachUserStoryArcsRoutes(router, deps) {
     } catch (err) {
       console.error('[StoryArcsRoute] Error looking up continuity:', err);
       return res.status(500).json({ ok: false, error: 'Failed to lookup continuity' });
+    }
+  });
+
+  // GET /api/v1/story-arcs/sync/status
+  router.get('/api/v1/story-arcs/sync/status', (req, res) => {
+    return res.json({ ok: true, ...runner.getStatus() });
+  });
+
+  // POST /api/v1/story-arcs/sync
+  const syncMiddlewares = typeof requireAdminAuth === 'function' ? [requireAdminAuth] : [];
+  router.post('/api/v1/story-arcs/sync', ...syncMiddlewares, async (req, res) => {
+    try {
+      const { mode = 'both', force = false } = req.body || {};
+      const result = await runner.startSync({ mode, force });
+      return res.json({ ok: true, result });
+    } catch (err) {
+      console.error('[StoryArcsRoute] Error triggering sync:', err);
+      return res.status(500).json({ ok: false, error: err.message });
     }
   });
 }

@@ -53,7 +53,67 @@ export async function renderPublisherStoryArcs(publisherName) {
   clear(container);
 
   const seriesAlphaFilter = document.getElementById('series-alpha-filter');
-  if (seriesAlphaFilter) clear(seriesAlphaFilter);
+  if (seriesAlphaFilter) {
+    clear(seriesAlphaFilter);
+    const isAdmin = (state.syncManager && state.syncManager.userRole === 'admin') ||
+                    (typeof window !== 'undefined' && window.syncManager && window.syncManager.userRole === 'admin');
+    const toolbar = document.createElement('div');
+    toolbar.className = 'w-full flex items-center justify-between pb-3 mb-2 border-b border-amber-500/20 text-xs text-amber-300';
+    toolbar.innerHTML = `
+      <div class="flex items-center gap-2 font-medium">
+        <span>⚡ Reading Orders Continuity</span>
+        <span class="text-gray-500">•</span>
+        <span class="text-gray-400">Canonical multi-series story arcs</span>
+      </div>
+      <div class="flex items-center gap-2">
+        ${isAdmin ? `
+          <button id="sync-story-arcs-toolbar-btn" class="px-3 py-1 rounded-full bg-amber-500/20 hover:bg-amber-500 text-amber-300 hover:text-black font-semibold border border-amber-400/40 transition-all flex items-center gap-1.5 shadow-xs cursor-pointer">
+            <span class="sync-icon">↻</span>
+            <span class="sync-text">Sync Reading Orders</span>
+          </button>
+        ` : ''}
+      </div>
+    `;
+
+    const syncBtn = toolbar.querySelector('#sync-story-arcs-toolbar-btn');
+    if (syncBtn) {
+      syncBtn.addEventListener('click', async () => {
+        const icon = syncBtn.querySelector('.sync-icon');
+        const text = syncBtn.querySelector('.sync-text');
+        if (icon) icon.classList.add('animate-spin');
+        if (text) text.textContent = 'Syncing...';
+        syncBtn.disabled = true;
+
+        try {
+          const res = await fetch('/api/v1/story-arcs/sync', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ mode: 'both' })
+          });
+          const data = await res.json();
+          if (data.ok) {
+            if (text) text.textContent = 'Up to Date!';
+            setTimeout(async () => {
+              await fetchStoryArcsForPublisher(publisherName);
+              renderPublisherStoryArcs(publisherName);
+            }, 800);
+          } else {
+            if (text) text.textContent = 'Sync Failed';
+          }
+        } catch (err) {
+          if (text) text.textContent = 'Error';
+        } finally {
+          setTimeout(() => {
+            if (icon) icon.classList.remove('animate-spin');
+            if (text) text.textContent = 'Sync Reading Orders';
+            syncBtn.disabled = false;
+          }, 2000);
+        }
+      });
+    }
+
+    seriesAlphaFilter.appendChild(toolbar);
+  }
 
   // Show loading skeleton if fetching
   let storyArcs = getStoryArcsForPublisher(publisherName);

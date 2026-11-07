@@ -61,6 +61,31 @@ function createStoryArcsRouter(routerInstance, deps = {}) {
     }
   });
 
+  // GET /api/v1/story-arcs/sync/status
+  router.get('/sync/status', (req, res) => {
+    const runner = deps.runner || (deps.getRunner ? deps.getRunner() : null);
+    if (!runner) {
+      return res.json({ ok: true, status: 'idle', isSyncing: false, progress: { current: 0, total: 0 } });
+    }
+    return res.json({ ok: true, ...runner.getStatus() });
+  });
+
+  // POST /api/v1/story-arcs/sync
+  router.post('/sync', async (req, res) => {
+    try {
+      const runner = deps.runner || (deps.getRunner ? deps.getRunner() : null);
+      if (!runner) {
+        return res.status(503).json({ ok: false, error: 'Sync runner not available' });
+      }
+      const { mode = 'both', force = false } = req.body || {};
+      const result = await runner.startSync({ mode, force });
+      return res.json({ ok: true, result });
+    } catch (err) {
+      console.error('[StoryArcsAPI] Error initiating sync:', err);
+      return res.status(500).json({ ok: false, error: err.message });
+    }
+  });
+
   return router;
 }
 

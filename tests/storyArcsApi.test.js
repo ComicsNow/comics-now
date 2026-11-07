@@ -76,10 +76,18 @@ describe('Story Arcs & Continuity API', () => {
     router = {
       get: jest.fn((routePath, handler) => {
         routeHandlers[routePath] = handler;
+      }),
+      post: jest.fn((routePath, handler) => {
+        routeHandlers[routePath] = handler;
       })
     };
 
-    createStoryArcsRouter(router, { continuityMatcher: matcher });
+    const mockRunner = {
+      getStatus: jest.fn().mockReturnValue({ status: 'idle', isSyncing: false, progress: { current: 0, total: 10 } }),
+      startSync: jest.fn().mockResolvedValue({ skipped: true, scrapedCount: 0 })
+    };
+
+    createStoryArcsRouter(router, { continuityMatcher: matcher, runner: mockRunner });
   });
 
   afterEach(() => {
@@ -163,6 +171,44 @@ describe('Story Arcs & Continuity API', () => {
         StoryArcNumber: '1',
         SeriesGroup: 'Marvel Comics Events'
       });
+    });
+  });
+
+  describe('GET /sync/status', () => {
+    it('returns the runner status', () => {
+      const handler = routeHandlers['/sync/status'];
+      expect(handler).toBeDefined();
+
+      const req = {};
+      const res = {
+        json: jest.fn()
+      };
+
+      handler(req, res);
+      expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
+        ok: true,
+        status: 'idle',
+        isSyncing: false
+      }));
+    });
+  });
+
+  describe('POST /sync', () => {
+    it('triggers sync via runner and returns result', async () => {
+      const handler = routeHandlers['/sync'];
+      expect(handler).toBeDefined();
+
+      const req = { body: { mode: 'both', force: false } };
+      const res = {
+        status: jest.fn().mockReturnThis(),
+        json: jest.fn()
+      };
+
+      await handler(req, res);
+      expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
+        ok: true,
+        result: { skipped: true, scrapedCount: 0 }
+      }));
     });
   });
 });

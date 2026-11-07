@@ -9,7 +9,7 @@ from typing import Callable, Optional
 
 from tagger_app.sources import (
     comicvine, metron, gcd, lcg, goodreads, blackwells, waterstones, googlebooks, amazon,
-    forbiddenplanet,
+    forbiddenplanet, readingorders,
 )
 
 
@@ -128,6 +128,14 @@ SOURCES = [
         "Searching Amazon...",
         lambda f, ctx, prog: amazon.resolve_amazon(
             f, cover_path=ctx.cover_path, on_progress=prog, existing_meta=ctx.existing_meta),
+        tier=2,
+    ),
+    Source(
+        "src-readingorders", "ReadingOrders (Story Arcs)",
+        frozenset({"src-readingorders", "readingorders", "ro"}),
+        "Checking ReadingOrders Story Arcs...",
+        lambda f, ctx, prog: readingorders.resolve_readingorders_for_source(
+            f, ctx=ctx, on_progress=prog),
         tier=2,
     ),
 ]
