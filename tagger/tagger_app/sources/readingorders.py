@@ -10,7 +10,10 @@ from pathlib import Path
 
 from tagger_app.core.query import clean_search_query
 
-DB_PATH = Path("/opt/comics-now/data/reading-orders.db")
+# Dynamically resolve data/reading-orders.db relative to repository root
+REPO_ROOT = Path(__file__).resolve().parents[2]
+DEFAULT_DB_PATH = REPO_ROOT / "data" / "reading-orders.db"
+DB_PATH = Path(os.environ.get("READING_ORDERS_DB_PATH", str(DEFAULT_DB_PATH)))
 
 
 def normalize_series_name(name: str) -> str:
