@@ -1,74 +1,67 @@
-# Comics Now! v3.3.0 Release Notes
+# Comics Now! v3.4.0 Release Notes
 
-Welcome to **Comics Now! v3.3.0** — a minor release focused on making tag search, converted-file management, and format filtering behave consistently across CBZ and CBR libraries. No README or wiki changes are included: these are corrections to behavior that should have worked already.
+Welcome to **Comics Now! v3.4.0** — introducing the **Story Arcs & Narrative Continuity Engine** powered by ReadingOrders.com, an interactive **Narrative Timeline DAG**, in-reader continuity prompts, a selectable **ReadingOrders** metadata source for **Tag Comics Now!**, and new **MCP server continuity tools**.
 
 ---
 
-## 🔧 What's Fixed in v3.3.0
+## ✨ What's New in v3.4.0
 
-### 1. Tag Search now works for CBR — and for any single comic
-* **Per-comic Tag Search** is available from the admin comic context menu for any CBZ or CBR, including files outside the scan inbox.
-  - Backed by `POST /api/v1/tag-comics-now/run-file` and the new MCP tool `run_tag_search`.
-  - Per-file runs are serialized; a full scan, another file run, or a pending review returns a clear `409`.
-* **CBR cover matching**:
-  - Node extracts the CBR cover and passes it to the Python tagger, which uses the supplied cover before any cache or archive extraction and falls back safely if it is unreadable.
-  - `.cbz`, `.cbr`, `.rar`, and `.pdf` extensions are stripped from search queries and similarity scoring.
-  - Adjacent sidecars are read first for non-ZIP files, so a complete sidecar next to a CBR counts as complete metadata.
-  - CBR writes always go to a sidecar `ComicInfo.xml`; RAR archives are never repacked.
-* **Companion mirroring**:
-  - A successful auto-tag or review apply mirrors metadata to the linked converted CBZ (`originalPath`) using update-only database writes.
-  - Mirrored content is skipped when the primary tag did not verify successfully.
+### 1. Story Arcs Smart Filter & Gold Box-Set View
+* **Dedicated Story Arcs Smart Filter**: New `⚡ Story Arcs` filter pill in the publisher library view, visually distinguished from personal Reading Lists (`#8B5CF6` Purple) using an Amber/Gold and Crimson box-set trade dress (`#F59E0B` / `#EF4444`).
+* **Live Library Completeness**: Each Story Arc card calculates real-time ownership metrics (`ownedCount`, `missingCount`, and `completenessPercent`) by matching local library comics against canonical multi-series reading orders.
+* **Isolated Continuity Database**: Canonical reading orders, issue sequences, and collected edition volumes are stored in a dedicated `data/reading-orders.db` SQLite database — keeping user reading lists and reading progress 100% untouched.
 
-### 2. Converted comics stay linked to their kept originals
-* New `comics.originalPath` column, created automatically on upgrade and indexed.
-* Full scans backfill links for existing converted files and skip re-conversion while a linked CBZ exists.
-* Moving a converted comic carries its kept CBR/PDF original and sidecar alongside it, aborts on destination collisions, and rolls the original back if the comic move fails.
-* Renaming a converted comic intentionally leaves the original and its link untouched, so the link stays valid.
+### 2. Narrative Timeline DAG Visualizer
+* **DC Trade-Dress Continuity Map**: Interactive horizontal timeline organizing crossover events across narrative milestones (`Act I: Inception`, `Act II: Escalation`, `Act III: Climax`).
+* **Dual Granularity Toggle**: Switch instantaneously between **Individual Issues** and **Collected Volume Stacks** (TPBs, hardcovers, and omnibuses).
+* **Importance & Gap Highlighting**: Badges distinguish **Essential / Core** issues from **Companion / Tie-In** issues, while missing library issues are highlighted as continuity gaps.
 
-### 3. Allowed Library Formats are respected everywhere
-* The library view, search results, and folder browser now hide files whose format is disabled in the Allowed Library Formats setting.
-* Filtering is read-side only: no database rows or files are removed, and cleanup still deletes only comics whose files are actually gone from disk.
+### 3. In-Reader Continuity Prompts ("Up Next in Arc")
+* Reaching the final page of an issue belonging to an indexed story arc surfaces an **Up Next in Arc** prompt with direct 1-tap navigation to the next chronological issue (even when the story crosses into a different series), or a clear continuity gap notice if the next issue is missing from the library.
 
-### 4. Guided View detection hardened for CBR
-* Each comic is read through one serialized archive session, avoiding repeated RAR extraction.
-* Zero-panel results are treated as failures, so empty sidecars are no longer written; sidecar writes are atomic.
-* Sidecar reconciliation validates content, preventing empty or corrupt sidecars from masking failed detections during rescans.
-* Stale RAR extraction directories are cleaned at startup.
-* Modal-guided detection now supports CBR through the project virtual environment, which provides `rarfile`.
+### 4. Tag Comics Now! Selectable Source (`ReadingOrders`)
+* **11th Metadata Source**: `ReadingOrders (Story Arcs)` (`src-readingorders`) is now available as a selectable checkbox in **Tag Comics Now! → Settings → Metadata Sources**.
+* **ComicInfo v2.0/v2.1 Enrichment**: When enabled, matched comics are automatically enriched with `<StoryArc>`, `<StoryArcNumber>`, and `<SeriesGroup>` tags via sub-millisecond local SQLite lookups with zero outbound network requests during tagging.
 
-### 5. Tagger reliability improvements
-* Gemini Vision candidate images served as `application/octet-stream` are recognized by magic bytes instead of being rejected; non-image responses are skipped.
-* Temporary Gemini API failures (for example, HTTP 503) now fall back to the standard tagger ranking instead of discarding valid candidates. An explicit visual no-match still rejects candidates.
+### 5. Polite Delta Scraper & Admin Sync Controls
+* **Admin-Only Sync**: Administrators can trigger delta syncs from the Story Arcs toolbar (`↻ Sync Reading Orders` / `POST /api/v1/story-arcs/sync`), while sync controls remain hidden from standard users.
+* **3-Tier Rescrape Prevention & Rate Limiting**:
+  - **Tier 1 (Sitemap ETag `HTTP 304`)**: Conditional `If-None-Match` check completes in ~150ms with zero page downloads when the upstream site has not changed.
+  - **Tier 2 & 3 (Slug Delta & Content Hash)**: Fetches only newly added or modified reading orders with a 1.2s per-request delay, 150–350ms randomized jitter, and a 5-error circuit breaker.
+
+### 6. Comics Now! MCP Server Continuity Tools
+* Added 4 new FastMCP tools in `comics_mcp`:
+  - `list_story_arcs(publisher, search)`
+  - `get_story_arc(arc_id)`
+  - `get_story_arc_next(comic_id)`
+  - `trigger_story_arcs_sync(mode)`
 
 ---
 
 ## ⬆️ Upgrade Notes
-* The `originalPath` column is added automatically at startup; links for existing converted comics are backfilled during the next full scan.
-* CBR tag metadata is written to an adjacent sidecar file. Comic archives are left byte-for-byte unchanged.
-* No settings changes are required.
+* `data/reading-orders.db` is initialized automatically in WAL mode on first access.
+* Existing user reading lists, custom sort orders, and reading progress records are completely untouched.
+* Optional `config.json` settings `readingOrdersIntervalDays` (default: `7`) and `readingOrdersMode` (default: `"both"`) are supported out of the box.
 
 ---
 
-## 📦 v3.3.0 Changelog
-1. `feat(tagger)`: add per-comic tag search with CBR support (`b44b2bd`)
-2. `feat(scan)`: link converted comics to their kept original files (`c4de6ea`)
-3. `feat(library)`: hide comics whose format is disabled in settings (`9933997`)
-4. `feat(guided)`: harden CBR detection and sidecar lifecycle (`0d52af1`)
-5. `test(archive)`: cover temp-dir RAR entry extraction (`ffa60fe`)
+## 📦 v3.4.0 Changelog
+1. `feat(continuity)`: add ReadingOrders scraper, Story Arcs smart filter, and narrative timeline (`d53f862`)
+2. `feat(continuity)`: add ReadingOrders MCP tools, selectable tagger source, runner and docs (`e9b06cf`)
 
 ---
 
 ## 🧪 Verification & Test Results
-- **Full Jest suite**: `179 suites passed, 1437 tests passed`.
-- **Python tagger suite**: `172 passed`.
-- **MCP suite**: `43 passed`.
-- **Production build**: Vite client bundle compiled successfully.
-- **Live CBR verification**: a complete review → apply cycle tagged both the CBR and its linked CBZ, wrote the sidecar, left the CBR checksum unchanged, and the skip path cleared pending review without starting a full scan.
-- **Architecture ratchet**: all touched modules remain under the 380-line ceiling.
+- **Full Jest suite**: `184 suites passed, 1460 tests passed`.
+- **MCP suite**: `47 passed`.
+- **Python tagger source suite**: `3 passed`.
+- **Production build**: Tailwind CSS v4 and Vite client bundle compiled cleanly.
+- **Architecture ratchet**: all new and modified modules remain strictly under the 380-line ceiling.
 
 ---
 
-# Previous Release: Comics Now! v3.2.0
+# Previous Release: Comics Now! v3.3.0
 
-- Configurable **Page Cache Limit** under **Settings → General**, with live usage reporting and immediate pruning — no restart required.
-- See GitHub Releases for the full v3.2.0 notes.
+- **Per-Comic Tag Search & CBR Support**: Single-comic tag search (`POST /api/v1/tag-comics-now/run-file` and MCP `run_tag_search`), CBR cover extraction, sidecar-only `ComicInfo.xml` writes for RAR/CBR archives, and companion metadata mirroring via `comics.originalPath`.
+- **Allowed Library Formats & Guided View Hardening**: Format filtering across library/search/folder views, serialized RAR archive sessions, atomic sidecar writes, and Gemini Vision fallback resilience.
+- See GitHub Releases for the full v3.3.0 notes.
