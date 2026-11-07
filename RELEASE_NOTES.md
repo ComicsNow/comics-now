@@ -68,6 +68,11 @@ Welcome to **Comics Now! v3.4.0** — introducing the **Story Arcs & Narrative C
 ### 12. Automated Weekly Continuity Delta Sync
 * Integrated autonomous delta synchronization into the weekly curator cron routine, fetching new and updated storylines non-destructively without altering reading progress or user-curated reading lists.
 
+### 13. Mobile-First Segmented Scope Settings Architecture (Approach A)
+* **M3 Segmented Scope Navigation**: Replaced the 8-tab horizontal scroll with a clean 3-scope segmented pill control (`📖 My Reader`, `⚙️ Server Admin`, `⚡ AI Engines`).
+* **Personal vs. Admin Separation**: Non-admin readers see only their 3 personal reading tabs (`Reading Experience`, `Offline Downloads`, `Synced Devices`) without horizontal scrolling or disabled admin clutter.
+* **Streamlined Admin Hub**: Server administrative tools and background automation engines are grouped logically into dedicated, high-contrast tab scopes.
+
 ---
 
 ## ⬆️ Upgrade Notes
@@ -86,6 +91,7 @@ Welcome to **Comics Now! v3.4.0** — introducing the **Story Arcs & Narrative C
 5. `feat(story-arcs)`: add Story Arc detail banner view, multi-lane spine and spurs DAG, and series continuity strip
 6. `feat(continuity)`: add in-grid badges, continuity jump interceptor, and weekly delta sync
 7. `feat(continuity)`: add collected editions crawler, range-aware matching, and publisher alias expansion
+8. `feat(settings)`: add Approach A segmented scope settings architecture and role-aware navigation
 
 ---
 

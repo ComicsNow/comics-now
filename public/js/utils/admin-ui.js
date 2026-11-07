@@ -81,6 +81,14 @@ export function hideAdminUI() {
       section.remove();
     }
   });
+
+  // Hide admin scopes in Settings modal
+  const adminScopes = document.querySelectorAll('.admin-only-scope');
+  adminScopes.forEach(el => el.remove());
+  const scopeBar = document.getElementById('settings-scope-bar');
+  if (scopeBar) {
+    scopeBar.style.display = 'none';
+  }
 }
 
 // Register on state/window just like original app.js did
