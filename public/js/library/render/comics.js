@@ -21,6 +21,7 @@ import * as SmartLists from '../smartlists.js';
 import { renderAlphaFilter } from '../alpha-list.js';
 import { syncSmartFilterButtons, mountSmartFilterHostInto } from '../smart-filters.js';
 import { createComicCard } from './comics/card-builder.js';
+import { createContinuityGapCard } from './comics/gap-card.js';
 import { renderSeriesContinuityStrip } from './series-continuity.js';
 
 const actionsRef = (typeof actions !== 'undefined' && actions?.navigation) ? actions : (typeof globalThis !== 'undefined' ? globalThis.__COMICS_STORE__?.actions : null);
@@ -189,7 +190,12 @@ export function renderComicCards(comicsToRender, viewType, targetContainer) {
   }
 
   comicsToRender.forEach((comic) => {
-    const card = createComicCard(comic);
-    container.appendChild(card);
+    if (comic.isGap) {
+      const gapCard = createContinuityGapCard(comic);
+      container.appendChild(gapCard);
+    } else {
+      const card = createComicCard(comic);
+      container.appendChild(card);
+    }
   });
 }

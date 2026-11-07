@@ -51,6 +51,24 @@ Welcome to **Comics Now! v3.4.0** — introducing the **Story Arcs & Narrative C
 * **Storage-Aware & Redundant Write Protection**: Respects existing storage modes (`archive` zip updates, `sidecar` `.ComicInfo.xml`, and `db` metadata). Automatically skips comics where existing Story Arc tags already match canonical values, avoiding unnecessary disk I/O and modified timestamps.
 * **Live SSE Progress Tracking & Cancellation**: Features a live progress bar with percentage, current comic indicator, updated/skipped counters, and a responsive cancel button.
 
+### 9. In-Grid Story Arc Badges & Continuity Gap Cards
+* **Visual Story Arc Badges**: Comic cards belonging to an active story arc display an amber continuity pill badge (`⚡ <Story Arc Name>`) directly on the card in library and series views.
+* **Inline Continuity Gap Cards**: When browsing issues of a series that participates in a multi-series crossover storyline, missing intermediate issues are visually rendered as dashed amber gap cards (`⚠️ Part of <Story Arc Name>`). Clicking a gap card immediately opens the storyline checklist and timeline visualizer.
+
+### 10. "Skipping Continuity" Reader Launch Interceptor
+* **Continuity Jump Interceptor**: When opening an issue that belongs to a canonical story arc, Comics Now! checks whether earlier chronological issues in that storyline remain unread.
+* **Non-Intrusive Modal**: If unread earlier issues exist, an Amber trade dress dialog informs the reader (`You are jumping ahead in <Story Arc>`) offering 1-tap options to `Read Oldest Unread` or `Continue to Issue`. Includes a persistent `Don't show again for this story arc` preference stored per arc.
+
+### 11. Mobile-First Settings IA & Scope Switcher
+* **3-Scope Settings Architecture**: Replaced cramped horizontal tabs with a responsive segmented scope bar:
+  - **📖 My Reader**: Personal reading preferences (Reading Experience, Offline Downloads, Synced Devices) available to all users.
+  - **⚙️ Server Admin**: Core server management (Storage & Library Paths, Users & Access, System Diagnostics Logs) gated strictly to administrators.
+  - **⚡ AI Engines**: Autonomous pipelines (Story Arcs & Reading Orders Crawler, Guided View GPU Engine).
+* **Bidirectional Workflow Bridges**: Added 1-tap navigation buttons connecting Story Arcs settings directly to Tag Comics Now! metadata sources, and vice-versa.
+
+### 12. Automated Weekly Continuity Delta Sync
+* Integrated autonomous delta synchronization into the weekly curator cron routine, fetching new and updated storylines non-destructively without altering reading progress or user-curated reading lists.
+
 ---
 
 ## ⬆️ Upgrade Notes
@@ -67,11 +85,12 @@ Welcome to **Comics Now! v3.4.0** — introducing the **Story Arcs & Narrative C
 3. `feat(settings)`: add dedicated Story Arcs settings tab, smart streaming logs, crawler engine, route contract integrity test, and 21-day log retention
 4. `feat(story-arcs)`: add batch ComicInfo.xml metadata enrichment with Option C override and target publisher scope
 5. `feat(story-arcs)`: add Story Arc detail banner view, multi-lane spine and spurs DAG, and series continuity strip
+6. `feat(continuity)`: add in-grid badges, continuity jump interceptor, weekly delta sync, and mobile-first settings scope switcher
 
 ---
 
 ## 🧪 Verification & Test Results
-- **Full Jest suite**: `189 suites passed, 1477 tests passed (100% pass rate)`.
+- **Full Jest suite**: `195 suites passed, 1503 tests passed (100% pass rate)`.
 - **MCP suite**: `47 passed`.
 - **Python tagger source suite**: `6 passed`.
 - **Production build**: Tailwind CSS v4 and Vite client bundle compiled cleanly.

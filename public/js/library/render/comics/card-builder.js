@@ -9,6 +9,7 @@ import {
 } from '../../../globals.js';
 import { toggleReadStatus } from '../../../progress.js';
 import { applyFilterAndRender } from '../../alpha-list.js';
+import { checkContinuityBeforeRead } from '../../../viewer/continuity-check.js';
 
 const renderContent = (typeof render === 'function' && render.length >= 2) ? render : (el, content) => {
   if (!el) return;
@@ -58,6 +59,9 @@ export function createComicCard(comic) {
   const displayInfo = applyDisplayInfoToComic(comic);
   const displayTitle = displayInfo.displayTitle;
   const subtitleText = displayInfo.subtitle;
+
+  const arcName = comic.StoryArc || comic.metadata?.StoryArc || comic.storyArc;
+  const arcNum = comic.StoryArcNumber || comic.metadata?.StoryArcNumber || comic.storyArcNumber;
 
   const derivedTotalPages = (() => {
     if (trackedTotalPages > 0) return trackedTotalPages;
@@ -138,6 +142,7 @@ export function createComicCard(comic) {
       <div>
         <p class="text-sm font-semibold text-white truncate">${displayTitle}</p>
         ${safeRaw(subtitleText ? `<p class="text-xs text-gray-300 truncate">${escapeHtml(subtitleText)}</p>` : '')}
+        ${safeRaw(arcName ? `<div class="mt-1 flex items-center gap-1"><span class="comic-arc-badge px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[10px] font-bold truncate">⚡ ${escapeHtml(arcName)}${arcNum ? ' #' + escapeHtml(arcNum) : ''}</span></div>` : '')}
       </div>
     </div>
     <div class="absolute bottom-0 left-0 right-0 h-1.5 bg-gray-700 rounded-b-lg">${safeRaw(progressPercent > 0 ? `<div class="${isRead ? 'bg-green-500' : 'bg-purple-500'} h-full rounded-b-lg transition-all duration-300" style="width: ${progressPercent}%;"></div>` : '')}</div>
@@ -192,10 +197,19 @@ export function createComicCard(comic) {
       if (interactiveButton) return;
     }
     if (target.closest(".download-btn") || target.closest(".status-toggle-btn")) return;
-    const openFn = (typeof window !== 'undefined' && window.openComicViewer) ||
-                   (typeof state !== 'undefined' && state.openComicViewer) ||
-                   (typeof global !== 'undefined' && global.openComicViewer);
-    if (typeof openFn === 'function') openFn(comic);
+
+    const launch = (c) => {
+      const openFn = (typeof window !== 'undefined' && window.openComicViewer) ||
+                     (typeof state !== 'undefined' && state.openComicViewer) ||
+                     (typeof global !== 'undefined' && global.openComicViewer);
+      if (typeof openFn === 'function') openFn(c);
+    };
+
+    if (typeof checkContinuityBeforeRead === 'function') {
+      checkContinuityBeforeRead(comic, () => launch(comic), (oldest) => launch(oldest));
+    } else {
+      launch(comic);
+    }
   });
   card.classList.add('cursor-pointer');
 

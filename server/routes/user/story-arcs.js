@@ -84,6 +84,67 @@ function attachUserStoryArcsRoutes(router, deps) {
     }
   });
 
+  // GET /api/v1/comics/:comicId/continuity
+  router.get('/api/v1/comics/:comicId/continuity', async (req, res) => {
+    try {
+      const comicId = req.params.comicId;
+      const comic = deps.dbGet ? deps.dbGet('SELECT id, name, series, metadata, lastReadPage, totalPages FROM comics WHERE id = ?', [comicId]) : null;
+      if (!comic) {
+        return res.json({ ok: true, hasArc: false, earlierUnread: [] });
+      }
+
+      const matcher = getMatcher();
+      if (!matcher) {
+        return res.json({ ok: true, hasArc: false, earlierUnread: [] });
+      }
+
+      let parsedMeta = {};
+      try {
+        parsedMeta = typeof comic.metadata === 'string' ? JSON.parse(comic.metadata) : (comic.metadata || {});
+      } catch (_) {}
+
+      const issueNum = parsedMeta.Number || (comic.name ? comic.name.match(/#?(\d+(\.\d+)?)/)?.[1] : null) || '1';
+      const continuity = await matcher.getComicContinuity(comic.series, issueNum);
+
+      if (!continuity || !continuity.arcId) {
+        return res.json({ ok: true, hasArc: false, earlierUnread: [] });
+      }
+
+      const arcDetails = await matcher.getStoryArcDetails(continuity.arcId);
+      const earlierIssues = (arcDetails?.issues || []).filter(iss => iss.position < continuity.position && iss.isOwned && iss.comicId);
+
+      const earlierUnread = [];
+      for (const iss of earlierIssues) {
+        const row = deps.dbGet ? deps.dbGet('SELECT id, name, lastReadPage, totalPages FROM comics WHERE id = ?', [iss.comicId]) : null;
+        if (row) {
+          const total = Number(row.totalPages) || 1;
+          const last = Number(row.lastReadPage) || 0;
+          if (last < total - 1) {
+            earlierUnread.push({
+              id: row.id,
+              name: row.name || `${iss.seriesName} #${iss.issueNumber}`,
+              position: iss.position,
+              seriesName: iss.seriesName,
+              issueNumber: iss.issueNumber
+            });
+          }
+        }
+      }
+
+      return res.json({
+        ok: true,
+        hasArc: true,
+        arcId: continuity.arcId,
+        arcTitle: continuity.arcTitle,
+        position: continuity.position,
+        earlierUnread
+      });
+    } catch (err) {
+      console.error('[StoryArcsRoute] Error checking comic continuity:', err);
+      return res.json({ ok: true, hasArc: false, earlierUnread: [] });
+    }
+  });
+
   // GET /api/v1/story-arcs/sync/status
   router.get('/api/v1/story-arcs/sync/status', (req, res) => {
     return res.json({ ok: true, ...runner.getStatus() });

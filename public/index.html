@@ -101,31 +101,56 @@
           </div>
           <button onclick="closeSettingsModal()" class="modal-close-btn text-2xl font-bold hover:text-gray-300 transition-colors" aria-label="Close settings modal" title="Close settings modal">&times;</button>
         </div>
-        <div class="flex overflow-x-auto border-b border-gray-600 px-4 sm:px-6 scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-gray-800 shrink-0">
-          <button id="settings-tab-general" data-text="General" class="tab-button active py-3 px-2 sm:px-4 text-xs sm:text-base whitespace-nowrap">
-            <span>General</span>
+        <!-- Responsive Scope Switcher Bar -->
+        <div id="settings-scope-bar" class="flex items-center gap-2 px-4 sm:px-6 pt-3 pb-2 bg-gray-900/60 border-b border-gray-700/60">
+          <button type="button" id="settings-scope-reader-btn" data-scope="reader" class="px-3 py-1.5 rounded-lg text-xs sm:text-sm font-bold bg-amber-500 text-black shadow-xs transition-all cursor-pointer">
+            <span>📖 My Reader</span>
           </button>
-          <button id="settings-tab-logs" data-text="Logs" class="tab-button py-3 px-2 sm:px-4 text-xs sm:text-base whitespace-nowrap">
-            <span>Logs</span>
+          <button type="button" id="settings-scope-server-btn" data-scope="server" class="admin-only-scope px-3 py-1.5 rounded-lg text-xs sm:text-sm font-bold text-gray-300 hover:text-white transition-all cursor-pointer">
+            <span>⚙️ Server Admin</span>
           </button>
-          <button id="settings-tab-downloads" data-text="Downloads" class="tab-button py-3 px-2 sm:px-4 text-xs sm:text-base whitespace-nowrap">
-            <span>Downloads</span>
+          <button type="button" id="settings-scope-engines-btn" data-scope="engines" class="admin-only-scope px-3 py-1.5 rounded-lg text-xs sm:text-sm font-bold text-gray-300 hover:text-white transition-all cursor-pointer">
+            <span>⚡ AI Engines</span>
           </button>
-          <button id="settings-tab-comics-defaults" data-text="Comics Defaults" class="tab-button py-3 px-2 sm:px-4 text-xs sm:text-base whitespace-nowrap">
-            <span>Comics Defaults</span>
-          </button>
-          <button id="settings-tab-devices" data-text="Devices" class="tab-button py-3 px-2 sm:px-4 text-xs sm:text-base whitespace-nowrap">
-            <span>Devices</span>
-          </button>
-          <button id="settings-tab-users" data-text="Users" class="tab-button py-3 px-2 sm:px-4 text-xs sm:text-base whitespace-nowrap">
-            <span>Users</span>
-          </button>
-          <button id="settings-tab-guided-reader" data-text="Guided Reader" class="tab-button py-3 px-2 sm:px-4 text-xs sm:text-base whitespace-nowrap">
-            <span>Guided Reader</span>
-          </button>
-          <button id="settings-tab-story-arcs" data-text="Story Arcs" class="tab-button py-3 px-2 sm:px-4 text-xs sm:text-base whitespace-nowrap">
-            <span>Story Arcs</span>
-          </button>
+        </div>
+
+        <!-- Scope Tabs Container -->
+        <div id="settings-tabs-row" class="border-b border-gray-600 px-4 sm:px-6 shrink-0 bg-gray-800">
+          <!-- 1. My Reader Scope Tabs -->
+          <div id="settings-scope-reader-tabs" class="scope-tabs-group flex overflow-x-auto scrollbar-thin scrollbar-thumb-gray-600 gap-1 sm:gap-2">
+            <button id="settings-tab-comics-defaults" data-text="Reading Experience" class="tab-button active py-2.5 px-3 sm:px-4 text-xs sm:text-sm font-semibold whitespace-nowrap">
+              <span>Reading Experience</span>
+            </button>
+            <button id="settings-tab-downloads" data-text="Downloads" class="tab-button py-2.5 px-3 sm:px-4 text-xs sm:text-sm font-semibold whitespace-nowrap">
+              <span>Offline Downloads</span>
+            </button>
+            <button id="settings-tab-devices" data-text="Devices" class="tab-button py-2.5 px-3 sm:px-4 text-xs sm:text-sm font-semibold whitespace-nowrap">
+              <span>Synced Devices</span>
+            </button>
+          </div>
+
+          <!-- 2. Server Admin Scope Tabs -->
+          <div id="settings-scope-server-tabs" class="scope-tabs-group hidden flex overflow-x-auto scrollbar-thin scrollbar-thumb-gray-600 gap-1 sm:gap-2">
+            <button id="settings-tab-general" data-text="Storage & Libraries" class="tab-button py-2.5 px-3 sm:px-4 text-xs sm:text-sm font-semibold whitespace-nowrap">
+              <span>Storage & Libraries</span>
+            </button>
+            <button id="settings-tab-users" data-text="Users & Access" class="tab-button py-2.5 px-3 sm:px-4 text-xs sm:text-sm font-semibold whitespace-nowrap">
+              <span>Users & Access</span>
+            </button>
+            <button id="settings-tab-logs" data-text="Diagnostics Logs" class="tab-button py-2.5 px-3 sm:px-4 text-xs sm:text-sm font-semibold whitespace-nowrap">
+              <span>Diagnostics Logs</span>
+            </button>
+          </div>
+
+          <!-- 3. AI Engines Scope Tabs -->
+          <div id="settings-scope-engines-tabs" class="scope-tabs-group hidden flex overflow-x-auto scrollbar-thin scrollbar-thumb-gray-600 gap-1 sm:gap-2">
+            <button id="settings-tab-story-arcs" data-text="Story Arcs & Continuity" class="tab-button py-2.5 px-3 sm:px-4 text-xs sm:text-sm font-semibold whitespace-nowrap">
+              <span>⚡ Story Arcs & Continuity</span>
+            </button>
+            <button id="settings-tab-guided-reader" data-text="Guided View AI" class="tab-button py-2.5 px-3 sm:px-4 text-xs sm:text-sm font-semibold whitespace-nowrap">
+              <span>Guided View AI</span>
+            </button>
+          </div>
         </div>
         <div class="flex-1 overflow-y-auto p-4 sm:p-6">
        
@@ -557,6 +582,10 @@
                 </p>
               </div>
               <div class="flex items-center gap-2">
+                <button type="button" id="bridge-to-tagger-btn" class="text-xs bg-blue-600/30 hover:bg-blue-600/50 text-blue-300 border border-blue-500/40 px-3 py-1 rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer" title="Open Tag Comics Now! to enrich library comics with story arcs">
+                  <span>🏷️</span>
+                  <span>Open Tagger →</span>
+                </button>
                 <span id="story-arcs-status-badge" class="text-xs px-3 py-1 rounded-full bg-gray-700/60 text-gray-300 border border-gray-600 font-semibold">
                   Idle
                 </span>
@@ -955,6 +984,9 @@
               <label class="flex items-center gap-2 cursor-pointer">
                 <input type="checkbox" id="src-cb-readingorders" class="rounded bg-gray-700 text-blue-600">
                 <span class="text-amber-400 font-medium">ReadingOrders</span>
+                <button type="button" id="bridge-to-story-arcs-settings-btn" class="ml-1 text-[11px] text-amber-400/90 hover:text-amber-300 underline underline-offset-2 transition-colors cursor-pointer" title="Configure crawler schedule and manual sync in Settings">
+                  (Settings →)
+                </button>
               </label>
             </div>
 

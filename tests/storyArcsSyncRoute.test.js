@@ -133,4 +133,12 @@ describe('Story Arcs Sync API Endpoints Integration', () => {
     expect(res.status).toBe(200);
     expect(res.body).toHaveProperty('ok', true);
   });
+
+  it('GET /api/v1/comics/:comicId/continuity returns continuity check payload', async () => {
+    const res = await executeRequest('GET', '/api/v1/comics/9999/continuity');
+    expect(res.status).toBe(200);
+    expect(res.body).toHaveProperty('ok', true);
+    expect(res.body).toHaveProperty('hasArc');
+    expect(Array.isArray(res.body.earlierUnread)).toBe(true);
+  });
 });
