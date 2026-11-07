@@ -11,10 +11,13 @@ Welcome to **Comics Now! v3.4.0** — introducing the **Story Arcs & Narrative C
 * **Live Library Completeness**: Each Story Arc card calculates real-time ownership metrics (`ownedCount`, `missingCount`, and `completenessPercent`) by matching local library comics against canonical multi-series reading orders.
 * **Isolated Continuity Database**: Canonical reading orders, issue sequences, and collected edition volumes are stored in a dedicated `data/reading-orders.db` SQLite database — keeping user reading lists and reading progress 100% untouched.
 
-### 2. Narrative Timeline DAG Visualizer
-* **DC Trade-Dress Continuity Map**: Interactive horizontal timeline organizing crossover events across narrative milestones (`Act I: Inception`, `Act II: Escalation`, `Act III: Climax`).
-* **Dual Granularity Toggle**: Switch instantaneously between **Individual Issues** and **Collected Volume Stacks** (TPBs, hardcovers, and omnibuses).
-* **Importance & Gap Highlighting**: Badges distinguish **Essential / Core** issues from **Companion / Tie-In** issues, while missing library issues are highlighted as continuity gaps.
+### 2. Story Arc Detail Banner & Narrative Timeline DAG
+* **Interactive Story Arc Detail Banner**: Clicking any box-set card in the Story Arcs smart list opens the Gold/Amber box-set detail banner (distinct from Reading Lists' purple playlist). Features real-time completeness progress, publication metadata, and 3-way view switching:
+  - **Grid View**: Visual cover cards in canonical sequence, clearly marking owned issues vs. missing gap placeholders.
+  - **Checklist View**: Tabular chronological reading checklist with storyline part annotations.
+  - **Narrative DAG View**: Integrated cinematic timeline visualizer.
+* **Spine & Orbit Spurs Visualizer**: Enhanced narrative timeline distinguishing main event / core issues along the central spine from tie-in series branching into angled orbit spurs. Features interactive card hover spotlighting, act milestones (`Act I: Inception`, `Act II: Escalation`, `Act III: Climax`), dual Issues / Collected Volumes toggle, and missing issue gap diagnostics.
+* **Series Page Continuity Strip**: On series pages (`/series/:publisher/:seriesName`), an inline Amber/Gold continuity strip surfaces associated story arcs with 1-click access to the full storyline detail.
 
 ### 3. In-Reader Continuity Prompts ("Up Next in Arc")
 * Reaching the final page of an issue belonging to an indexed story arc surfaces an **Up Next in Arc** prompt with direct 1-tap navigation to the next chronological issue (even when the story crosses into a different series), or a clear continuity gap notice if the next issue is missing from the library.
@@ -63,6 +66,7 @@ Welcome to **Comics Now! v3.4.0** — introducing the **Story Arcs & Narrative C
 2. `feat(continuity)`: add ReadingOrders MCP tools, selectable tagger source, runner and docs (`e9b06cf`)
 3. `feat(settings)`: add dedicated Story Arcs settings tab, smart streaming logs, crawler engine, route contract integrity test, and 21-day log retention
 4. `feat(story-arcs)`: add batch ComicInfo.xml metadata enrichment with Option C override and target publisher scope
+5. `feat(story-arcs)`: add Story Arc detail banner view, multi-lane spine and spurs DAG, and series continuity strip
 
 ---
 

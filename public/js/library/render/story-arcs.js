@@ -14,6 +14,7 @@ import {
   createEmptyMessage
 } from '../../globals.js';
 import { getStoryArcsForPublisher, fetchStoryArcsForPublisher } from '../smartlists/story-arcs.js';
+import { showStoryArcDetail } from '../story-arcs-detail.js';
 
 const clear = typeof clearElement === 'function' ? clearElement : (el) => { if (el) el.innerHTML = ''; };
 const renderContent = (typeof render === 'function' && render.length >= 2) ? render : (el, content) => {
@@ -220,16 +221,27 @@ export async function renderPublisherStoryArcs(publisherName) {
       </div>
     `);
 
-    // Wire timeline button
+    // Wire card click to open Story Arc Detail View
+    card.classList.add('cursor-pointer');
+    card.addEventListener('click', (e) => {
+      e.preventDefault();
+      const fn = state.showStoryArcDetail || (typeof window !== 'undefined' && window.showStoryArcDetail) || showStoryArcDetail;
+      if (typeof fn === 'function') {
+        fn(arc.id, arc.title, 'grid');
+      }
+    });
+
+    // Wire timeline button to open directly in DAG mode
     const timelineBtn = card.querySelector('.arc-timeline-btn');
     if (timelineBtn) {
       timelineBtn.addEventListener('click', (e) => {
         e.preventDefault();
         e.stopPropagation();
-        if (typeof window !== 'undefined' && typeof window.openArcTimelineModal === 'function') {
+        const fn = state.showStoryArcDetail || (typeof window !== 'undefined' && window.showStoryArcDetail) || showStoryArcDetail;
+        if (typeof fn === 'function') {
+          fn(arc.id, arc.title, 'dag');
+        } else if (typeof window !== 'undefined' && typeof window.openArcTimelineModal === 'function') {
           window.openArcTimelineModal(arc.id, arc.title);
-        } else {
-          console.log('[StoryArcs] Opening timeline for:', arc.id);
         }
       });
     }

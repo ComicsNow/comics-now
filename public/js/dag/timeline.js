@@ -159,22 +159,39 @@ function renderIssuesTimeline(track, issues) {
 
     const card = document.createElement('div');
     const isOwned = Boolean(iss.isOwned);
-    card.className = `relative flex flex-col w-40 shrink-0 rounded-xl overflow-hidden shadow-xl transition-all duration-300 hover:scale-105 cursor-pointer border ${
-      isOwned ? 'bg-gray-900 border-gray-700 hover:border-amber-400' : 'bg-gray-950/80 border-dashed border-amber-500/40 opacity-75'
-    }`;
+    const isTieIn = iss.importance === 'Tie-In' || iss.importance === 'Recommended';
+
+    card.className = 'story-arc-timeline-node relative flex flex-col w-40 shrink-0 rounded-xl overflow-hidden shadow-xl transition-all duration-300 cursor-pointer border';
+    if (isTieIn) {
+      card.classList.add('translate-y-2', 'border-dashed', 'border-amber-400/60');
+    } else {
+      card.classList.add('border-solid');
+    }
+
+    if (isOwned) {
+      card.classList.add('bg-gray-900', 'border-gray-700', 'hover:border-amber-400');
+    } else {
+      card.classList.add('bg-gray-950/80', 'border-amber-500/40', 'opacity-80');
+    }
 
     card.innerHTML = `
+      ${isTieIn ? `
+        <div class="bg-amber-950/90 text-amber-300 px-2 py-0.5 text-[8px] font-extrabold uppercase tracking-wider flex items-center justify-between border-b border-amber-500/40">
+          <span>↳ Tie-In Spur</span>
+          <span>#${iss.position}</span>
+        </div>
+      ` : ''}
       <div class="relative w-full aspect-[13/20] bg-black overflow-hidden">
         ${iss.coverImageUrl ? `
           <img src="${iss.coverImageUrl}" alt="${escapeHtml(iss.seriesName)}" class="w-full h-full object-cover">
         ` : `
           <div class="w-full h-full flex items-center justify-center text-gray-600 text-2xl font-bold">#${iss.issueNumber}</div>
         `}
-        <div class="absolute top-2 left-2 px-1.5 py-0.5 rounded bg-black/80 backdrop-blur-sm text-[10px] font-bold text-amber-400 border border-amber-400/30">
+        <div class="absolute top-2 left-2 px-1.5 py-0.5 rounded bg-black/80 backdrop-blur-xs text-[10px] font-bold text-amber-400 border border-amber-400/30">
           #${iss.position}
         </div>
         ${isOwned ? `
-          <div class="absolute top-2 right-2 w-5 h-5 rounded-full bg-emerald-500 flex items-center justify-center text-black text-xs font-bold shadow">✓</div>
+          <div class="absolute top-2 right-2 w-5 h-5 rounded-full bg-emerald-500 flex items-center justify-center text-black text-xs font-bold shadow-xs">✓</div>
         ` : `
           <div class="absolute top-2 right-2 px-1.5 py-0.5 rounded bg-amber-950/90 text-amber-300 text-[9px] font-bold border border-amber-500/50">Missing</div>
         `}
@@ -183,6 +200,7 @@ function renderIssuesTimeline(track, issues) {
         <div>
           <div class="text-[10px] uppercase font-bold text-gray-400 line-clamp-1">${escapeHtml(iss.seriesName)}</div>
           <div class="text-xs font-extrabold text-white line-clamp-1">Issue #${iss.issueNumber}</div>
+          ${iss.storyParts ? `<div class="text-[9px] text-amber-400/90 line-clamp-1 mt-0.5">${escapeHtml(iss.storyParts)}</div>` : ''}
         </div>
         ${iss.importance === 'Essential' ? `
           <span class="mt-2 text-[9px] font-bold uppercase text-red-400 tracking-wider">● Essential</span>
@@ -190,10 +208,31 @@ function renderIssuesTimeline(track, issues) {
       </div>
     `;
 
+    // Hover spotlight
+    card.addEventListener('mouseenter', () => {
+      card.classList.add('scale-105', 'z-20', 'shadow-2xl', 'ring-2', 'ring-amber-400');
+      track.querySelectorAll('.story-arc-timeline-node').forEach((node) => {
+        if (node !== card) node.classList.add('opacity-40');
+      });
+    });
+
+    card.addEventListener('mouseleave', () => {
+      card.classList.remove('scale-105', 'z-20', 'shadow-2xl', 'ring-2', 'ring-amber-400');
+      track.querySelectorAll('.story-arc-timeline-node').forEach((node) => {
+        node.classList.remove('opacity-40');
+      });
+    });
+
     if (isOwned && iss.comicId) {
       card.addEventListener('click', () => {
         closeArcTimelineModal();
-        launchComicReader(iss.comicId);
+        if (typeof launchComicReader === 'function') {
+          launchComicReader(iss.comicId);
+        }
+      });
+    } else {
+      card.addEventListener('click', () => {
+        alert(`Missing Issue Gap: ${iss.seriesName} #${iss.issueNumber}\nStoryline: ${iss.storyParts || 'Part of narrative arc'}\n\nThis comic is required for canonical continuity but not yet in your library.`);
       });
     }
 
@@ -236,7 +275,70 @@ function renderCollectedTimeline(track, collections) {
   });
 }
 
+export function renderTimelineIntoContainer(container, arcData) {
+  if (!container || !arcData) return;
+  let viewMode = 'issues';
+
+  container.innerHTML = `
+    <div class="w-full h-full flex flex-col bg-gray-950 overflow-hidden relative">
+      <div class="flex items-center justify-between px-4 py-2.5 bg-gray-900/80 border-b border-gray-800 shrink-0">
+        <div class="flex items-center gap-2">
+          <span class="text-xs font-bold text-amber-400">⚡ Narrative Spine & Orbit Spurs</span>
+          <span class="text-gray-600 text-xs">•</span>
+          <span class="text-gray-400 text-xs">${arcData.issues?.length || 0} Chronological Issues</span>
+        </div>
+        <div class="flex rounded-lg bg-gray-800 p-0.5 border border-gray-700 text-xs">
+          <button data-dag-action="issues" class="px-2.5 py-1 rounded-md font-bold transition-all bg-amber-500 text-black shadow-xs cursor-pointer">
+            Issues
+          </button>
+          <button data-dag-action="collected" class="px-2.5 py-1 rounded-md font-bold transition-all text-gray-400 hover:text-white cursor-pointer">
+            Collected Volumes
+          </button>
+        </div>
+      </div>
+      <div class="flex-1 overflow-x-auto overflow-y-hidden p-6 relative flex items-center bg-[radial-gradient(#1f2937_1px,transparent_1px)] [background-size:20px_20px]">
+        <div data-dag-role="track" class="flex items-center gap-8 min-w-max py-8 px-8 relative">
+        </div>
+      </div>
+    </div>
+  `;
+
+  const track = container.querySelector('[data-dag-role="track"]');
+  const btnIssues = container.querySelector('[data-dag-action="issues"]');
+  const btnCollected = container.querySelector('[data-dag-action="collected"]');
+
+  const update = () => {
+    track.innerHTML = '';
+    if (viewMode === 'collected') {
+      renderCollectedTimeline(track, arcData.collections || []);
+    } else {
+      renderIssuesTimeline(track, arcData.issues || []);
+    }
+  };
+
+  if (btnIssues) {
+    btnIssues.addEventListener('click', () => {
+      viewMode = 'issues';
+      btnIssues.className = 'px-2.5 py-1 rounded-md font-bold transition-all bg-amber-500 text-black shadow-xs cursor-pointer';
+      btnCollected.className = 'px-2.5 py-1 rounded-md font-bold transition-all text-gray-400 hover:text-white cursor-pointer';
+      update();
+    });
+  }
+
+  if (btnCollected) {
+    btnCollected.addEventListener('click', () => {
+      viewMode = 'collected';
+      btnCollected.className = 'px-2.5 py-1 rounded-md font-bold transition-all bg-amber-500 text-black shadow-xs cursor-pointer';
+      btnIssues.className = 'px-2.5 py-1 rounded-md font-bold transition-all text-gray-400 hover:text-white cursor-pointer';
+      update();
+    });
+  }
+
+  update();
+}
+
 if (typeof window !== 'undefined') {
   window.openArcTimelineModal = openArcTimelineModal;
   window.closeArcTimelineModal = closeArcTimelineModal;
+  window.renderTimelineIntoContainer = renderTimelineIntoContainer;
 }

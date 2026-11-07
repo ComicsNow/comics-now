@@ -21,6 +21,7 @@ import * as SmartLists from '../smartlists.js';
 import { renderAlphaFilter } from '../alpha-list.js';
 import { syncSmartFilterButtons, mountSmartFilterHostInto } from '../smart-filters.js';
 import { createComicCard } from './comics/card-builder.js';
+import { renderSeriesContinuityStrip } from './series-continuity.js';
 
 const actionsRef = (typeof actions !== 'undefined' && actions?.navigation) ? actions : (typeof globalThis !== 'undefined' ? globalThis.__COMICS_STORE__?.actions : null);
 const clear = typeof clearElement === 'function' ? clearElement : (el) => { if (el) { if (typeof el.replaceChildren === 'function') el.replaceChildren(); else el.innerHTML = ''; } };
@@ -128,6 +129,7 @@ export async function showComicList(seriesName) {
       }
     }
 
+    renderSeriesContinuityStrip(seriesName, state.currentPublisher);
     renderAlphaFilter(comicAlphaFilter, comicsToRender, renderComicCards, 'comics');
 
   } catch (error) {
