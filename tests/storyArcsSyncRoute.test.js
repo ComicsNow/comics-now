@@ -1,19 +1,85 @@
 /**
  * Story Arcs Sync Route Integration Tests
  * Validates that POST /api/v1/story-arcs/sync and related endpoints exist,
- * return valid JSON (never HTML fallback), and handle sync triggers cleanly.
+ * proxy correctly to the Python service, and return valid JSON cleanly.
  */
 const { createApiRouter } = require('../server/routes');
-const { getReadingOrdersRunner } = require('../server/services/reading-orders-runner');
 
 describe('Story Arcs Sync API Endpoints Integration', () => {
   let router;
-  let runner;
+  let originalFetch;
 
   beforeEach(() => {
-    runner = getReadingOrdersRunner();
-    jest.spyOn(runner, 'startSync').mockImplementation(async () => ({ ok: true }));
-    jest.spyOn(runner, 'cancelSync').mockImplementation(() => true);
+    originalFetch = global.fetch;
+    global.fetch = jest.fn((url, opts = {}) => {
+      const urlStr = String(url);
+      const method = (opts.method || 'GET').toUpperCase();
+
+      if (urlStr.includes('/api/story-arcs/sync/status')) {
+        return Promise.resolve({
+          status: 200,
+          json: () => Promise.resolve({ ok: true, isSyncing: false, percent: 0, currentSlug: null })
+        });
+      }
+      if (urlStr.includes('/api/story-arcs/sync/cancel')) {
+        return Promise.resolve({
+          status: 200,
+          json: () => Promise.resolve({ ok: true, cancelled: true })
+        });
+      }
+      if (urlStr.includes('/api/story-arcs/sync') && method === 'POST') {
+        return Promise.resolve({
+          status: 200,
+          json: () => Promise.resolve({ ok: true, message: 'Sync started' })
+        });
+      }
+      if (urlStr.includes('/api/story-arcs/batch-tag/publishers')) {
+        return Promise.resolve({
+          status: 200,
+          json: () => Promise.resolve({ ok: true, publishers: ['DC Comics', 'Marvel Comics'] })
+        });
+      }
+      if (urlStr.includes('/api/story-arcs/batch-tag/status')) {
+        return Promise.resolve({
+          status: 200,
+          json: () => Promise.resolve({ ok: true, isRunning: false, current: 0, total: 0 })
+        });
+      }
+      if (urlStr.includes('/api/story-arcs/batch-tag/cancel')) {
+        return Promise.resolve({
+          status: 200,
+          json: () => Promise.resolve({ ok: true, cancelled: true })
+        });
+      }
+      if (urlStr.includes('/api/story-arcs/batch-tag') && method === 'POST') {
+        return Promise.resolve({
+          status: 200,
+          json: () => Promise.resolve({ ok: true, message: 'Batch enrichment started' })
+        });
+      }
+      if (urlStr.includes('/api/story-arcs/logs')) {
+        if (method === 'DELETE') {
+          return Promise.resolve({
+            status: 200,
+            json: () => Promise.resolve({ ok: true })
+          });
+        }
+        return Promise.resolve({
+          status: 200,
+          json: () => Promise.resolve({ ok: true, logs: [] })
+        });
+      }
+      if (urlStr.includes('/api/story-arcs/continuity/next/')) {
+        return Promise.resolve({
+          status: 200,
+          json: () => Promise.resolve({ hasArc: false, earlierUnread: [] })
+        });
+      }
+      return Promise.resolve({
+        status: 200,
+        json: () => Promise.resolve({ ok: true })
+      });
+    });
 
     const mockDeps = {
       log: jest.fn(),
@@ -33,7 +99,7 @@ describe('Story Arcs Sync API Endpoints Integration', () => {
   });
 
   afterEach(() => {
-    runner.cancelSync();
+    global.fetch = originalFetch;
   });
 
   function executeRequest(method, url, body = {}) {

@@ -116,7 +116,7 @@
           <button type="button" id="settings-scope-engines-btn" data-scope="engines"
             class="admin-only-scope scope-btn px-3.5 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition-all cursor-pointer flex items-center gap-1.5 text-gray-300 hover:text-white hover:bg-gray-800">
             <span>⚡</span>
-            <span>AI Engines</span>
+            <span>Guided View AI</span>
           </button>
         </div>
 
@@ -148,11 +148,8 @@
             </button>
           </div>
 
-          <!-- 3. AI Engines Scope Tabs -->
+          <!-- 3. Guided View AI Scope Tabs -->
           <div id="settings-scope-engines-tabs" class="scope-tabs-group hidden flex items-center gap-1 sm:gap-2" style="display: none;">
-            <button id="settings-tab-story-arcs" data-text="Story Arcs" class="tab-button py-2 px-2.5 sm:px-3 text-xs font-semibold whitespace-nowrap">
-              <span>Story Arcs</span>
-            </button>
             <button id="settings-tab-guided-reader" data-text="Guided View" class="tab-button py-2 px-2.5 sm:px-3 text-xs font-semibold whitespace-nowrap">
               <span>Guided View AI</span>
             </button>
@@ -574,197 +571,6 @@
             </div>
           </div>
         </div>
-
-        <!-- Story Arcs Tab -->
-        <div id="settings-content-story-arcs" class="hidden space-y-6">
-          <div class="border border-gray-700/80 bg-gray-800/40 rounded-xl p-5 shadow-xs">
-            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
-              <div>
-                <h4 class="text-xl font-bold flex items-center gap-2 text-white">
-                  <span class="text-amber-400">⚡</span> Story Arcs & Reading Orders
-                </h4>
-                <p class="text-xs sm:text-sm text-gray-400 mt-1">
-                  Continuity reading order crawler and timeline indexing powered by ReadingOrders.com.
-                </p>
-              </div>
-              <div class="flex items-center gap-2">
-                <button type="button" id="bridge-to-tagger-btn" class="text-xs bg-blue-600/30 hover:bg-blue-600/50 text-blue-300 border border-blue-500/40 px-3 py-1 rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer" title="Open Tag Comics Now! to enrich library comics with story arcs">
-                  <span>🏷️</span>
-                  <span>Open Tagger →</span>
-                </button>
-                <span id="story-arcs-status-badge" class="text-xs px-3 py-1 rounded-full bg-gray-700/60 text-gray-300 border border-gray-600 font-semibold">
-                  Idle
-                </span>
-              </div>
-            </div>
-
-            <!-- Stats & Quick Status Card -->
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3.5 rounded-lg bg-gray-800/80 border border-gray-700/70 mb-5">
-              <div>
-                <span class="text-xs text-gray-400 uppercase tracking-wider block font-semibold">Database Status</span>
-                <span id="story-arcs-details-text" class="text-sm font-medium text-amber-300">0 Story Arcs Indexed</span>
-              </div>
-              <div>
-                <span class="text-xs text-gray-400 uppercase tracking-wider block font-semibold">Last Synchronization</span>
-                <span id="story-arcs-last-sync-text" class="text-sm font-medium text-gray-200">Never</span>
-              </div>
-            </div>
-
-            <!-- Configuration & Scheduling Form -->
-            <div class="space-y-4 border-t border-gray-700/80 pt-4">
-              <h5 class="text-sm font-semibold text-gray-200 uppercase tracking-wider">Sync Configuration</h5>
-              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label for="story-arcs-interval-input" class="block text-xs font-medium text-gray-300 mb-1">
-                    Auto-Sync Schedule (Days)
-                  </label>
-                  <input type="number" id="story-arcs-interval-input" min="0" max="90" step="1" value="7"
-                    class="w-full bg-gray-700 text-white p-2 rounded-lg text-sm focus:outline-hidden focus:ring-2 focus:ring-amber-500"
-                    placeholder="7 (0 = disabled)">
-                  <span class="text-xs text-gray-400 mt-0.5 block">Periodic background sync interval. Set to 0 to disable automatic scans.</span>
-                </div>
-                <div>
-                  <label for="story-arcs-mode-select" class="block text-xs font-medium text-gray-300 mb-1">
-                    Order Ingestion Mode
-                  </label>
-                  <select id="story-arcs-mode-select"
-                    class="w-full bg-gray-700 text-white p-2 rounded-lg text-sm focus:outline-hidden focus:ring-2 focus:ring-amber-500">
-                    <option value="both">Both Issues & Collected Editions</option>
-                    <option value="issues">Single Issues Only</option>
-                    <option value="collected">Collected Volumes Only</option>
-                  </select>
-                  <span class="text-xs text-gray-400 mt-0.5 block">Scrape issue-by-issue checklists, trade paperbacks, or both.</span>
-                </div>
-              </div>
-
-              <div class="flex items-center justify-between pt-2">
-                <label class="flex items-center gap-2 cursor-pointer text-xs text-gray-300 select-none">
-                  <input type="checkbox" id="story-arcs-force-cb" class="w-4 h-4 rounded text-amber-600 focus:ring-amber-500 bg-gray-700 border-gray-600">
-                  <span>Force Re-Scrape (Bypass 7-day cache TTL)</span>
-                </label>
-                <button type="button" id="save-story-arcs-config-btn"
-                  class="bg-gray-700 hover:bg-gray-600 text-white text-xs font-semibold py-2 px-4 rounded-lg transition-colors cursor-pointer">
-                  Save Schedule
-                </button>
-              </div>
-              <div id="story-arcs-settings-status" class="text-xs text-center font-medium"></div>
-            </div>
-
-            <!-- Action Controls & Live Progress -->
-            <div class="border-t border-gray-700/80 pt-4 mt-4">
-              <div class="flex flex-wrap items-center gap-3">
-                <button type="button" id="start-story-arcs-scan-btn"
-                  class="bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-white text-sm font-semibold py-2 px-4 rounded-lg transition-colors flex items-center gap-2 shadow-xs cursor-pointer">
-                  <span>▷</span>
-                  <span class="sync-text">Start Initial Scan / Sync</span>
-                </button>
-                <button type="button" id="cancel-story-arcs-scan-btn"
-                  class="hidden bg-red-600/80 hover:bg-red-600 text-white text-sm font-semibold py-2 px-4 rounded-lg transition-colors flex items-center gap-2 shadow-xs cursor-pointer">
-                  <span>⏹</span>
-                  <span>Cancel Sync</span>
-                </button>
-              </div>
-
-              <!-- Progress bar -->
-              <div id="story-arcs-progress-card" class="hidden mt-4 p-3 bg-gray-900/60 rounded-lg border border-amber-500/30">
-                <div class="flex justify-between text-xs text-gray-300 mb-1">
-                  <span id="story-arcs-progress-label">Preparing crawler...</span>
-                  <span id="story-arcs-progress-percent" class="font-bold text-amber-400">0%</span>
-                </div>
-                <div class="w-full bg-gray-700 rounded-full h-2.5 overflow-hidden">
-                  <div id="story-arcs-progress-bar" class="bg-amber-500 h-2.5 rounded-full transition-all duration-300" style="width: 0%"></div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Batch ComicInfo.xml Story Arc Enrichment Section -->
-          <div class="border border-gray-700/80 bg-gray-800/40 rounded-xl p-5 shadow-xs">
-            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3">
-              <div>
-                <h5 class="text-base font-bold flex items-center gap-2 text-white">
-                  <span class="text-amber-400">🏷️</span> ComicInfo.xml Story Arc Enrichment
-                </h5>
-                <p class="text-xs text-gray-400 mt-0.5">
-                  Updates <span class="text-amber-300 font-mono">&lt;StoryArc&gt;</span>, <span class="text-amber-300 font-mono">&lt;StoryArcNumber&gt;</span>, and <span class="text-amber-300 font-mono">&lt;SeriesGroup&gt;</span> in ComicInfo.xml for all library comics matching canonical reading orders. Strictly preserves all creator, character, date, and description metadata.
-                </p>
-              </div>
-              <span id="story-arcs-batch-status-badge" class="text-xs px-2.5 py-1 rounded-full bg-gray-700/60 text-gray-300 border border-gray-600 font-semibold self-start sm:self-center">
-                Idle
-              </span>
-            </div>
-
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
-              <div>
-                <label for="story-arcs-batch-publisher-select" class="block text-xs font-medium text-gray-300 mb-1">
-                  Target Publisher Scope
-                </label>
-                <select id="story-arcs-batch-publisher-select"
-                  class="w-full bg-gray-700 text-white p-2 rounded-lg text-xs focus:outline-hidden focus:ring-2 focus:ring-amber-500">
-                  <option value="all">All Publishers in Story Arcs DB</option>
-                </select>
-                <span class="text-[11px] text-gray-400 mt-0.5 block">Matches comics belonging to publishers present in reading-orders.db.</span>
-              </div>
-              <div class="flex flex-col justify-end">
-                <div class="flex items-center gap-3">
-                  <button type="button" id="start-story-arcs-batch-btn"
-                    class="bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-white text-xs font-semibold py-2.5 px-4 rounded-lg transition-colors flex items-center gap-2 shadow-xs cursor-pointer">
-                    <span>🏷️</span>
-                    <span id="story-arcs-batch-btn-text">Batch Update ComicInfo.xml</span>
-                  </button>
-                  <button type="button" id="cancel-story-arcs-batch-btn"
-                    class="hidden bg-red-600/80 hover:bg-red-600 text-white text-xs font-semibold py-2.5 px-3.5 rounded-lg transition-colors flex items-center gap-1.5 shadow-xs cursor-pointer">
-                    <span>⏹</span>
-                    <span>Cancel</span>
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            <!-- Batch Progress Bar -->
-            <div id="story-arcs-batch-progress-card" class="hidden p-3 bg-gray-900/60 rounded-lg border border-amber-500/30">
-              <div class="flex justify-between text-xs text-gray-300 mb-1">
-                <span id="story-arcs-batch-progress-label">Preparing enrichment...</span>
-                <span id="story-arcs-batch-progress-percent" class="font-bold text-amber-400">0%</span>
-              </div>
-              <div class="w-full bg-gray-700 rounded-full h-2 overflow-hidden">
-                <div id="story-arcs-batch-progress-bar" class="bg-amber-500 h-2 rounded-full transition-all duration-300" style="width: 0%"></div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Live Streaming Crawler Logs -->
-          <div class="border border-gray-700/80 bg-gray-800/40 rounded-xl p-5 shadow-xs">
-            <div class="flex items-center justify-between mb-3">
-              <div class="flex items-center gap-2">
-                <h5 class="text-sm font-semibold text-gray-200 uppercase tracking-wider">Live Sync & Crawler Logs</h5>
-                <span id="story-arcs-log-count" class="text-xs px-2 py-0.5 rounded bg-gray-800 text-gray-400 border border-gray-700 font-mono">0 lines</span>
-              </div>
-              <div class="flex items-center gap-3">
-                <label class="flex items-center gap-1.5 text-xs text-gray-400 cursor-pointer select-none">
-                  <input type="checkbox" id="story-arcs-autoscroll-cb" checked class="w-3.5 h-3.5 rounded text-amber-600 focus:ring-amber-500 bg-gray-700 border-gray-600">
-                  <span>Auto-scroll</span>
-                </label>
-                <button type="button" id="clear-story-arcs-logs-btn" class="text-xs text-red-400 hover:text-red-300 transition-colors cursor-pointer">Clear</button>
-              </div>
-            </div>
-
-            <!-- Log Viewer Container with Smart Scroll & Jump Button -->
-            <div class="relative">
-              <div id="story-arcs-log-output" class="bg-black/90 p-3 overflow-y-auto text-xs rounded-lg font-mono border border-gray-800 h-64 sm:h-80 scrollbar-thin scrollbar-thumb-gray-700 scrollbar-track-black">
-                <div class="text-gray-500 italic">No logs received yet. Click 'Start Initial Scan / Sync' above to begin.</div>
-              </div>
-              <button type="button" id="story-arcs-jump-bottom-btn"
-                class="hidden absolute bottom-3 right-4 bg-amber-600/90 hover:bg-amber-500 text-white text-xs font-semibold py-1.5 px-3 rounded-full shadow-lg transition-all flex items-center gap-1 backdrop-blur-xs cursor-pointer">
-                <span>↓ Jump to latest</span>
-              </button>
-            </div>
-            <div class="text-[11px] text-gray-400 mt-2 flex items-center justify-between">
-              <span>Sync logs are retained up to 21 days according to policy.</span>
-              <span>Rate limit: 600ms per slug</span>
-            </div>
-          </div>
-        </div>
         </div>
       </div>
     </div>
@@ -817,6 +623,9 @@
         <div id="ct-scope-sources-tabs" class="ct-scope-tabs-group hidden items-center gap-2 overflow-x-auto scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-gray-800" style="display: none;">
           <button id="ct-tab-settings" class="tab-button py-2.5 px-2.5 sm:px-4 text-xs sm:text-sm whitespace-nowrap">
             <span>Metadata Sources & Rules</span>
+          </button>
+          <button id="ct-tab-story-arcs" class="tab-button py-2.5 px-2.5 sm:px-4 text-xs sm:text-sm whitespace-nowrap flex items-center gap-1.5">
+            <span>Story Arcs & Continuity</span>
           </button>
           <button id="ct-tab-gemini" class="tab-button py-2.5 px-2.5 sm:px-4 text-xs sm:text-sm whitespace-nowrap flex items-center gap-1.5">
             <span>Gemini Vision AI</span>
@@ -1135,6 +944,193 @@
           <div class="flex justify-between items-center">
             <button id="ct-save-btn" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-6 rounded-full transition-colors text-sm">Save Settings</button>
             <button id="ct-clear-history-btn" class="text-xs text-gray-400 hover:text-red-400 transition-colors">Clear Enhancement History</button>
+          </div>
+        </div>
+
+        <!-- Story Arcs & Continuity Tab -->
+        <div id="ct-content-story-arcs" class="hidden space-y-6">
+          <div class="border border-gray-700/80 bg-gray-800/40 rounded-xl p-5 shadow-xs">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+              <div>
+                <h4 class="text-xl font-bold flex items-center gap-2 text-white">
+                  <span class="text-amber-400">⚡</span> Story Arcs &amp; Reading Orders
+                </h4>
+                <p class="text-xs sm:text-sm text-gray-400 mt-1">
+                  Continuity reading order crawler and timeline indexing powered by ReadingOrders.com.
+                </p>
+              </div>
+              <div class="flex items-center gap-2">
+                <span id="story-arcs-status-badge" class="text-xs px-3 py-1 rounded-full bg-gray-700/60 text-gray-300 border border-gray-600 font-semibold">
+                  Idle
+                </span>
+              </div>
+            </div>
+
+            <!-- Stats & Quick Status Card -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3.5 rounded-lg bg-gray-800/80 border border-gray-700/70 mb-5">
+              <div>
+                <span class="text-xs text-gray-400 uppercase tracking-wider block font-semibold">Database Status</span>
+                <span id="story-arcs-details-text" class="text-sm font-medium text-amber-300">0 Story Arcs Indexed</span>
+              </div>
+              <div>
+                <span class="text-xs text-gray-400 uppercase tracking-wider block font-semibold">Last Synchronization</span>
+                <span id="story-arcs-last-sync-text" class="text-sm font-medium text-gray-200">Never</span>
+              </div>
+            </div>
+
+            <!-- Configuration & Scheduling Form -->
+            <div class="space-y-4 border-t border-gray-700/80 pt-4">
+              <h5 class="text-sm font-semibold text-gray-200 uppercase tracking-wider">Sync Configuration</h5>
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label for="story-arcs-interval-input" class="block text-xs font-medium text-gray-300 mb-1">
+                    Auto-Sync Schedule (Days)
+                  </label>
+                  <input type="number" id="story-arcs-interval-input" min="0" max="90" step="1" value="7"
+                    class="w-full bg-gray-700 text-white p-2 rounded-lg text-sm focus:outline-hidden focus:ring-2 focus:ring-amber-500"
+                    placeholder="7 (0 = disabled)">
+                  <span class="text-xs text-gray-400 mt-0.5 block">Periodic background sync interval. Set to 0 to disable automatic scans.</span>
+                </div>
+                <div>
+                  <label for="story-arcs-mode-select" class="block text-xs font-medium text-gray-300 mb-1">
+                    Order Ingestion Mode
+                  </label>
+                  <select id="story-arcs-mode-select"
+                    class="w-full bg-gray-700 text-white p-2 rounded-lg text-sm focus:outline-hidden focus:ring-2 focus:ring-amber-500">
+                    <option value="both">Both Issues &amp; Collected Editions</option>
+                    <option value="issues">Single Issues Only</option>
+                    <option value="collected">Collected Volumes Only</option>
+                  </select>
+                  <span class="text-xs text-gray-400 mt-0.5 block">Scrape issue-by-issue checklists, trade paperbacks, or both.</span>
+                </div>
+              </div>
+
+              <div class="flex items-center justify-between pt-2">
+                <label class="flex items-center gap-2 cursor-pointer text-xs text-gray-300 select-none">
+                  <input type="checkbox" id="story-arcs-force-cb" class="w-4 h-4 rounded text-amber-600 focus:ring-amber-500 bg-gray-700 border-gray-600">
+                  <span>Force Re-Scrape (Bypass 7-day cache TTL)</span>
+                </label>
+                <button type="button" id="save-story-arcs-config-btn"
+                  class="bg-gray-700 hover:bg-gray-600 text-white text-xs font-semibold py-2 px-4 rounded-lg transition-colors cursor-pointer">
+                  Save Schedule
+                </button>
+              </div>
+              <div id="story-arcs-settings-status" class="text-xs text-center font-medium"></div>
+            </div>
+
+            <!-- Action Controls & Live Progress -->
+            <div class="border-t border-gray-700/80 pt-4 mt-4">
+              <div class="flex flex-wrap items-center gap-3">
+                <button type="button" id="start-story-arcs-scan-btn"
+                  class="bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-white text-sm font-semibold py-2 px-4 rounded-lg transition-colors flex items-center gap-2 shadow-xs cursor-pointer">
+                  <span>▷</span>
+                  <span class="sync-text">Start Initial Scan / Sync</span>
+                </button>
+                <button type="button" id="cancel-story-arcs-scan-btn"
+                  class="hidden bg-red-600/80 hover:bg-red-600 text-white text-sm font-semibold py-2 px-4 rounded-lg transition-colors flex items-center gap-2 shadow-xs cursor-pointer">
+                  <span>⏹</span>
+                  <span>Cancel Sync</span>
+                </button>
+              </div>
+
+              <!-- Progress bar -->
+              <div id="story-arcs-progress-card" class="hidden mt-4 p-3 bg-gray-900/60 rounded-lg border border-amber-500/30">
+                <div class="flex justify-between text-xs text-gray-300 mb-1">
+                  <span id="story-arcs-progress-label">Preparing crawler...</span>
+                  <span id="story-arcs-progress-percent" class="font-bold text-amber-400">0%</span>
+                </div>
+                <div class="w-full bg-gray-700 rounded-full h-2.5 overflow-hidden">
+                  <div id="story-arcs-progress-bar" class="bg-amber-500 h-2.5 rounded-full transition-all duration-300" style="width: 0%"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Batch ComicInfo.xml Story Arc Enrichment Section -->
+          <div class="border border-gray-700/80 bg-gray-800/40 rounded-xl p-5 shadow-xs">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3">
+              <div>
+                <h5 class="text-base font-bold flex items-center gap-2 text-white">
+                  <span class="text-amber-400">🏷️</span> ComicInfo.xml Story Arc Enrichment
+                </h5>
+                <p class="text-xs text-gray-400 mt-0.5">
+                  Updates <span class="text-amber-300 font-mono">&lt;StoryArc&gt;</span>, <span class="text-amber-300 font-mono">&lt;StoryArcNumber&gt;</span>, and <span class="text-amber-300 font-mono">&lt;SeriesGroup&gt;</span> in ComicInfo.xml for all library comics matching canonical reading orders. Strictly preserves all creator, character, date, and description metadata.
+                </p>
+              </div>
+              <span id="story-arcs-batch-status-badge" class="text-xs px-2.5 py-1 rounded-full bg-gray-700/60 text-gray-300 border border-gray-600 font-semibold self-start sm:self-center">
+                Idle
+              </span>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+              <div>
+                <label for="story-arcs-batch-publisher-select" class="block text-xs font-medium text-gray-300 mb-1">
+                  Target Publisher Scope
+                </label>
+                <select id="story-arcs-batch-publisher-select"
+                  class="w-full bg-gray-700 text-white p-2 rounded-lg text-xs focus:outline-hidden focus:ring-2 focus:ring-amber-500">
+                  <option value="all">All Publishers in Story Arcs DB</option>
+                </select>
+                <span class="text-[11px] text-gray-400 mt-0.5 block">Matches comics belonging to publishers present in reading-orders.db.</span>
+              </div>
+              <div class="flex flex-col justify-end">
+                <div class="flex items-center gap-3">
+                  <button type="button" id="start-story-arcs-batch-btn"
+                    class="bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-white text-xs font-semibold py-2.5 px-4 rounded-lg transition-colors flex items-center gap-2 shadow-xs cursor-pointer">
+                    <span>🏷️</span>
+                    <span id="story-arcs-batch-btn-text">Batch Update ComicInfo.xml</span>
+                  </button>
+                  <button type="button" id="cancel-story-arcs-batch-btn"
+                    class="hidden bg-red-600/80 hover:bg-red-600 text-white text-xs font-semibold py-2.5 px-3.5 rounded-lg transition-colors flex items-center gap-1.5 shadow-xs cursor-pointer">
+                    <span>⏹</span>
+                    <span>Cancel</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Batch Progress Bar -->
+            <div id="story-arcs-batch-progress-card" class="hidden p-3 bg-gray-900/60 rounded-lg border border-amber-500/30">
+              <div class="flex justify-between text-xs text-gray-300 mb-1">
+                <span id="story-arcs-batch-progress-label">Preparing enrichment...</span>
+                <span id="story-arcs-batch-progress-percent" class="font-bold text-amber-400">0%</span>
+              </div>
+              <div class="w-full bg-gray-700 rounded-full h-2 overflow-hidden">
+                <div id="story-arcs-batch-progress-bar" class="bg-amber-500 h-2 rounded-full transition-all duration-300" style="width: 0%"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Live Streaming Crawler Logs -->
+          <div class="border border-gray-700/80 bg-gray-800/40 rounded-xl p-5 shadow-xs">
+            <div class="flex items-center justify-between mb-3">
+              <div class="flex items-center gap-2">
+                <h5 class="text-sm font-semibold text-gray-200 uppercase tracking-wider">Live Sync &amp; Crawler Logs</h5>
+                <span id="story-arcs-log-count" class="text-xs px-2 py-0.5 rounded bg-gray-800 text-gray-400 border border-gray-700 font-mono">0 lines</span>
+              </div>
+              <div class="flex items-center gap-3">
+                <label class="flex items-center gap-1.5 text-xs text-gray-400 cursor-pointer select-none">
+                  <input type="checkbox" id="story-arcs-autoscroll-cb" checked class="w-3.5 h-3.5 rounded text-amber-600 focus:ring-amber-500 bg-gray-700 border-gray-600">
+                  <span>Auto-scroll</span>
+                </label>
+                <button type="button" id="clear-story-arcs-logs-btn" class="text-xs text-red-400 hover:text-red-300 transition-colors cursor-pointer">Clear</button>
+              </div>
+            </div>
+
+            <!-- Log Viewer Container with Smart Scroll & Jump Button -->
+            <div class="relative">
+              <div id="story-arcs-log-output" class="bg-black/90 p-3 overflow-y-auto text-xs rounded-lg font-mono border border-gray-800 h-64 sm:h-80 scrollbar-thin scrollbar-thumb-gray-700 scrollbar-track-black">
+                <div class="text-gray-500 italic">No logs received yet. Click 'Start Initial Scan / Sync' above to begin.</div>
+              </div>
+              <button type="button" id="story-arcs-jump-bottom-btn"
+                class="hidden absolute bottom-3 right-4 bg-amber-600/90 hover:bg-amber-500 text-white text-xs font-semibold py-1.5 px-3 rounded-full shadow-lg transition-all flex items-center gap-1 backdrop-blur-xs cursor-pointer">
+                <span>↓ Jump to latest</span>
+              </button>
+            </div>
+            <div class="text-[11px] text-gray-400 mt-2 flex items-center justify-between">
+              <span>Sync logs are retained up to 21 days according to policy.</span>
+              <span>Rate limit: 600ms per slug</span>
+            </div>
           </div>
         </div>
 

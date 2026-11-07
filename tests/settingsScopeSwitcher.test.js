@@ -48,7 +48,6 @@ describe('Settings Scope Switcher (Approach A)', () => {
             <button id="settings-tab-logs" class="tab-button">Logs</button>
           </div>
           <div id="settings-scope-engines-tabs" class="scope-tabs-group hidden">
-            <button id="settings-tab-story-arcs" class="tab-button">Story Arcs</button>
             <button id="settings-tab-guided-reader" class="tab-button">Guided Reader</button>
           </div>
         </div>
@@ -58,7 +57,6 @@ describe('Settings Scope Switcher (Approach A)', () => {
         <div id="settings-content-general" class="hidden"></div>
         <div id="settings-content-users" class="hidden"></div>
         <div id="settings-content-logs" class="hidden"></div>
-        <div id="settings-content-story-arcs" class="hidden"></div>
         <div id="settings-content-guided-reader" class="hidden"></div>
       </div>
     `;
@@ -68,11 +66,11 @@ describe('Settings Scope Switcher (Approach A)', () => {
   test('defines correct scope hierarchy and mappings', () => {
     expect(switcher.SCOPES.reader.tabs).toEqual(['comics-defaults', 'downloads', 'devices']);
     expect(switcher.SCOPES.server.tabs).toEqual(['general', 'users', 'logs']);
-    expect(switcher.SCOPES.engines.tabs).toEqual(['story-arcs', 'guided-reader']);
+    expect(switcher.SCOPES.engines.tabs).toEqual(['guided-reader']);
 
     expect(switcher.TAB_TO_SCOPE['comics-defaults']).toBe('reader');
     expect(switcher.TAB_TO_SCOPE['general']).toBe('server');
-    expect(switcher.TAB_TO_SCOPE['story-arcs']).toBe('engines');
+    expect(switcher.TAB_TO_SCOPE['guided-reader']).toBe('engines');
   });
 
   test('setSettingsScope switches active scope and shows correct tab group', () => {
@@ -99,8 +97,8 @@ describe('Settings Scope Switcher (Approach A)', () => {
   test('syncScopeWithActiveTab automatically aligns scope when switching tabs directly', () => {
     switcher.initSettingsScopeSwitcher();
 
-    // Directly navigating to story-arcs should switch scope to engines
-    switcher.syncScopeWithActiveTab('story-arcs');
+    // Directly navigating to guided-reader should switch scope to engines
+    switcher.syncScopeWithActiveTab('guided-reader');
     expect(switcher.getSettingsScope()).toBe('engines');
 
     const enginesTabs = document.getElementById('settings-scope-engines-tabs');

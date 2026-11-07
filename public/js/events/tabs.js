@@ -64,6 +64,7 @@ export function switchCtTab(activeTab, activeContent, routePath) {
     typeof ctTabOutput !== 'undefined' ? ctTabOutput : null,
     typeof ctTabMatches !== 'undefined' ? ctTabMatches : null,
     typeof ctTabSettings !== 'undefined' ? ctTabSettings : null,
+    document.getElementById('ct-tab-story-arcs'),
     typeof ctTabGemini !== 'undefined' ? ctTabGemini : null,
     typeof ctTabLogs !== 'undefined' ? ctTabLogs : null,
     typeof ctTabManagement !== 'undefined' ? ctTabManagement : null,
@@ -77,6 +78,7 @@ export function switchCtTab(activeTab, activeContent, routePath) {
     typeof ctContentOutput !== 'undefined' ? ctContentOutput : null,
     typeof ctContentMatches !== 'undefined' ? ctContentMatches : null,
     typeof ctContentSettings !== 'undefined' ? ctContentSettings : null,
+    document.getElementById('ct-content-story-arcs'),
     typeof ctContentGemini !== 'undefined' ? ctContentGemini : null,
     typeof ctContentLogs !== 'undefined' ? ctContentLogs : null,
     typeof ctContentManagement !== 'undefined' ? ctContentManagement : null
@@ -240,18 +242,6 @@ export function initSettingsTabListeners() {
     }
   });
 
-  document.getElementById('settings-tab-story-arcs')?.addEventListener('click', () => {
-    if (!state._isNavigatingFromRouter && state.router) {
-      state.router.navigate('/settings/story-arcs', true);
-    }
-    switchSettingsTab('story-arcs');
-
-    const openArcsFn = state.openStoryArcsTab || window.openStoryArcsTab;
-    if (typeof openArcsFn === 'function') {
-      openArcsFn();
-    }
-  });
-
   document.getElementById('log-level-filter')?.addEventListener('change', () => {
     const fetchLogsFn = state.fetchLogs || window.fetchLogs;
     if (typeof fetchLogsFn === 'function') fetchLogsFn();
@@ -313,6 +303,18 @@ export function initCtTabListeners() {
   ctTabSettings?.addEventListener('click', () => {
     switchCtTab(ctTabSettings, ctContentSettings, '/tag-comics-now');
   });
+
+  const ctTabStoryArcs = document.getElementById('ct-tab-story-arcs');
+  const ctContentStoryArcs = document.getElementById('ct-content-story-arcs');
+  if (ctTabStoryArcs) {
+    ctTabStoryArcs.addEventListener('click', () => {
+      switchCtTab(ctTabStoryArcs, ctContentStoryArcs, '/tag-comics-now/story-arcs');
+      const openArcsFn = state.openStoryArcsTab || window.openStoryArcsTab;
+      if (typeof openArcsFn === 'function') {
+        openArcsFn();
+      }
+    });
+  }
 
   if (typeof ctTabGemini !== 'undefined' && ctTabGemini) {
     ctTabGemini.addEventListener('click', () => {

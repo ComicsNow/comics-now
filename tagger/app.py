@@ -63,6 +63,7 @@ from tagger_app.blueprints.manual_tagger import manual_tagger_bp
 from tagger_app.blueprints.api_v1 import api_v1_bp
 from tagger_app.blueprints.logs import logs_bp
 from tagger_app.blueprints.scheduler_routes import scheduler_bp
+from tagger_app.blueprints.story_arcs import story_arcs_bp
 
 # Flask Application Instance
 app = Flask(__name__)
@@ -73,6 +74,7 @@ app.register_blueprint(manual_tagger_bp)
 app.register_blueprint(api_v1_bp)
 app.register_blueprint(logs_bp)
 app.register_blueprint(scheduler_bp)
+app.register_blueprint(story_arcs_bp)
 
 
 def _env_flag(name, default=False):

@@ -57,6 +57,7 @@ def test_registry_order_and_coverage():
         "src-comicvine", "src-metron", "src-gcd", "src-lcg",
         "src-forbiddenplanet", "src-googlebooks", "src-goodreads",
         "src-blackwells", "src-waterstones", "src-amazon",
+        "src-readingorders",
     ]
 
 

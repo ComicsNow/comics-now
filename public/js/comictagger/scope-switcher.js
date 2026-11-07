@@ -20,7 +20,7 @@ export const CT_SCOPES = {
     label: 'Sources & AI',
     icon: '⚙️',
     defaultTab: 'settings',
-    tabs: ['settings', 'gemini']
+    tabs: ['settings', 'story-arcs', 'gemini']
   },
   organize: {
     id: 'organize',
@@ -36,6 +36,7 @@ export const CT_TAB_TO_SCOPE = {
   'matches': 'scanner',
   'logs': 'scanner',
   'settings': 'sources',
+  'story-arcs': 'sources',
   'gemini': 'sources',
   'management': 'organize',
   'operations': 'organize',

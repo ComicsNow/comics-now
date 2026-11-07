@@ -74,12 +74,13 @@ describe('Tag Comics Now Scope Switcher', () => {
   test('defines correct scope hierarchy and tab mappings', () => {
     switcher = loadCtScopeSwitcher();
     expect(switcher.CT_SCOPES.scanner.tabs).toEqual(['output', 'matches', 'logs']);
-    expect(switcher.CT_SCOPES.sources.tabs).toEqual(['settings', 'gemini']);
+    expect(switcher.CT_SCOPES.sources.tabs).toEqual(['settings', 'story-arcs', 'gemini']);
     expect(switcher.CT_SCOPES.organize.tabs).toEqual(['operations', 'name', 'folder', 'errors']);
 
     expect(switcher.CT_TAB_TO_SCOPE['output']).toBe('scanner');
     expect(switcher.CT_TAB_TO_SCOPE['matches']).toBe('scanner');
     expect(switcher.CT_TAB_TO_SCOPE['settings']).toBe('sources');
+    expect(switcher.CT_TAB_TO_SCOPE['story-arcs']).toBe('sources');
     expect(switcher.CT_TAB_TO_SCOPE['gemini']).toBe('sources');
     expect(switcher.CT_TAB_TO_SCOPE['management']).toBe('organize');
     expect(switcher.CT_TAB_TO_SCOPE['operations']).toBe('organize');

@@ -26,11 +26,11 @@ export const SCOPES = {
   },
   engines: {
     id: 'engines',
-    label: 'AI Engines',
+    label: 'Guided View AI',
     icon: '⚡',
     adminOnly: true,
-    defaultTab: 'story-arcs',
-    tabs: ['story-arcs', 'guided-reader']
+    defaultTab: 'guided-reader',
+    tabs: ['guided-reader']
   }
 };
 
@@ -41,7 +41,6 @@ export const TAB_TO_SCOPE = {
   'general': 'server',
   'users': 'server',
   'logs': 'server',
-  'story-arcs': 'engines',
   'guided-reader': 'engines'
 };
 

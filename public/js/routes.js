@@ -151,11 +151,19 @@ function registerRoutes() {
       if (guidedTab) guidedTab.click();
     });
 
-    global.router.addRoute('/settings/story-arcs', () => {
-      if (typeof global.openSettingsModal === 'function') {
-        global.openSettingsModal();
+    global.router.addRoute('/tag-comics-now/story-arcs', () => {
+      if (typeof global.openCTModal === 'function') {
+        global.openCTModal();
       }
-      const storyArcsTab = document.getElementById('settings-tab-story-arcs');
+      const storyArcsTab = document.getElementById('ct-tab-story-arcs');
+      if (storyArcsTab) storyArcsTab.click();
+    });
+
+    global.router.addRoute('/settings/story-arcs', () => {
+      if (typeof global.openCTModal === 'function') {
+        global.openCTModal();
+      }
+      const storyArcsTab = document.getElementById('ct-tab-story-arcs');
       if (storyArcsTab) storyArcsTab.click();
     });
 
