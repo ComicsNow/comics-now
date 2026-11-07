@@ -52,6 +52,8 @@ describe('User Settings Routes', () => {
       deleteCbrAfterConversion: false,
       deletePdfAfterConversion: false,
       metadataStorage: 'sidecar',
+      readingOrdersIntervalDays: 7,
+      readingOrdersMode: 'both',
       hasApiKey: true,
       comicVineApiKey: 'api-key-value'
     });
@@ -76,6 +78,8 @@ describe('User Settings Routes', () => {
       deleteCbrAfterConversion: false,
       deletePdfAfterConversion: false,
       metadataStorage: 'sidecar',
+      readingOrdersIntervalDays: 7,
+      readingOrdersMode: 'both',
       hasApiKey: true,
       comicVineApiKey: undefined
     });

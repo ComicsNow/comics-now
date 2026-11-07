@@ -177,7 +177,9 @@ module.exports = function attach(router, deps) {
         metadataStorage = 'archive',
         pageCacheMaxMb,
         deleteCbrAfterConversion,
-        deletePdfAfterConversion
+        deletePdfAfterConversion,
+        readingOrdersIntervalDays,
+        readingOrdersMode
       } = req.body || {};
 
       // Validate scan interval
@@ -254,6 +256,24 @@ module.exports = function attach(router, deps) {
         const encApiKey = cryptoVault.encrypt(sanitizedApiKey);
         deps.setComicVineApiKey(encApiKey);
         await saveSetting('comicVineApiKey', encApiKey);
+      }
+
+      if (readingOrdersIntervalDays !== undefined) {
+        const numDays = Number(readingOrdersIntervalDays);
+        const days = Number.isFinite(numDays) ? Math.max(0, Math.min(90, Math.round(numDays))) : 7;
+        if (typeof deps.setReadingOrdersIntervalDays === 'function') {
+          deps.setReadingOrdersIntervalDays(days);
+        }
+        await saveSetting('readingOrdersIntervalDays', days);
+      }
+
+      if (readingOrdersMode !== undefined) {
+        const allowedModes = ['both', 'issues', 'collected'];
+        const sanitizedMode = allowedModes.includes(readingOrdersMode) ? readingOrdersMode : 'both';
+        if (typeof deps.setReadingOrdersMode === 'function') {
+          deps.setReadingOrdersMode(sanitizedMode);
+        }
+        await saveSetting('readingOrdersMode', sanitizedMode);
       }
 
       scheduleNextScan();

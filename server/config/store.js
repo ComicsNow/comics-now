@@ -16,6 +16,7 @@ const {
 } = require('./paths');
 const { applyEnvOverrides } = require('./env');
 const { createTaggerConfigAccessors } = require('./tagger-config');
+const { createStoryArcsConfigAccessors } = require('./story-arcs-config');
 
 const DEFAULT_CONFIG = {
   port: 3000,
@@ -45,7 +46,9 @@ const DEFAULT_CONFIG = {
   geminiModel: 'gemini-3.5-flash-lite',
   geminiCoverMatchEnabled: true,
   geminiCoverDailyCap: 450,
-  geminiTermsAccepted: false
+  geminiTermsAccepted: false,
+  readingOrdersIntervalDays: 7,
+  readingOrdersMode: 'both'
 };
 
 let config = { ...DEFAULT_CONFIG };
@@ -321,6 +324,7 @@ function setComicsLocation(location, skipSave = false) {
 }
 
 const taggerAccessors = createTaggerConfigAccessors(config, saveConfigToDisk);
+const storyArcsAccessors = createStoryArcsConfigAccessors(config, saveConfigToDisk);
 
 module.exports = {
   DEFAULT_CONFIG,
@@ -356,5 +360,6 @@ module.exports = {
   getAdminEmail,
   getCloudflareConfig,
   getTrustedIPs,
-  ...taggerAccessors
+  ...taggerAccessors,
+  ...storyArcsAccessors
 };

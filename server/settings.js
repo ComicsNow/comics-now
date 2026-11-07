@@ -22,7 +22,9 @@ const {
   setGeminiModel,
   setGeminiCoverMatchEnabled,
   setGeminiCoverDailyCap,
-  setGeminiTermsAccepted
+  setGeminiTermsAccepted,
+  setReadingOrdersIntervalDays,
+  setReadingOrdersMode
 } = require('./config');
 
 async function loadSettings() {
@@ -161,6 +163,16 @@ async function loadSettings() {
         let val;
         try { val = JSON.parse(row.value); } catch { val = row.value; }
         setGeminiTermsAccepted(val === true || val === 'true', true);
+      }
+      if (row.key === 'readingOrdersIntervalDays') {
+        let val;
+        try { val = JSON.parse(row.value); } catch { val = row.value; }
+        setReadingOrdersIntervalDays(val, true);
+      }
+      if (row.key === 'readingOrdersMode') {
+        let val;
+        try { val = JSON.parse(row.value); } catch { val = row.value; }
+        setReadingOrdersMode(val, true);
       }
     }
     log('INFO', 'SERVER', 'Settings loaded from DB.');

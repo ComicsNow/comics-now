@@ -12,7 +12,9 @@ module.exports = function attach(router, deps) {
     getAllowedFormats,
     getDeleteCbrAfterConversion,
     getDeletePdfAfterConversion,
-    getMetadataStorage
+    getMetadataStorage,
+    getReadingOrdersIntervalDays,
+    getReadingOrdersMode
   } = deps;
 
   router.get('/api/v1/settings', async (req, res) => {
@@ -37,6 +39,8 @@ module.exports = function attach(router, deps) {
       deleteCbrAfterConversion: getDeleteCbrAfterConversion ? getDeleteCbrAfterConversion() : false,
       deletePdfAfterConversion: getDeletePdfAfterConversion ? getDeletePdfAfterConversion() : false,
       metadataStorage: getMetadataStorage(),
+      readingOrdersIntervalDays: typeof getReadingOrdersIntervalDays === 'function' ? getReadingOrdersIntervalDays() : 7,
+      readingOrdersMode: typeof getReadingOrdersMode === 'function' ? getReadingOrdersMode() : 'both',
       hasApiKey: !!(apiKey && apiKey !== 'YOUR_API_KEY_HERE'),
       // Only send actual key to admins (for settings form)
       comicVineApiKey: isAdmin ? apiKey : undefined

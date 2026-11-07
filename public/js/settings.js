@@ -16,6 +16,10 @@ import {
   fetchLogs
 } from './settings/form-sync.js';
 
+import {
+  refreshStoryArcsSyncStatus
+} from './settings/story-arcs-settings.js';
+
 const global = typeof canonicalGlobal !== 'undefined' ? canonicalGlobal : new Proxy(typeof window !== 'undefined' ? window : globalThis, {
   get: (t, p) => (typeof state !== 'undefined' && p in state) ? state[p] : t[p],
   set: (t, p, v) => { if (typeof state !== 'undefined') state[p] = v; try { t[p] = v; } catch {} return true; }
@@ -36,6 +40,9 @@ export function openSettingsModal() {
     settingsModal.classList.remove('hidden');
   }
   fetchSettings();
+  if (typeof refreshStoryArcsSyncStatus === 'function') {
+    refreshStoryArcsSyncStatus();
+  }
   refreshLibraryFolders();
   if (settingsTabDevices && settingsTabDevices.classList.contains('active')) {
     if (typeof global.refreshDeviceList === 'function') {

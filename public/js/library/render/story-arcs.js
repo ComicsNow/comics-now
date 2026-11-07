@@ -67,6 +67,10 @@ export async function renderPublisherStoryArcs(publisherName) {
       </div>
       <div class="flex items-center gap-2">
         ${isAdmin ? `
+          <button id="open-story-arcs-settings-btn" class="px-2.5 py-1 rounded-full bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-white font-medium border border-gray-600 transition-all flex items-center gap-1 cursor-pointer" title="Configure Scheduling & Ingestion">
+            <span>⚙</span>
+            <span>Settings</span>
+          </button>
           <button id="sync-story-arcs-toolbar-btn" class="px-3 py-1 rounded-full bg-amber-500/20 hover:bg-amber-500 text-amber-300 hover:text-black font-semibold border border-amber-400/40 transition-all flex items-center gap-1.5 shadow-xs cursor-pointer">
             <span class="sync-icon">↻</span>
             <span class="sync-text">Sync Reading Orders</span>
@@ -74,6 +78,23 @@ export async function renderPublisherStoryArcs(publisherName) {
         ` : ''}
       </div>
     `;
+
+    const settingsBtn = toolbar.querySelector('#open-story-arcs-settings-btn');
+    if (settingsBtn) {
+      settingsBtn.addEventListener('click', () => {
+        if (typeof window.openStoryArcsSettingsModal === 'function') {
+          window.openStoryArcsSettingsModal();
+        } else if (typeof window.openSettingsModal === 'function') {
+          window.openSettingsModal();
+          const card = document.getElementById('story-arcs-scheduling-card');
+          if (card) {
+            card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            card.classList.add('ring-2', 'ring-amber-500');
+            setTimeout(() => card.classList.remove('ring-2', 'ring-amber-500'), 2500);
+          }
+        }
+      });
+    }
 
     const syncBtn = toolbar.querySelector('#sync-story-arcs-toolbar-btn');
     if (syncBtn) {

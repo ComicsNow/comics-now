@@ -156,6 +156,56 @@
                 </div>
               </div>
             </div>
+            <!-- Story Arcs & Reading Orders Scheduling Section -->
+            <div id="story-arcs-scheduling-card" class="border-t border-gray-700 pt-4">
+              <div class="flex items-center justify-between mb-2">
+                <h4 class="text-lg font-semibold flex items-center gap-2">
+                  <span class="text-amber-400">⚡</span> Story Arcs & Reading Orders
+                </h4>
+                <span id="reading-orders-status-badge" class="text-xs px-2.5 py-1 rounded-full bg-gray-800 text-gray-300 border border-gray-700">
+                  Idle
+                </span>
+              </div>
+              <p class="text-sm text-gray-400 mb-3">
+                Automated background synchronization and continuity indexing from ReadingOrders.com.
+              </p>
+              
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+                <div>
+                  <label for="reading-orders-interval-input" class="block text-xs font-medium text-gray-300 mb-1">
+                    Auto-Sync Schedule (Days)
+                  </label>
+                  <input type="number" id="reading-orders-interval-input" min="0" max="90" step="1" value="7"
+                    class="w-full bg-gray-700 text-white p-2 rounded-lg focus:outline-hidden focus:ring-2 focus:ring-amber-500"
+                    placeholder="7 (0 = disabled)">
+                  <span class="text-xs text-gray-400 mt-0.5 block">0 disables periodic background sync.</span>
+                </div>
+                <div>
+                  <label for="reading-orders-mode-select" class="block text-xs font-medium text-gray-300 mb-1">
+                    Ingestion Mode
+                  </label>
+                  <select id="reading-orders-mode-select"
+                    class="w-full bg-gray-700 text-white p-2 rounded-lg focus:outline-hidden focus:ring-2 focus:ring-amber-500">
+                    <option value="both">Both Issues & Collected Volumes</option>
+                    <option value="issues">Single Issues Only</option>
+                    <option value="collected">Collected Volumes Only</option>
+                  </select>
+                  <span class="text-xs text-gray-400 mt-0.5 block">Which order formats to scrape and index.</span>
+                </div>
+              </div>
+
+              <div class="flex items-center justify-between p-3 rounded-lg bg-gray-800/80 border border-gray-700/60">
+                <div class="text-xs text-gray-300">
+                  <div id="reading-orders-last-sync-text" class="font-medium text-gray-200">Last Sync: Never</div>
+                  <div id="reading-orders-details-text" class="text-gray-400 mt-0.5">Rate-limited crawler with ETag caching</div>
+                </div>
+                <button type="button" id="sync-reading-orders-settings-btn"
+                  class="bg-amber-600 hover:bg-amber-500 text-white text-xs font-semibold py-2 px-3.5 rounded-lg transition-colors flex items-center gap-1.5 shadow-xs cursor-pointer">
+                  <span class="sync-icon">↻</span>
+                  <span class="sync-text">Sync Now</span>
+                </button>
+              </div>
+            </div>
             <div class="flex flex-col sm:flex-row justify-end gap-2 sm:space-x-2 pt-4">
               <button type="button" id="scan-button" class="bg-yellow-600 hover:bg-yellow-700 text-white font-bold py-2 px-4 rounded-full transition-colors">Scan Now</button>
               <button type="button" id="full-scan-button" class="bg-orange-600 hover:bg-orange-700 text-white font-bold py-2 px-4 rounded-full transition-colors">Full Scan</button>

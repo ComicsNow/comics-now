@@ -82,6 +82,16 @@ export async function fetchSettings() {
     if (pdfConversionSelect && data.deletePdfAfterConversion !== undefined) {
       pdfConversionSelect.value = data.deletePdfAfterConversion ? 'delete' : 'keep';
     }
+
+    const readingOrdersIntervalInput = document.getElementById('reading-orders-interval-input');
+    if (readingOrdersIntervalInput && data.readingOrdersIntervalDays !== undefined) {
+      readingOrdersIntervalInput.value = data.readingOrdersIntervalDays;
+    }
+
+    const readingOrdersModeSelect = document.getElementById('reading-orders-mode-select');
+    if (readingOrdersModeSelect && data.readingOrdersMode) {
+      readingOrdersModeSelect.value = data.readingOrdersMode;
+    }
   } catch (error) {
     if (settingsStatusDiv) {
       settingsStatusDiv.textContent = 'Failed to load settings.';
@@ -120,6 +130,12 @@ export function initSettingsFormEvents() {
       const pageCacheMaxMb = pageCacheInput && pageCacheInput.value !== ''
         ? Number(pageCacheInput.value)
         : undefined;
+      const readingOrdersIntervalInput = document.getElementById('reading-orders-interval-input');
+      const readingOrdersIntervalDays = readingOrdersIntervalInput && readingOrdersIntervalInput.value !== ''
+        ? Number(readingOrdersIntervalInput.value)
+        : undefined;
+      const readingOrdersModeSelect = document.getElementById('reading-orders-mode-select');
+      const readingOrdersMode = readingOrdersModeSelect ? readingOrdersModeSelect.value : undefined;
       let apiKey = '';
       let allowedFormats = 'cbz';
       let metadataStorage = 'archive';
@@ -147,7 +163,9 @@ export function initSettingsFormEvents() {
             metadataStorage,
             pageCacheMaxMb,
             deleteCbrAfterConversion,
-            deletePdfAfterConversion
+            deletePdfAfterConversion,
+            readingOrdersIntervalDays,
+            readingOrdersMode
           })
         });
 

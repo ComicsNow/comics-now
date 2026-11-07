@@ -48,6 +48,10 @@ const {
   setGcdPassword,
   getTaggerForceReprocess,
   setTaggerForceReprocess,
+  getReadingOrdersIntervalDays,
+  setReadingOrdersIntervalDays,
+  getReadingOrdersMode,
+  setReadingOrdersMode,
   getConfig
 } = require('../config');
 
@@ -167,6 +171,10 @@ function createConfiguredApiRouter() {
     setDeletePdfAfterConversion,
     getMetadataStorage,
     setMetadataStorage,
+    getReadingOrdersIntervalDays,
+    setReadingOrdersIntervalDays,
+    getReadingOrdersMode,
+    setReadingOrdersMode,
     setTaggerMode,
     getTaggerServiceUrl,
     setTaggerServiceUrl,

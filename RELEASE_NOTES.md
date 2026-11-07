@@ -23,8 +23,10 @@ Welcome to **Comics Now! v3.4.0** — introducing the **Story Arcs & Narrative C
 * **11th Metadata Source**: `ReadingOrders (Story Arcs)` (`src-readingorders`) is now available as a selectable checkbox in **Tag Comics Now! → Settings → Metadata Sources**.
 * **ComicInfo v2.0/v2.1 Enrichment**: When enabled, matched comics are automatically enriched with `<StoryArc>`, `<StoryArcNumber>`, and `<SeriesGroup>` tags via sub-millisecond local SQLite lookups with zero outbound network requests during tagging.
 
-### 5. Polite Delta Scraper & Admin Sync Controls
-* **Admin-Only Sync**: Administrators can trigger delta syncs from the Story Arcs toolbar (`↻ Sync Reading Orders` / `POST /api/v1/story-arcs/sync`), while sync controls remain hidden from standard users.
+### 5. Polite Delta Scraper & Admin Scheduling & Sync Controls
+* **Admin Settings Scheduling Card**: A dedicated **Story Arcs & Reading Orders** card in General Settings allows configuring the auto-sync interval (`readingOrdersIntervalDays`, default: 7 days, 0 = disabled), choosing the ingestion mode (`both`, `issues`, or `collected`), viewing live sync status/last-sync timestamps, and triggering manual syncs.
+* **Story Arcs Toolbar Shortcut**: A direct **⚙ Settings** button in the Story Arcs toolbar navigates straight to the scheduling card with smooth scrolling and highlight animation.
+* **Admin-Only Sync**: Administrators can trigger delta syncs from either the Settings modal or the Story Arcs toolbar (`↻ Sync Reading Orders` / `POST /api/v1/story-arcs/sync`), while sync controls remain hidden from standard users.
 * **3-Tier Rescrape Prevention & Rate Limiting**:
   - **Tier 1 (Sitemap ETag `HTTP 304`)**: Conditional `If-None-Match` check completes in ~150ms with zero page downloads when the upstream site has not changed.
   - **Tier 2 & 3 (Slug Delta & Content Hash)**: Fetches only newly added or modified reading orders with a 1.2s per-request delay, 150–350ms randomized jitter, and a 5-error circuit breaker.

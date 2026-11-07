@@ -12,6 +12,7 @@ const http = require('http');
 const { DomainRateLimiter } = require('./reading-orders-limiter');
 const { parseReadingOrderPage, parseCollectedEditionsPage } = require('./readingOrdersParser');
 const { getReadingOrdersDb } = require('../readingOrdersDb');
+const config = require('../config');
 
 const SITEMAP_URL = 'https://www.readingorders.com/sitemap-0.xml';
 
@@ -28,6 +29,17 @@ class ReadingOrdersRunner {
     this.lastSyncTime = null;
     this.lastError = null;
     this.lastSitemapEtag = null;
+    this._syncTimer = null;
+  }
+
+  getOrderCount() {
+    try {
+      if (this.readingOrdersDb && this.readingOrdersDb.db) {
+        const row = this.readingOrdersDb.db.prepare('SELECT COUNT(*) as count FROM reading_orders').get();
+        return row ? row.count : 0;
+      }
+    } catch (_) {}
+    return 0;
   }
 
   getStatus() {
@@ -38,7 +50,32 @@ class ReadingOrdersRunner {
       lastSyncTime: this.lastSyncTime,
       lastError: this.lastError,
       lastSitemapEtag: this.lastSitemapEtag,
+      orderCount: this.getOrderCount(),
     };
+  }
+
+  schedulePeriodicSync(intervalDays, mode = 'both') {
+    if (this._syncTimer) {
+      clearInterval(this._syncTimer);
+      this._syncTimer = null;
+    }
+    const days = Number(intervalDays);
+    if (!Number.isFinite(days) || days <= 0) {
+      return;
+    }
+    const checkIntervalMs = 12 * 60 * 60 * 1000;
+    this._syncTimer = setInterval(async () => {
+      const now = Date.now();
+      const intervalMs = days * 24 * 60 * 60 * 1000;
+      if (!this.lastSyncTime || (now - this.lastSyncTime) >= intervalMs) {
+        try {
+          await this.startSync({ mode, force: false });
+        } catch (_) {}
+      }
+    }, checkIntervalMs);
+    if (this._syncTimer && this._syncTimer.unref) {
+      this._syncTimer.unref();
+    }
   }
 
   async _fetchSitemapHeaders() {
@@ -147,6 +184,11 @@ let defaultRunnerInstance = null;
 function getReadingOrdersRunner(options) {
   if (!defaultRunnerInstance) {
     defaultRunnerInstance = new ReadingOrdersRunner(options);
+    try {
+      const interval = typeof config.getReadingOrdersIntervalDays === 'function' ? config.getReadingOrdersIntervalDays() : 7;
+      const mode = typeof config.getReadingOrdersMode === 'function' ? config.getReadingOrdersMode() : 'both';
+      defaultRunnerInstance.schedulePeriodicSync(interval, mode);
+    } catch (_) {}
   }
   return defaultRunnerInstance;
 }
