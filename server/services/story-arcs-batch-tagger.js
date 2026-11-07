@@ -10,6 +10,33 @@ const { initReadingOrdersDb } = require('../readingOrdersDb');
 const { createContinuityMatcher } = require('./continuityMatcher');
 const { storyArcsLog } = require('../logger');
 
+const PUBLISHER_ALIASES = {
+  'dc': ['DC Comics', 'DC', 'Vertigo', 'Black Label', 'WildStorm'],
+  'dc comics': ['DC Comics', 'DC', 'Vertigo', 'Black Label', 'WildStorm'],
+  'marvel': ['Marvel Comics', 'Marvel', 'MAX', 'Icon'],
+  'marvel comics': ['Marvel Comics', 'Marvel', 'MAX', 'Icon'],
+  'image': ['Image', 'Image Comics', 'Skybound', 'Top Cow'],
+  'image comics': ['Image', 'Image Comics', 'Skybound', 'Top Cow'],
+  'dark horse': ['Dark Horse', 'Dark Horse Comics'],
+  'dark horse comics': ['Dark Horse', 'Dark Horse Comics'],
+  'idw': ['IDW', 'IDW Publishing'],
+  'idw publishing': ['IDW', 'IDW Publishing']
+};
+
+function expandPublisherAliases(pubs) {
+  const expanded = new Set();
+  for (const pub of pubs) {
+    if (!pub) continue;
+    expanded.add(pub);
+    const key = pub.trim().toLowerCase();
+    const aliases = PUBLISHER_ALIASES[key];
+    if (aliases) {
+      for (const a of aliases) expanded.add(a);
+    }
+  }
+  return Array.from(expanded);
+}
+
 function parseIssueNumber(name, existingNum) {
   if (existingNum !== undefined && existingNum !== null && String(existingNum).trim() !== '') {
     return String(existingNum).trim();
@@ -100,9 +127,9 @@ function createStoryArcsBatchTagger(deps = {}) {
       let targetPubs = [];
 
       if (publisher && publisher !== 'all') {
-        targetPubs = [publisher];
+        targetPubs = expandPublisherAliases([publisher]);
       } else {
-        targetPubs = allPubs;
+        targetPubs = expandPublisherAliases(allPubs);
       }
 
       if (targetPubs.length === 0) {
@@ -149,7 +176,7 @@ function createStoryArcsBatchTagger(deps = {}) {
         const seriesName = comic.series || existing.Series || '';
         const issueNum = parseIssueNumber(comic.name, existing.Number);
 
-        const arcMeta = matcher.getComicInfoMetadata(seriesName, issueNum);
+        const arcMeta = matcher.getComicInfoMetadata(seriesName, issueNum, comic);
 
         if (!arcMeta) {
           progress.skipped++;

@@ -6,6 +6,7 @@
  */
 const path = require('path');
 const Database = require('better-sqlite3');
+const { normalizeSeries, isIssueInRange } = require('./services/continuityMatcher');
 
 const DEFAULT_DB_PATH = path.join(__dirname, '..', 'data', 'reading-orders.db');
 
@@ -66,6 +67,15 @@ function initReadingOrdersDb(dbPath = DEFAULT_DB_PATH) {
     );
     CREATE INDEX IF NOT EXISTS idx_roc_order_pos ON reading_order_collections(reading_order_id, position);
   `);
+
+  // Self-heal known misclassified publishers
+  try {
+    db.prepare(`
+      UPDATE reading_orders
+      SET publisher = 'DC Comics'
+      WHERE id = 'blackest-night' AND (publisher = 'Other' OR publisher IS NULL)
+    `).run();
+  } catch (_) {}
 
   // Prepared statements
   const insertOrderStmt = db.prepare(`
@@ -220,12 +230,24 @@ function initReadingOrdersDb(dbPath = DEFAULT_DB_PATH) {
   }
 
   function findArcForIssue(seriesName, issueNumber) {
-    // Find matching issue in any reading order
-    const match = db.prepare(`
+    if (!seriesName) return null;
+    const normTargetSeries = normalizeSeries(seriesName);
+
+    // 1. Fast exact lookup
+    let match = db.prepare(`
       SELECT * FROM reading_order_issues
       WHERE series_name = ? COLLATE NOCASE AND issue_number = ?
       LIMIT 1
     `).get(seriesName, String(issueNumber));
+
+    // 2. Normalized series and range lookup
+    if (!match) {
+      const candidates = db.prepare(`SELECT * FROM reading_order_issues`).all();
+      match = candidates.find(c => {
+        const normCandSeries = normalizeSeries(c.series_name);
+        return normCandSeries === normTargetSeries && isIssueInRange(issueNumber, c.issue_number);
+      });
+    }
 
     if (!match) return null;
 
@@ -261,6 +283,57 @@ function initReadingOrdersDb(dbPath = DEFAULT_DB_PATH) {
     };
   }
 
+  function findArcForCollection(comic) {
+    if (!comic) return null;
+    const seriesStr = String(comic.series || '').trim();
+    const nameStr = String(comic.name || '').trim();
+    const fullText = normalizeSeries(`${seriesStr} ${nameStr}`);
+    if (!fullText) return null;
+
+    const collections = db.prepare(`SELECT * FROM reading_order_collections ORDER BY position ASC`).all();
+    if (!collections || collections.length === 0) return null;
+
+    for (const col of collections) {
+      const colTitleNorm = normalizeSeries(col.title);
+      if (!colTitleNorm) continue;
+
+      const vMatch = colTitleNorm.match(/\b(?:volume|vol|part|book)\s*(\d+|one|two|three|four|five)\b/i);
+      if (vMatch) {
+        const rootTitle = colTitleNorm.replace(/\b(?:volume|vol|part|book)\s*(\d+|one|two|three|four|five)\b/i, '').trim();
+        const vToken = vMatch[1].toLowerCase();
+        const numMap = { one: '1', two: '2', three: '3', four: '4', five: '5' };
+        const vNum = numMap[vToken] || vToken;
+
+        const hasRoot = fullText.includes(rootTitle);
+        const hasVol = fullText.includes(`volume ${vNum}`) || fullText.includes(`vol ${vNum}`) || fullText.includes(`part ${vNum}`);
+        if (hasRoot && hasVol) {
+          return {
+            readingOrderId: col.reading_order_id,
+            position: col.position,
+            importance: 'Essential',
+            isCollection: true,
+            collectionTitle: col.title
+          };
+        }
+      } else {
+        if (fullText.includes(colTitleNorm)) {
+          if (fullText.includes('companion') && !colTitleNorm.includes('companion')) {
+            continue;
+          }
+          return {
+            readingOrderId: col.reading_order_id,
+            position: col.position,
+            importance: 'Essential',
+            isCollection: true,
+            collectionTitle: col.title
+          };
+        }
+      }
+    }
+
+    return null;
+  }
+
   return {
     db,
     upsertReadingOrder,
@@ -270,7 +343,8 @@ function initReadingOrdersDb(dbPath = DEFAULT_DB_PATH) {
     getReadingOrderById,
     getReadingOrderIssues,
     getReadingOrderCollections,
-    findArcForIssue
+    findArcForIssue,
+    findArcForCollection
   };
 }
 

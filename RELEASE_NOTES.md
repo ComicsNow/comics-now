@@ -59,12 +59,11 @@ Welcome to **Comics Now! v3.4.0** — introducing the **Story Arcs & Narrative C
 * **Continuity Jump Interceptor**: When opening an issue that belongs to a canonical story arc, Comics Now! checks whether earlier chronological issues in that storyline remain unread.
 * **Non-Intrusive Modal**: If unread earlier issues exist, an Amber trade dress dialog informs the reader (`You are jumping ahead in <Story Arc>`) offering 1-tap options to `Read Oldest Unread` or `Continue to Issue`. Includes a persistent `Don't show again for this story arc` preference stored per arc.
 
-### 11. Mobile-First Settings IA & Scope Switcher
-* **3-Scope Settings Architecture**: Replaced cramped horizontal tabs with a responsive segmented scope bar:
-  - **📖 My Reader**: Personal reading preferences (Reading Experience, Offline Downloads, Synced Devices) available to all users.
-  - **⚙️ Server Admin**: Core server management (Storage & Library Paths, Users & Access, System Diagnostics Logs) gated strictly to administrators.
-  - **⚡ AI Engines**: Autonomous pipelines (Story Arcs & Reading Orders Crawler, Guided View GPU Engine).
-* **Bidirectional Workflow Bridges**: Added 1-tap navigation buttons connecting Story Arcs settings directly to Tag Comics Now! metadata sources, and vice-versa.
+### 11. Collected Editions & Range-Aware Continuity Matching
+* **Collected Editions & Volumes Support**: Ingests collected edition reading orders (`/reading-orders/<slug>/collected-editions`) alongside individual single issues. Accurately identifies Deluxe Editions, Companion volumes, Omnibuses, and DC Finest collections in user libraries.
+* **Range & Series Alias Normalization**: Continuity matcher recognizes multi-issue spans (e.g. `#1-5`, `#426-429`, `#529-530`), strips volume/year metadata, normalizes curly punctuation, and handles event series prefixes.
+* **Publisher Alias Expansion**: Batch ComicInfo.xml tagger automatically expands publisher scopes (e.g., `DC Comics` includes `DC`, `Vertigo`, and `Black Label`; `Marvel Comics` includes `Marvel`, `MAX`, and `Icon`).
+* **Canonical Metadata Clean-up**: Strips web scraping title artifacts so `<StoryArc>` tags are cleanly populated with canonical storyline names.
 
 ### 12. Automated Weekly Continuity Delta Sync
 * Integrated autonomous delta synchronization into the weekly curator cron routine, fetching new and updated storylines non-destructively without altering reading progress or user-curated reading lists.
@@ -85,7 +84,8 @@ Welcome to **Comics Now! v3.4.0** — introducing the **Story Arcs & Narrative C
 3. `feat(settings)`: add dedicated Story Arcs settings tab, smart streaming logs, crawler engine, route contract integrity test, and 21-day log retention
 4. `feat(story-arcs)`: add batch ComicInfo.xml metadata enrichment with Option C override and target publisher scope
 5. `feat(story-arcs)`: add Story Arc detail banner view, multi-lane spine and spurs DAG, and series continuity strip
-6. `feat(continuity)`: add in-grid badges, continuity jump interceptor, weekly delta sync, and mobile-first settings scope switcher
+6. `feat(continuity)`: add in-grid badges, continuity jump interceptor, and weekly delta sync
+7. `feat(continuity)`: add collected editions crawler, range-aware matching, and publisher alias expansion
 
 ---
 

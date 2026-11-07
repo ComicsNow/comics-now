@@ -11,7 +11,7 @@ const https = require('https');
 const http = require('http');
 const { DomainRateLimiter } = require('./reading-orders-limiter');
 const { parseReadingOrderPage, parseCollectedEditionsPage } = require('./readingOrdersParser');
-const { getReadingOrdersDb } = require('../readingOrdersDb');
+const { initReadingOrdersDb } = require('../readingOrdersDb');
 const { storyArcsLog } = require('../logger');
 const config = require('../config');
 
@@ -32,6 +32,7 @@ class ReadingOrdersRunner {
     this.lastSitemapEtag = null;
     this._syncTimer = null;
     this.isCancelled = false;
+    this.readingOrdersDb = options.readingOrdersDb || (typeof initReadingOrdersDb === 'function' ? initReadingOrdersDb() : null);
   }
 
   getOrderCount() {
@@ -184,7 +185,8 @@ class ReadingOrdersRunner {
     try {
       if (!force) {
         const sitemapMeta = await this._fetchSitemapHeaders();
-        if (sitemapMeta.status === 304 || (this.lastSitemapEtag && sitemapMeta.etag === this.lastSitemapEtag)) {
+        const currentCount = this.getOrderCount();
+        if (currentCount >= 150 && (sitemapMeta.status === 304 || (this.lastSitemapEtag && sitemapMeta.etag === this.lastSitemapEtag))) {
           this.status = 'idle';
           this.isSyncing = false;
           this.lastSyncTime = Date.now();
@@ -286,6 +288,9 @@ let defaultRunnerInstance = null;
 function getReadingOrdersRunner(options) {
   if (!defaultRunnerInstance) {
     defaultRunnerInstance = new ReadingOrdersRunner(options);
+    if (!defaultRunnerInstance.readingOrdersDb && typeof initReadingOrdersDb === 'function') {
+      defaultRunnerInstance.readingOrdersDb = initReadingOrdersDb();
+    }
     try {
       const interval = typeof config.getReadingOrdersIntervalDays === 'function' ? config.getReadingOrdersIntervalDays() : 7;
       const mode = typeof config.getReadingOrdersMode === 'function' ? config.getReadingOrdersMode() : 'both';

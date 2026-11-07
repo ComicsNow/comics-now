@@ -17,7 +17,6 @@ import {
   ctMatchesBadge,
   clearDownloadsBtn
 } from '../globals.js';
-import { initSettingsScopeSwitcher, syncScopeWithActiveTab } from '../settings/scope-switcher.js';
 
 // Helper to switch settings tabs and update UI
 export function switchSettingsTab(tabName) {
@@ -47,10 +46,6 @@ export function switchSettingsTab(tabName) {
   if (state.logInterval) {
     clearInterval(state.logInterval);
     state.logInterval = null;
-  }
-
-  if (typeof syncScopeWithActiveTab === 'function') {
-    syncScopeWithActiveTab();
   }
 }
 
@@ -92,10 +87,6 @@ export function switchCtTab(activeTab, activeContent, routePath) {
  * Initializes settings tab navigation and subtab dirty guards.
  */
 export function initSettingsTabListeners() {
-  if (typeof initSettingsScopeSwitcher === 'function') {
-    initSettingsScopeSwitcher();
-  }
-
   // Guard: warn before leaving the Comics Defaults subtab with unsaved changes.
   document.addEventListener('click', (e) => {
     if (!state.comicsDefaultsDirty) return;

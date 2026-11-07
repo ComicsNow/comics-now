@@ -7,12 +7,42 @@
 
 function normalizeSeries(series) {
   if (!series) return '';
-  return series
+  let str = String(series).trim();
+  str = str.replace(/[’‘]/g, "'");
+  str = str.replace(/\s*\(\d{4}\)/g, '');
+  str = str.replace(/^(?:dc\s*k\.?o\.?|civil\s*war|blackest\s*night)\s*[:\-–—]?\s*/i, '');
+  return str
     .toLowerCase()
-    .replace(/\s*\(\d{4}\)/g, '') // remove year e.g. (2006)
-    .replace(/[^a-z0-9]/g, ' ')   // normalize punctuation
+    .replace(/[^a-z0-9]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
+}
+
+function isIssueInRange(comicNum, arcNumStr) {
+  if (comicNum === null || comicNum === undefined || arcNumStr === null || arcNumStr === undefined) return false;
+  const cMatches = String(comicNum).trim().match(/\d+(?:\.\d+)?/);
+  if (!cMatches) return false;
+  const cVal = parseFloat(cMatches[0]);
+  if (isNaN(cVal)) return false;
+
+  const arcStr = String(arcNumStr).trim();
+  if (arcStr.includes('-')) {
+    const parts = arcStr.split('-');
+    const lowMatch = parts[0].match(/\d+(?:\.\d+)?/);
+    const highMatch = parts[1].match(/\d+(?:\.\d+)?/);
+    if (lowMatch && highMatch) {
+      const low = parseFloat(lowMatch[0]);
+      const high = parseFloat(highMatch[0]);
+      if (!isNaN(low) && !isNaN(high)) {
+        return cVal >= low && cVal <= high;
+      }
+    }
+  }
+
+  const aMatches = arcStr.match(/\d+(?:\.\d+)?/);
+  if (!aMatches) return false;
+  const aVal = parseFloat(aMatches[0]);
+  return !isNaN(aVal) && cVal === aVal;
 }
 
 function normalizeIssueNum(num) {
@@ -42,30 +72,54 @@ function createContinuityMatcher({ readingOrdersDb, getComics }) {
     const raw = typeof getComics === 'function' ? getComics() : [];
     const comics = Array.isArray(raw) ? raw : (await raw) || [];
     const map = new Map();
+    const seriesMap = new Map();
 
     for (const c of comics) {
       const meta = parseComicMetadata(c);
       const series = c.series || meta.Series || '';
       const num = meta.Number || c.name?.match(/#?(\d+)/)?.[1] || '';
-      const normKey = `${normalizeSeries(series)}:::${normalizeIssueNum(num)}`;
+      const normS = normalizeSeries(series);
+      const normN = normalizeIssueNum(num);
+      const normKey = `${normS}:::${normN}`;
       if (!map.has(normKey)) {
         map.set(normKey, c);
       }
+      if (!seriesMap.has(normS)) {
+        seriesMap.set(normS, []);
+      }
+      seriesMap.get(normS).push({ ...c, issueNum: num });
     }
-    return map;
+    return { map, seriesMap };
+  }
+
+  function findOwnedComic(iss, libData) {
+    if (!iss || !libData) return null;
+    const sName = iss.series_name || iss.seriesName || '';
+    const iNum = iss.issue_number || iss.issueNumber || '';
+    const normS = normalizeSeries(sName);
+    const directKey = `${normS}:::${normalizeIssueNum(iNum)}`;
+    if (libData.map && libData.map.has(directKey)) {
+      return libData.map.get(directKey);
+    }
+    if (libData.seriesMap) {
+      const seriesList = libData.seriesMap.get(normS);
+      if (seriesList && seriesList.length > 0) {
+        return seriesList.find(c => isIssueInRange(c.issueNum, iNum)) || null;
+      }
+    }
+    return null;
   }
 
   async function getStoryArcsForPublisher(publisher) {
     const orders = readingOrdersDb.getReadingOrders({ publisher });
-    const libMap = await getLibraryMap();
+    const libData = await getLibraryMap();
 
     return orders.map(order => {
       const issues = readingOrdersDb.getReadingOrderIssues(order.id);
       let ownedCount = 0;
 
       for (const iss of issues) {
-        const key = `${normalizeSeries(iss.series_name)}:::${normalizeIssueNum(iss.issue_number)}`;
-        if (libMap.has(key)) {
+        if (findOwnedComic(iss, libData)) {
           ownedCount++;
         }
       }
@@ -95,11 +149,10 @@ function createContinuityMatcher({ readingOrdersDb, getComics }) {
 
     const rawIssues = readingOrdersDb.getReadingOrderIssues(arcId);
     const collections = readingOrdersDb.getReadingOrderCollections(arcId);
-    const libMap = await getLibraryMap();
+    const libData = await getLibraryMap();
 
     const issues = rawIssues.map(iss => {
-      const key = `${normalizeSeries(iss.series_name)}:::${normalizeIssueNum(iss.issue_number)}`;
-      const ownedComic = libMap.get(key);
+      const ownedComic = findOwnedComic(iss, libData);
       return {
         id: iss.id,
         position: iss.position,
@@ -130,12 +183,11 @@ function createContinuityMatcher({ readingOrdersDb, getComics }) {
     if (!arcData) return null;
 
     const order = readingOrdersDb.getReadingOrderById(arcData.readingOrderId);
-    const libMap = await getLibraryMap();
+    const libData = await getLibraryMap();
 
     function decorateIssue(iss) {
       if (!iss) return null;
-      const key = `${normalizeSeries(iss.seriesName)}:::${normalizeIssueNum(iss.issueNumber)}`;
-      const owned = libMap.get(key);
+      const owned = findOwnedComic(iss, libData);
       return {
         ...iss,
         isOwned: Boolean(owned),
@@ -143,9 +195,11 @@ function createContinuityMatcher({ readingOrdersDb, getComics }) {
       };
     }
 
+    const cleanTitle = (order?.title || arcData.readingOrderId).replace(/\s+Reading\s+Order$/i, '').trim();
+
     return {
       arcId: arcData.readingOrderId,
-      arcTitle: order?.title || arcData.readingOrderId,
+      arcTitle: cleanTitle,
       position: arcData.position,
       importance: arcData.importance,
       storyParts: arcData.storyParts,
@@ -154,16 +208,26 @@ function createContinuityMatcher({ readingOrdersDb, getComics }) {
     };
   }
 
-  function getComicInfoMetadata(seriesName, issueNumber) {
-    const arcData = readingOrdersDb.findArcForIssue(seriesName, issueNumber);
+  function getComicInfoMetadata(seriesName, issueNumber, comic = null) {
+    let arcData = null;
+    if (comic && typeof readingOrdersDb.findArcForCollection === 'function') {
+      arcData = readingOrdersDb.findArcForCollection(comic);
+    }
+    if (!arcData) {
+      arcData = readingOrdersDb.findArcForIssue(seriesName, issueNumber);
+    }
+    if (!arcData && typeof readingOrdersDb.findArcForCollection === 'function') {
+      arcData = readingOrdersDb.findArcForCollection({ series: seriesName, name: `${seriesName} #${issueNumber}` });
+    }
     if (!arcData) return null;
 
     const order = readingOrdersDb.getReadingOrderById(arcData.readingOrderId);
     const publisher = order?.publisher || '';
     const seriesGroup = publisher ? `${publisher} Events` : 'Comic Events';
+    const cleanArcTitle = (order?.title || arcData.readingOrderId).replace(/\s+Reading\s+Order$/i, '').trim();
 
     return {
-      StoryArc: order?.title || arcData.readingOrderId,
+      StoryArc: cleanArcTitle,
       StoryArcNumber: String(arcData.position),
       SeriesGroup: seriesGroup
     };
@@ -175,12 +239,14 @@ function createContinuityMatcher({ readingOrdersDb, getComics }) {
     getComicContinuity,
     getComicInfoMetadata,
     normalizeSeries,
-    normalizeIssueNum
+    normalizeIssueNum,
+    isIssueInRange
   };
 }
 
 module.exports = {
   createContinuityMatcher,
   normalizeSeries,
-  normalizeIssueNum
+  normalizeIssueNum,
+  isIssueInRange
 };
