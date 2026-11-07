@@ -93,8 +93,8 @@ self.addEventListener('fetch', event => {
   }
 
   // PLUGIN BYPASS: Private plugin bundles are never PWA-cached. Their loader
-  // script skips them offline and in standalone/fullscreen modes, and they
-  // must not be served from cache in any other case either.
+  // script skips them offline, and they must not be served from cache in any
+  // other case either.
   if (url.pathname.includes('/plugins/')) {
     return;
   }

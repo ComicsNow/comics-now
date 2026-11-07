@@ -7,7 +7,10 @@
  *     PWA-cached — see the /plugins/ bypass in public/service-worker.js)
  *
  * They ARE loaded in PWA standalone / fullscreen display modes and in iOS
- * Safari standalone (navigator.standalone).
+ * Safari standalone (navigator.standalone) whenever the app is online.
+ *
+ * When the app transitions between online and offline states, the guard
+ * automatically updates plugin element visibility to prevent broken requests.
  *
  * When no plugins are active the function returns an empty string and the
  * bootstrap injects nothing.
@@ -32,18 +35,57 @@ function buildPluginLoaderScript(baseHref, active = {}) {
 
   return `<script>
 (function () {
-  if (navigator.onLine === false) return;
-  var isStandalone = (window.matchMedia && (window.matchMedia('(display-mode: standalone)').matches || window.matchMedia('(display-mode: fullscreen)').matches)) || navigator.standalone === true;
-  if (isStandalone) return;
+  var loaded = false;
   var pluginSources = [
 ${sourceList}
   ];
-  pluginSources.forEach(function (src) {
-    var s = document.createElement('script');
-    s.type = 'module';
-    s.src = src;
-    document.head.appendChild(s);
+
+  function updatePluginVisibility() {
+    var isOff = navigator.onLine === false || (document.body && document.body.classList && document.body.classList.contains('is-offline'));
+    var trackerBtn = document.getElementById('tracker-button');
+    var ariaBtn = document.getElementById('aria-button');
+    var trackerView = document.getElementById('tracker-view');
+    var ariaView = document.getElementById('aria-view');
+
+    if (trackerBtn) trackerBtn.style.display = isOff ? 'none' : '';
+    if (ariaBtn) ariaBtn.style.display = isOff ? 'none' : '';
+    if (isOff) {
+      if (trackerView) trackerView.style.display = 'none';
+      if (ariaView) ariaView.style.display = 'none';
+    }
+  }
+
+  function loadPlugins() {
+    if (loaded) return;
+    if (navigator.onLine === false) return;
+    loaded = true;
+    pluginSources.forEach(function (src) {
+      var s = document.createElement('script');
+      s.type = 'module';
+      s.src = src;
+      document.head.appendChild(s);
+    });
+  }
+
+  if (navigator.onLine !== false) {
+    loadPlugins();
+  }
+
+  window.addEventListener('online', function () {
+    loadPlugins();
+    updatePluginVisibility();
   });
+
+  window.addEventListener('offline', function () {
+    updatePluginVisibility();
+  });
+
+  if (window.MutationObserver) {
+    var obs = new MutationObserver(function () {
+      updatePluginVisibility();
+    });
+    obs.observe(document.body || document.documentElement, { attributes: true, attributeFilter: ['class'] });
+  }
 })();
 </script>`;
 }

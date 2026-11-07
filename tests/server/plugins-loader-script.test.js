@@ -31,20 +31,20 @@ describe('buildPluginLoaderScript (private plugin injection guard)', () => {
     expect(script).not.toContain('plugins/aria.js');
   });
 
-  test.each(BASE_HREFS)('skips loading while offline (base "%s")', (baseHref) => {
+  test.each(BASE_HREFS)('skips loading while offline and listens for network reconnection (base "%s")', (baseHref) => {
     const script = buildPluginLoaderScript(baseHref, { trackerActive: true, ariaActive: true });
 
     expect(script).toContain('navigator.onLine');
     expect(script).toContain("navigator.onLine === false");
+    expect(script).toContain("addEventListener('online'");
+    expect(script).toContain("addEventListener('offline'");
   });
 
-  test.each(BASE_HREFS)('skips loading in PWA standalone and fullscreen display modes (base "%s")', (baseHref) => {
+  test.each(BASE_HREFS)('permits loading in PWA standalone and fullscreen display modes when online (base "%s")', (baseHref) => {
     const script = buildPluginLoaderScript(baseHref, { trackerActive: true, ariaActive: true });
 
-    expect(script).toContain('(display-mode: standalone)');
-    expect(script).toContain('(display-mode: fullscreen)');
-    // iOS Safari standalone detection
-    expect(script).toContain('navigator.standalone');
+    // PWA standalone mode must NOT be blocked when online
+    expect(script).not.toContain('if (isStandalone) return;');
   });
 
   test.each(BASE_HREFS)('loads plugin modules by creating script elements when allowed (base "%s")', (baseHref) => {
