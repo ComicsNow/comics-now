@@ -967,18 +967,18 @@
                 <span class="text-[11px] text-gray-400 font-mono">Story Arcs, Timeline & Vision Matching</span>
               </div>
               <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <label class="flex items-center justify-between cursor-pointer bg-gray-800/80 hover:bg-gray-800 p-3 rounded-md border border-gray-700/80 transition-colors">
-                  <div class="flex items-center gap-2">
-                    <input type="checkbox" id="src-cb-readingorders" class="rounded bg-gray-700 text-blue-600">
+                <div class="flex items-center justify-between bg-gray-800/80 hover:bg-gray-800 p-3 rounded-md border border-gray-700/80 transition-colors">
+                  <label class="flex items-center gap-2 cursor-pointer flex-1 min-w-0" for="src-cb-readingorders">
+                    <input type="checkbox" id="src-cb-readingorders" class="rounded bg-gray-700 text-blue-600 shrink-0">
                     <div>
                       <span class="text-amber-400 font-semibold text-sm">ReadingOrders Continuity Engine</span>
                       <p class="text-xs text-gray-400">Enriches Story Arc tags, crossover events & reading order numbers</p>
                     </div>
-                  </div>
-                  <button type="button" id="bridge-to-story-arcs-settings-btn" class="text-xs text-amber-400/90 hover:text-amber-300 underline underline-offset-2 transition-colors cursor-pointer shrink-0 ml-2" title="Configure crawler schedule and manual sync in Settings">
+                  </label>
+                  <button type="button" id="bridge-to-story-arcs-settings-btn" onclick="document.getElementById('ct-tab-story-arcs')?.click()" class="text-xs text-amber-400/90 hover:text-amber-300 underline underline-offset-2 transition-colors cursor-pointer shrink-0 ml-2" title="Configure crawler schedule and manual sync in Story Arcs tab">
                     Settings →
                   </button>
-                </label>
+                </div>
 
                 <div class="flex items-center justify-between bg-gray-800/80 p-3 rounded-md border border-gray-700/80">
                   <div class="flex items-center gap-2.5">

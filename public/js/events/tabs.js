@@ -316,6 +316,15 @@ export function initCtTabListeners() {
     });
   }
 
+  const bridgeToStoryArcsBtn = document.getElementById('bridge-to-story-arcs-settings-btn');
+  if (bridgeToStoryArcsBtn) {
+    bridgeToStoryArcsBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      ctTabStoryArcs?.click();
+    });
+  }
+
   if (typeof ctTabGemini !== 'undefined' && ctTabGemini) {
     ctTabGemini.addEventListener('click', () => {
       switchCtTab(ctTabGemini, ctContentGemini, '/tag-comics-now/gemini');
