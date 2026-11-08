@@ -60,8 +60,10 @@ For the complete REST endpoint reference — every route under `/api/v1` with pa
    - [Bulk Operations & Import](#bulk-operations--import)
    - [Story Arcs & Continuity Engine (ReadingOrders.com)](#story-arcs--continuity-engine-readingorderscom)
      - [Reading Lists vs. Story Arcs (Design Distinction)](#reading-lists-vs-story-arcs-design-distinction)
+     - [Gemini Flash AI Matching (Exclusive Engine — Zero Fallback)](#gemini-flash-ai-matching-exclusive-engine--zero-fallback)
      - [Narrative Timeline DAG Visualizer](#narrative-timeline-dag-visualizer)
      - [In-Reader Continuity Prompts](#in-reader-continuity-prompts)
+     - [Unified Live Sync & Crawler Logging](#unified-live-sync--crawler-logging)
      - [Scraper Politeness & 3-Tier Rescrape Prevention](#scraper-politeness--3-tier-rescrape-prevention)
      - [Role-Based Access Control (RBAC)](#role-based-access-control-rbac)
 10. [Devices, Progress Syncing & Offline PWA](#10-devices-progress-syncing--offline-pwa)
@@ -751,6 +753,13 @@ To eliminate duplicate navigation and preserve cognitive clarity:
 - **Story Arcs (Gold Box-Set `#F59E0B`/`#EF4444`)**: Canonical multi-series events (e.g. *Civil War*, *Crisis on Infinite Earths*, *Blackest Night*, *Absolute Universe*) indexed from ReadingOrders.com into an isolated database (`data/reading-orders.db`). Users cannot accidentally alter or delete canonical storylines.
 - **Library Completeness Bar**: Every Story Arc card displays a real-time completeness percentage and owned/missing issue count (`85 / 109 Issues (78%)`) against your local collection.
 
+#### Gemini Flash AI Matching (Exclusive Engine — Zero Fallback)
+Crossover continuity matching is an inherently semantic challenge that cannot be solved reliably with rigid heuristic rules or title regex:
+- **Why Heuristics and Rule Matchers Fail**: Major comic events span dozens of separate series, one-shots, annuals, and tie-ins where titles do not match the event name (e.g., *DC All In Special #1* and *Absolute Batman #1* are core parts of *Absolute Universe*). Conversely, naive title matching creates catastrophic false positives (such as matching a 2005 *Justice League Unlimited* run to a 2024 *DC K.O.* event simply due to common words).
+- **Gemini Flash AI as the Exclusive Engine**: **Gemini Flash AI semantic understanding is the only reliable way to achieve accurate, high-confidence continuity matching**. It evaluates the holistic relationship between candidate comics and canonical storyline checklists, reconciling publication dates, issue numbering, creator credits, and narrative context.
+- **Strict Zero-Fallback Policy**: To protect library data integrity, Comics Now! enforces a strict zero-fallback rule for story arc enrichment. If Gemini is not configured, or if the AI does not find a confident match ($\ge 85\%$ confidence), the comic is left untouched. **There is no fallback to heuristic or rule-based matchers**. This ensures that speculative or incorrect tags will never corrupt your `.ComicInfo.xml` sidecars or database metadata.
+- **Quota-Safe Rate Limiting & Dynamic Scoping**: The engine operates safely within Google Gemini free and paid tiers with 15 RPM / 250k TPM rate limiting and backoff retries. Dynamic candidate scoping pre-filters library comics by publisher and title phrases, reducing prompt payload sizes and latency.
+
 #### Narrative Timeline DAG Visualizer
 Every Story Arc features an interactive DC comic trade-dress timeline visualizer:
 - **Publication & Reading Chronology**: Maps out reading order with direct visual links between issues.
@@ -763,6 +772,17 @@ When reading an issue that belongs to an active story arc, reaching the final pa
 - Displays the next issue title, cover, and publication date according to canonical continuity.
 - If the next issue is in your library, one tap immediately launches the next issue without returning to the library grid.
 - If the next issue is missing, it alerts you with a friendly gap warning showing where the story continues.
+
+#### Unified Live Sync & Crawler Logging
+The Story Arcs settings tab features a real-time Server-Sent Events (SSE) console connected to `GET /api/v1/story-arcs/stream`:
+- **Single Terminal Output**: Both ReadingOrders.com crawler sync jobs and Gemini batch tagging operations stream to the same **Live Sync & Crawler Logs** viewer.
+- **Granular Progress Telemetry**: Displays turn-by-turn percentage `[idx/total] (X%)`, AI prompt token estimation, rate-limit wait notices, and matched comic notifications (color-coded in emerald green `SUCCESS` badges).
+- **Automated Post-Sync AI Matching**: When the crawler discovers and ingests new reading orders during a sync run, candidate library comics are automatically evaluated against the new storylines using Gemini Flash AI in real time.
+
+#### Contextual Smart Filters & Publisher Navigation
+- **Libraries (Root) View**: Displays exclusively `Reading Lists` and `Story Arcs` smart filters for clean high-level collection browsing. Contextual filters (`New`, `Downloaded`, `Guided View`, `Manga`) dynamically appear upon opening individual publisher libraries.
+- **Instant Count Caching**: Story Arc filter badge counts are calculated instantly from indexed reading orders in memory, eliminating multi-publisher scanning delays.
+- **Breadcrumb Reset**: Clicking breadcrumbs back to the Libraries root view automatically deselects active smart filters.
 
 #### Scraper Politeness & 3-Tier Rescrape Prevention
 The background crawler incorporates adaptive rate-limiting and conditional caching from `tagger_app`:

@@ -220,9 +220,11 @@ For massive multi-title crossover events (*Crisis on Infinite Earths*, *Absolute
 
 Never lose track of where to read next in complex multi-series crossover events (*Civil War*, *Crisis on Infinite Earths*, *Blackest Night*, *Absolute Universe*):
 - 🏆 **Dedicated Story Arcs View (Gold Box-Set Design)**: Instant Smart Filter separating canonical multi-series crossovers (`#F59E0B`/`#EF4444`) from personal reading lists.
+- 🤖 **Gemini Flash AI Matching (Exclusive Engine — Zero Fallback)**: Continuity matching is powered exclusively by Gemini Flash AI. Comic book crossover events span dozens of separate series, one-shots, variant titles, collected edition trades, and tie-ins. Heuristic regex and string rule matchers are notoriously brittle and generate false positives. **Gemini Flash semantic understanding is the only reliable way to achieve accurate, high-confidence continuity matching**. If Gemini is unavailable or finds no confident match, the comic is left untouched—guaranteeing zero metadata corruption.
 - ⏱️ **Narrative Timeline DAG Visualizer**: Visual timeline displaying chronological reading flow, issue importance tags (Core, Essential, Companion), and local library collection gaps.
 - 📖 **In-Reader Continuity Prompts**: Automatically alerts you upon finishing an issue with an *"Up Next in Arc"* prompt leading directly to the next chronological issue.
 - 🏷️ **Tag Comics Now! ComicInfo Standard**: Selectable metadata source enriching files with ComicInfo v2.0/v2.1 `<StoryArc>`, `<StoryArcNumber>`, and `<SeriesGroup>` tags.
+- 📡 **Unified Live Sync & Crawler Logs**: Live SSE streaming console displaying real-time turn-by-turn progress (`[idx/total] (X%)`), AI token estimation, and matched issues. When the crawler indexes new reading orders, candidate comics are automatically evaluated with Gemini.
 - 🛡️ **Polite Scraping & 3-Tier Rescrape Prevention**: High-performance periodic runner with rate limiting (1.2s delay + anti-bot jitter) and Sitemap ETag conditional validation (`HTTP 304`), skipping unmodified pages in < 150ms.
 
 ---
