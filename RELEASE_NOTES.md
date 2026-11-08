@@ -1,10 +1,10 @@
-# Comics Now! v3.4.0 Release Notes
+# Comics Now! v4.0.0 Release Notes
 
-Welcome to **Comics Now! v3.4.0** — introducing the **Story Arcs & Narrative Continuity Engine** powered by ReadingOrders.com, an interactive **Narrative Timeline DAG**, in-reader continuity prompts, a selectable **ReadingOrders** metadata source for **Tag Comics Now!**, and new **MCP server continuity tools**.
+Welcome to **Comics Now! v4.0.0** — introducing the **Story Arcs & Narrative Continuity Engine** powered by ReadingOrders.com, an interactive **Narrative Timeline DAG**, in-reader continuity prompts, a selectable **ReadingOrders** metadata source for **Tag Comics Now!**, and new **MCP server continuity tools**.
 
 ---
 
-## ✨ What's New in v3.4.0
+## ✨ What's New in v4.0.0
 
 ### 1. Story Arcs Smart Filter & Gold Box-Set View
 * **Dedicated Story Arcs Smart Filter**: New `⚡ Story Arcs` filter pill in the publisher library view, visually distinguished from personal Reading Lists (`#8B5CF6` Purple) using an Amber/Gold and Crimson box-set trade dress (`#F59E0B` / `#EF4444`).
@@ -125,7 +125,7 @@ Welcome to **Comics Now! v3.4.0** — introducing the **Story Arcs & Narrative C
 
 ---
 
-## 📦 v3.4.0 Changelog
+## 📦 v4.0.0 Changelog
 1. `feat(continuity)`: add ReadingOrders scraper, Story Arcs smart filter, and narrative timeline (`d53f862`)
 2. `feat(continuity)`: add ReadingOrders MCP tools, selectable tagger source, runner and docs (`e9b06cf`)
 3. `feat(settings)`: add dedicated Story Arcs settings tab, smart streaming logs, crawler engine, route contract integrity test, and 21-day log retention
