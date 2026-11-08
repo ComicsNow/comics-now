@@ -9,7 +9,7 @@ const { getReadingPrefMaps, setReadingPreference, resolveReadingModes, dbRun } =
 
 function createModuleSandbox() {
   const state = {
-    currentView: 'root',
+    currentView: 'publishers',
     currentRootFolder: null,
     activeSmartFilter: null,
     comicIdMap: new Map(),

@@ -114,6 +114,7 @@ describe('Story Arcs Detail & Banner UI View', () => {
 
     loadModule('../public/js/library/story-arcs-collections.js');
     loadModule('../public/js/library/story-arcs-issues.js');
+    loadModule('../public/js/library/story-arcs-metro.js');
     loadModule('../public/js/library/story-arcs-detail.js');
   });
 
@@ -152,6 +153,26 @@ describe('Story Arcs Detail & Banner UI View', () => {
     gridBtn.click();
     expect(gridContainer.classList.contains('hidden')).toBe(false);
     expect(checklistContainer.classList.contains('hidden')).toBe(true);
+  });
+
+  test('view mode switcher supports metro timeline view mode', async () => {
+    await sandbox.showStoryArcDetail('court-of-owls', 'Batman: The Court of Owls', 'grid');
+
+    const gridContainer = document.getElementById('story-arc-grid-view');
+    const metroContainer = document.getElementById('story-arc-metro-view');
+    const metroBtn = document.getElementById('story-arc-view-metro-btn');
+
+    expect(metroBtn).not.toBeNull();
+    expect(gridContainer.classList.contains('hidden')).toBe(false);
+    expect(metroContainer.classList.contains('hidden')).toBe(true);
+
+    metroBtn.click();
+    expect(gridContainer.classList.contains('hidden')).toBe(true);
+    expect(metroContainer.classList.contains('hidden')).toBe(false);
+
+    // Inspector card and metro nodes should be rendered
+    const nodes = metroContainer.querySelectorAll('.metro-node');
+    expect(nodes.length).toBe(3);
   });
 
   test('grid view renders owned issue cards and missing gap cards', async () => {

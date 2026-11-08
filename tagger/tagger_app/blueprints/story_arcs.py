@@ -81,7 +81,7 @@ def api_sync_cancel():
 
 @story_arcs_bp.route("/api/story-arcs/stream", methods=["GET"])
 def api_sync_stream():
-    """Server-Sent Events (SSE) live log stream for crawler."""
+    """Server-Sent Events (SSE) live log stream for crawler and Gemini batch tagger."""
     q: queue.Queue = queue.Queue(maxsize=100)
 
     def on_log(entry):
@@ -91,11 +91,14 @@ def api_sync_stream():
             pass
 
     continuity_crawler._log_subscribers.append(on_log)
+    continuity_batch_tagger._log_subscribers.append(on_log)
 
     def generate():
         try:
-            # Yield initial history
-            for entry in continuity_crawler.get_logs(limit=200):
+            # Yield initial history from both crawler and Gemini batch tagger
+            combined = continuity_crawler.get_logs(limit=100) + continuity_batch_tagger.get_logs(limit=100)
+            combined.sort(key=lambda x: x.get("timestamp", ""))
+            for entry in combined[-200:]:
                 yield f"data: {json.dumps(entry)}\n\n"
 
             while True:
@@ -108,6 +111,8 @@ def api_sync_stream():
         finally:
             if on_log in continuity_crawler._log_subscribers:
                 continuity_crawler._log_subscribers.remove(on_log)
+            if on_log in continuity_batch_tagger._log_subscribers:
+                continuity_batch_tagger._log_subscribers.remove(on_log)
 
     return Response(generate(), mimetype="text/event-stream")
 
@@ -119,13 +124,15 @@ def api_sync_stream():
 def api_start_batch_tag():
     """Trigger batch StoryArc ComicInfo.xml metadata enrichment (supports dryRun simulation)."""
     data = request.get_json(silent=True) or {}
-    target = data.get("targetPublisher")
+    target = data.get("targetPublisher") or data.get("publisher")
     dry_run = bool(data.get("dryRun", False))
+    engine = data.get("engine", "gemini")
     try:
         res = continuity_batch_tagger.start_batch_tag(
             target_publisher=target,
             run_async=True,
             dry_run=dry_run,
+            engine=engine,
         )
         return jsonify({"ok": True, **res})
     except RuntimeError as e:
@@ -201,14 +208,17 @@ def api_get_publishers():
 
 @story_arcs_bp.route("/api/story-arcs/logs", methods=["GET"])
 def api_get_logs():
-    """Return recent crawler logs."""
+    """Return recent crawler and Gemini batch tagger logs."""
     limit = request.args.get("limit", default=100, type=int)
-    return jsonify({"ok": True, "logs": continuity_crawler.get_logs(limit=limit)})
+    combined = continuity_crawler.get_logs(limit=limit) + continuity_batch_tagger.get_logs(limit=limit)
+    combined.sort(key=lambda x: x.get("timestamp", ""))
+    return jsonify({"ok": True, "logs": combined[-limit:]})
 
 
 @story_arcs_bp.route("/api/story-arcs/logs", methods=["DELETE"])
 def api_clear_logs():
-    """Clear crawler log buffer."""
+    """Clear crawler and Gemini batch tagger log buffers."""
     continuity_crawler._logs.clear()
+    continuity_batch_tagger._logs.clear()
     return jsonify({"ok": True})
 

@@ -148,23 +148,40 @@ export function updateReadingListFilterButtonCount() {
     maybeFetchReadingLists();
   }
 
-  if (currentView === 'series' && currentPublisher) {
-    const matchingLists = getReadingListsForPublisher(currentPublisher);
-    span.textContent = matchingLists.length.toString();
-    btn.classList.toggle('hidden', matchingLists.length === 0);
+  if (currentView === 'comics' || currentView === 'comic') {
+    btn.classList.add('hidden');
+    if (state.activeSmartFilter === 'reading-list') {
+      state.activeSmartFilter = null;
+      if (typeof window !== 'undefined') window.activeSmartFilter = null;
+    }
     return;
   }
 
-  if (currentView === 'publishers') {
-    let publishers = {};
-    if (currentRootFolder && library) {
-      const normalizedPath = currentRootFolder.replace(/[\\\/]+$/, '');
-      const rootData = library[currentRootFolder] || library[normalizedPath] || library[normalizedPath + '/'];
-      publishers = rootData?.publishers || {};
+  if (currentView === 'series') {
+    if (!currentPublisher) {
+      span.textContent = '0';
+      btn.classList.add('hidden');
+      return;
     }
-    const pubNamesWithLists = Object.keys(publishers).filter(pubName => getReadingListsForPublisher(pubName).length > 0);
-    span.textContent = pubNamesWithLists.length.toString();
-    btn.classList.toggle('hidden', pubNamesWithLists.length === 0);
+    const matchingLists = getReadingListsForPublisher(currentPublisher);
+    span.textContent = matchingLists.length.toString();
+    const hasLists = matchingLists.length > 0;
+    btn.classList.toggle('hidden', !hasLists);
+    if (!hasLists && state.activeSmartFilter === 'reading-list') {
+      state.activeSmartFilter = null;
+      if (typeof window !== 'undefined') window.activeSmartFilter = null;
+    }
+    return;
+  }
+
+  if (currentView === 'publishers' || currentView === 'root') {
+    const count = cachedReadingLists.length;
+    span.textContent = count.toString();
+    btn.classList.toggle('hidden', count === 0);
+    if (count === 0 && state.activeSmartFilter === 'reading-list') {
+      state.activeSmartFilter = null;
+      if (typeof window !== 'undefined') window.activeSmartFilter = null;
+    }
     return;
   }
 

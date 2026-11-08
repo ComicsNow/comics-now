@@ -223,6 +223,25 @@ class ContinuityCrawler:
                     backfill_missing_covers(max_workers=6)
                 except Exception as cover_err:
                     self.log("WARN", f"Cover backfill notice: {cover_err}")
+
+                try:
+                    from tagger_app.continuity.gemini_batch_tagger import get_gemini_tagger
+                    gemini = get_gemini_tagger()
+                    if gemini and gemini.config.get("api_key"):
+                        self.log("INFO", f"Starting Gemini Flash story arc matching for {len(slugs_to_scrape)} newly synced orders...")
+                        for s_idx, slug in enumerate(slugs_to_scrape, start=1):
+                            if self.is_cancelled:
+                                self.log("WARN", "Sync cancelled during Gemini evaluation.")
+                                break
+                            pct = int((s_idx / len(slugs_to_scrape)) * 100)
+                            self.log("INFO", f"[Gemini Sync {s_idx}/{len(slugs_to_scrape)}] ({pct}%) Matching candidate comics for '{slug}'...")
+                            gem_res = gemini.tag_arc(slug, dry_run=False, log_fn=lambda lvl, msg: self.log(lvl, msg))
+                            if gem_res.get("totalMatches", 0) > 0:
+                                self.log("SUCCESS", f"  ✓ Gemini matched {gem_res['totalMatches']} issues for '{slug}'")
+                    else:
+                        self.log("INFO", "Gemini API key not configured. Story Arc matching requires Gemini AI.")
+                except Exception as g_sync_err:
+                    self.log("WARN", f"Automated Gemini sync matching notice: {g_sync_err}")
             self.log("INFO", f"Sync completed: {scraped} reading orders updated.")
             return {"skipped": False, "scrapedCount": scraped}
         except Exception as e:

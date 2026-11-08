@@ -25,6 +25,8 @@ import { showFolderView } from '../folder-viewer.js';
 import { renderAlphaFilter, applyFilterAndRender } from '../alpha-list.js';
 import { syncSmartFilterButtons, mountSmartFilterHostInto, hideSmartFilterHost } from '../smart-filters.js';
 import { showPublisherList } from './publishers.js';
+import { renderPublisherStoryArcs } from './story-arcs.js';
+import { renderPublisherReadingLists } from './reading-lists.js';
 
 const actionsRef = (typeof actions !== 'undefined' && actions?.navigation) ? actions : (typeof globalThis !== 'undefined' ? globalThis.__COMICS_STORE__?.actions : null);
 const clear = typeof clearElement === 'function' ? clearElement : (el) => { if (el) { if (typeof el.replaceChildren === 'function') el.replaceChildren(); else el.innerHTML = ''; } };
@@ -80,14 +82,19 @@ export function showRootFolderList(options = {}) {
     state.currentPublisher = null;
     state.currentSeries = null;
   }
+  if (!options.preserveSmartFilter) {
+    state.activeSmartFilter = null;
+  }
   if (typeof window !== 'undefined') {
     window.currentView = state.currentView;
     window.currentRootFolder = state.currentRootFolder;
     window.currentPublisher = state.currentPublisher;
     window.currentSeries = state.currentSeries;
+    window.activeSmartFilter = state.activeSmartFilter;
   }
   syncSmartFilterButtons();
   updateBreadcrumb([]);
+  if (typeof updateFilterButtonCounts === 'function') updateFilterButtonCounts();
 
   const rootFoldersFromLibrary = state.library ? Object.keys(state.library) : [];
   const rootFolders = [];
@@ -143,14 +150,25 @@ export function showRootFolderList(options = {}) {
   }
 
   showView(rootFolderListDiv);
-  if (state.activeSmartFilter) {
-    mountSmartFilterHostInto(rootFolderListDiv);
-  } else {
-    hideSmartFilterHost();
-  }
+  mountSmartFilterHostInto(rootFolderListDiv);
+
+  const existingStoryArcFilter = document.getElementById('story-arcs-status-filter');
+  if (existingStoryArcFilter && state.activeSmartFilter !== 'story-arc') existingStoryArcFilter.remove();
+  const existingReadingListFilter = document.getElementById('reading-lists-status-filter');
+  if (existingReadingListFilter && state.activeSmartFilter !== 'reading-list') existingReadingListFilter.remove();
 
   if (!rootFolderListContainer) return;
 
+  if (state.activeSmartFilter === 'story-arc') {
+    renderPublisherStoryArcs(null, rootFolderListContainer);
+    return;
+  }
+  if (state.activeSmartFilter === 'reading-list') {
+    renderPublisherReadingLists(null, rootFolderListContainer);
+    return;
+  }
+
+  rootFolderListContainer.className = 'grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6';
   clear(rootFolderListContainer);
 
   if (visibleRootCards.length === 0 && persistedDeviceCount === 0) {

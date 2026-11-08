@@ -27,7 +27,7 @@ import { updateBreadcrumb, makeCountChips } from '../breadcrumb.js';
 import * as Data from '../data.js';
 import { renderAlphaFilter, applyFilterAndRender } from '../alpha-list.js';
 import { syncSmartFilterButtons, mountSmartFilterHostInto } from '../smart-filters.js';
-import { showSeriesList } from './series.js';
+import { showSeriesList, renderPublisherStoryArcs, renderPublisherReadingLists } from './series.js';
 
 const actionsRef = (typeof actions !== 'undefined' && actions?.navigation) ? actions : (typeof globalThis !== 'undefined' ? globalThis.__COMICS_STORE__?.actions : null);
 const clear = typeof clearElement === 'function' ? clearElement : (el) => { if (el) { if (typeof el.replaceChildren === 'function') el.replaceChildren(); else el.innerHTML = ''; } };
@@ -107,7 +107,7 @@ export function showPublisherList(rootFolder, options = {}) {
   const publishersToRender = filterPublishersByActiveFilter(publishers);
   const publisherNames = Object.keys(publishersToRender);
 
-  if (publisherNames.length === 1 && !force) {
+  if (publisherNames.length === 1 && !force && state.activeSmartFilter !== 'story-arc' && state.activeSmartFilter !== 'reading-list') {
     state.currentPublisher = publisherNames[0];
     if (typeof window !== 'undefined') window.currentPublisher = state.currentPublisher;
     showSeriesList(publisherNames[0]);
@@ -127,22 +127,47 @@ export function showPublisherList(rootFolder, options = {}) {
     { label: folderLabel }
   ]);
 
+  const existingStoryArcFilter = document.getElementById('story-arcs-status-filter');
+  if (existingStoryArcFilter && state.activeSmartFilter !== 'story-arc') existingStoryArcFilter.remove();
+  const existingReadingListFilter = document.getElementById('reading-lists-status-filter');
+  if (existingReadingListFilter && state.activeSmartFilter !== 'reading-list') existingReadingListFilter.remove();
+
+  if (state.activeSmartFilter === 'reading-list') {
+    if (publisherAlphaFilter) clear(publisherAlphaFilter);
+    renderPublisherReadingLists(null, publisherListContainer);
+    return;
+  }
+
+  if (state.activeSmartFilter === 'story-arc') {
+    if (publisherAlphaFilter) clear(publisherAlphaFilter);
+    renderPublisherStoryArcs(null, publisherListContainer);
+    return;
+  }
+
+  if (publisherListContainer) {
+    publisherListContainer.className = 'grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6';
+  }
   renderAlphaFilter(publisherAlphaFilter, publishersToRender, renderPublisherCards, 'publishers');
 }
 
 export function renderPublisherCards(publishersToShow) {
+  if (publisherListContainer) {
+    publisherListContainer.className = 'grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6';
+  }
   clear(publisherListContainer);
   const publishers = Object.keys(publishersToShow).sort();
   if (publishers.length === 0) {
-    const msg = state.activeSmartFilter === 'reading-list'
-      ? 'No publishers with reading lists found.'
-      : state.activeFilter === 'in-progress'
-        ? 'No publishers in progress.'
-        : state.activeFilter === 'read'
-          ? 'No publishers read.'
-          : state.activeFilter === 'unread'
-            ? 'No unread publishers.'
-            : 'No publishers found.';
+    const msg = state.activeSmartFilter === 'story-arc'
+      ? 'No publishers with story arcs found.'
+      : state.activeSmartFilter === 'reading-list'
+        ? 'No publishers with reading lists found.'
+        : state.activeFilter === 'in-progress'
+          ? 'No publishers in progress.'
+          : state.activeFilter === 'read'
+            ? 'No publishers read.'
+            : state.activeFilter === 'unread'
+              ? 'No unread publishers.'
+              : 'No publishers found.';
     renderContent(publisherListContainer, createEmptyMessage(msg));
     const backBtn = document.createElement('button');
     backBtn.className = 'mt-4 text-purple-400 hover:text-purple-300';
@@ -163,13 +188,23 @@ export function renderPublisherCards(publishersToShow) {
     const pubReadingLists = typeof getReadingLists === 'function' ? getReadingLists(publisher) : [];
     const readingListCount = pubReadingLists.length;
 
+    const getStoryArcs = state.getStoryArcsForPublisher || (typeof window !== 'undefined' && window.getStoryArcsForPublisher) || SmartLists.getStoryArcsForPublisher;
+    const pubStoryArcs = typeof getStoryArcs === 'function' ? getStoryArcs(publisher) : [];
+    const storyArcCount = pubStoryArcs.length;
+
     let countsChips = makeCountChips(counts);
+    let extraChips = '';
     if (readingListCount > 0) {
-      const chipHtml = `<span class="card-count-chip reading-list" title="${readingListCount} Reading List${readingListCount === 1 ? '' : 's'}">📚 ${readingListCount}</span>`;
+      extraChips += `<span class="card-count-chip reading-list" title="${readingListCount} Reading List${readingListCount === 1 ? '' : 's'}">📚 ${readingListCount}</span>`;
+    }
+    if (storyArcCount > 0) {
+      extraChips += `<span class="card-count-chip story-arc text-amber-400 border border-amber-500/30" title="${storyArcCount} Story Arc${storyArcCount === 1 ? '' : 's'}">⚡ ${storyArcCount}</span>`;
+    }
+    if (extraChips) {
       if (countsChips.endsWith('</div>')) {
-        countsChips = countsChips.slice(0, -6) + chipHtml + '</div>';
+        countsChips = countsChips.slice(0, -6) + extraChips + '</div>';
       } else {
-        countsChips = `<div class="card-counts">${chipHtml}</div>`;
+        countsChips = `<div class="card-counts">${extraChips}</div>`;
       }
     }
 

@@ -26,14 +26,26 @@ DEFAULT_THUMBNAILS_DIR = REPO_ROOT / "thumbnails"
 
 
 def extract_volume_number(text: Any) -> Optional[int]:
-    """Extract volume or book integer from string (e.g. 'Vol. 2', 'Volume 2', 'Book 2')."""
-    if not text:
+    """Extract volume or book integer from string (e.g. 'Vol. 2', 'Volume 2', 'Book 2', 'v01', 'v2', '1')."""
+    if text is None:
         return None
+    if isinstance(text, int):
+        return text
     s = str(text).strip()
-    m = re.search(r"\b(?:vol(?:ume)?\.?\s*(\d+)|book\s*(\d+))\b", s, re.IGNORECASE)
+    if s.isdigit():
+        try:
+            val = int(s)
+            return None if 1900 <= val <= 2099 else val
+        except ValueError:
+            return None
+    m = re.search(
+        r"\b(?:vol(?:ume)?\.?\s*0*(\d+)|book\.?\s*0*(\d+)|v\.?\s*0*(\d+))\b",
+        s,
+        re.IGNORECASE,
+    )
     if m:
         try:
-            return int(m.group(1) or m.group(2))
+            return int(m.group(1) or m.group(2) or m.group(3))
         except ValueError:
             pass
     return None

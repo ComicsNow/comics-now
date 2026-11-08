@@ -32,11 +32,9 @@ export function renderCollectionsFilterBar(container, collections, onFilterChang
 
   filters.forEach((f) => {
     const btn = document.createElement('button');
-    btn.className = `px-2.5 py-1 rounded-full font-bold transition-all cursor-pointer ${
-      activeFilterStatus === f.id
-        ? 'bg-amber-500 text-black shadow-xs'
-        : 'bg-gray-900 text-gray-400 hover:text-white hover:bg-gray-800 border border-gray-800'
-    }`;
+    const activeClass = 'bg-amber-500 text-black shadow-xs';
+    const inactiveClass = 'bg-gray-900 text-gray-400 hover:text-white hover:bg-gray-800 border border-gray-800';
+    btn.className = 'px-2.5 py-1 rounded-full font-bold transition-all cursor-pointer ' + (activeFilterStatus === f.id ? activeClass : inactiveClass);
     btn.textContent = f.label;
     btn.addEventListener('click', () => {
       activeFilterStatus = f.id;

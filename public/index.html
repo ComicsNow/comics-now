@@ -1119,6 +1119,20 @@
 
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
               <div>
+                <label for="story-arcs-engine-select" class="block text-xs font-medium text-gray-300 mb-1">
+                  Enrichment Engine
+                </label>
+                <div class="w-full bg-gray-700/80 border border-gray-600 text-white p-2 rounded-lg text-xs flex items-center justify-between">
+                  <div class="flex items-center gap-2">
+                    <span class="text-amber-400">🤖</span>
+                    <span class="font-medium text-white">Gemini Flash AI</span>
+                  </div>
+                  <span class="text-[10px] px-2 py-0.5 rounded bg-emerald-900/60 text-emerald-300 border border-emerald-700/50 font-semibold">Exclusive</span>
+                </div>
+                <input type="hidden" id="story-arcs-engine-select" value="gemini">
+                <span class="text-[11px] text-gray-400 mt-0.5 block">Story Arc matching strictly uses Gemini Flash AI (no heuristic fallback).</span>
+              </div>
+              <div>
                 <label for="story-arcs-batch-publisher-select" class="block text-xs font-medium text-gray-300 mb-1">
                   Target Publisher Scope
                 </label>
@@ -1128,24 +1142,19 @@
                 </select>
                 <span class="text-[11px] text-gray-400 mt-0.5 block">Matches comics belonging to publishers present in reading-orders.db.</span>
               </div>
-              <div class="flex flex-col justify-end">
-                <label class="flex items-center gap-1.5 text-xs text-amber-400 font-medium cursor-pointer mb-2 select-none">
-                  <input type="checkbox" id="story-arcs-batch-dry-run-checkbox" class="accent-amber-500 rounded" checked>
-                  <span>Dry Run (Simulate only, no files or DB updated)</span>
-                </label>
-                <div class="flex items-center gap-3">
-                  <button type="button" id="start-story-arcs-batch-btn"
-                    class="bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-white text-xs font-semibold py-2.5 px-4 rounded-lg transition-colors flex items-center gap-2 shadow-xs cursor-pointer">
-                    <span>🏷️</span>
-                    <span id="story-arcs-batch-btn-text">Run Simulation (Dry Run)</span>
-                  </button>
-                  <button type="button" id="cancel-story-arcs-batch-btn"
-                    class="hidden bg-red-600/80 hover:bg-red-600 text-white text-xs font-semibold py-2.5 px-3.5 rounded-lg transition-colors flex items-center gap-1.5 shadow-xs cursor-pointer">
-                    <span>⏹</span>
-                    <span>Cancel</span>
-                  </button>
-                </div>
-              </div>
+            </div>
+
+            <div class="flex items-center justify-end gap-3 mb-3 pt-1">
+              <button type="button" id="start-story-arcs-batch-btn"
+                class="bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-white text-xs font-semibold py-2.5 px-5 rounded-lg transition-colors flex items-center justify-center gap-2 shadow-xs cursor-pointer w-full sm:w-auto">
+                <span>🏷️</span>
+                <span id="story-arcs-batch-btn-text">Batch Tag Story Arcs</span>
+              </button>
+              <button type="button" id="cancel-story-arcs-batch-btn"
+                class="hidden bg-red-600/80 hover:bg-red-600 text-white text-xs font-semibold py-2.5 px-3.5 rounded-lg transition-colors flex items-center justify-center gap-1.5 shadow-xs cursor-pointer w-full sm:w-auto">
+                <span>⏹</span>
+                <span>Cancel</span>
+              </button>
             </div>
 
             <!-- Batch Progress Bar -->

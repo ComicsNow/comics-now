@@ -9,6 +9,8 @@ Decomposed modular Flask service with single-responsibility blueprints:
 """
 
 import os
+import concurrent.futures
+import werkzeug.serving
 from flask import Flask
 
 from tagger_app.config import (
@@ -103,6 +105,24 @@ def get_run_config():
     }
 
 
+class BoundedThreadedWSGIServer(werkzeug.serving.ThreadedWSGIServer):
+    """Threaded WSGI server with bounded concurrency to prevent thread exhaustion."""
+    def __init__(self, *args, max_workers: int = 16, **kwargs):
+        self._pool = concurrent.futures.ThreadPoolExecutor(
+            max_workers=max_workers,
+            thread_name_prefix="FlaskWorker"
+        )
+        super().__init__(*args, **kwargs)
+
+    def process_request(self, request, client_address):
+        self._pool.submit(self.process_request_thread, request, client_address)
+
+    def server_close(self):
+        super().server_close()
+        if hasattr(self, '_pool'):
+            self._pool.shutdown(wait=False)
+
+
 def create_app():
     """Application factory: initialize services and return the configured Flask app.
 
@@ -122,6 +142,8 @@ if __name__ == '__main__':
     create_app()
     cfg = get_run_config()
     if cfg["debug"]:
-        print("[!] WARNING: Flask debug mode is ON (Werkzeug debugger allows code execution). "
-              "Never use this on an exposed host.")
-    app.run(**cfg)
+        app.run(**cfg)
+    else:
+        server = BoundedThreadedWSGIServer(cfg["host"], cfg["port"], app, max_workers=16)
+        print(f"[Internal Worker] Serving bounded HTTP on {cfg['host']}:{cfg['port']} (max 16 worker threads)")
+        server.serve_forever()

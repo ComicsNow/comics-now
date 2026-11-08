@@ -32,6 +32,7 @@ from tagger_app.core.comicinfo import (
     write_comic_info,
     generate_comic_info_xml,
 )
+from tagger_app.continuity.gemini_batch_tagger import get_gemini_tagger
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 if not (REPO_ROOT / "comics-now.db").exists() and (Path(__file__).resolve().parents[2] / "comics-now.db").exists():
@@ -115,8 +116,9 @@ class ContinuityBatchTagger:
         target_publisher: Optional[str] = None,
         run_async: bool = True,
         dry_run: bool = False,
+        engine: str = "gemini",
     ) -> Dict[str, Any]:
-        """Trigger batch tagging run with optional dry-run simulation mode."""
+        """Trigger batch tagging run using Gemini exclusively (no rule-based fallback)."""
         with self._lock:
             if self.is_running:
                 raise RuntimeError("Batch Story Arc tagging is already running.")
@@ -134,16 +136,72 @@ class ContinuityBatchTagger:
                 "currentComic": "",
             }
 
+        target_fn = self._run_gemini_batch if engine == "gemini" else self._run_batch
         if run_async:
             self._thread = threading.Thread(
-                target=self._run_batch,
+                target=target_fn,
                 args=(target_publisher, dry_run),
                 daemon=True,
             )
             self._thread.start()
-            return {"started": True, "targetPublisher": target_publisher, "dryRun": dry_run}
+            return {"started": True, "targetPublisher": target_publisher, "dryRun": dry_run, "engine": engine}
         else:
-            return self._run_batch(target_publisher, dry_run)
+            return target_fn(target_publisher, dry_run)
+
+    def _run_gemini_batch(self, target_publisher: Optional[str], dry_run: bool = False) -> Dict[str, Any]:
+        """Execute Gemini Flash Story Arc batch tagging with live SSE log broadcasting."""
+        mode_label = "DRY-RUN simulation" if dry_run else "live write"
+        self.log("INFO", f"Starting Gemini Flash Story Arc batch tagging [{mode_label}] (target: {target_publisher or 'All'})...")
+        try:
+            gemini_tagger = get_gemini_tagger()
+            if not gemini_tagger or not gemini_tagger.config.get("api_key"):
+                err_msg = "Gemini API key is not configured. Story Arc matching strictly requires Gemini AI (no local fallback allowed)."
+                self.log("ERROR", err_msg)
+                self.status = "error"
+                return {"error": err_msg}
+
+            def log_callback(level: str, msg: str) -> None:
+                self.log(level, msg)
+
+            def progress_callback(cur: int, tot: int, current_arc: str, matches_cnt: int) -> None:
+                with self._lock:
+                    self.progress["current"] = cur
+                    self.progress["total"] = tot
+                    self.progress["currentComic"] = current_arc
+                    self.progress["updated"] = matches_cnt
+
+            def cancel_check() -> bool:
+                return self.is_cancelled
+
+            results = gemini_tagger.tag_all_library(
+                dry_run=dry_run,
+                target_publisher=target_publisher,
+                log_fn=log_callback,
+                progress_fn=progress_callback,
+                is_cancelled_fn=cancel_check,
+            )
+
+            with self._lock:
+                self.dry_run_results = []
+                for arc_id, arc_data in results.get("matchedArcs", {}).items():
+                    for m in arc_data.get("matches", []):
+                        self.dry_run_results.append({
+                            "comic": m.get("comicName"),
+                            "arc": arc_data.get("title"),
+                            "position": m.get("position"),
+                            "confidence": m.get("confidence"),
+                            "action": m.get("action"),
+                        })
+                self.status = "complete" if not self.is_cancelled else "cancelled"
+                self.last_run_time = datetime.now(timezone.utc).isoformat()
+            return results
+        except Exception as e:
+            self.status = "error"
+            self.log("ERROR", f"Gemini batch tagging encountered an error: {e}")
+            raise e
+        finally:
+            with self._lock:
+                self.is_running = False
 
     def _run_batch(self, target_publisher: Optional[str], dry_run: bool = False) -> Dict[str, Any]:
         """Iterate library comics, match against reading-orders.db, and update ComicInfo sidecars."""

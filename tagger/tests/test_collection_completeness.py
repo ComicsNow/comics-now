@@ -212,3 +212,100 @@ def test_get_story_arc_detail_enriches_read_status(tmp_path):
     assert col_2["owned"] is True
     assert col_2["readStatus"] == "read"
     assert col_2["comicId"] == "c_mm_1"
+
+
+def test_extract_volume_number_formats():
+    from tagger_app.continuity.three_gate_matcher import extract_volume_number
+
+    assert extract_volume_number("Absolute Batman v01 - The Zoo (2025)") == 1
+    assert extract_volume_number("Batman v02 (2024)") == 2
+    assert extract_volume_number("Flash v3") == 3
+    assert extract_volume_number("Wonder Woman v.01") == 1
+    assert extract_volume_number("Superman v 04") == 4
+    assert extract_volume_number("Vol. 5: Test") == 5
+    assert extract_volume_number("Volume 6") == 6
+    assert extract_volume_number("Book 7") == 7
+
+
+def test_find_owned_collection_absolute_batman_and_false_positive_prevention(tmp_path):
+    from tagger_app.continuity.library_store import _load_library_comics
+
+    cn_path = tmp_path / "cn_batman.db"
+    conn = sqlite3.connect(str(cn_path))
+    conn.execute(
+        """
+        CREATE TABLE comics (
+            id TEXT PRIMARY KEY,
+            name TEXT,
+            series TEXT,
+            publisher TEXT,
+            metadata TEXT,
+            pageCount INTEGER DEFAULT 160,
+            lastReadPage INTEGER DEFAULT 0
+        )
+        """
+    )
+    # Comic A: Absolute Batman v01 - The Zoo
+    conn.execute(
+        """
+        INSERT INTO comics (id, name, series, publisher, metadata, pageCount, lastReadPage)
+        VALUES ('c_ab_1', 'Absolute Batman v01 - The Zoo (2025).cbz', 'Absolute Batman', 'DC Comics',
+                '{"Number": "1", "Volume": "1", "Title": "Vol. 1: The Zoo", "Year": 2025}', 192, 0)
+        """
+    )
+    # Comic B: Main continuity Batman Vol 3 (must NOT match Absolute Batman Vol 3)
+    conn.execute(
+        """
+        INSERT INTO comics (id, name, series, publisher, metadata, pageCount, lastReadPage)
+        VALUES ('c_bm_3', 'Batman Vol. 3: The Joker Year One (2024).cbz', 'Batman', 'DC Comics',
+                '{"Volume": "3", "Year": 2024}', 160, 0)
+        """
+    )
+    # Comic C: Standalone TPB Batman: Cataclysm
+    conn.execute(
+        """
+        INSERT INTO comics (id, name, series, publisher, metadata, pageCount, lastReadPage)
+        VALUES ('c_cataclysm', 'Batman: Cataclysm - Cataclysm (1999).cbz', 'Batman: Cataclysm', 'DC Comics',
+                '{"Year": 1999}', 460, 0)
+        """
+    )
+    conn.commit()
+    conn.close()
+
+    direct_map, series_map, by_id, arc_tagged_map = _load_library_comics(cn_path)
+
+    # 1. Absolute Batman Vol 1 should match c_ab_1
+    col_1 = {
+        "id": "col_ab_1",
+        "position": 1,
+        "title": "Absolute Batman: Volume 1",
+        "subtitle": "The Zoo",
+        "release_year": 2025,
+    }
+    match_1 = find_owned_collection(col_1, direct_map, series_map, arc_tagged_map, "Absolute Universe")
+    assert match_1 is not None
+    assert match_1["id"] == "c_ab_1"
+
+    # 2. Absolute Batman Vol 3 should NOT match c_bm_3 (false positive prevention)
+    col_3 = {
+        "id": "col_ab_3",
+        "position": 3,
+        "title": "Absolute Batman: Volume 3",
+        "subtitle": "Devil's Workshop",
+        "release_year": 2026,
+    }
+    match_3 = find_owned_collection(col_3, direct_map, series_map, arc_tagged_map, "Absolute Universe")
+    assert match_3 is None
+
+    # 3. Standalone TPB Cataclysm should match c_cataclysm
+    col_cataclysm = {
+        "id": "col_cat",
+        "position": 1,
+        "title": "Batman: Cataclysm",
+        "subtitle": "A massive earthquake devastates Gotham",
+        "release_year": 1999,
+    }
+    match_cat = find_owned_collection(col_cataclysm, direct_map, series_map, arc_tagged_map, "Batman: No Mans Land")
+    assert match_cat is not None
+    assert match_cat["id"] == "c_cataclysm"
+

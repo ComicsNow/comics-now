@@ -188,9 +188,15 @@ export function filterPublishersByActiveFilter(publishers = {}) {
       const readingLists = typeof getReadingLists === 'function' ? getReadingLists(publisherName) : [];
       if (readingLists.length === 0) continue;
     }
+    if (scope === 'story-arc') {
+      const SmartLists = state.LibrarySmartLists || window.LibrarySmartLists || {};
+      const getStoryArcs = state.getStoryArcsForPublisher || window.getStoryArcsForPublisher || SmartLists.getStoryArcsForPublisher;
+      const storyArcs = typeof getStoryArcs === 'function' ? getStoryArcs(publisherName) : [];
+      if (storyArcs.length === 0) continue;
+    }
     const counts = getPublisherStatusCounts(publisherData);
-    // When a scope is active (other than reading-list where we already checked reading lists), drop publishers with zero in-scope total.
-    if (scope && scope !== 'reading-list' && (counts.total || 0) === 0) continue;
+    // When a scope is active (other than reading-list/story-arc where we already checked), drop publishers with zero in-scope total.
+    if (scope && scope !== 'reading-list' && scope !== 'story-arc' && (counts.total || 0) === 0) continue;
     if (statusCountsMatchFilter(counts)) {
       filtered[publisherName] = publisherData;
     }

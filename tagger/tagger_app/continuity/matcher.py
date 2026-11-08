@@ -55,6 +55,7 @@ def get_story_arcs_with_completeness(
     init_continuity_db(conn)
     try:
         cursor = conn.cursor()
+        cursor.execute("PRAGMA busy_timeout = 5000")
         query = "SELECT * FROM reading_orders WHERE 1=1"
         params = []
         if publisher:
@@ -183,6 +184,7 @@ def get_story_arc_detail(
     init_continuity_db(conn)
     try:
         cursor = conn.cursor()
+        cursor.execute("PRAGMA busy_timeout = 5000")
         cursor.execute("SELECT * FROM reading_orders WHERE id = ?", (arc_id,))
         row = cursor.fetchone()
         if not row:
@@ -294,6 +296,7 @@ def get_next_continuity_issue(
     init_continuity_db(conn)
     try:
         cursor = conn.cursor()
+        cursor.execute("PRAGMA busy_timeout = 5000")
         cursor.execute(
             """
             SELECT i.*, o.title as arc_title, o.id as arc_id

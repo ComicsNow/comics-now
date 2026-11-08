@@ -22,6 +22,10 @@ function createModuleSandbox() {
     state: state,
     console: console,
     fetch: jest.fn(),
+    syncSmartFilterButtons: jest.fn(),
+    mountSmartFilterHostInto: jest.fn(),
+    updateBreadcrumb: jest.fn(),
+    showView: jest.fn(),
     applyDisplayInfoToComic: jest.fn(c => c)
   };
   sandbox.globalThis = sandbox;
@@ -113,16 +117,14 @@ describe('Publisher View Reading List Filter', () => {
     const count = document.getElementById('dynamic-reading-list-filter-count');
 
     expect(btn.classList.contains('hidden')).toBe(false);
-    expect(count.textContent).toBe('2'); // DC and Marvel have reading lists
+    expect(count.textContent).toBe('2'); // displays all reading lists across library
   });
 
-  test('updateReadingListFilterButtonCount hides button on publisher view when no publishers have reading lists', () => {
+  test('updateReadingListFilterButtonCount hides button on publisher view when no reading lists exist', () => {
     const setCachedReadingLists = env.sandbox.setCachedReadingLists;
     const updateReadingListFilterButtonCount = env.sandbox.updateReadingListFilterButtonCount;
 
-    setCachedReadingLists([
-      { id: 'list-1', name: 'Dark Horse Classics', publishers: ['Dark Horse'] }
-    ]);
+    setCachedReadingLists([]);
 
     env.state.currentView = 'publishers';
     env.state.currentRootFolder = '/comics/main';
@@ -203,5 +205,131 @@ describe('Publisher View Reading List Filter', () => {
 
     const filtered = filterPublishersByActiveFilter(publishers);
     expect(Object.keys(filtered)).toEqual(['DC', 'Marvel']);
+  });
+
+  test('showPublisherList with activeSmartFilter reading-list invokes renderPublisherReadingLists(null, container)', () => {
+    document.body.innerHTML += `
+      <div id="publisher-list"></div>
+      <div id="publisher-list-container"></div>
+      <div id="publisher-title"></div>
+      <div id="publisher-alpha-filter"></div>
+    `;
+
+    const mockRenderPublisherReadingLists = jest.fn();
+    env.sandbox.renderPublisherReadingLists = mockRenderPublisherReadingLists;
+    env.sandbox.publisherListDiv = document.getElementById('publisher-list');
+    env.sandbox.publisherListContainer = document.getElementById('publisher-list-container');
+    env.sandbox.publisherTitleH2 = document.getElementById('publisher-title');
+    env.sandbox.publisherAlphaFilter = document.getElementById('publisher-alpha-filter');
+    env.sandbox.clearElement = jest.fn();
+    env.sandbox.filterPublishersByActiveFilter = jest.fn(pubs => pubs);
+    env.sandbox.showView = jest.fn();
+    env.sandbox.mountSmartFilterHostInto = jest.fn();
+    env.sandbox.updateBreadcrumb = jest.fn();
+    env.sandbox.syncSmartFilterButtons = jest.fn();
+    env.sandbox.renderAlphaFilter = jest.fn();
+
+    env.loadFile('../public/js/library/render/publishers.js');
+
+    env.state.library = {
+      '/comics/main': {
+        publishers: {
+          'DC': { series: {} },
+          'Marvel': { series: {} }
+        }
+      }
+    };
+    env.state.currentRootFolder = '/comics/main';
+    env.state.activeSmartFilter = 'reading-list';
+
+    const showPublisherList = env.sandbox.showPublisherList;
+    showPublisherList('/comics/main', { force: true });
+
+    expect(mockRenderPublisherReadingLists).toHaveBeenCalledWith(null, env.sandbox.publisherListContainer);
+  });
+
+  test('renderPublisherReadingLists(null) renders all cached reading lists across publishers', () => {
+    document.body.innerHTML = `
+      <div id="publisher-list-container"></div>
+    `;
+
+    const setCachedReadingLists = env.sandbox.setCachedReadingLists;
+    setCachedReadingLists([
+      { id: 'list-1', name: 'Batman Saga', publishers: ['DC'], totalComics: 5, readComics: 0 },
+      { id: 'list-2', name: 'Spider-Verse', publishers: ['Marvel'], totalComics: 10, readComics: 5 },
+      { id: 'list-3', name: 'Spawn Origins', publishers: ['Image'], totalComics: 8, readComics: 8 }
+    ]);
+
+    env.state.currentView = 'publishers';
+    env.sandbox.safeHtml = (strings, ...values) => ({ html: strings.reduce((acc, str, i) => acc + str + (values[i] ?? ''), ''), __isRawHtml: true });
+    env.sandbox.safeRaw = (str) => str;
+    env.sandbox.escapeHtml = (str) => str;
+    env.sandbox.API_BASE_URL = '';
+
+    env.loadFile('../public/js/library/render/reading-lists.js');
+
+    const renderPublisherReadingLists = env.sandbox.renderPublisherReadingLists;
+    const container = document.getElementById('publisher-list-container');
+
+    renderPublisherReadingLists(null, container);
+
+    // Default status filter is 'in-progress' -> 1 card
+    const initialCards = container.querySelectorAll('.reading-list-card');
+    expect(initialCards.length).toBe(1);
+
+    const filterBar = document.getElementById('reading-lists-status-filter');
+    expect(filterBar).not.toBeNull();
+
+    // Click 'All (3)' status button
+    const allBtn = filterBar.querySelector('button[data-status="all"]');
+    expect(allBtn).not.toBeNull();
+    allBtn.click();
+
+    const allCards = container.querySelectorAll('.reading-list-card');
+    expect(allCards.length).toBe(3);
+  });
+
+  test('on root (Libraries) view, button displays all reading lists count and showRootFolderList renders full reading lists', () => {
+    document.body.innerHTML += `
+      <div id="root-folder-list"></div>
+      <div id="root-folder-list-container"></div>
+    `;
+
+    const mockRenderPublisherReadingLists = jest.fn();
+    env.sandbox.renderPublisherReadingLists = mockRenderPublisherReadingLists;
+    env.sandbox.rootFolderListDiv = document.getElementById('root-folder-list');
+    env.sandbox.rootFolderListContainer = document.getElementById('root-folder-list-container');
+    env.sandbox.clearElement = jest.fn();
+    env.sandbox.createEmptyMessage = jest.fn();
+
+    env.loadFile('../public/js/library/render/root-folders.js');
+
+    const setCachedReadingLists = env.sandbox.setCachedReadingLists;
+    const updateReadingListFilterButtonCount = env.sandbox.updateReadingListFilterButtonCount;
+
+    setCachedReadingLists([
+      { id: 'list-1', name: 'Batman Saga', publishers: ['DC'] },
+      { id: 'list-2', name: 'Spider-Verse', publishers: ['Marvel'] }
+    ]);
+
+    env.state.currentView = 'root';
+    updateReadingListFilterButtonCount();
+
+    const span = document.getElementById('dynamic-reading-list-filter-count');
+    const btn = document.getElementById('dynamic-reading-list-filter-btn');
+
+    expect(span.textContent).toBe('2');
+    expect(btn.classList.contains('hidden')).toBe(false);
+
+    // Verify breadcrumb returning to Libraries unselects activeSmartFilter
+    env.state.activeSmartFilter = 'reading-list';
+    const showRootFolderList = env.sandbox.showRootFolderList;
+    showRootFolderList({ force: true }); // without preserveSmartFilter
+    expect(env.state.activeSmartFilter).toBeNull();
+
+    // Verify selecting reading-list in root view calls renderPublisherReadingLists(null, container)
+    env.state.activeSmartFilter = 'reading-list';
+    showRootFolderList({ force: true, preserveSmartFilter: true });
+    expect(mockRenderPublisherReadingLists).toHaveBeenCalledWith(null, env.sandbox.rootFolderListContainer);
   });
 });

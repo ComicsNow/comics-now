@@ -11,6 +11,7 @@ import {
 import { launchComicReader } from '../dag/interactions.js';
 import { renderIssuesGridView, renderIssuesChecklistView } from './story-arcs-issues.js';
 import { renderCollectionsGridView, renderCollectionsChecklistView } from './story-arcs-collections.js';
+import { renderStoryArcMetroView } from './story-arcs-metro.js';
 import { getStoryArcEditionPreference } from '../settings/story-arc-reader-settings.js';
 
 let activeArcDetailModal = null;
@@ -79,6 +80,10 @@ export function createStoryArcDetailModal() {
                 <span>☰</span>
                 <span class="hidden md:inline">Checklist</span>
               </button>
+              <button id="story-arc-view-metro-btn" class="px-2.5 py-1.5 rounded-md font-bold transition-all flex items-center gap-1 text-gray-400 hover:text-white cursor-pointer" title="Timeline View">
+                <span>◈</span>
+                <span class="hidden md:inline">Timeline</span>
+              </button>
             </div>
 
             <button id="story-arc-modal-close-btn" class="p-2 text-gray-400 hover:text-white transition-colors cursor-pointer text-xl ml-1" title="Close">
@@ -123,6 +128,9 @@ export function createStoryArcDetailModal() {
 
         <!-- 4. Collected Volumes Checklist -->
         <div id="story-arc-collections-checklist-view" class="hidden"></div>
+
+        <!-- 5. Interactive Metro Line & Proportional Progression Visualizer -->
+        <div id="story-arc-metro-view" class="hidden flex flex-col gap-6 w-full max-w-full overflow-hidden"></div>
       </div>
     </div>
   `;
@@ -147,8 +155,10 @@ export function createStoryArcDetailModal() {
   // View mode switcher handlers
   const gridBtn = modal.querySelector('#story-arc-view-grid-btn');
   const checklistBtn = modal.querySelector('#story-arc-view-checklist-btn');
+  const metroBtn = modal.querySelector('#story-arc-view-metro-btn');
   if (gridBtn) gridBtn.addEventListener('click', () => setViewMode('grid'));
   if (checklistBtn) checklistBtn.addEventListener('click', () => setViewMode('checklist'));
+  if (metroBtn) metroBtn.addEventListener('click', () => setViewMode('metro'));
 
   activeArcDetailModal = modal;
   return modal;
@@ -173,18 +183,20 @@ export function setFormat(format) {
 }
 
 export function setViewMode(mode) {
-  currentViewMode = mode === 'checklist' ? 'checklist' : 'grid';
+  currentViewMode = mode === 'checklist' ? 'checklist' : (mode === 'metro' ? 'metro' : 'grid');
   const modal = activeArcDetailModal || document.getElementById('story-arc-detail-modal');
   if (!modal) return;
 
   const gridBtn = modal.querySelector('#story-arc-view-grid-btn');
   const checklistBtn = modal.querySelector('#story-arc-view-checklist-btn');
+  const metroBtn = modal.querySelector('#story-arc-view-metro-btn');
 
   const active = 'px-2.5 py-1.5 rounded-md font-bold transition-all flex items-center gap-1 bg-amber-500 text-black shadow-xs cursor-pointer';
   const inactive = 'px-2.5 py-1.5 rounded-md font-bold transition-all flex items-center gap-1 text-gray-400 hover:text-white cursor-pointer';
 
   if (gridBtn) gridBtn.className = currentViewMode === 'grid' ? active : inactive;
   if (checklistBtn) checklistBtn.className = currentViewMode === 'checklist' ? active : inactive;
+  if (metroBtn) metroBtn.className = currentViewMode === 'metro' ? active : inactive;
 
   updateViewVisibility(modal);
 }
@@ -204,12 +216,24 @@ function updateViewVisibility(modal) {
   const issuesChecklist = modal.querySelector('#story-arc-checklist-view');
   const colGrid = modal.querySelector('#story-arc-collections-grid-view');
   const colChecklist = modal.querySelector('#story-arc-collections-checklist-view');
+  const metroView = modal.querySelector('#story-arc-metro-view');
 
   const isIssues = currentFormat === 'issues';
+  setElementHidden(metroView, currentViewMode !== 'metro');
   setElementHidden(issuesGrid, !isIssues || currentViewMode !== 'grid');
   setElementHidden(issuesChecklist, !isIssues || currentViewMode !== 'checklist');
   setElementHidden(colGrid, isIssues || currentViewMode !== 'grid');
   setElementHidden(colChecklist, isIssues || currentViewMode !== 'checklist');
+
+  if (currentViewMode === 'metro' && currentArcData) {
+    const items = isIssues ? (currentArcData.issues || []) : (currentArcData.collections || []);
+    renderStoryArcMetroView(metroView, items, currentFormat, (item) => {
+      closeStoryArcDetail();
+      if (item && item.comicId && typeof launchComicReader === 'function') {
+        launchComicReader(item.comicId);
+      }
+    });
+  }
 }
 
 function updateHeaderSummary(modal, arc) {
@@ -293,6 +317,10 @@ function populateArcDetails(modal, arc, targetFormat = 'issues', targetViewMode 
   renderIssuesChecklistView(modal, arc.issues || [], onComicSelect);
   renderCollectionsGridView(modal, arc.collections || [], onComicSelect);
   renderCollectionsChecklistView(modal, arc.collections || [], onComicSelect);
+
+  const metroContainer = modal.querySelector('#story-arc-metro-view');
+  const metroItems = targetFormat === 'issues' ? (arc.issues || []) : (arc.collections || []);
+  renderStoryArcMetroView(metroContainer, metroItems, targetFormat, onComicSelect);
 
   setFormat(targetFormat);
   setViewMode(targetViewMode);

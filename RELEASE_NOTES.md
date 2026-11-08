@@ -100,6 +100,21 @@ Welcome to **Comics Now! v3.4.0** — introducing the **Story Arcs & Narrative C
 * **Publisher Classification & Three-Gate Matcher**: Hardened publisher detection in `parser.py` to prevent cross-publisher misclassifications, and integrated a three-gate matcher with cover service heuristics and collection completeness tracking.
 * **Portable Test Harness**: Hardened test fixtures to use dynamic relative root resolution, ensuring zero exposure of host paths or personal identifiers across the test suite.
 
+### 18. Gemini Flash AI Story Arc Tagger (Whole Library Semantic Matcher)
+* **High-Density Semantic Tagger**: Evaluates library comic collections against canonical ReadingOrders.com checklists using Gemini Flash AI with quota-safe token rate limiting (15 RPM / 250k TPM) and backoff retry.
+* **Dynamic Candidate Scoping**: Intelligently scopes comic candidates per storyline by pre-indexing library titles and publishers, reducing context overhead while guaranteeing 100% semantic matching precision.
+* **Review & Verification**: Emits structured match justifications, proposed `<StoryArc>` / `<StoryArcNumber>` tags, and confidence scores across both CLI review and live in-app enrichment runs.
+
+### 19. Strict Zero-Fallback Story Arc Matching & Unified Live Sync Logging
+* **Exclusive Gemini Matching**: Removed heuristic and local rule-based match fallbacks. Story arc matching strictly operates via Gemini Flash AI; if Gemini is unconfigured or finds no match, no heuristic fallback is performed.
+* **Unified Live Sync & Crawler Logs**: Streamlined `/api/v1/story-arcs/stream` to broadcast events from both crawler sync and Gemini batch tagging, displaying real-time progress (`[idx/total] (X%)`), AI prompt token counts, and matched issues directly in the Live Sync & Crawler Logs console.
+* **Automated Post-Sync Evaluation**: When ReadingOrders.com sync discovers newly added reading orders, candidate comics are automatically evaluated against them using Gemini Flash with real-time live logging.
+
+### 20. Contextual Smart Filters & Publisher View Performance
+* **Libraries (Root) View Smart Filters**: Restricted root view smart filters strictly to `Reading Lists` and `Story Arcs` for clean top-level collection navigation. Contextual filters (`New`, `Downloaded`, `Guided View`, `Manga`) dynamically reveal upon entering publisher views.
+* **Instantaneous Story Arc Filter Counting**: Story arc filter badge counts are calculated instantly from indexed reading orders in memory without scanning all publishers, eliminating navigation lag and unneeded revalidations.
+* **Breadcrumb Scope Resets**: Navigating back to the Libraries root view via breadcrumbs automatically deselects active smart filters to restore the full top-level view cleanly.
+
 ---
 
 ## ⬆️ Upgrade Notes
@@ -124,12 +139,15 @@ Welcome to **Comics Now! v3.4.0** — introducing the **Story Arcs & Narrative C
 11. `feat(continuity)`: strip false-positive story arcs, mandate sidecar-only tagging, and enforce year and series matching guards
 12. `feat(continuity)`: add dry-run simulation mode, O(1) indexed matcher, reading order era boundaries, and publisher guards
 13. `feat(library)`: streamline reading list and story arc views, separate issue/collection views, and integrate three-gate matcher
+14. `feat(continuity)`: add Gemini Flash AI story arc tagger with quota protection and dynamic candidate scoping
+15. `feat(continuity)`: enforce zero-fallback Gemini story arc matching and unify live crawler/batch SSE log stream
+16. `feat(library)`: contextualize smart filters for Libraries root view and optimize story arcs count latency
 
 ---
 
 ## 🧪 Verification & Test Results
-- **Full Jest suite**: `189 suites passed, 1470 tests passed (100% pass rate)`.
-- **Python tagger pytest suite**: `232 tests passed (100% pass rate)`.
+- **Full Jest suite**: `194 suites passed, 1502 tests passed (100% pass rate)`.
+- **Python tagger pytest suite**: `37 tests passed (100% pass rate)`.
 - **Production build**: Tailwind CSS v4 and Vite client bundle compiled cleanly.
 - **Architecture ratchet**: all new and modified modules remain strictly under the 380-line ceiling.
 

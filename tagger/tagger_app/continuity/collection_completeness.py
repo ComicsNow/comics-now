@@ -3,7 +3,7 @@ import re
 import sqlite3
 from typing import Optional, Dict, Any, List
 
-from tagger_app.continuity.util import normalize_series
+from tagger_app.continuity.util import normalize_series, is_year_compatible
 from tagger_app.continuity.three_gate_matcher import extract_volume_number
 
 
@@ -16,33 +16,65 @@ def find_owned_collection(
 ) -> Optional[Dict[str, Any]]:
     """Match a reading order collection against local library comics."""
     pos_str = str(col.get("position", ""))
-    norm_arc = normalize_series(clean_arc_title)
+    clean_arc = re.sub(r"\s+Reading\s+Order.*$", "", str(clean_arc_title or ""), flags=re.IGNORECASE).strip()
+    norm_arc = normalize_series(clean_arc)
 
     # 1. Match by tagged StoryArc and StoryArcNumber (O(1) lookup)
     tagged_key = f"{norm_arc}:::{pos_str}"
     if tagged_key in arc_tagged_map:
         return arc_tagged_map[tagged_key]
 
-    # 2. Match by series and volume alignment
+    # 2. Extract title, subtitle, target volume, and base series
     cand_title = col.get("title") or ""
     cand_sub = col.get("subtitle") or ""
     vol_num = extract_volume_number(f"{cand_title} {cand_sub}")
+    ro_year = col.get("release_year")
+
+    # Extract base series by stripping volume suffixes (e.g. 'Absolute Batman: Volume 1' -> 'Absolute Batman')
+    base_s = re.sub(
+        r"[:\-–—]\s*(?:vol(?:ume)?\.?\s*\d+|book\.?\s*\d+|v\.?\s*\d+).*$",
+        "",
+        cand_title,
+        flags=re.IGNORECASE,
+    ).strip()
+    norm_base = normalize_series(base_s)
     norm_col_title = normalize_series(cand_title)
+    norm_sub = normalize_series(cand_sub)
 
-    # Search in series_map
-    if norm_col_title in series_map and vol_num is not None:
-        for c in series_map[norm_col_title]:
-            c_vol = extract_volume_number(c.get("name") or "") or extract_volume_number(c.get("series") or "")
-            if c_vol == vol_num:
-                return c
+    # Candidate series in library (exact normalized matches only, never loose substring)
+    candidate_series_keys = []
+    if norm_base in series_map:
+        candidate_series_keys.append(norm_base)
+    if norm_col_title in series_map and norm_col_title not in candidate_series_keys:
+        candidate_series_keys.append(norm_col_title)
 
-    # Fallback: check if cand_title or cand_sub matches series
-    combined = f"{norm_col_title} {normalize_series(cand_sub)}".strip()
-    for s_name, comics_list in series_map.items():
-        if s_name in combined or combined in s_name:
-            for c in comics_list:
-                c_vol = extract_volume_number(c.get("name") or "") or extract_volume_number(c.get("series") or "")
-                if c_vol is not None and vol_num is not None and c_vol == vol_num:
+    for s_key in candidate_series_keys:
+        for c in series_map[s_key]:
+            c_vol = c.get("volume") if c.get("volume") is not None else (
+                extract_volume_number(c.get("name") or "") or extract_volume_number(c.get("series") or "")
+            )
+            c_year = c.get("year")
+            # Guard against cross-era mismatch when release years are known
+            if ro_year and c_year and not is_year_compatible(c_year, ro_year, max_gap=3):
+                continue
+
+            # Case A: Collection specifies a volume number
+            if vol_num is not None:
+                if c_vol == vol_num:
+                    return c
+                # Subtitle alignment within the exact same series
+                if norm_sub and len(norm_sub) >= 4:
+                    comb_comic = f"{normalize_series(c.get('name') or '')} {normalize_series(c.get('metaTitle') or '')}"
+                    if norm_sub in comb_comic:
+                        return c
+            else:
+                # Case B: Standalone collection without volume (e.g. 'Batman: Cataclysm')
+                if norm_sub and len(norm_sub) >= 4:
+                    comb_comic = f"{normalize_series(c.get('name') or '')} {normalize_series(c.get('metaTitle') or '')}"
+                    if norm_sub in comb_comic:
+                        return c
+                # If library series has 1 comic and it's volume 1 or unnumbered
+                if c_vol in (None, 1) and len(series_map[s_key]) == 1:
                     return c
 
     return None

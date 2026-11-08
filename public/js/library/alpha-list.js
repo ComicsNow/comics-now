@@ -178,7 +178,7 @@ export function applyFilterAndRender() {
       break;
     default:
       if (typeof showRootFolderList === 'function') {
-        showRootFolderList({ force: true });
+        showRootFolderList({ force: true, preserveSmartFilter: true });
       }
   }
 }

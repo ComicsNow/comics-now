@@ -89,7 +89,7 @@ export function showSeriesList(publisherName, options = {}) {
   const filteredSeries = filterSeriesByActiveFilter(seriesData);
   const seriesNames = Object.keys(filteredSeries);
 
-  if (seriesNames.length === 1 && !force) {
+  if (seriesNames.length === 1 && !force && state.activeSmartFilter !== 'story-arc' && state.activeSmartFilter !== 'reading-list') {
     state.currentSeries = seriesNames[0];
     if (typeof window !== 'undefined') window.currentSeries = state.currentSeries;
     showComicList(seriesNames[0]);
@@ -112,6 +112,15 @@ export function showSeriesList(publisherName, options = {}) {
 
   const sortContainer = document.getElementById('series-sort-container');
   const modeToggle = document.getElementById('smart-scope-mode-toggle');
+  const existingStoryArcFilter = document.getElementById('story-arcs-status-filter');
+  if (existingStoryArcFilter && state.activeSmartFilter !== 'story-arc') {
+    existingStoryArcFilter.remove();
+  }
+  const existingReadingListFilter = document.getElementById('reading-lists-status-filter');
+  if (existingReadingListFilter && state.activeSmartFilter !== 'reading-list') {
+    existingReadingListFilter.remove();
+  }
+
   if (state.activeSmartFilter === 'reading-list') {
     if (sortContainer) sortContainer.classList.add('hidden');
     if (modeToggle) modeToggle.classList.add('hidden');
@@ -125,6 +134,10 @@ export function showSeriesList(publisherName, options = {}) {
     return;
   }
   if (sortContainer) sortContainer.classList.remove('hidden');
+  const seriesListContainer = document.getElementById('series-list-container');
+  if (seriesListContainer) {
+    seriesListContainer.className = 'grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6';
+  }
   renderAlphaFilter(seriesAlphaFilter, filteredSeries, renderSeriesCards, 'series');
 
   if (typeof window !== 'undefined') {
@@ -142,6 +155,14 @@ export function showSeriesList(publisherName, options = {}) {
 export function renderSeriesCards(seriesToRender) {
   const container = document.getElementById('series-list-container');
   if (!container) return;
+  const existingStoryArcFilter = document.getElementById('story-arcs-status-filter');
+  if (existingStoryArcFilter && state.activeSmartFilter !== 'story-arc') {
+    existingStoryArcFilter.remove();
+  }
+  const existingReadingListFilter = document.getElementById('reading-lists-status-filter');
+  if (existingReadingListFilter && state.activeSmartFilter !== 'reading-list') {
+    existingReadingListFilter.remove();
+  }
   clear(container);
   container.className = 'grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6';
 

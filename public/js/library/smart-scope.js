@@ -19,7 +19,7 @@ export function renderForActiveScope(scope) {
     if (global.currentSeries && typeof global.showComicList === 'function') return global.showComicList(global.currentSeries);
     if (global.currentPublisher && typeof global.showSeriesList === 'function') return global.showSeriesList(global.currentPublisher, { force: true });
     if (global.currentRootFolder && typeof global.showPublisherList === 'function') return global.showPublisherList(global.currentRootFolder, { force: true });
-    return global.showRootFolderList({ force: true });
+    return global.showRootFolderList({ force: true, preserveSmartFilter: true });
   }
 
   if (global.LibraryRender && typeof global.LibraryRender.applyFilterAndRender === 'function') {
@@ -32,7 +32,7 @@ export function renderForActiveScope(scope) {
   }
   
   if (typeof global.showRootFolderList === 'function') {
-    global.showRootFolderList({ force: true });
+    global.showRootFolderList({ force: true, preserveSmartFilter: true });
   }
 }
 

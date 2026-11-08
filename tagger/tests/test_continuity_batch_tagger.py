@@ -1,7 +1,7 @@
 """Unit tests for tagger_app.continuity.batch_tagger."""
 import sqlite3
 import pytest
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 from tagger_app.continuity.db import init_continuity_db, upsert_reading_order, upsert_reading_order_issues
 from tagger_app.continuity.batch_tagger import ContinuityBatchTagger
 
@@ -90,7 +90,7 @@ def test_batch_tagger_creates_sidecar_and_preserves_archive(tmp_path, mock_ro_db
 
     # 3. Run batch tagger
     tagger = ContinuityBatchTagger(cn_db_path=str(cn_path), ro_db_path=mock_ro_db)
-    res = tagger.start_batch_tag(target_publisher="DC Comics", run_async=False)
+    res = tagger.start_batch_tag(target_publisher="DC Comics", run_async=False, engine="rules")
     assert res.get("completed") is True
     assert res["progress"]["updated"] == 1
 
@@ -151,7 +151,7 @@ def test_batch_tagger_dry_run_mode_creates_zero_files_and_zero_db_writes(tmp_pat
 
     # 3. Run batch tagger in DRY RUN mode
     tagger = ContinuityBatchTagger(cn_db_path=str(cn_path), ro_db_path=mock_ro_db)
-    res = tagger.start_batch_tag(target_publisher="DC Comics", run_async=False, dry_run=True)
+    res = tagger.start_batch_tag(target_publisher="DC Comics", run_async=False, dry_run=True, engine="rules")
     assert res.get("completed") is True
     assert res.get("dryRun") is True
     assert res["progress"]["updated"] == 1
@@ -171,5 +171,42 @@ def test_batch_tagger_dry_run_mode_creates_zero_files_and_zero_db_writes(tmp_pat
     row = cn_check.execute("SELECT metadata FROM comics WHERE id = 'c1'").fetchone()
     assert "StoryArc" not in row[0], "Dry run must NOT update database metadata!"
     cn_check.close()
+
+
+def test_batch_tagger_routes_to_gemini_engine(tmp_path, mock_ro_db):
+    tagger = ContinuityBatchTagger(ro_db_path=mock_ro_db)
+    mock_gemini_inst = MagicMock()
+    mock_gemini_inst.config = {"api_key": "mock-api-key-test-001"}
+    mock_gemini_inst.tag_all_library.return_value = {
+        "completed": True,
+        "dryRun": True,
+        "engine": "gemini",
+        "totalArcs": 1,
+        "totalMatches": 1,
+        "arcsWithMatches": 1,
+        "matchedArcs": {"crisis-on-infinite-earths": {"title": "Crisis on Infinite Earths", "matches": []}},
+    }
+
+    with patch("tagger_app.continuity.batch_tagger.get_gemini_tagger", return_value=mock_gemini_inst):
+        res = tagger.start_batch_tag(target_publisher="DC Comics", run_async=False, dry_run=True, engine="gemini")
+        assert res.get("completed") is True
+        assert res.get("engine") == "gemini"
+        assert res.get("dryRun") is True
+        mock_gemini_inst.tag_all_library.assert_called_once()
+
+
+def test_batch_tagger_gemini_no_fallback_when_unconfigured(mock_ro_db):
+    tagger = ContinuityBatchTagger(ro_db_path=mock_ro_db)
+    mock_gemini_inst = MagicMock()
+    mock_gemini_inst.config = {"api_key": ""}
+
+    with patch("tagger_app.continuity.batch_tagger.get_gemini_tagger", return_value=mock_gemini_inst):
+        res = tagger.start_batch_tag(target_publisher="DC Comics", run_async=False, engine="gemini")
+        assert "error" in res
+        assert tagger.status == "error"
+        # Verify no fallback to rule-based engine occurred
+        logs = tagger.get_logs()
+        assert any("no local fallback allowed" in l["message"] for l in logs)
+
 
 

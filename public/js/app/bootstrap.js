@@ -209,9 +209,14 @@ export async function loadInitialData() {
   // 5) Load library from cache first, then sync with server
   await loadLibraryOfflineFirst();
 
-  // 6) Pre-fetch reading lists for smart filter integration
-  if (appGlobal.LibrarySmartLists && typeof appGlobal.LibrarySmartLists.fetchAndCacheReadingLists === 'function') {
-    appGlobal.LibrarySmartLists.fetchAndCacheReadingLists().catch(err => console.warn('[loadInitialData:readingLists]', err));
+  // 6) Pre-fetch reading lists & story arcs for smart filter integration
+  if (appGlobal.LibrarySmartLists) {
+    if (typeof appGlobal.LibrarySmartLists.fetchAndCacheReadingLists === 'function') {
+      appGlobal.LibrarySmartLists.fetchAndCacheReadingLists().catch(err => console.warn('[loadInitialData:readingLists]', err));
+    }
+    if (typeof appGlobal.LibrarySmartLists.fetchAllStoryArcs === 'function') {
+      appGlobal.LibrarySmartLists.fetchAllStoryArcs().catch(err => console.warn('[loadInitialData:storyArcs]', err));
+    }
   }
 }
 

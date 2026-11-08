@@ -1,6 +1,5 @@
-"""Unit tests for the Continuity Metadata Enricher and automated tagging hook."""
+"""Unit tests for the Continuity Metadata Enricher (Gemini exclusive, zero fallback)."""
 import os
-import sqlite3
 import pytest
 from pathlib import Path
 from unittest.mock import MagicMock, patch
@@ -25,14 +24,16 @@ def test_enrich_with_continuity_success(tmp_path):
         "matchedArc": "Absolute Universe",
         "storyArcNumber": "6",
         "seriesGroup": "DC Comics Events",
+        "confidence": 0.95,
+        "reason": "Clear match in Absolute line",
         "geminiVerified": True,
     }
 
-    with patch("tagger_app.continuity.enricher.get_matcher") as mock_get_matcher:
-        matcher_inst = MagicMock()
-        matcher_inst.match_comic.return_value = mock_match
-        mock_get_matcher.return_value = matcher_inst
+    mock_gemini = MagicMock()
+    mock_gemini.config = {"api_key": "mock-api-key-test-001"}
+    mock_gemini.match_single_comic.return_value = mock_match
 
+    with patch("tagger_app.continuity.gemini_batch_tagger.get_gemini_tagger", return_value=mock_gemini):
         res = enrich_with_continuity(metadata, file_path, cover_path=cover_path)
 
         assert res is not None
@@ -42,7 +43,7 @@ def test_enrich_with_continuity_success(tmp_path):
         assert metadata["continuity_gemini_verified"] is True
 
 
-def test_enrich_with_continuity_no_match(tmp_path):
+def test_enrich_with_continuity_no_fallback_when_gemini_fails_or_unmatched():
     metadata = {
         "title": "Random Comic",
         "series": "Random Non-Event Series",
@@ -51,21 +52,33 @@ def test_enrich_with_continuity_no_match(tmp_path):
     }
     file_path = "/comics/Random Comic 01.cbz"
 
-    with patch("tagger_app.continuity.enricher.get_matcher") as mock_get_matcher:
-        matcher_inst = MagicMock()
-        matcher_inst.match_comic.return_value = None
-        mock_get_matcher.return_value = matcher_inst
+    mock_gemini = MagicMock()
+    mock_gemini.config = {"api_key": "mock-api-key-test-001"}
+    mock_gemini.match_single_comic.return_value = None
 
+    with patch("tagger_app.continuity.gemini_batch_tagger.get_gemini_tagger", return_value=mock_gemini):
         res = enrich_with_continuity(metadata, file_path)
 
+        # Must return None with zero fallback to local/rule matchers
         assert res is None
         assert "story_arc" not in metadata
         assert "story_arc_number" not in metadata
 
 
+def test_enrich_with_continuity_disabled_when_gemini_not_configured():
+    metadata = {"series": "Batman", "publisher": "DC Comics"}
+    mock_gemini = MagicMock()
+    mock_gemini.config = {"api_key": ""}
+
+    with patch("tagger_app.continuity.gemini_batch_tagger.get_gemini_tagger", return_value=mock_gemini):
+        res = enrich_with_continuity(metadata, "/comics/Batman 01.cbz")
+        assert res is None
+        assert "story_arc" not in metadata
+
+
 def test_enrich_with_continuity_handles_exceptions_gracefully():
     metadata = {"series": "Batman"}
-    with patch("tagger_app.continuity.enricher.get_matcher", side_effect=RuntimeError("DB locked")):
+    with patch("tagger_app.continuity.gemini_batch_tagger.get_gemini_tagger", side_effect=RuntimeError("API error")):
         res = enrich_with_continuity(metadata, "/nonexistent.cbz")
         assert res is None
         assert "story_arc" not in metadata

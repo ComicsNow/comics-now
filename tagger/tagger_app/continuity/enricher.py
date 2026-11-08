@@ -53,13 +53,17 @@ def enrich_with_continuity(
     enable_gemini: bool = True,
     ro_db_path: Path | str = DEFAULT_RO_DB,
 ) -> Optional[Dict[str, Any]]:
-    """Enrich ComicInfo metadata dict with matched Story Arc and Reading Order position."""
-    if not isinstance(metadata, dict):
+    """Enrich ComicInfo metadata dict with matched Story Arc details using Gemini exclusively.
+    
+    Story Arc matching strictly requires Gemini AI. No heuristic/local rule fallback is permitted.
+    """
+    if not isinstance(metadata, dict) or not enable_gemini:
         return None
 
     try:
-        matcher = get_matcher(ro_db_path=ro_db_path)
-        if not matcher:
+        from tagger_app.continuity.gemini_batch_tagger import get_gemini_tagger
+        gemini_tagger = get_gemini_tagger()
+        if not gemini_tagger or not gemini_tagger.config.get("api_key"):
             return None
 
         filename = os.path.basename(file_path) if file_path else ""
@@ -77,17 +81,16 @@ def enrich_with_continuity(
             "thumb_path": resolved_thumb,
         }
 
-        arc_match = matcher.match_comic(comic_payload, enable_gemini_arbiter=enable_gemini)
-        if not arc_match:
-            return None
-
-        metadata["story_arc"] = arc_match["matchedArc"]
-        metadata["story_arc_number"] = str(arc_match["storyArcNumber"])
-        metadata["series_group"] = arc_match["seriesGroup"]
-        if arc_match.get("geminiVerified"):
+        g_match = gemini_tagger.match_single_comic(comic_payload)
+        if g_match and g_match.get("matchedArc"):
+            metadata["story_arc"] = g_match["matchedArc"]
+            metadata["story_arc_number"] = str(g_match.get("storyArcNumber") or "1")
+            metadata["series_group"] = g_match.get("seriesGroup", "DC Comics Events")
             metadata["continuity_gemini_verified"] = True
+            return g_match
 
-        return arc_match
+        # Strict requirement: No heuristic or local 3-gate fallback allowed.
+        return None
     except Exception as e:
-        print(f"[-] Continuity enrichment failed for {file_path}: {e}")
+        print(f"[-] Continuity Gemini enrichment failed for {file_path}: {e}")
         return None

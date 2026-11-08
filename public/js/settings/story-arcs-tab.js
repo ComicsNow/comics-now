@@ -11,6 +11,7 @@ import {
   refreshBatchTagStatus,
   initBatchTaggerListeners
 } from './story-arcs-batch-tagger.js';
+import { clearStoryArcsCache, fetchAllStoryArcs } from '../library/smartlists/story-arcs.js';
 
 const global = typeof canonicalGlobal !== 'undefined' ? canonicalGlobal : new Proxy(typeof window !== 'undefined' ? window : globalThis, {
   get: (t, p) => (typeof state !== 'undefined' && p in state) ? state[p] : t[p],
@@ -143,7 +144,8 @@ export function connectStoryArcsStream() {
 
       const msg = document.createElement('span');
       msg.className = entry.level === 'ERROR' ? 'text-red-400 font-semibold' :
-                      entry.level === 'WARN' ? 'text-amber-400' : 'text-gray-200';
+                      entry.level === 'WARN' ? 'text-amber-400' :
+                      entry.level === 'SUCCESS' ? 'text-emerald-400 font-semibold' : 'text-gray-200';
       msg.textContent = entry.message;
 
       line.appendChild(time);
@@ -152,6 +154,11 @@ export function connectStoryArcsStream() {
 
       totalLogLines++;
       if (countEl) countEl.textContent = `${totalLogLines} lines`;
+
+      if (entry.message && entry.message.includes('Sync completed')) {
+        clearStoryArcsCache();
+        fetchAllStoryArcs();
+      }
 
       // Smart auto-scroll check
       const isAtBottom = logOutput.scrollHeight - logOutput.clientHeight <= logOutput.scrollTop + 35;
