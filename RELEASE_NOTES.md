@@ -1,10 +1,14 @@
-# Comics Now! v4.0.0 Release Notes
+# Comics Now! v4.0.1 Release Notes
 
-Welcome to **Comics Now! v4.0.0** — introducing the **Story Arcs & Narrative Continuity Engine** powered by ReadingOrders.com, an interactive **Narrative Timeline DAG**, in-reader continuity prompts, a selectable **ReadingOrders** metadata source for **Tag Comics Now!**, and new **MCP server continuity tools**.
+Welcome to **Comics Now! v4.0.1** — patch release delivering reverse proxy/tunnel static asset delivery fixes and non-destructive reading list parity synchronization.
+
+### 🛡️ v4.0.1 Highlights
+* **Vite Bundle Asset Delivery Behind Reverse Proxies & Tunnels**: Added `/assets/` and `/logos/` to `publicPathPrefixes` in the JWT authentication middleware (`server/middleware/auth.js`). Eliminates `401 Unauthorized` responses on JavaScript/CSS asset bundles when accessing Comics Now! via Cloudflare Tunnels, reverse proxies, and subpath deployments with authentication enabled.
+* **Non-Destructive Reading List Additive Parity Sync**: Default reading list sync now additively introduces missing comics via `INSERT OR IGNORE` and aligns `sortOrder` across all user profiles without modifying reading progress or removing user-curated items.
 
 ---
 
-## ✨ What's New in v4.0.0
+## ✨ Features & Major Capabilities in v4.0.x
 
 ### 1. Story Arcs Smart Filter & Gold Box-Set View
 * **Dedicated Story Arcs Smart Filter**: New `⚡ Story Arcs` filter pill in the publisher library view, visually distinguished from personal Reading Lists (`#8B5CF6` Purple) using an Amber/Gold and Crimson box-set trade dress (`#F59E0B` / `#EF4444`).
