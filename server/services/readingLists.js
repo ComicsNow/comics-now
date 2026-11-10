@@ -89,6 +89,29 @@ async function syncDefaultReadingLists(options = {}) {
           if (log) log('ERROR', 'READING_LISTS', `Failed to update list "${list.name}" for user "${targetUserId}": ${err.message}`);
         }
       } else {
+        try {
+          await dbRun(`
+            INSERT OR IGNORE INTO reading_list_items (listId, comicId, addedAt, sortOrder)
+            SELECT ?, comicId, COALESCE(addedAt, ?), COALESCE(sortOrder, 0)
+            FROM reading_list_items
+            WHERE listId = ?
+          `, [existing.id, now, list.id]);
+
+          const templateItems = await dbAll(
+            'SELECT comicId, sortOrder FROM reading_list_items WHERE listId = ?',
+            [list.id]
+          );
+          if (Array.isArray(templateItems)) {
+            for (const item of templateItems) {
+              await dbRun(
+                'UPDATE reading_list_items SET sortOrder = ? WHERE listId = ? AND comicId = ?',
+                [item.sortOrder ?? 0, existing.id, item.comicId]
+              );
+            }
+          }
+        } catch (err) {
+          if (log) log('ERROR', 'READING_LISTS', `Failed to additively sync list "${list.name}" for user "${targetUserId}": ${err.message}`);
+        }
         skippedCount++;
       }
       continue;

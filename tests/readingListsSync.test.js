@@ -98,6 +98,7 @@ describe('Reading Lists Sync Service', () => {
         mockDb.reading_list_items = mockDb.reading_list_items.filter(i => !listIdsToDelete.includes(i.listId));
       }
       if (query.includes('INSERT INTO reading_list_items') || query.includes('INSERT OR IGNORE INTO reading_list_items')) {
+        const isIgnore = query.includes('INSERT OR IGNORE');
         if (query.includes('SELECT')) {
           const targetListId = params[0];
           const addedAt = params[1];
@@ -105,6 +106,10 @@ describe('Reading Lists Sync Service', () => {
 
           const sourceItems = mockDb.reading_list_items.filter(i => i.listId === sourceListId);
           for (const item of sourceItems) {
+            const exists = mockDb.reading_list_items.some(
+              i => i.listId === targetListId && i.comicId === item.comicId
+            );
+            if (isIgnore && exists) continue;
             mockDb.reading_list_items.push({
               listId: targetListId,
               comicId: item.comicId,
@@ -113,13 +118,24 @@ describe('Reading Lists Sync Service', () => {
             });
           }
         } else {
-          mockDb.reading_list_items.push({
-            listId: params[0],
-            comicId: params[1],
-            addedAt: params[2],
-            sortOrder: params[3]
-          });
+          const exists = mockDb.reading_list_items.some(
+            i => i.listId === params[0] && i.comicId === params[1]
+          );
+          if (!(isIgnore && exists)) {
+            mockDb.reading_list_items.push({
+              listId: params[0],
+              comicId: params[1],
+              addedAt: params[2],
+              sortOrder: params[3]
+            });
+          }
         }
+      }
+      if (query.includes('UPDATE reading_list_items SET sortOrder = ? WHERE listId = ? AND comicId = ?')) {
+        const item = mockDb.reading_list_items.find(
+          i => i.listId === params[1] && i.comicId === params[2]
+        );
+        if (item) item.sortOrder = params[0];
       }
       return { changes: 1 };
     });
@@ -169,6 +185,38 @@ describe('Reading Lists Sync Service', () => {
 
     expect(result.created).toBe(1); // Only Spider-Man created
     expect(result.skipped).toBe(1); // Batman skipped
+  });
+
+  test('syncDefaultReadingLists additively adds missing items and aligns sortOrder on existing lists when overwrite=false without removing user items', async () => {
+    mockDb.reading_lists.push({
+      id: 'existing-list',
+      userId: 'user-1',
+      name: 'Batman Saga',
+      description: 'Custom',
+      sortOrder: 0,
+      created: 500,
+      updated: 500
+    });
+    // User already has comic-100 with an outdated sortOrder (9) plus a custom comic-999
+    mockDb.reading_list_items.push(
+      { listId: 'existing-list', comicId: 'comic-100', addedAt: 500, sortOrder: 9 },
+      { listId: 'existing-list', comicId: 'comic-999', addedAt: 600, sortOrder: 10 }
+    );
+
+    await syncDefaultReadingLists({
+      targetUserId: 'user-1',
+      dbRun: mockDbRun,
+      dbGet: mockDbGet,
+      dbAll: mockDbAll,
+      log: jest.fn()
+    });
+
+    const items = mockDb.reading_list_items.filter(i => i.listId === 'existing-list');
+    // Should contain comic-100 (sortOrder aligned to 0), newly added comic-101 (sortOrder 1), and preserved custom comic-999
+    expect(items.map(i => i.comicId).sort()).toEqual(['comic-100', 'comic-101', 'comic-999']);
+    expect(items.find(i => i.comicId === 'comic-100').sortOrder).toBe(0);
+    expect(items.find(i => i.comicId === 'comic-101').sortOrder).toBe(1);
+    expect(items.find(i => i.comicId === 'comic-999').sortOrder).toBe(10);
   });
 
   test('syncDefaultReadingLists overwrites existing lists when overwrite=true', async () => {

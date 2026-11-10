@@ -68,6 +68,12 @@ Welcome to **Comics Now! v4.0.0** — introducing the **Story Arcs & Narrative C
 ### 12. Automated Weekly Continuity Delta Sync
 * Integrated autonomous delta synchronization into the weekly curator cron routine, fetching new and updated storylines non-destructively without altering reading progress or user-curated reading lists.
 
+### 13. Reverse Proxy & Tunnel Static Asset Whitelist
+* **Vite Bundle Asset Delivery**: Added `/assets/` and `/logos/` to `publicPathPrefixes` in the JWT authentication middleware (`server/middleware/auth.js`). Ensures Vite-compiled CSS and JavaScript bundles load reliably without 401 rejections behind Cloudflare Tunnels, reverse proxies, and subpath deployments when authentication is enabled.
+
+### 14. Reading Lists Additive Parity Sync
+* **Non-Destructive User Parity Sync**: Default reading list synchronization additively introduces missing comics to user reading lists via `INSERT OR IGNORE` and aligns `sortOrder` to canonical templates without modifying existing progress or removing user-added issues.
+
 ### 13. Mobile-First Segmented Scope Settings Architecture (Approach A)
 * **M3 Segmented Scope Navigation**: Replaced the 8-tab horizontal scroll with a clean 3-scope segmented pill control (`📖 My Reader`, `⚙️ Server Admin`, `⚡ AI Engines`).
 * **Personal vs. Admin Separation**: Non-admin readers see only their 3 personal reading tabs (`Reading Experience`, `Offline Downloads`, `Synced Devices`) without horizontal scrolling or disabled admin clutter.
@@ -146,7 +152,7 @@ Welcome to **Comics Now! v4.0.0** — introducing the **Story Arcs & Narrative C
 ---
 
 ## 🧪 Verification & Test Results
-- **Full Jest suite**: `194 suites passed, 1502 tests passed (100% pass rate)`.
+- **Full Jest suite**: `196 suites passed, 1506 tests passed (100% pass rate)`.
 - **Python tagger pytest suite**: `37 tests passed (100% pass rate)`.
 - **Production build**: Tailwind CSS v4 and Vite client bundle compiled cleanly.
 - **Architecture ratchet**: all new and modified modules remain strictly under the 380-line ceiling.

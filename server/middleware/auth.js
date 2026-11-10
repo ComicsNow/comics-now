@@ -123,7 +123,7 @@ async function extractUserFromJWT(req, res, next) {
     '/style.css',
     '/jszip.min.js'
   ]);
-  const publicPathPrefixes = ['/icons/', '/screenshots/', '/js/'];
+  const publicPathPrefixes = ['/icons/', '/screenshots/', '/js/', '/assets/', '/logos/'];
 
   // Normalize path to prevent path traversal (VULN-001)
   const normalizedPath = path.posix.normalize(req.path);
