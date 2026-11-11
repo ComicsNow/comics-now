@@ -1,171 +1,53 @@
-# Comics Now! v4.0.1 Release Notes
+# Comics Now! v4.1.0 Release Notes
 
-Welcome to **Comics Now! v4.0.1** — patch release delivering reverse proxy/tunnel static asset delivery fixes and non-destructive reading list parity synchronization.
-
-### 🛡️ v4.0.1 Highlights
-* **Smart Panel-Aware Speech Bubble Zoom Placement**: Guided view speech bubble zoom now dynamically avoids covering the active comic panel artwork. When inspecting dialogue callouts in Western Speech Zoom, Manga Speech Zoom, or Manga Panel Zoom, the magnifier overlay identifies the containing panel's on-screen geometry to dock cleanly above, below, or to the side of the panel, with opposite-corner fallbacks for full-page splash panels and zero impact on panel zoom rendering.
-* **Vite Bundle Asset Delivery Behind Reverse Proxies & Tunnels**: Added `/assets/` and `/logos/` to `publicPathPrefixes` in the JWT authentication middleware (`server/middleware/auth.js`). Eliminates `401 Unauthorized` responses on JavaScript/CSS asset bundles when accessing Comics Now! via Cloudflare Tunnels, reverse proxies, and subpath deployments with authentication enabled.
-* **Non-Destructive Reading List Additive Parity Sync**: Default reading list sync now additively introduces missing comics via `INSERT OR IGNORE` and aligns `sortOrder` across all user profiles without modifying reading progress or removing user-curated items.
+Welcome to **Comics Now! v4.1.0** — feature release introducing smart panel-aware speech bubble zoom placement with intelligent panel collision avoidance, seamless reading flow preservation, and reverse proxy asset delivery hardening.
 
 ---
 
-## ✨ Features & Major Capabilities in v4.0.x
+## ✨ What's New & Highlights in v4.1.0
 
-### 1. Story Arcs Smart Filter & Gold Box-Set View
-* **Dedicated Story Arcs Smart Filter**: New `⚡ Story Arcs` filter pill in the publisher library view, visually distinguished from personal Reading Lists (`#8B5CF6` Purple) using an Amber/Gold and Crimson box-set trade dress (`#F59E0B` / `#EF4444`).
-* **Live Library Completeness**: Each Story Arc card calculates real-time ownership metrics (`ownedCount`, `missingCount`, and `completenessPercent`) by matching local library comics against canonical multi-series reading orders.
-* **Isolated Continuity Database**: Canonical reading orders, issue sequences, and collected edition volumes are stored in a dedicated `data/reading-orders.db` SQLite database — keeping user reading lists and reading progress 100% untouched.
+### 1. Smart Panel-Aware Speech Bubble Zoom Placement
+* **Dynamic Panel Collision Avoidance**: Guided view speech bubble zoom now intelligently avoids covering the active comic panel artwork. When inspecting dialogue bubbles in **Western Speech Zoom**, **Manga Speech Zoom**, or **Manga Panel Zoom**, the viewer calculates the containing panel's on-screen geometry and dynamically docks the magnifier callout in clear space:
+  - **Clean Vertical Docking**: Docks cleanly above or below the panel when vertical clearance is available.
+  - **Side-Escape for Tall Panels**: When viewing tall vertical panels spanning most of the page height, the overlay escapes horizontally to the left or right side, keeping the entire panel and its artwork in view.
+  - **Opposite-Corner Fallback for Splash Pages**: On giant full-page splash panels where panel overlap is unavoidable, the overlay positions itself in the corner opposite the bubble (e.g. bubble in top-left → overlay in bottom-right).
+* **Guaranteed Bubble Visibility**: The placement algorithm strictly penalizes bubble overlap to zero, ensuring the magnifier callout never obscures the original speech bubble being read.
+* **Intra-Panel Placement Stability**: Consecutive taps on dialogue bubbles within the same panel maintain positional stability, eliminating erratic jumping across the screen during conversations.
+* **100% Decoupled from Panel Zoom**: Panel zoom rendering remains completely untouched in its own isolated branch, maintaining standard centering, fit scaling, and navigation.
 
-### 2. Story Arc Detail Banner & Narrative Timeline DAG
-* **Interactive Story Arc Detail Banner**: Clicking any box-set card in the Story Arcs smart list opens the Gold/Amber box-set detail banner (distinct from Reading Lists' purple playlist). Features real-time completeness progress, publication metadata, and 3-way view switching:
-  - **Grid View**: Visual cover cards in canonical sequence, clearly marking owned issues vs. missing gap placeholders.
-  - **Checklist View**: Tabular chronological reading checklist with storyline part annotations.
-  - **Narrative DAG View**: Integrated cinematic timeline visualizer.
-* **Spine & Orbit Spurs Visualizer**: Enhanced narrative timeline distinguishing main event / core issues along the central spine from tie-in series branching into angled orbit spurs. Features interactive card hover spotlighting, act milestones (`Act I: Inception`, `Act II: Escalation`, `Act III: Climax`), dual Issues / Collected Volumes toggle, and missing issue gap diagnostics.
-* **Series Page Continuity Strip**: On series pages (`/series/:publisher/:seriesName`), an inline Amber/Gold continuity strip surfaces associated story arcs with 1-click access to the full storyline detail.
-
-### 3. In-Reader Continuity Prompts ("Up Next in Arc")
-* Reaching the final page of an issue belonging to an indexed story arc surfaces an **Up Next in Arc** prompt with direct 1-tap navigation to the next chronological issue (even when the story crosses into a different series), or a clear continuity gap notice if the next issue is missing from the library.
-
-### 4. Tag Comics Now! Selectable Source (`ReadingOrders`)
-* **11th Metadata Source**: `ReadingOrders (Story Arcs)` (`src-readingorders`) is now available as a selectable checkbox in **Tag Comics Now! → Settings → Metadata Sources**.
-* **ComicInfo v2.0/v2.1 Enrichment**: When enabled, matched comics are automatically enriched with `<StoryArc>`, `<StoryArcNumber>`, and `<SeriesGroup>` tags via sub-millisecond local SQLite lookups with zero outbound network requests during tagging.
-
-### 5. Dedicated Story Arcs Settings Tab & Live Streaming Crawler
-* **Dedicated Settings Tab**: Replaced the nested general settings card with a top-level **Story Arcs** tab (`#settings-tab-story-arcs`) featuring:
-  - Configuration of auto-sync intervals (`readingOrdersIntervalDays`, default: 7 days, 0 = disabled) and ingestion modes (`both`, `issues`, `collected`).
-  - Strict user-initiated synchronization: `[ ▷ Start Initial Scan / Sync ]` button with optional `Force Re-Scrape` cache bypass.
-  - Live progress card showing currently scraped slug, percentage bar, and cancel controls (`[ ⏹ Cancel Sync ]`).
-  - Live SSE streaming log output (`GET /api/v1/story-arcs/stream`) with log line counter and clear action.
-* **Resilient Crawler Engine**: Auto-detects publishers (`DC Comics`, `Marvel Comics`) from timeline breadcrumbs and links, supports HTTP 308 redirects, and indexes storylines into `data/reading-orders.db`.
-
-### 6. Universal 21-Day Log Retention Policy & Smart Auto-Scroll
-* **Universal 21-Day Retention**: Enforced across all logging layers in Comics Now! — in-memory log streams (`storyArcsLogs`, `guidedLogs`, general logs), on-disk Tag Comics Now scan logs (`data/scan_logs/scan_log_*.json`), and audit records are automatically pruned after 21 days. Includes a daily scheduled retention sweep.
-* **Smart Auto-Scroll in Log Viewers**: Fixed aggressive auto-scrolling across live streaming log viewers (both in Tag Comics Now! / Comic Tagger and Story Arcs). When users scroll up to inspect previous log lines, scroll position is strictly preserved; scrolling back to the bottom (within 35px) resumes auto-scroll, paired with a floating `[ ↓ Jump to latest ]` button.
-
-### 7. Comics Now! MCP Server Continuity Tools
-* Added 4 new FastMCP tools in `comics_mcp`:
-  - `list_story_arcs(publisher, search)`
-  - `get_story_arc(arc_id)`
-  - `get_story_arc_next(comic_id)`
-  - `trigger_story_arcs_sync(mode)`
-
-### 8. Batch ComicInfo.xml Story Arc Enrichment (Option C Override)
-* **Targeted Metadata Enrichment**: Added batch ComicInfo.xml metadata enrichment directly within the Story Arcs settings tab. Allows administrators to run batch updates across all library comics or target specific publishers present in `reading-orders.db` (e.g. `DC Comics`, `Marvel Comics`).
-* **Canonical Story Arc Override (Option C)**: Always enriches `<StoryArc>`, `<StoryArcNumber>`, and `<SeriesGroup>` with canonical continuity data from the Story Arcs database, while strictly preserving all other existing ComicInfo.xml fields (creators, characters, summaries, genres, dates, page lists, and cover coordinates).
-* **Storage-Aware & Redundant Write Protection**: Respects existing storage modes (`archive` zip updates, `sidecar` `.ComicInfo.xml`, and `db` metadata). Automatically skips comics where existing Story Arc tags already match canonical values, avoiding unnecessary disk I/O and modified timestamps.
-* **Live SSE Progress Tracking & Cancellation**: Features a live progress bar with percentage, current comic indicator, updated/skipped counters, and a responsive cancel button.
-
-### 9. In-Grid Story Arc Badges & Continuity Gap Cards
-* **Visual Story Arc Badges**: Comic cards belonging to an active story arc display an amber continuity pill badge (`⚡ <Story Arc Name>`) directly on the card in library and series views.
-* **Inline Continuity Gap Cards**: When browsing issues of a series that participates in a multi-series crossover storyline, missing intermediate issues are visually rendered as dashed amber gap cards (`⚠️ Part of <Story Arc Name>`). Clicking a gap card immediately opens the storyline checklist and timeline visualizer.
-
-### 10. "Skipping Continuity" Reader Launch Interceptor
-* **Continuity Jump Interceptor**: When opening an issue that belongs to a canonical story arc, Comics Now! checks whether earlier chronological issues in that storyline remain unread.
-* **Non-Intrusive Modal**: If unread earlier issues exist, an Amber trade dress dialog informs the reader (`You are jumping ahead in <Story Arc>`) offering 1-tap options to `Read Oldest Unread` or `Continue to Issue`. Includes a persistent `Don't show again for this story arc` preference stored per arc.
-
-### 11. Collected Editions & Range-Aware Continuity Matching
-* **Collected Editions & Volumes Support**: Ingests collected edition reading orders (`/reading-orders/<slug>/collected-editions`) alongside individual single issues. Accurately identifies Deluxe Editions, Companion volumes, Omnibuses, and DC Finest collections in user libraries.
-* **Range & Series Alias Normalization**: Continuity matcher recognizes multi-issue spans (e.g. `#1-5`, `#426-429`, `#529-530`), strips volume/year metadata, normalizes curly punctuation, and handles event series prefixes.
-* **Publisher Alias Expansion**: Batch ComicInfo.xml tagger automatically expands publisher scopes (e.g., `DC Comics` includes `DC`, `Vertigo`, and `Black Label`; `Marvel Comics` includes `Marvel`, `MAX`, and `Icon`).
-* **Canonical Metadata Clean-up**: Strips web scraping title artifacts so `<StoryArc>` tags are cleanly populated with canonical storyline names.
-
-### 12. Automated Weekly Continuity Delta Sync
-* Integrated autonomous delta synchronization into the weekly curator cron routine, fetching new and updated storylines non-destructively without altering reading progress or user-curated reading lists.
-
-### 13. Reverse Proxy & Tunnel Static Asset Whitelist
-* **Vite Bundle Asset Delivery**: Added `/assets/` and `/logos/` to `publicPathPrefixes` in the JWT authentication middleware (`server/middleware/auth.js`). Ensures Vite-compiled CSS and JavaScript bundles load reliably without 401 rejections behind Cloudflare Tunnels, reverse proxies, and subpath deployments when authentication is enabled.
-
-### 14. Reading Lists Additive Parity Sync
-* **Non-Destructive User Parity Sync**: Default reading list synchronization additively introduces missing comics to user reading lists via `INSERT OR IGNORE` and aligns `sortOrder` to canonical templates without modifying existing progress or removing user-added issues.
-
-### 13. Mobile-First Segmented Scope Settings Architecture (Approach A)
-* **M3 Segmented Scope Navigation**: Replaced the 8-tab horizontal scroll with a clean 3-scope segmented pill control (`📖 My Reader`, `⚙️ Server Admin`, `⚡ AI Engines`).
-* **Personal vs. Admin Separation**: Non-admin readers see only their 3 personal reading tabs (`Reading Experience`, `Offline Downloads`, `Synced Devices`) without horizontal scrolling or disabled admin clutter.
-* **Streamlined Admin Hub**: Server administrative tools and background automation engines are grouped logically into dedicated, high-contrast tab scopes.
-
-### 14. Tag Comics Now! Settings & Navigation Re-Architecture
-* **3-Scope Workflow Navigation**: Re-architected `#ct-modal` into 3 admin-focused scopes (`🔍 Scanner & Review`, `⚙️ Sources & AI`, `🗂️ File Organization`) with compact `text-xs` subnav pills and zero horizontal scrolling on mobile.
-* **Elimination of Double-Stacked Tabs**: Promoted the 4 nested management sub-views (`Inbox Operations`, `Naming Rules`, `Folder Rules`, `Session Errors`) directly into the single primary subnav row, completely eliminating nested tab bars.
-* **3-Tier Metadata Editorial Hierarchy**: Structured 11 metadata sources into Tier 1 (Primary Issue DBs: ComicVine, Metron, GCD, LCG), Tier 2 (Retail & ISBN Catalogs: Google Books, Amazon, Goodreads, Forbidden Planet, Blackwell's, Waterstones), and Tier 3 (Continuity & AI Synthesis: ReadingOrders, Gemini Vision).
-* **Decoupled Save Actions & CSS Uniformity**: Independent save handlers for tagger sources/thresholds vs. Gemini AI to prevent configuration overwrites, fixed tab underline indicators, and styled dark numeric and password inputs.
-
-### 15. Safe Story Arc Stripping, Sidecar-Only Tagging & Strict Matcher Guards
-* **Safe Backup & False-Positive Stripping**: Safely backed up all candidate metadata files with a cryptographic manifest to `data/backups/` and cleanly stripped false-positive `<StoryArc>` and `<StoryArcNumber>` tags from XML sidecars and SQLite database records.
-* **Sidecar-Only Tagging Guarantee**: Batch Story Arc enrichment is strictly configured to write exclusively to external `.ComicInfo.xml` sidecars (`storage_mode="sidecar"`). The underlying `.cbz` archives are never unpacked or rewritten, completely eliminating multi-gigabyte disk copying and ensuring instantaneous sub-millisecond updates.
-* **Strict Matcher Precision Guards**:
-  - Replaced broad substring queries with exact normalized series matching.
-  - Added publication year and era cross-validation (`abs(comic_year - ro_year) <= 2`), preventing modern events (e.g. 2024 *DC K.O.*) from erroneously matching legacy classic runs (e.g. 2005 *Justice League Unlimited*).
-  - Hardened issue number extraction to prioritize `#Number` and strip leading file track indices (`01 `, `06 `) and parenthesized publication years (`(2005)`).
-
-### 16. Story Arc Dry-Run Simulation Engine & Precision Matcher
-* **Strict Dry-Run Simulation Mode**: Administrators can preview proposed Story Arc tags across the entire library with zero side effects. In dry-run mode, no `.ComicInfo.xml` sidecars or `.cbz` archives are modified, and `comics-now.db` remains 100% untouched. Proposed matches are accumulated in memory and streamed live to the UI via SSE.
-* **O(1) Pre-Indexed Series Lookups**: Replaced $O(N \times M)$ nested iteration with in-memory series indexing, slashing full library batch scan times across 5,600+ comics from ~45 seconds down to under 1 second.
-* **Storyline Era Window Fallback**: If an individual issue row in ReadingOrders.com lacks an explicit publication date, the matcher cross-references against the overall reading order's era window ($\pm 2$ years). Prevents legacy runs (e.g. 2005 *Justice League Unlimited*) from erroneously matching modern event tie-in spans (e.g. 2024-2026 *DC K.O.*).
-* **Publisher Family Guard**: Cross-company false positives are rejected at the matcher boundary (e.g. *Europe Comics* vs *Marvel*, *DC Comics* vs *Marvel*).
-* **Collected Editions Overlap Matching**: Correctly matches trade paperbacks and volumes by checking issue collection spans extracted from comic summaries against reading order issue spans.
-
-### 17. Clean Reading List & Story Arc Views, Publisher Separation & Three-Gate Matching
-* **Streamlined Scope & View Modes**: Permanently removed redundant List/Folder view mode toggles (`#smart-scope-mode-toggle`) when viewing Reading Lists and Story Arcs, ensuring clean and consistent card presentation.
-* **Modular Story Arc Views**: Split Story Arc details into dedicated, maintainable modules (`story-arcs-issues.js`, `story-arcs-collections.js`). Collected edition cards accurately compute ownership and completeness against collected volume targets rather than single issues.
-* **Publisher Classification & Three-Gate Matcher**: Hardened publisher detection in `parser.py` to prevent cross-publisher misclassifications, and integrated a three-gate matcher with cover service heuristics and collection completeness tracking.
-* **Portable Test Harness**: Hardened test fixtures to use dynamic relative root resolution, ensuring zero exposure of host paths or personal identifiers across the test suite.
-
-### 18. Gemini Flash AI Story Arc Tagger (Whole Library Semantic Matcher)
-* **High-Density Semantic Tagger**: Evaluates library comic collections against canonical ReadingOrders.com checklists using Gemini Flash AI with quota-safe token rate limiting (15 RPM / 250k TPM) and backoff retry.
-* **Dynamic Candidate Scoping**: Intelligently scopes comic candidates per storyline by pre-indexing library titles and publishers, reducing context overhead while guaranteeing 100% semantic matching precision.
-* **Review & Verification**: Emits structured match justifications, proposed `<StoryArc>` / `<StoryArcNumber>` tags, and confidence scores across both CLI review and live in-app enrichment runs.
-
-### 19. Strict Zero-Fallback Story Arc Matching & Unified Live Sync Logging
-* **Exclusive Gemini Matching**: Removed heuristic and local rule-based match fallbacks. Story arc matching strictly operates via Gemini Flash AI; if Gemini is unconfigured or finds no match, no heuristic fallback is performed.
-* **Unified Live Sync & Crawler Logs**: Streamlined `/api/v1/story-arcs/stream` to broadcast events from both crawler sync and Gemini batch tagging, displaying real-time progress (`[idx/total] (X%)`), AI prompt token counts, and matched issues directly in the Live Sync & Crawler Logs console.
-* **Automated Post-Sync Evaluation**: When ReadingOrders.com sync discovers newly added reading orders, candidate comics are automatically evaluated against them using Gemini Flash with real-time live logging.
-
-### 20. Contextual Smart Filters & Publisher View Performance
-* **Libraries (Root) View Smart Filters**: Restricted root view smart filters strictly to `Reading Lists` and `Story Arcs` for clean top-level collection navigation. Contextual filters (`New`, `Downloaded`, `Guided View`, `Manga`) dynamically reveal upon entering publisher views.
-* **Instantaneous Story Arc Filter Counting**: Story arc filter badge counts are calculated instantly from indexed reading orders in memory without scanning all publishers, eliminating navigation lag and unneeded revalidations.
-* **Breadcrumb Scope Resets**: Navigating back to the Libraries root view via breadcrumbs automatically deselects active smart filters to restore the full top-level view cleanly.
+### 2. Reverse Proxy & Tunnel Asset Delivery Hardening
+* **Vite Bundle Asset Delivery**: Whitelisted `/assets/` and `/logos/` in `publicPathPrefixes` in the JWT authentication middleware (`server/middleware/auth.js`). Eliminates `401 Unauthorized` responses on JavaScript/CSS asset bundles when accessing Comics Now! via Cloudflare Tunnels, reverse proxies, and subpath deployments with authentication enabled.
 
 ---
 
 ## ⬆️ Upgrade Notes
-* `data/reading-orders.db` is initialized automatically in WAL mode on first access.
-* Existing user reading lists, custom sort orders, and reading progress records are completely untouched.
-* All log entries and on-disk scan logs older than 21 days are automatically pruned.
-* Optional `config.json` settings `readingOrdersIntervalDays` (default: `7`) and `readingOrdersMode` (default: `"both"`) are supported out of the box.
+* **No Database Migrations Required**: v4.1.0 is 100% backward-compatible with existing databases and sidecar files.
+* **Zero Disruption to User Data**: All user reading lists, reading progress, and custom sort orders remain completely untouched.
+* **Automatic Client Update**: Frontend assets are bundled via Vite (`public/dist/`); browsers will automatically load the new viewer scripts.
 
 ---
 
-## 📦 v4.0.0 Changelog
-1. `feat(continuity)`: add ReadingOrders scraper, Story Arcs smart filter, and narrative timeline (`d53f862`)
-2. `feat(continuity)`: add ReadingOrders MCP tools, selectable tagger source, runner and docs (`e9b06cf`)
-3. `feat(settings)`: add dedicated Story Arcs settings tab, smart streaming logs, crawler engine, route contract integrity test, and 21-day log retention
-4. `feat(story-arcs)`: add batch ComicInfo.xml metadata enrichment with Option C override and target publisher scope
-5. `feat(story-arcs)`: add Story Arc detail banner view, multi-lane spine and spurs DAG, and series continuity strip
-6. `feat(continuity)`: add in-grid badges, continuity jump interceptor, and weekly delta sync
-7. `feat(continuity)`: add collected editions crawler, range-aware matching, and publisher alias expansion
-8. `feat(settings)`: add Approach A segmented scope settings architecture and role-aware navigation
-9. `feat(comictagger)`: re-architect Tag Comics Now settings into 3 admin scopes, eliminate double-stacked tabs, and structure 3-tier metadata sources (`ba75bc8`)
-10. `feat(story-arcs)`: migrate continuity crawler, matcher, and batch tagger 100% into Python tagger subsystem and proxy via Node.js
-11. `feat(continuity)`: strip false-positive story arcs, mandate sidecar-only tagging, and enforce year and series matching guards
-12. `feat(continuity)`: add dry-run simulation mode, O(1) indexed matcher, reading order era boundaries, and publisher guards
-13. `feat(library)`: streamline reading list and story arc views, separate issue/collection views, and integrate three-gate matcher
-14. `feat(continuity)`: add Gemini Flash AI story arc tagger with quota protection and dynamic candidate scoping
-15. `feat(continuity)`: enforce zero-fallback Gemini story arc matching and unify live crawler/batch SSE log stream
-16. `feat(library)`: contextualize smart filters for Libraries root view and optimize story arcs count latency
+## 📦 v4.1.0 Changelog
+1. `feat(viewer)`: smart panel-aware speech bubble zoom placement (`0b82150`)
+2. `fix(auth)`: whitelist Vite /assets/ and /logos/ in JWT auth middleware for proxy and tunnel deployments (`14a26c9`)
 
 ---
 
 ## 🧪 Verification & Test Results
-- **Full Jest suite**: `196 suites passed, 1506 tests passed (100% pass rate)`.
-- **Python tagger pytest suite**: `37 tests passed (100% pass rate)`.
+- **Full Jest suite**: `197 suites passed, 1520 tests passed (100% pass rate)`.
+- **Dedicated TDD placement test suite**: `tests/guidedBubblePlacement.test.js` (14/14 tests passed).
+- **Interactive zoom integration**: `tests/guidedInteractiveZoom.test.js` and `tests/guidedZoomOverlay.test.js` verified (100% pass rate).
 - **Production build**: Tailwind CSS v4 and Vite client bundle compiled cleanly.
-- **Architecture ratchet**: all new and modified modules remain strictly under the 380-line ceiling.
 
 ---
 
-# Previous Release: Comics Now! v3.3.0
+# Previous Release: Comics Now! v4.0.0
 
-- **Per-Comic Tag Search & CBR Support**: Single-comic tag search (`POST /api/v1/tag-comics-now/run-file` and MCP `run_tag_search`), CBR cover extraction, sidecar-only `ComicInfo.xml` writes for RAR/CBR archives, and companion metadata mirroring via `comics.originalPath`.
-- **Allowed Library Formats & Guided View Hardening**: Format filtering across library/search/folder views, serialized RAR archive sessions, atomic sidecar writes, and Gemini Vision fallback resilience.
-- See GitHub Releases for the full v3.3.0 notes.
+### Story Arcs, Narrative Timelines & Continuity Management
+- **Dedicated Story Arcs Smart Filter**: New `⚡ Story Arcs` filter pill in publisher view with Gold/Amber trade dress (`#F59E0B` / `#EF4444`) and real-time library completeness metrics.
+- **Story Arc Detail Banner & DAG Visualizer**: Interactive box-set detail banner with Grid, Checklist, and Spine & Orbit Spurs timeline visualizer.
+- **In-Reader Continuity Prompts**: "Up Next in Arc" prompt upon reaching the final page of an issue.
+- **Tag Comics Now! Source**: `ReadingOrders (Story Arcs)` source for `<StoryArc>`, `<StoryArcNumber>`, and `<SeriesGroup>` ComicInfo enrichment.
+- **Dedicated Settings Tab & Crawler**: Multi-publisher crawler engine with live SSE streaming logs and 21-day retention policy.
+- **MCP Continuity Tools**: Added 4 FastMCP continuity tools (`list_story_arcs`, `get_story_arc`, `get_story_arc_next`, `trigger_story_arcs_sync`).
+- See GitHub Releases for the full v4.0.0 notes.
