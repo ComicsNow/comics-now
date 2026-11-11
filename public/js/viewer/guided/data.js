@@ -22,6 +22,19 @@ export async function loadGuidedView(comicId) {
   }
 }
 
+export function currentPageData() {
+  const comic = state.currentComic || window.currentComic;
+  if (!comic) return null;
+  const data = cache.get(comic.id);
+  if (!data || !data.pages) return null;
+  const getPages = state.getViewerPages || window.getViewerPages;
+  const pages = getPages?.() || [];
+  const pageIndex = (state.currentPageIndex !== undefined && state.currentPageIndex !== null) ? state.currentPageIndex : window.currentPageIndex;
+  const fname = pages[pageIndex];
+  if (!fname) return null;
+  return data.pages[fname] || null;
+}
+
 export function currentPagePanels() {
   const comic = state.currentComic || window.currentComic;
   if (!comic) return [];
@@ -125,6 +138,7 @@ export const currentPageRawPanels = currentPageRawBoxes;
 Object.assign(state.GuidedView, {
   cache,
   loadGuidedView,
+  currentPageData,
   currentPagePanels,
   currentPageRawPanels,
   currentPageBubbles,
@@ -139,6 +153,7 @@ if (typeof window !== 'undefined' && window.GuidedView && window.GuidedView !== 
   Object.assign(window.GuidedView, {
     cache,
     loadGuidedView,
+    currentPageData,
     currentPagePanels,
     currentPageRawPanels,
     currentPageBubbles,

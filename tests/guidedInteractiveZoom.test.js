@@ -50,6 +50,7 @@ function createInteractiveZoomSandbox() {
 
   loadFile('../public/js/viewer/guided/geometry.js');
   loadFile('../public/js/viewer/guided/data.js');
+  loadFile('../public/js/viewer/guided/bubble-placement.js');
   loadFile('../public/js/viewer/guided/mode-registry.js');
   loadFile('../public/js/viewer/guided/overlay.js');
   loadFile('../public/js/viewer/guided/pan.js');

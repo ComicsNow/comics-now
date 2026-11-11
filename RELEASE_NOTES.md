@@ -3,6 +3,7 @@
 Welcome to **Comics Now! v4.0.1** — patch release delivering reverse proxy/tunnel static asset delivery fixes and non-destructive reading list parity synchronization.
 
 ### 🛡️ v4.0.1 Highlights
+* **Smart Panel-Aware Speech Bubble Zoom Placement**: Guided view speech bubble zoom now dynamically avoids covering the active comic panel artwork. When inspecting dialogue callouts in Western Speech Zoom, Manga Speech Zoom, or Manga Panel Zoom, the magnifier overlay identifies the containing panel's on-screen geometry to dock cleanly above, below, or to the side of the panel, with opposite-corner fallbacks for full-page splash panels and zero impact on panel zoom rendering.
 * **Vite Bundle Asset Delivery Behind Reverse Proxies & Tunnels**: Added `/assets/` and `/logos/` to `publicPathPrefixes` in the JWT authentication middleware (`server/middleware/auth.js`). Eliminates `401 Unauthorized` responses on JavaScript/CSS asset bundles when accessing Comics Now! via Cloudflare Tunnels, reverse proxies, and subpath deployments with authentication enabled.
 * **Non-Destructive Reading List Additive Parity Sync**: Default reading list sync now additively introduces missing comics via `INSERT OR IGNORE` and aligns `sortOrder` across all user profiles without modifying reading progress or removing user-curated items.
 

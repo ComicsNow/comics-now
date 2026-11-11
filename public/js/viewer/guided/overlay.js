@@ -8,6 +8,7 @@
  */
 import { state, clearElement } from '../../globals.js';
 import { html, raw, render } from '../../ui/template.js';
+import { computeSmartBubblePlacement, findParentPanel, getPagePanels } from './bubble-placement.js';
 
 const clear = typeof clearElement === 'function' ? clearElement : (el) => { if (el) { if (typeof el.replaceChildren === 'function') el.replaceChildren(); else el.innerHTML = ''; } };
 const renderContent = (typeof render === 'function' && render.length >= 2) ? render : (el, content) => {
@@ -114,6 +115,7 @@ export function applyBubbleOverlay(targetBox, isPanelZoom) {
 
   if (!targetBox) {
     if (overlay) {
+      overlay._lastPlacement = null;
       overlay.style.opacity = '0';
       clearTimeout(overlay._hideTimer);
       overlay._hideTimer = setTimeout(() => {
@@ -258,29 +260,51 @@ export function applyBubbleOverlay(targetBox, isPanelZoom) {
     overlayW = Math.min(maxBubbleW, Math.max(minBubbleW, Math.round(pw * innerScale + padX * 2)));
     overlayH = Math.min(maxBubbleH, Math.max(minBubbleH, Math.round(ph * innerScale + padY * 2)));
 
-    targetX = Math.max(6, Math.min(stageW - overlayW - 6, (stageW - overlayW) / 2));
-    
-    // STABILIZATION: Use a more stable positioning logic to prevent jumpiness.
-    // Instead of a hard flip at center, we use a 20% deadzone.
-    const deadzone = stageH * 0.1;
-    const mid = stageH / 2;
-    
-    if (typeof overlay._lastYPos === 'undefined') {
-      overlay._lastYPos = bubbleStageCy < mid ? 'bottom' : 'top';
+    // Use smart panel-aware placement to avoid obscuring the parent panel
+    const pageData = (typeof state !== 'undefined' && state.GuidedView && typeof state.GuidedView.currentPageData === 'function')
+      ? state.GuidedView.currentPageData()
+      : null;
+    const getPanels = (typeof state !== 'undefined' && state.GuidedView && state.GuidedView.getPagePanels) || (typeof getPagePanels !== 'undefined' ? getPagePanels : null);
+    const findParent = (typeof state !== 'undefined' && state.GuidedView && state.GuidedView.findParentPanel) || (typeof findParentPanel !== 'undefined' ? findParentPanel : null);
+    const computePlacement = (typeof state !== 'undefined' && state.GuidedView && state.GuidedView.computeSmartBubblePlacement) || (typeof computeSmartBubblePlacement !== 'undefined' ? computeSmartBubblePlacement : null);
+
+    let targetCoords = null;
+    if (typeof computePlacement === 'function') {
+      const isMangaMode = !!(comic && (comic.mangaMode === true || comic.mangaMode == 1));
+      const pagePanels = (typeof getPanels === 'function')
+        ? getPanels(pageData, isMangaMode)
+        : [];
+      const parentPanel = (typeof findParent === 'function')
+        ? findParent(pagePanels, targetBox)
+        : null;
+
+      targetCoords = computePlacement({
+        bubble: targetBox,
+        parentPanel,
+        stageW,
+        stageH,
+        overlayW,
+        overlayH,
+        imgLayout: {
+          naturalWidth: img.naturalWidth,
+          naturalHeight: img.naturalHeight,
+          scale: baseScale,
+          imgLeft: (stageW - img.naturalWidth * baseScale) / 2,
+          imgTop
+        },
+        lastPlacement: overlay._lastPlacement || null
+      });
+      overlay._lastPlacement = targetCoords;
     }
 
-    if (overlay._lastYPos === 'bottom') {
-      if (bubbleStageCy > mid + deadzone) overlay._lastYPos = 'top';
+    if (targetCoords) {
+      targetX = targetCoords.targetX;
+      targetY = targetCoords.targetY;
     } else {
-      if (bubbleStageCy < mid - deadzone) overlay._lastYPos = 'bottom';
+      targetX = Math.max(6, Math.min(stageW - overlayW - 6, (stageW - overlayW) / 2));
+      targetY = bubbleStageCy < (stageH / 2) ? (stageH - overlayH - 100) : 60;
+      targetY = Math.max(10, Math.min(stageH - overlayH - 10, targetY));
     }
-
-    if (overlay._lastYPos === 'top') {
-      targetY = 60;
-    } else {
-      targetY = stageH - overlayH - 100;
-    }
-    targetY = Math.max(10, Math.min(stageH - overlayH - 10, targetY));
 
     overlayScale = 1;
   }

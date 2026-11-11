@@ -61,6 +61,8 @@ describe('Guided View Zoom & Overlay Scaling', () => {
       script.runInContext(sandbox);
     }
 
+    loadFile('../public/js/viewer/guided/geometry.js');
+    loadFile('../public/js/viewer/guided/bubble-placement.js');
     loadFile('../public/js/viewer/guided/overlay.js');
   });
 

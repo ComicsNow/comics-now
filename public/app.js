@@ -85,6 +85,7 @@ import './js/viewer/viewer-local.js';
 import './js/viewer/end-navigation.js';
 import './js/viewer/guided/data.js';
 import './js/viewer/guided/geometry.js';
+import './js/viewer/guided/bubble-placement.js';
 import './js/viewer/guided/overlay.js';
 import './js/viewer/guided/mode-registry.js';
 import './js/viewer/guided/modes/guided.js';
