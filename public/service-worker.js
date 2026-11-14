@@ -18,6 +18,7 @@ const ASSET_PATHS = [
   'style.css',
   'tailwind.css',
   'jszip.min.js',
+  'unrar.wasm',
   'manifest.json',
   'icons/icon-192x192.png',
   'icons/icon-512x512.png',
@@ -112,28 +113,54 @@ self.addEventListener('fetch', event => {
   const isThumbnail = url.pathname.includes('/thumbnails/');
   const isGuidedView = url.pathname.match(/\/api\/v1\/comics\/.*\/guided-view/);
 
-  if (isComicPage || isThumbnail || isGuidedView) {
+  if (isComicPage || isThumbnail) {
     event.respondWith((async () => {
       const cache = await caches.open(DOWNLOADS_CACHE_NAME);
-      
-      // Try network first (to get latest if online), but fallback to cache
+      const cached = await cache.match(req);
+      if (cached) return cached;
+
       try {
-        const net = await fetch(req, { cache: 'no-store' });
+        const net = await fetch(req);
+        if (net.ok) {
+          cache.put(req, net.clone());
+          trimDownloadsCache(cache, 800).catch(() => {});
+        }
+        return net;
+      } catch (err) {
+        return new Response('Offline - Image not cached', {
+          status: 503,
+          statusText: 'Offline',
+          headers: { 'Content-Type': 'text/plain' }
+        });
+      }
+    })());
+    return;
+  }
+
+  if (isGuidedView) {
+    event.respondWith((async () => {
+      const cache = await caches.open(DOWNLOADS_CACHE_NAME);
+      const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+      const timeoutId = controller ? setTimeout(() => controller.abort(), 1500) : null;
+
+      try {
+        const net = await fetch(req, controller ? { signal: controller.signal } : undefined);
+        if (timeoutId) clearTimeout(timeoutId);
         if (net.ok) {
           cache.put(req, net.clone());
           return net;
         }
       } catch (err) {
-        // Ignore network errors and try cache
+        if (timeoutId) clearTimeout(timeoutId);
       }
 
       const match = await cache.match(req);
       if (match) return match;
 
-      return new Response('Offline - Image not cached', {
+      return new Response('Offline - Guided view not cached', {
         status: 503,
         statusText: 'Offline',
-        headers: { 'Content-Type': 'text/plain' }
+        headers: { 'Content-Type': 'application/json' }
       });
     })());
     return;
@@ -317,17 +344,33 @@ async function openDownloadDB() {
 
     request.onupgradeneeded = (event) => {
       const database = event.target.result;
-      // Ensure basic stores exist if SW is the one upgrading
+      // Create all 8 stores matching db-core.js so SW initialization never skips page stores
+      if (!database.objectStoreNames.contains('comics')) {
+        const comicsStore = database.createObjectStore('comics', { keyPath: 'id' });
+        comicsStore.createIndex('userId', 'userId', { unique: false });
+      }
+      if (!database.objectStoreNames.contains('progress')) {
+        database.createObjectStore('progress', { keyPath: 'id' });
+      }
+      if (!database.objectStoreNames.contains('statuses')) {
+        database.createObjectStore('statuses', { keyPath: 'key' });
+      }
+      if (!database.objectStoreNames.contains('library')) {
+        database.createObjectStore('library', { keyPath: 'key' });
+      }
       if (!database.objectStoreNames.contains('downloadQueue')) {
         const queueStore = database.createObjectStore('downloadQueue', { keyPath: 'id' });
         queueStore.createIndex('priority', 'priority', { unique: false });
+        queueStore.createIndex('status', 'status', { unique: false });
       }
       if (!database.objectStoreNames.contains('settings')) {
         database.createObjectStore('settings', { keyPath: 'key' });
       }
-      if (!database.objectStoreNames.contains('comics')) {
-        const comicsStore = database.createObjectStore('comics', { keyPath: 'id' });
-        comicsStore.createIndex('userId', 'userId', { unique: false });
+      if (!database.objectStoreNames.contains('deviceLibraries')) {
+        database.createObjectStore('deviceLibraries', { keyPath: 'id' });
+      }
+      if (!database.objectStoreNames.contains('deviceComics')) {
+        database.createObjectStore('deviceComics', { keyPath: 'id' });
       }
     };
   });
@@ -563,191 +606,19 @@ async function showCompletionNotification(completedCount) {
   }
 }
 
-let isProcessingQueue = false;
-
 /**
- * Process download queue (Background Sync handler)
+ * Trim cached page images in DOWNLOADS_CACHE_NAME to a bounded entry count
  */
-async function processDownloadQueue() {
-  if (isProcessingQueue) return;
-  isProcessingQueue = true;
-
+async function trimDownloadsCache(cache, maxEntries = 800) {
   try {
-    let db;
-    try {
-      db = await openDownloadDB();
-    } catch (error) {
-      console.error('[SW] Failed to open IndexedDB:', error);
-      return;
+    const keys = await cache.keys();
+    if (keys.length <= maxEntries) return;
+    const excess = keys.length - maxEntries;
+    for (let i = 0; i < excess; i++) {
+      await cache.delete(keys[i]);
     }
-
-    let queue;
-    try {
-      queue = await getQueueItems(db);
-    } catch (error) {
-      console.error('[SW] Failed to load queue:', error);
-      return;
-    }
-
-    // Filter only pending items
-    const pendingItems = queue.filter(item => item.status === 'pending');
-
-    if (pendingItems.length === 0) {
-      return;
-    }
-
-    // Get Cloudflare Access JWT token
-    const jwtToken = await getStoredJWT(db);
-
-    let completedCount = 0;
-
-    for (const item of pendingItems) {
-      try {
-        // Re-verify item is still in queue and pending (to handle external cancellations)
-        const currentQueue = await getQueueItems(db);
-        const stillExists = currentQueue.find(i => i.id === item.id && i.status === 'pending');
-        if (!stillExists) continue;
-
-        // Update status to downloading
-        await updateQueueItem(db, item.id, { status: 'downloading', progress: 0 });
-
-        // Notify clients of status change
-        await notifyClients({
-          type: 'download-status',
-          comicId: item.id,
-          status: 'downloading'
-        });
-
-        // Construct download URL (path must be base64 encoded, then URI encoded)
-        const downloadUrl = `${self.location.origin}${BASE_PATH}api/v1/comics/download?path=${encodeURIComponent(encodePath(item.comicPath))}`;
-
-        // Download comic with authentication
-        const headers = {
-          'Cache-Control': 'no-cache'
-        };
-
-        // Add Cloudflare Access token if available
-        if (jwtToken) {
-          headers['cf-access-jwt-assertion'] = jwtToken;
-        }
-
-        let response;
-        try {
-          response = await fetch(downloadUrl, {
-            headers: headers,
-            credentials: 'include',
-            mode: 'cors',
-            cache: 'no-cache'
-          });
-        } catch (fetchError) {
-          console.error('[SW] Fetch error:', fetchError);
-          throw new Error(`Network error: ${fetchError.message}. Try downloading from library instead.`);
-        }
-
-
-        if (!response.ok) {
-          // Handle authentication errors specially
-          if (response.status === 401 || response.status === 403) {
-            throw new Error('Authentication expired - please reopen app and restart download');
-          }
-          throw new Error(`Download failed: ${response.status} ${response.statusText}`);
-        }
-
-        // Download with progress tracking
-        const blob = await downloadWithProgress(response, async (progress) => {
-          await updateQueueItem(db, item.id, { progress });
-          await notifyClients({
-            type: 'download-progress',
-            comicId: item.id,
-            progress: progress
-          });
-        });
-
-        // Fetch guided view data to cache it
-        try {
-          const guidedViewUrl = `${self.location.origin}${BASE_PATH}api/v1/comics/${encodeURIComponent(item.comic.id)}/guided-view`;
-          const gvRes = await fetch(guidedViewUrl, { headers: headers, credentials: 'include' });
-          if (gvRes.ok) {
-            const cache = await caches.open(DOWNLOADS_CACHE_NAME);
-            await cache.put(guidedViewUrl, gvRes);
-          }
-        } catch (gvErr) {
-          console.error('[SW] Guided view fetch failed:', gvErr);
-        }
-
-        // Save to IndexedDB
-        await saveComicBlob(db, item.comic, blob);
-
-        // Mark complete and remove from queue after 3 seconds
-        await updateQueueItem(db, item.id, {
-          status: 'completed',
-          progress: 1
-        });
-
-        await notifyClients({
-          type: 'download-complete',
-          comicId: item.id
-        });
-
-        completedCount++;
-
-        // Remove from queue
-        setTimeout(async () => {
-          let db2;
-          try {
-            db2 = await openDownloadDB();
-            await removeQueueItem(db2, item.id);
-          } catch (error) {
-            console.error('[SW] Error removing completed item:', error);
-          } finally {
-            if (db2) {
-              db2.close();
-            }
-          }
-        }, 3000);
-
-      } catch (error) {
-        console.error('[SW] Download failed:', item.comicName, error);
-
-        try {
-          await updateQueueItem(db, item.id, {
-            status: 'error',
-            error: error.message || 'Download failed'
-          });
-
-          await notifyClients({
-            type: 'download-error',
-            comicId: item.id,
-            error: error.message
-          });
-        } catch (updateError) {
-          console.error('[SW] Error updating failed item:', updateError);
-        }
-      }
-    }
-
-    // Show notification if any completed
-    if (completedCount > 0) {
-      await showCompletionNotification(completedCount);
-    }
-  } finally {
-    isProcessingQueue = false;
-  }
+  } catch (_) {}
 }
-
-// SYNC EVENT: Handle background sync for downloads
-self.addEventListener('sync', (event) => {
-  if (event.tag === 'download-comics') {
-    event.waitUntil(processDownloadQueue());
-  }
-});
-
-// MESSAGE EVENT: Handle explicit download start commands
-self.addEventListener('message', (event) => {
-  if (event.data && event.data.type === 'start-downloads') {
-    event.waitUntil(processDownloadQueue());
-  }
-});
 
 // NOTIFICATION CLICK: Handle notification interactions
 self.addEventListener('notificationclick', (event) => {

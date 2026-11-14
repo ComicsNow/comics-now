@@ -46,17 +46,39 @@ async function loadOfflineComicPages(comic) {
       return [];
     }
 
-    const JSZipCtor = global.JSZip;
-    if (!JSZipCtor) {
-      return [];
+    const openArchiveFn = typeof global.openClientArchive === 'function'
+      ? global.openClientArchive
+      : (typeof window !== 'undefined' && typeof window.openClientArchive === 'function' ? window.openClientArchive : null);
+
+    let entryNames = [];
+    if (openArchiveFn) {
+      let archive = null;
+      if (global.currentComicArchiveCache && global.currentComicArchiveCache.id === comic.id && !global.currentComicArchiveCache.failed) {
+        archive = global.currentComicArchiveCache.archive;
+      } else {
+        archive = await openArchiveFn(zipData, comic.name || comic.path || '');
+        global.currentComicArchiveCache = { id: comic.id, archive };
+        if (archive.type === 'cbz' && archive.zip) {
+          global.currentComicZipCache = { id: comic.id, zip: archive.zip };
+        }
+      }
+      entryNames = archive.listEntries();
+    } else {
+      const JSZipCtor = global.JSZip;
+      if (!JSZipCtor) {
+        return [];
+      }
+      const zip = await new JSZipCtor().loadAsync(zipData);
+      global.currentComicZipCache = { id: comic.id, zip };
+      entryNames = Object.keys(zip.files).filter((name) => {
+        const entry = zip.files[name];
+        return entry && !entry.dir;
+      });
     }
 
-    const zip = await new JSZipCtor().loadAsync(zipData);
-    const pageNames = Object.keys(zip.files)
-      .filter(name => {
-        const entry = zip.files[name];
-        if (!entry || entry.dir) return false;
-        if (name.startsWith(MAC_OS_RESOURCE_PREFIX)) return false;
+    const pageNames = entryNames
+      .filter((name) => {
+        if (!name || name.startsWith(MAC_OS_RESOURCE_PREFIX)) return false;
         return IMAGE_FILE_REGEX.test(name);
       })
       .sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }));

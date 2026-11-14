@@ -37,6 +37,7 @@ backups/
 *.sqlite3
 *.bak
 *.bak-*
+*.testbak
 
 # Server-side page transcode cache (regenerated on demand)
 page-cache/

@@ -1,0 +1,154 @@
+/**
+ * @jest-environment node
+ */
+
+const fs = require('fs');
+const path = require('path');
+const vm = require('vm');
+
+function loadServiceWorkerSandbox(overrides = {}) {
+  const listeners = new Map();
+  const cacheMap = new Map();
+  const mockCache = {
+    match: jest.fn(async (req) => cacheMap.get(typeof req === 'string' ? req : req.url) || null),
+    put: jest.fn(async (req, res) => {
+      cacheMap.set(typeof req === 'string' ? req : req.url, res);
+    }),
+    keys: jest.fn(async () => Array.from(cacheMap.keys()).map((url) => ({ url }))),
+    delete: jest.fn(async (req) => cacheMap.delete(typeof req === 'string' ? req : req.url))
+  };
+
+  const createdStores = [];
+  const existingStoreNames = new Set();
+  const mockDb = {
+    objectStoreNames: {
+      contains: (name) => existingStoreNames.has(name)
+    },
+    createObjectStore: jest.fn((name, opts) => {
+      existingStoreNames.add(name);
+      const store = { name, opts, indexes: [], createIndex: jest.fn((idxName) => store.indexes.push(idxName)) };
+      createdStores.push(store);
+      return store;
+    })
+  };
+
+  const sandbox = {
+    self: null,
+    location: { origin: 'http://localhost:3000' },
+    registration: { scope: 'http://localhost:3000/' },
+    caches: {
+      open: jest.fn(async () => mockCache),
+      keys: jest.fn(async () => []),
+      delete: jest.fn(async () => true)
+    },
+    indexedDB: {
+      open: jest.fn(() => {
+        const req = { result: mockDb, onsuccess: null, onupgradeneeded: null, onerror: null, onblocked: null };
+        setTimeout(() => {
+          if (req.onupgradeneeded) req.onupgradeneeded({ target: req });
+          if (req.onsuccess) req.onsuccess({ target: req });
+        }, 0);
+        return req;
+      })
+    },
+    fetch: overrides.fetch || jest.fn(async () => ({
+      ok: true,
+      status: 200,
+      clone: () => ({ ok: true, status: 200, fromNetwork: true })
+    })),
+    URL,
+    Response: class MockResponse {
+      constructor(body, init = {}) {
+        this.body = body;
+        this.status = init.status || 200;
+        this.ok = this.status >= 200 && this.status < 300;
+        this.headers = init.headers || {};
+      }
+    },
+    AbortController: global.AbortController,
+    setTimeout,
+    clearTimeout,
+    console,
+    addEventListener: (type, fn) => listeners.set(type, fn)
+  };
+  sandbox.self = sandbox;
+  vm.createContext(sandbox);
+
+  const swPath = path.resolve(__dirname, '../public/service-worker.js');
+  const code = fs.readFileSync(swPath, 'utf8');
+  vm.runInContext(code, sandbox);
+
+  return { sandbox, listeners, cacheMap, mockCache, createdStores, existingStoreNames };
+}
+
+describe('public/service-worker.js', () => {
+  test('pre-caches unrar.wasm in ASSET_PATHS', () => {
+    const swPath = path.resolve(__dirname, '../public/service-worker.js');
+    const code = fs.readFileSync(swPath, 'utf8');
+    expect(code).toContain("'unrar.wasm'");
+  });
+
+  test('serves comic page images Cache-First without cache: no-store on miss', async () => {
+    const { sandbox, listeners, cacheMap } = loadServiceWorkerSandbox();
+    const fetchListener = listeners.get('fetch');
+    expect(typeof fetchListener).toBe('function');
+
+    const imgUrl = 'http://localhost:3000/api/v1/comics/pages/image?path=abc&page=1.jpg&fmt=webp';
+    const cachedRes = { ok: true, status: 200, cached: true };
+    cacheMap.set(imgUrl, cachedRes);
+
+    let respondedPromise;
+    fetchListener({
+      request: { method: 'GET', url: imgUrl, headers: { get: () => '' } },
+      respondWith: (p) => { respondedPromise = p; }
+    });
+
+    const hit = await respondedPromise;
+    expect(hit).toBe(cachedRes);
+    expect(sandbox.fetch).not.toHaveBeenCalled();
+
+    // Cache miss fetches without cache: 'no-store'
+    const missUrl = 'http://localhost:3000/api/v1/comics/pages/image?path=abc&page=2.jpg&fmt=webp';
+    let missPromise;
+    fetchListener({
+      request: { method: 'GET', url: missUrl, headers: { get: () => '' } },
+      respondWith: (p) => { missPromise = p; }
+    });
+
+    await missPromise;
+    expect(sandbox.fetch).toHaveBeenCalledTimes(1);
+    const fetchOpts = sandbox.fetch.mock.calls[0][1];
+    expect(fetchOpts?.cache).not.toBe('no-store');
+    expect(cacheMap.has(missUrl)).toBe(true);
+  });
+
+  test('removes deprecated SW processDownloadQueue and sync download-comics handler', () => {
+    const swPath = path.resolve(__dirname, '../public/service-worker.js');
+    const swCode = fs.readFileSync(swPath, 'utf8');
+    expect(swCode).not.toContain('function processDownloadQueue');
+    expect(swCode).not.toContain("event.tag === 'download-comics'");
+
+    const downloadsPath = path.resolve(__dirname, '../public/js/offline/downloads.js');
+    const dlCode = fs.readFileSync(downloadsPath, 'utf8');
+    expect(dlCode).not.toContain('registerBackgroundSync');
+  });
+
+  test('openDownloadDB creates all 8 object stores on version upgrade', async () => {
+    const { sandbox, existingStoreNames } = loadServiceWorkerSandbox();
+    await sandbox.openDownloadDB();
+
+    const expectedStores = [
+      'comics',
+      'progress',
+      'statuses',
+      'library',
+      'downloadQueue',
+      'settings',
+      'deviceLibraries',
+      'deviceComics'
+    ];
+    for (const storeName of expectedStores) {
+      expect(existingStoreNames.has(storeName)).toBe(true);
+    }
+  });
+});

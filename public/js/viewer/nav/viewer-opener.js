@@ -130,9 +130,27 @@ async function openComicViewer(comic, options = {}) {
   }
 
   global.resetComicSummary?.();
+  if (typeof URL?.revokeObjectURL === 'function') {
+    const revoked = new Set();
+    for (const url of global.pageUrlCache?.values?.() || []) {
+      if (typeof url === 'string' && url.startsWith('blob:') && !revoked.has(url)) {
+        URL.revokeObjectURL(url);
+        revoked.add(url);
+      }
+    }
+    for (const key of global.preloadedImages?.keys?.() || []) {
+      if (typeof key === 'string' && key.startsWith('blob:') && !revoked.has(key)) {
+        URL.revokeObjectURL(key);
+        revoked.add(key);
+      }
+    }
+  }
   global.currentComic = comic;
   global.currentMetadata = null;
+  global.currentComicArchiveCache = null;
   global.currentComicZipCache = null;
+  global.inFlightPageLoads?.clear?.();
+  global.prefetchedNextComicIds?.clear?.();
   global.preloadedImages?.clear?.();
   global.pageUrlCache?.clear?.();
   global.hidePageJumpInput?.({ focusButton: false });

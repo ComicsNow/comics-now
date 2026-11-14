@@ -1,6 +1,6 @@
 import { state, global as canonicalGlobal } from '../globals.js';
 import { html, render } from '../ui/template.js';
-import { getPageUrl, preloadPages, prunePreloadedImages } from './server/preloader.js';
+import { getPageUrl, loadOrGetPageImage, preloadPages, prunePreloadedImages } from './server/preloader.js';
 import { saveProgress, navigatePage as executeNavigatePage } from './server/navigation.js';
 
 const global = typeof canonicalGlobal !== 'undefined' ? canonicalGlobal : new Proxy(typeof window !== 'undefined' ? window : globalThis, {
@@ -58,20 +58,7 @@ export async function renderPage() {
     global.updateNavigationButtons?.(requestedIndex, pages.length, isMangaMode);
 
     const pageUrl = await getPageUrl(pages[requestedIndex]);
-    let img = global.preloadedImages?.get(pageUrl);
-    if (!img) {
-      img = new Image();
-      img.src = pageUrl;
-      global.preloadedImages?.set(pageUrl, img);
-    }
-
-    await new Promise((resolve, reject) => {
-      if (img.complete) resolve();
-      else {
-        img.onload = () => resolve();
-        img.onerror = (err) => reject(err);
-      }
-    });
+    const img = await loadOrGetPageImage(pageUrl);
 
     if (requestedIndex !== global.currentPageIndex) return false;
 

@@ -164,13 +164,14 @@ export async function syncOfflineProgress() {
         }
 
         if (!comicPath) {
-          debugLog('OFFLINE', `Comic with ID ${item.id} not found in library or offline cache, cleaning up progress entry`);
+          debugLog('OFFLINE', `Comic with ID ${item.id} path not yet resolved, retaining unsynced progress for next sync attempt`);
+          item.syncAttempts = (item.syncAttempts || 0) + 1;
           await new Promise((resolve, reject) => {
             const tx2 = activeDb.transaction(['progress'], 'readwrite');
-            tx2.objectStore('progress').delete(item.id);
+            tx2.objectStore('progress').put(item);
             tx2.oncomplete = () => resolve();
-            tx2.onerror = () => reject(tx2.error || new Error('delete failed'));
-          });
+            tx2.onerror = () => reject(tx2.error || new Error('put failed'));
+          }).catch(() => {});
           continue;
         }
 

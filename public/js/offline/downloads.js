@@ -42,9 +42,7 @@ export class BackgroundDownloadManager {
     this.persistentQueue = [];
     this.partialData = new Map();
     this.activeDownloadId = null;
-    this.useServiceWorker = BackgroundDownloadManager.isBackgroundSyncSupported();
     this.useBackgroundFetch = BackgroundDownloadManager.isBackgroundFetchSupported();
-    this.syncRegistered = false;
     this.isCollapsed = this.loadCollapsedState();
     this.activeTab = 'in-progress';
     this.explicitlyOpen = false;
@@ -131,23 +129,6 @@ export class BackgroundDownloadManager {
 
   async addToQueue(comic) {
     return addComicToQueue(this, comic);
-  }
-
-  async registerBackgroundSync() {
-    if (!this.useServiceWorker) return false;
-
-    try {
-      const registration = await navigator.serviceWorker.ready;
-      await registration.sync.register('download-comics');
-      this.syncRegistered = true;
-      return true;
-    } catch (_) {
-      this.useServiceWorker = false;
-      if (!this.isProcessing) {
-        this.processQueue();
-      }
-      return false;
-    }
   }
 
   async _abortBackgroundFetch(comicId) {

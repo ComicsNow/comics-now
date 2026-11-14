@@ -1,6 +1,6 @@
 # Comics Now! v4.2.0 Release Notes
 
-Welcome to **Comics Now! v4.2.0** — feature and security release introducing configurable Gemini AI Thinking Levels, strict Flash-Lite model discovery filtering, comprehensive defense-in-depth origin security hardening (SSRF prevention, sidecar proxy path traversal mitigation, thumbnail IDOR authorization), and configuration storage protections.
+Welcome to **Comics Now! v4.2.0** — feature, performance, and security release introducing configurable Gemini AI Thinking Levels, strict Flash-Lite model discovery filtering, native client-side offline CBR/CBZ extraction with Cache-First Service Worker image delivery and deduplicated preloading, comprehensive defense-in-depth origin security hardening, and configuration storage protections.
 
 ---
 
@@ -17,6 +17,11 @@ Welcome to **Comics Now! v4.2.0** — feature and security release introducing c
 * **Thumbnail IDOR & Access Check Hardening**: Removed unguarded static thumbnail exposure and enforced per-user library access verification (`checkComicAccess`) across cached and on-demand thumbnail generation.
 * **Configuration Storage & Key Transport Hardening**: Enforced `0600` file permissions on `config.json` and `comics-now.db` upon creation and save; added support for passing Gemini API keys via `X-Gemini-Api-Key` HTTP header to prevent API key exposure in URL query parameters and proxy logs.
 * **End-to-End Config & Tagger Secret Encryption**: Enforced automatic AES-256-GCM encryption (`enc:v1:...`) for all API keys and passwords in `config.json` on load, setter invocation, and save; added missing `gcdUser`, `gcdPassword`, and `googleBooksApiKey` settings hydration from SQLite; and scrubbed persisted plaintext secrets from `scheduler_config.json` while masking credentials in tagger scheduler API responses.
+
+### 3. Offline CBR/CBZ Playback, Service Worker Caching & Preloading Reliability
+* **Native Client-Side CBR & CBZ Extraction**: Added unified archive extraction (`archive-extractor.js` + `unrar.wasm`) using `JSZip` for `.cbz` and `node-unrar-js` WebAssembly for `.cbr`, enabling offline downloaded and local `.cbr` comics to open and stream pages natively in the browser without server-side transcoding.
+* **Cache-First Service Worker Media Delivery & Schema Parity**: Switched `/api/v1/comics/pages/image` and `/thumbnails/` to Cache-First with bounded cache trimming (800 entries), added a 1500ms timeout guard on `/guided-view` network-first fetches, removed dead Service Worker Background Sync stubs, and aligned `openDownloadDB()` to initialize all 8 IndexedDB object stores.
+* **Deduplicated Preloading, Memory-First Cache & Object URL Cleanup**: Shared in-flight `Image` loads between background preloading and `renderPage()`, checked in-memory archive caches before reading IndexedDB/File handles, revoked evicted `blob:` URLs via `URL.revokeObjectURL()`, enabled lookahead preloading for local device comics, added next-issue cover prefetching on the final two pages, and retained unsynced offline progress records on transient path lookup failures.
 
 ---
 
@@ -35,11 +40,13 @@ Welcome to **Comics Now! v4.2.0** — feature and security release introducing c
 5. `security(thumbnails)`: enforce per-user library access checks on thumbnail generation and serving
 6. `security(config)`: restrict configuration and database file permissions to 0600
 7. `security(secrets)`: auto-encrypt plaintext secrets in config.json on load/save and scrub/mask tagger scheduler_config.json credentials
+8. `feat(offline)`: native client-side CBR/CBZ extraction via WebAssembly and offline progress retention
+9. `perf(viewer)`: Cache-First SW image delivery, deduplicated in-flight page preloading, blob URL cleanup, and next-issue cover prefetching
 
 ---
 
 ## 🧪 Verification & Test Results
-- **Full Jest suite**: `197 suites passed, 1537 tests passed (100% pass rate)`.
+- **Full Jest suite**: `203 suites passed, 1555 tests passed (100% pass rate)`.
 - **Targeted Python tagger suites**: `tagger/tests/test_scheduler.py` and `tagger/tests/test_web_endpoints.py` (`16 passed`).
 - **Architectural invariants**: `tests/architectureRatchet.test.js` verified (100% pass rate).
 - **Security & route integration suites**: `tests/urlMetadataExtractor.test.js`, `tests/storyArcsSyncRoute.test.js`, `tests/metadataRoutes.test.js`, `tests/server/routes/static.test.js` verified.
