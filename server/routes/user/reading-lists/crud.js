@@ -13,7 +13,7 @@ module.exports = function attachCrudRoutes(router, deps) {
     log
   } = deps;
 
-  const batchInsertReadingListItems = createBatchInserter(dbRun);
+  const batchInsertReadingListItems = createBatchInserter(dbRun, deps);
 
   // Get all reading lists for current user with progress stats
   router.get('/api/v1/reading-lists', requireAuth, async (req, res) => {
@@ -109,7 +109,7 @@ module.exports = function attachCrudRoutes(router, deps) {
           if (!v.valid) return res.status(400).json({ message: `Invalid comic ID at index ${index}: ${v.error}` });
           itemsToInsert.push({ comicId: v.sanitized, addedAt: now, sortOrder: index });
         }
-        await batchInsertReadingListItems(listId, itemsToInsert, false);
+        await batchInsertReadingListItems(listId, itemsToInsert, false, req.user);
       }
 
       // If requested or if created by default-user (e.g. MCP / server seed), propagate to all other users
@@ -185,7 +185,7 @@ module.exports = function attachCrudRoutes(router, deps) {
               }
             }
             if (itemsToInsert.length > 0) {
-              comicsAdded = await batchInsertReadingListItems(listId, itemsToInsert, true);
+              comicsAdded = await batchInsertReadingListItems(listId, itemsToInsert, true, req.user);
             }
           }
 

@@ -1,8 +1,11 @@
+import inspect
 import json
 import unittest
 from unittest.mock import patch
 
-from comics_mcp import server
+import pytest
+
+from comics_mcp import modal_scraper, server
 
 
 class TestMcpTools(unittest.TestCase):
@@ -331,3 +334,62 @@ class TestMcpTools(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+def test_modal_scraper_http_get_blocks_ssrf(monkeypatch):
+    called = []
+    monkeypatch.setattr(
+        modal_scraper.urllib.request,
+        "urlopen",
+        lambda *args, **kwargs: called.append(args),
+    )
+
+    for bad_url in [
+        "file:///etc/passwd",
+        "http://127.0.0.1:5000/",
+        "http://169.254.169.254/latest/meta-data/",
+        "http://[::1]/",
+        "http://10.0.0.1/",
+        "http://metadata.google.internal/",
+    ]:
+        with pytest.raises(ValueError):
+            modal_scraper._http_get(bad_url)
+
+    assert len(called) == 0
+
+
+def test_is_destructive_blocks_all_destructive_keywords():
+    for path in [
+        "/api/v1/convert/delete-cbr",
+        "/api/v1/convert/delete-pdf",
+        "/api/v1/scan-logs/clear",
+        "/api/v1/reading-lists/bulk-remove-comics",
+        "/api/v1/admin/cache/reset",
+        "/api/v1/admin/db/prune",
+        "/api/v1/admin/jobs/purge",
+        "/api/v1/admin/table/drop",
+        "/api/v1/admin/session/destroy",
+        "/api/v1/admin/library/wipe",
+        "/api/v1/admin/logs/truncate",
+        "/api/v1/metadata/overwrite",
+    ]:
+        assert server._is_destructive("POST", path) is True, f"Expected destructive: {path}"
+        assert server._is_destructive("PUT", path) is True, f"Expected destructive PUT: {path}"
+
+    assert server._is_destructive("GET", "/api/v1/comics") is False
+    assert server._is_destructive("POST", "/api/v1/auth/login") is False
+
+
+def test_mcp_cors_configuration_is_restricted(monkeypatch):
+    src = inspect.getsource(server)
+    assert 'allow_origins=["*"]' not in src
+
+    cors_kwargs = server._get_cors_kwargs()
+    assert cors_kwargs["allow_credentials"] is False
+    assert "*" not in cors_kwargs["allow_origins"]
+    assert "http://localhost:3000" in cors_kwargs["allow_origins"]
+
+    monkeypatch.setenv("MCP_ALLOWED_ORIGINS", "https://comics.example.com, https://admin.example.com")
+    custom_kwargs = server._get_cors_kwargs()
+    assert custom_kwargs["allow_origins"] == ["https://comics.example.com", "https://admin.example.com"]
+    assert custom_kwargs["allow_credentials"] is False

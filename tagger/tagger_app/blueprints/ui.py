@@ -5,7 +5,7 @@ import shutil
 import hashlib
 from flask import Blueprint, render_template, request, jsonify, send_file
 
-from tagger_app.config import UPLOAD_FOLDER, STATIC_TEMP_DIR
+from tagger_app.config import UPLOAD_FOLDER, STATIC_TEMP_DIR, is_safe_cbz_path, is_safe_browse_dir
 from tagger_app.scheduler.state import scheduler_config
 from tagger_app.scheduler.scanner import sessions
 from tagger_app.core.enrichment import check_comic_info_completeness
@@ -56,11 +56,15 @@ def browse_files():
     else:
         default_dir = os.path.expanduser("~") if os.path.exists(os.path.expanduser("~")) else workspace_dir
 
-    path = request.args.get("path", default_dir)
-    path = os.path.abspath(path)
-
-    if not os.path.exists(path) or not os.path.isdir(path):
-        path = default_dir
+    requested_path = request.args.get("path")
+    if requested_path is not None:
+        if not is_safe_browse_dir(requested_path):
+            return jsonify({"error": "Access denied or invalid directory."}), 403
+        path = os.path.abspath(requested_path)
+    else:
+        path = os.path.abspath(default_dir)
+        if not os.path.exists(path) or not os.path.isdir(path):
+            path = default_dir
 
     try:
         subdirs = []
@@ -110,11 +114,8 @@ def load_local_file():
     data = request.json or {}
     file_path = data.get("file_path")
 
-    if not file_path or not os.path.exists(file_path):
-        return jsonify({"error": "Selected file does not exist on the server."}), 400
-
-    if not file_path.lower().endswith('.cbz'):
-        return jsonify({"error": "Only .cbz files are supported."}), 400
+    if not is_safe_cbz_path(file_path):
+        return jsonify({"error": "Invalid or unsupported .cbz file path."}), 400
 
     filename = os.path.basename(file_path)
     session_id = hashlib.md5(file_path.encode('utf-8')).hexdigest()
@@ -169,6 +170,7 @@ def load_local_file():
         })
     except Exception as e:
         print(f"[-] Error extracting cover: {e}")
+        sessions.pop(session_id, None)
         if not cover_exists:
             shutil.rmtree(session_dir, ignore_errors=True)
         return jsonify({"error": "Failed to extract cover"}), 500
@@ -182,6 +184,8 @@ def download_file(session_id):
 
     session_info = sessions[session_id]
     cbz_path = session_info["cbz_path"]
+    if not is_safe_cbz_path(cbz_path):
+        return "Invalid file path", 400
     filename = session_info["filename"]
 
     return send_file(

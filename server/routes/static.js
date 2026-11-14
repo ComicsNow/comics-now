@@ -9,7 +9,7 @@ const {
 } = require('../constants');
 const { log } = require('../logger');
 const { isAuthEnabled } = require('../config');
-const { dbGet, dbRun } = require('../db');
+const { dbGet, dbRun, dbAll } = require('../db');
 const { checkComicAccess } = require('../access-control');
 const { generateThumbnail } = require('../services/library-pages');
 
@@ -27,21 +27,30 @@ function createStaticRouter({ getConfig, getComicsDirectories, getPublicLibrarie
         cachedIndexHtml = await fs.promises.readFile(path.join(STATIC_DIR, 'index.html'), 'utf-8');
       }
       const indexHtml = cachedIndexHtml;
-      const baseHref = config.baseUrl.endsWith('/') ? config.baseUrl : (config.baseUrl + '/');
+      const rawBaseHref = config.baseUrl.endsWith('/') ? config.baseUrl : (config.baseUrl + '/');
+      const safeBaseHref = String(rawBaseHref)
+        .replace(/&/g, '&amp;')
+        .replace(/"/g, '&quot;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
       const hideSupport = config.hideSupportForAdmin || process.env.HIDE_SUPPORT_FOR_ADMIN === 'true';
       const supportCss = hideSupport ? '\n  <style>#kofi-settings-link { display: none !important; }</style>' : '';
+      const appConfigJson = JSON.stringify({
+        baseUrl: config.baseUrl,
+        libraries: getPublicLibraries(),
+        authEnabled: isAuthEnabled(),
+        cloudflareTeamDomain: config.authentication?.cloudflare?.teamDomain || null,
+        hideSupportForAdmin: config.hideSupportForAdmin || false
+      })
+        .replace(/</g, '\\u003c')
+        .replace(/>/g, '\\u003e')
+        .replace(/&/g, '\\u0026');
       const injectedHtml = indexHtml
         .replace(
           '<script id="app-config"></script>',
-          `<script>window.APP_CONFIG = ${JSON.stringify({
-            baseUrl: config.baseUrl,
-            libraries: getPublicLibraries(),
-            authEnabled: isAuthEnabled(),
-            cloudflareTeamDomain: config.authentication?.cloudflare?.teamDomain || null,
-            hideSupportForAdmin: config.hideSupportForAdmin || false
-          })}</script>${supportCss}\n  <link rel="manifest" href="${baseHref}manifest.json">`
+          `<script>window.APP_CONFIG = ${appConfigJson}</script>${supportCss}\n  <link rel="manifest" href="${safeBaseHref}manifest.json">`
         )
-        .replace('<base href="/">', `<base href="${baseHref}">`);
+        .replace('<base href="/">', `<base href="${safeBaseHref}">`);
 
       res.set('Cache-Control', 'no-store');
       res.send(injectedHtml);
@@ -144,18 +153,27 @@ function createStaticRouter({ getConfig, getComicsDirectories, getPublicLibrarie
         'SELECT id, path, publisher, series FROM comics WHERE id = ? OR thumbnailPath = ?',
         [id, safeFilename]
       );
-      if (isAuthEnabled() && comic && req.user && req.user.role !== 'admin') {
-        const hasAccess = await checkComicAccess({
-          userId: req.user.userId,
-          userRole: req.user.role,
-          comicPath: comic.path,
-          publisher: comic.publisher,
-          series: comic.series,
-          rootFolders: getComicsDirectories(),
-          comicId: comic.id
-        });
-        if (!hasAccess) {
-          return res.status(403).send('Forbidden');
+      if (isAuthEnabled()) {
+        if (!req.user) {
+          return res.status(403).send('Access denied');
+        }
+        if (req.user.role !== 'admin') {
+          if (!comic) {
+            return res.status(403).send('Access denied');
+          }
+          const hasAccess = await checkComicAccess({
+            userId: req.user.userId,
+            userRole: req.user.role,
+            comicPath: comic.path,
+            publisher: comic.publisher,
+            series: comic.series,
+            rootFolders: getComicsDirectories(),
+            comicId: comic.id,
+            dbAllFunc: dbAll
+          });
+          if (!hasAccess) {
+            return res.status(403).send('Forbidden');
+          }
         }
       }
       if (fs.existsSync(full)) {

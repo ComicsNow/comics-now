@@ -4,6 +4,8 @@
  * Checks reading order continuity and renders next-issue or gap prompt.
  */
 
+import { escapeHtml } from '../globals.js';
+
 export async function getNextComicInStoryArc(currentComic) {
   if (!currentComic) return null;
   const series = currentComic.series || currentComic.metadata?.Series || null;
@@ -44,10 +46,14 @@ export function renderStoryArcPrompt(nav, arcContinuity, onNavigate) {
     nav.insertBefore(arcBanner, nav.firstChild);
   }
 
+  const safeTitle = escapeHtml(arcTitle);
+  const safeSeries = escapeHtml(nextIss.seriesName);
+  const safeIssueNum = escapeHtml(nextIss.issueNumber);
+
   arcBanner.classList.remove('hidden');
   if (nextIss.isOwned && nextIss.comicId) {
     arcBanner.innerHTML = `
-      <span>⚡ <strong>Up Next in ${arcTitle}:</strong> ${nextIss.seriesName} #${nextIss.issueNumber}</span>
+      <span>⚡ <strong>Up Next in ${safeTitle}:</strong> ${safeSeries} #${safeIssueNum}</span>
       <button class="px-2.5 py-1 rounded bg-amber-500 hover:bg-amber-400 text-black font-bold text-xs cursor-pointer shadow">Read Now →</button>
     `;
     arcBanner.querySelector('button')?.addEventListener('click', () => {
@@ -55,7 +61,7 @@ export function renderStoryArcPrompt(nav, arcContinuity, onNavigate) {
     });
   } else {
     arcBanner.innerHTML = `
-      <span>⚠️ <strong>Next in ${arcTitle}:</strong> ${nextIss.seriesName} #${nextIss.issueNumber} <em>(Missing from Library)</em></span>
+      <span>⚠️ <strong>Next in ${safeTitle}:</strong> ${safeSeries} #${safeIssueNum} <em>(Missing from Library)</em></span>
       <span class="text-amber-400/80 text-[10px]">Continuity Gap</span>
     `;
   }

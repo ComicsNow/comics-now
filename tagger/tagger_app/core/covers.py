@@ -3,9 +3,11 @@
 Extracted from the legacy tagger.py monolith (architecture review, step 1).
 """
 import io
+import ipaddress
 import os
-import zipfile
 import sqlite3
+import zipfile
+from urllib.parse import urlparse
 from PIL import Image
 
 import requests
@@ -65,19 +67,27 @@ def extract_cover_from_cbz(cbz_path, output_dir="temp_covers"):
         return dest_path
 
 def is_safe_cover_url(url: str) -> bool:
-    """Validate that candidate cover URL does not target loopback or cloud metadata services.
-    Permits public web endpoints and local LAN IP ranges for self-hosted home servers."""
+    """Validate that candidate cover URL does not target loopback, link-local, or cloud metadata services.
+    Permits public web endpoints and local RFC1918 LAN IP ranges for self-hosted home servers."""
     if not url or not isinstance(url, str):
         return False
-    from urllib.parse import urlparse
     try:
-        parsed = urlparse(url)
+        parsed = urlparse(url.strip())
         if parsed.scheme not in ("http", "https"):
             return False
-        host = (parsed.hostname or "").lower()
-        if host in ("127.0.0.1", "localhost", "::1", "0.0.0.0") or host.endswith(".localhost"):
+        host = (parsed.hostname or "").strip("[]").split("%")[0].lower()
+        if not host:
             return False
-        if host.startswith("169.254."):
+        if host in ("localhost", "metadata.google.internal") or host.endswith((".localhost", ".internal")):
+            return False
+        try:
+            ip_obj = ipaddress.ip_address(host)
+        except ValueError:
+            return True
+        mapped = getattr(ip_obj, "ipv4_mapped", None)
+        if mapped is not None:
+            ip_obj = mapped
+        if ip_obj.is_loopback or ip_obj.is_link_local or ip_obj.is_unspecified or ip_obj.is_multicast:
             return False
         return True
     except Exception:
@@ -146,6 +156,10 @@ def compare_covers_python(local_image_path, candidate_image_url, hash_size=16):
             domain_limiter.wait_for_domain(candidate_image_url)
             headers = {"User-Agent": HEADERS["User-Agent"]}
             img_res = requests.get(candidate_image_url, headers=headers, timeout=10)
+            final_url = getattr(img_res, "url", None)
+            if isinstance(final_url, str) and final_url and not is_safe_cover_url(final_url):
+                print(f"[-] Security: Rejected unsafe cover redirect URL: {final_url}")
+                return 0.0
             if img_res.status_code != 200:
                 print(f"[-] Failed to download candidate cover: HTTP {img_res.status_code}")
                 return 0.0

@@ -43,7 +43,8 @@ jest.mock('../../../server/config', () => ({
 
 jest.mock('../../../server/db', () => ({
   dbGet: jest.fn(),
-  dbRun: jest.fn()
+  dbRun: jest.fn(),
+  dbAll: jest.fn().mockResolvedValue([])
 }));
 
 jest.mock('../../../server/access-control', () => ({
@@ -56,6 +57,8 @@ jest.mock('../../../server/services/library-pages', () => ({
 
 // We'll need to clear module cache for static.js to ensure mocks are applied
 const { createStaticRouter } = require('../../../server/routes/static');
+const { dbGet, dbAll } = require('../../../server/db');
+const { checkComicAccess } = require('../../../server/access-control');
 
 describe('Static Router', () => {
   let mockGetConfig;
@@ -211,9 +214,6 @@ describe('Static Router', () => {
 
     describe('/thumbnails/:filename', () => {
       it('does not mount unguarded express.static on /thumbnails and enforces checkComicAccess', async () => {
-        const { dbGet } = require('../../../server/db');
-        const { checkComicAccess } = require('../../../server/access-control');
-
         const thumbUseCall = router.use.mock.calls.find(call => call[0] === '/thumbnails');
         expect(thumbUseCall).toBeUndefined();
 
@@ -237,11 +237,66 @@ describe('Static Router', () => {
         expect(checkComicAccess).toHaveBeenCalledWith(expect.objectContaining({
           userId: 'restricted-user',
           userRole: 'user',
-          comicId: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
+          comicId: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+          dbAllFunc: dbAll
         }));
         expect(res.status).toHaveBeenCalledWith(403);
         expect(res.sendFile).not.toHaveBeenCalled();
       });
+
+      it('returns 403 when auth is enabled and req.user is missing', async () => {
+        const handler = router.get.mock.calls.find(call => call[0] === '/thumbnails/:filename')[1];
+        fs.existsSync.mockReturnValue(true);
+        req.params = { filename: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.jpg' };
+        req.user = null;
+
+        await handler(req, res, next);
+
+        expect(res.status).toHaveBeenCalledWith(403);
+        expect(res.sendFile).not.toHaveBeenCalled();
+      });
+
+      it('returns 403 when auth is enabled, user is non-admin, and comic is missing from DB', async () => {
+        const handler = router.get.mock.calls.find(call => call[0] === '/thumbnails/:filename')[1];
+        fs.existsSync.mockReturnValue(true);
+        dbGet.mockResolvedValue(null);
+        req.params = { filename: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.jpg' };
+        req.user = { userId: 'restricted-user', role: 'user' };
+
+        await handler(req, res, next);
+
+        expect(res.status).toHaveBeenCalledWith(403);
+        expect(res.sendFile).not.toHaveBeenCalled();
+      });
+    });
+
+    it('escapes HTML and script breakouts in sendAppShell APP_CONFIG and baseHref', async () => {
+      mockGetConfig.mockReturnValue({
+        baseUrl: '/comics/"><script>alert(1)</script>',
+        authentication: {
+          cloudflare: {
+            teamDomain: 'team&<test>'
+          }
+        },
+        hideSupportForAdmin: false
+      });
+      mockGetPublicLibraries.mockReturnValue([
+        { id: 1, name: '</script><script>alert(2)</script>' }
+      ]);
+
+      const handler = router.get.mock.calls.find(call => call[0] === '/index.html')[1];
+      fs.promises.readFile.mockResolvedValue(
+        '<html><head><script id="app-config"></script><base href="/"></head><body></body></html>'
+      );
+
+      await handler(req, res);
+
+      const sentHtml = res.send.mock.calls[0][0];
+      expect(sentHtml).not.toContain('</script><script>alert(');
+      expect(sentHtml).not.toContain('"><script>');
+      expect(sentHtml).toContain('\\u003c/script\\u003e');
+      expect(sentHtml).toContain('\\u0026');
+      expect(sentHtml).toContain('&quot;&gt;&lt;script&gt;');
     });
   });
 });

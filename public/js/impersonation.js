@@ -40,6 +40,15 @@ const safeRaw = (typeof raw !== 'undefined' && typeof raw === 'function' && raw.
 
 const apiBase = () => state.API_BASE_URL || window.API_BASE_URL || '';
 
+async function clearOfflineDownloadCache() {
+  try {
+    const cacheStorage = (typeof window !== 'undefined' && window.caches) || (typeof caches !== 'undefined' ? caches : null);
+    if (cacheStorage && typeof cacheStorage.delete === 'function') {
+      await cacheStorage.delete('comics-now-downloads');
+    }
+  } catch (_) { /* ignore cache cleanup failures */ }
+}
+
 export async function startImpersonation(userId, userEmail) {
   const res = await fetch(`${apiBase()}/api/v1/admin/impersonate/${encodeURIComponent(userId)}`, {
     method: 'POST',
@@ -52,6 +61,7 @@ export async function startImpersonation(userId, userEmail) {
   }
   // Reload so the whole app re-renders as the target user (their library
   // access, progress, etc. all follow the swapped identity).
+  await clearOfflineDownloadCache();
   window.location.reload();
   return true;
 }
@@ -63,6 +73,7 @@ export async function stopImpersonation() {
       headers: { 'Content-Type': 'application/json' }
     });
   } catch (_) { /* reload regardless */ }
+  await clearOfflineDownloadCache();
   window.location.reload();
 }
 

@@ -102,6 +102,7 @@ def save_scheduler_data():
                     "history": scheduler_status["history"]
                 }
             }, f, indent=4)
+        os.chmod(CONFIG_FILE, 0o600)
     except Exception as e:
         print(f"[-] Failed to save scheduler config: {e}")
 

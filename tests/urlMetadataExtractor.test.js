@@ -2,7 +2,8 @@ const {
   fetchUrlAsMarkdown,
   buildUrlMetadataPrompt,
   extractMetadataFromUrl,
-  isSafeWebUrl
+  isSafeWebUrl,
+  isPrivateOrReservedIP
 } = require('../server/services/url-metadata-extractor');
 const attachMetadataRoutes = require('../server/routes/user/metadata');
 
@@ -47,6 +48,32 @@ describe('URL Metadata Extractor Service & Route (TDD)', () => {
         expect(isSafeWebUrl('http://[::ffff:192.168.0.1]/')).toBe(false);
         expect(isSafeWebUrl('http://100.64.0.1/')).toBe(false);
         expect(isSafeWebUrl('http://internal.service.internal/')).toBe(false);
+      });
+
+      test('isPrivateOrReservedIP rejects extended IPv6 link-local (fe80::/10), ULA, multicast, uncompressed loopback, and IPv4-mapped forms', () => {
+        const blockedIps = [
+          'fe80::1',
+          'fe90::1',
+          'febf::1',
+          '0:0:0:0:0:0:0:1',
+          '0:0:0:0:0:0:0:0',
+          '0:0:0:0:0:ffff:127.0.0.1',
+          '::ffff:7f00:1',
+          '::ffff:169.254.169.254',
+          '::ffff:10.0.0.1',
+          'fc00::1',
+          'fd12::1',
+          'ff02::1',
+          '::1',
+          '::',
+          '0.0.0.0',
+          '100.64.0.1'
+        ];
+        for (const ip of blockedIps) {
+          expect(isPrivateOrReservedIP(ip)).toBe(true);
+        }
+        expect(isSafeWebUrl('http://[fe90::1]/')).toBe(false);
+        expect(isSafeWebUrl('http://[febf::1]/')).toBe(false);
       });
 
       test('fetchUrlAsMarkdown rejects direct fallback when DNS resolves to private/loopback IP', async () => {

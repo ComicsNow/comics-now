@@ -281,8 +281,19 @@ module.exports = function attach(router, deps) {
   router.post('/api/v1/user/library-preferences', requireAuth, async (req, res) => {
     try {
       const { path, mangaMode, continuousMode } = req.body;
-      if (!path) {
+      if (!path || typeof path !== 'string') {
         return res.status(400).json({ ok: false, message: 'Bad request: path is required' });
+      }
+      const normPath = path.replace(/\\/g, '/').replace(/\/+$/, '');
+      if (!normPath || normPath.includes('\0') || normPath.split('/').includes('..')) {
+        return res.status(403).json({ ok: false, message: 'Forbidden: Invalid library path' });
+      }
+      const roots = typeof getComicsDirectories === 'function' ? (getComicsDirectories() || []) : [];
+      if (roots.length > 0 && !roots.some((r) => {
+        const nr = String(r || '').replace(/\\/g, '/').replace(/\/+$/, '');
+        return nr && (normPath === nr || normPath.startsWith(`${nr}/`));
+      })) {
+        return res.status(403).json({ ok: false, message: 'Forbidden: Invalid library path' });
       }
 
       const userId = req.user?.userId || 'default-user';

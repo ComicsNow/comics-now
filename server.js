@@ -43,7 +43,7 @@ const guidedReader = require('./server/services/guided-reader');
 const { createStaticRouter } = require('./server/routes/static');
 const { createConfiguredApiRouter } = require('./server/bootstrap/api-router');
 const { setupGracefulShutdown } = require('./server/lifecycle');
-const { setupRateLimits } = require('./server/middleware/rate-limits');
+const { setupRateLimits, createOriginCsrfGuard } = require('./server/middleware/rate-limits');
 
 const {
   extractUserFromJWT,
@@ -81,6 +81,9 @@ const dbReady = initializeDatabase();
         "style-src": ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
         "font-src": ["'self'", "https:", "data:", "https://fonts.gstatic.com"],
         "img-src": ["'self'", "data:", "https://placehold.co", "blob:", "https:"],
+        "object-src": ["'none'"],
+        "base-uri": ["'self'"],
+        "frame-ancestors": ["'self'"],
         "upgrade-insecure-requests": null,
       },
     },
@@ -119,6 +122,10 @@ const dbReady = initializeDatabase();
   // Admin impersonation guards
   app.use(baseUrl, createImpersonationMiddleware({ dbGet, dbRun, log }));
   app.use(baseUrl, impersonationReadOnlyGuard);
+
+  // Same-origin CSRF guard on mutating /api requests
+  const apiBase = (baseUrl === '/' ? '' : baseUrl.replace(/\/+$/, '')) + '/api';
+  app.use(apiBase, createOriginCsrfGuard({ getCorsConfig }));
 
   // Main API router
   const apiRouter = createConfiguredApiRouter();

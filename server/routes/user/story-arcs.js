@@ -68,11 +68,39 @@ function attachUserStoryArcsRoutes(router, deps) {
     }
   });
 
+  // Helper to verify non-admin access to a comic when auth is enabled
+  async function checkComicIdAccess(req, targetComicId) {
+    if (typeof deps?.isAuthEnabled !== 'function' || !deps.isAuthEnabled()) return true;
+    if (!req.user) return false;
+    if (req.user.role === 'admin') return true;
+    if (typeof deps.dbGet !== 'function' || typeof deps.checkComicAccess !== 'function') return true;
+    const comic = await deps.dbGet('SELECT id, path, publisher, series FROM comics WHERE id = ?', [targetComicId]);
+    if (!comic) return false;
+    const rootFolders = typeof deps.getComicsDirectories === 'function' ? deps.getComicsDirectories() : [];
+    return Boolean(await deps.checkComicAccess({
+      userId: req.user.userId,
+      userRole: req.user.role,
+      comicPath: comic.path,
+      publisher: comic.publisher,
+      series: comic.series,
+      rootFolders,
+      comicId: comic.id
+    }));
+  }
+
   // GET /api/v1/comics/:comicId/continuity
   router.get('/api/v1/comics/:comicId/continuity', async (req, res) => {
     const comicId = req.params.comicId;
     if (!comicId || !SAFE_PARAM_RE.test(comicId)) {
       return res.status(400).json({ ok: false, error: 'Invalid comic ID' });
+    }
+    if (typeof deps?.isAuthEnabled === 'function' && deps.isAuthEnabled()) {
+      if (!req.user) {
+        return res.status(401).json({ ok: false, error: 'Unauthorized' });
+      }
+      if (!(await checkComicIdAccess(req, comicId))) {
+        return res.status(403).json({ ok: false, error: 'Forbidden' });
+      }
     }
     try {
       const baseUrl = getTaggerBaseUrl(deps);
@@ -80,6 +108,24 @@ function attachUserStoryArcsRoutes(router, deps) {
         signal: AbortSignal.timeout(5000)
       });
       const data = await upstream.json();
+      if (data && typeof deps?.isAuthEnabled === 'function' && deps.isAuthEnabled() && req.user?.role !== 'admin') {
+        if (Array.isArray(data.earlierUnread)) {
+          const filtered = [];
+          for (const item of data.earlierUnread) {
+            const id = item && (item.id || item.comicId);
+            if (id && (await checkComicIdAccess(req, id))) {
+              filtered.push(item);
+            }
+          }
+          data.earlierUnread = filtered;
+        }
+        if (data.nextIssue && typeof data.nextIssue === 'object') {
+          const nextId = data.nextIssue.id || data.nextIssue.comicId;
+          if (!nextId || !(await checkComicIdAccess(req, nextId))) {
+            data.nextIssue = null;
+          }
+        }
+      }
       return res.json({ ok: true, ...data });
     } catch (err) {
       return res.json({ ok: true, hasArc: false, earlierUnread: [] });

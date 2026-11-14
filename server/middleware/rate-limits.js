@@ -23,6 +23,51 @@ const generalLimiter = rateLimit({
   legacyHeaders: false
 });
 
+const outboundProxyLimiter = rateLimit({
+  windowMs: 1 * 60 * 1000, // 1 minute
+  max: 120,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: 'Too many outbound proxy requests, please try again shortly'
+});
+
+function createOriginCsrfGuard(options = {}) {
+  const getCorsConfig = typeof options.getCorsConfig === 'function' ? options.getCorsConfig : null;
+  const mutatingMethods = new Set(['POST', 'PUT', 'DELETE', 'PATCH']);
+
+  return function originCsrfGuard(req, res, next) {
+    if (!mutatingMethods.has((req.method || '').toUpperCase())) {
+      return next();
+    }
+    const headers = req.headers || {};
+    const hasCookie = Boolean(headers.cookie);
+    if (!hasCookie) {
+      return next();
+    }
+    const rawOrigin = headers.origin || headers.referer;
+    if (!rawOrigin) {
+      return next();
+    }
+    try {
+      const parsedOrigin = new URL(rawOrigin);
+      const originHost = (parsedOrigin.host || '').toLowerCase();
+      const requestHost = (typeof req.get === 'function' ? req.get('host') : headers.host || '').toLowerCase();
+      if (originHost && requestHost && originHost === requestHost) {
+        return next();
+      }
+      const corsConf = getCorsConfig ? getCorsConfig() : null;
+      if (corsConf && corsConf.enabled && Array.isArray(corsConf.allowedOrigins)) {
+        if (corsConf.allowedOrigins.includes(parsedOrigin.origin)) {
+          return next();
+        }
+      }
+    } catch (_) {
+      return res.status(403).json({ ok: false, error: 'Forbidden: Invalid origin header' });
+    }
+    return res.status(403).json({ ok: false, error: 'Forbidden: Cross-site request blocked' });
+  };
+}
+
 const generalLimiterExclusions = new Set([
   '/api/v1/public/auth',
   '/api/v1/comics/pages/image',
@@ -46,6 +91,10 @@ const pathJoin = (base, sub) => {
 function setupRateLimits(app, baseUrl = '/') {
   app.use(pathJoin(baseUrl, 'api/v1/public/auth'), authLimiter);
   app.use(pathJoin(baseUrl, 'api/v1/comics/pages/image'), pagesLimiter);
+  app.use(pathJoin(baseUrl, 'api/v1/proxy/cover'), outboundProxyLimiter);
+  app.use(pathJoin(baseUrl, 'api/v1/metadata/extract-from-url'), outboundProxyLimiter);
+  app.use(pathJoin(baseUrl, 'api/v1/tracker-proxy'), outboundProxyLimiter);
+  app.use(pathJoin(baseUrl, 'api/v1/aria-rpc'), outboundProxyLimiter);
 
   app.use(baseUrl, (req, res, next) => {
     const relativePath = req.path.startsWith(baseUrl) ? req.path.slice(baseUrl.length) || '/' : req.path;
@@ -62,5 +111,7 @@ module.exports = {
   authLimiter,
   pagesLimiter,
   generalLimiter,
+  outboundProxyLimiter,
+  createOriginCsrfGuard,
   setupRateLimits
 };

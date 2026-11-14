@@ -130,6 +130,24 @@ describe('impersonation.js', () => {
       await expect(sandbox.startImpersonation('user-123', 'test@example.com'))
         .rejects.toThrow('Network error');
     });
+
+    it('clears comics-now-downloads SW cache before reloading on startImpersonation', async () => {
+      const callOrder = [];
+      const deleteMock = jest.fn(async () => { callOrder.push('cache-delete'); });
+      sandbox.caches = { delete: deleteMock };
+      if (sandbox.window) sandbox.window.caches = sandbox.caches;
+      sandbox.location.reload = jest.fn(() => { callOrder.push('reload'); });
+
+      global.fetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ ok: true })
+      });
+
+      await sandbox.startImpersonation('user-123', 'test@example.com');
+
+      expect(deleteMock).toHaveBeenCalledWith('comics-now-downloads');
+      expect(callOrder).toEqual(['cache-delete', 'reload']);
+    });
   });
 
   describe('stopImpersonation', () => {
@@ -233,6 +251,21 @@ describe('impersonation.js', () => {
       // wait for promises to flush for reload
       await new Promise(process.nextTick);
       expect(sandbox.location.reload).toHaveBeenCalled();
+    });
+
+    it('clears comics-now-downloads SW cache before reloading on stopImpersonation', async () => {
+      const callOrder = [];
+      const deleteMock = jest.fn(async () => { callOrder.push('cache-delete'); });
+      sandbox.caches = { delete: deleteMock };
+      if (sandbox.window) sandbox.window.caches = sandbox.caches;
+      sandbox.location.reload = jest.fn(() => { callOrder.push('reload'); });
+
+      global.fetch.mockResolvedValueOnce({ ok: true });
+
+      await sandbox.stopImpersonation();
+
+      expect(deleteMock).toHaveBeenCalledWith('comics-now-downloads');
+      expect(callOrder).toEqual(['cache-delete', 'reload']);
     });
   });
 

@@ -72,8 +72,17 @@ function setCookie(res, token, req = null) {
   });
 }
 
-function clearCookie(res) {
-  res.clearCookie(COOKIE_NAME, { path: '/' });
+function clearCookie(res, req = null) {
+  const reqObj = req || res?.req || null;
+  const isSecure = reqObj
+    ? (reqObj.secure || reqObj.headers?.['x-forwarded-proto'] === 'https')
+    : (process.env.NODE_ENV === 'production');
+  res.clearCookie(COOKIE_NAME, {
+    httpOnly: true,
+    sameSite: 'lax',
+    secure: isSecure,
+    path: '/'
+  });
 }
 
 /**
@@ -95,7 +104,7 @@ function createImpersonationMiddleware(deps) {
       try {
         payload = jwt.verify(token, secret, { algorithms: ['HS256'] });
       } catch (e) {
-        clearCookie(res); // stale/invalid — drop it
+        clearCookie(res, req); // stale/invalid — drop it
         return next();
       }
 

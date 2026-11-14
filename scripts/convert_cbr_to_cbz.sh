@@ -38,7 +38,7 @@ for cbr_file in "$@"; do
     fi
 
     # Get the base filename without the .cbr extension
-    base_name=$(basename "$cbr_file" .cbr)
+    base_name=$(basename -- "$cbr_file" .cbr)
     cbz_file="${base_name}.cbz"
 
     # Create a unique temporary directory in the current working directory
@@ -51,25 +51,28 @@ for cbr_file in "$@"; do
 
     echo "--- Processing $cbr_file ---"
 
-    # 1. Extract the CBR file into the temp directory
+    # 1. Extract the CBR file into the temp directory (reject symlinks with -ol-)
     echo "Extracting $cbr_file..."
-    unrar_output=$(unrar x -o+ -y "$cbr_file" "$temp_dir/" 2>&1)
+    unrar_output=$(unrar x -o+ -y -ol- -- "$cbr_file" "$temp_dir/" 2>&1)
     unrar_code=$?
 
     if [ $unrar_code -ne 0 ]; then
         echo "Error: Failed to extract $cbr_file (unrar code $unrar_code)." >&2
         echo "$unrar_output" | tail -n 5 >&2
-        rm -rf "$temp_dir" # Clean up failed attempt
+        rm -rf -- "$temp_dir" # Clean up failed attempt
         has_error=1
         continue
     fi
 
-    # 2. Change into the temp directory
-    cd "$temp_dir" || { rm -rf "$temp_dir"; has_error=1; continue; }
+    # Defense-in-depth: strip any symbolic links before re-packing
+    find "$temp_dir" -type l -delete
 
-    # 3. Create the new CBZ (Zip) file with 0 compression
+    # 2. Change into the temp directory
+    cd "$temp_dir" || { rm -rf -- "$temp_dir"; has_error=1; continue; }
+
+    # 3. Create the new CBZ (Zip) file with 0 compression (never dereference symlinks)
     echo "Creating $cbz_file (store-only)..."
-    zip_output=$(zip -0 -r -q "../$cbz_file" . 2>&1)
+    zip_output=$(zip -0 -r -q -y -- "../$cbz_file" . 2>&1)
     zip_success=$?
 
     # 4. Change back to the original directory
@@ -80,7 +83,7 @@ for cbr_file in "$@"; do
         echo "Successfully created $cbz_file"
         if [ "${DELETE_ORIGINALS:-false}" = "true" ]; then
             echo "Removing original $cbr_file..."
-            rm "$cbr_file"
+            rm -f -- "$cbr_file"
         else
             echo "Keeping original $cbr_file"
         fi
@@ -91,7 +94,7 @@ for cbr_file in "$@"; do
     fi
 
     # 6. Clean up the temporary directory
-    rm -rf "$temp_dir"
+    rm -rf -- "$temp_dir"
     echo "-----------------------------"
 
 done

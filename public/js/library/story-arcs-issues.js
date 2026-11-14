@@ -36,12 +36,12 @@ export function renderIssuesGridView(modal, issues, onIssueClick) {
     card.innerHTML = `
       <div class="relative w-full aspect-[13/20] bg-black overflow-hidden">
         ${iss.coverImageUrl ? `
-          <img src="${iss.coverImageUrl}" alt="${escapeHtml(iss.seriesName)}" class="w-full h-full object-cover">
+          <img src="${escapeHtml(iss.coverImageUrl)}" alt="${escapeHtml(iss.seriesName)}" class="w-full h-full object-cover">
         ` : `
-          <div class="w-full h-full flex items-center justify-center text-gray-600 text-xl font-bold">#${iss.issueNumber}</div>
+          <div class="w-full h-full flex items-center justify-center text-gray-600 text-xl font-bold">#${escapeHtml(iss.issueNumber)}</div>
         `}
         <div class="absolute top-2 left-2 px-1.5 py-0.5 rounded bg-black/80 backdrop-blur-xs text-[10px] font-bold text-amber-400 border border-amber-400/30">
-          #${iss.position}
+          #${escapeHtml(iss.position)}
         </div>
         <div class="absolute top-2 right-2">
           ${badgeHtml}
@@ -50,7 +50,7 @@ export function renderIssuesGridView(modal, issues, onIssueClick) {
       <div class="p-2.5 flex flex-col justify-between flex-1">
         <div>
           <div class="text-[10px] uppercase font-bold text-gray-400 line-clamp-1">${escapeHtml(iss.seriesName)}</div>
-          <div class="text-xs font-extrabold text-white line-clamp-1">Issue #${iss.issueNumber}</div>
+          <div class="text-xs font-extrabold text-white line-clamp-1">Issue #${escapeHtml(iss.issueNumber)}</div>
           ${iss.storyParts ? `<div class="text-[10px] text-amber-400/90 line-clamp-1 mt-0.5">${escapeHtml(iss.storyParts)}</div>` : ''}
         </div>
         ${iss.importance === 'Essential' ? `
@@ -88,9 +88,9 @@ export function renderIssuesChecklistView(modal, issues, onIssueClick) {
     const badgeHtml = getReadStatusBadge(iss.readStatus || (isOwned ? 'unread' : 'missing'), iss.lastReadPage, iss.pageCount);
 
     tr.innerHTML = `
-      <td class="py-2.5 px-4 text-center font-mono text-amber-400 font-bold">${iss.position}</td>
+      <td class="py-2.5 px-4 text-center font-mono text-amber-400 font-bold">${escapeHtml(iss.position)}</td>
       <td class="py-2.5 px-4 font-semibold text-white">
-        ${escapeHtml(iss.seriesName)} <span class="text-amber-300">#${iss.issueNumber}</span>
+        ${escapeHtml(iss.seriesName)} <span class="text-amber-300">#${escapeHtml(iss.issueNumber)}</span>
       </td>
       <td class="py-2.5 px-4 hidden sm:table-cell text-gray-400 text-xs">${escapeHtml(iss.publicationDate || '—')}</td>
       <td class="py-2.5 px-4 text-xs text-gray-300">${escapeHtml(iss.storyParts || '—')}</td>

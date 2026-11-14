@@ -135,6 +135,12 @@ _DESTRUCTIVE_EXEMPTIONS = [
 ]
 
 
+_DESTRUCTIVE_KEYWORDS_RE = re.compile(
+    r"(?:^|/|-|_)(?:delete-cbr|delete-pdf|clear|remove|reset|prune|purge|drop|destroy|wipe|truncate|overwrite)(?:$|/|-|_|\?)",
+    re.IGNORECASE,
+)
+
+
 def _is_destructive(method: str, path: str) -> bool:
     m = method.upper()
     for dm, rx in _DESTRUCTIVE_EXEMPTIONS:
@@ -143,6 +149,8 @@ def _is_destructive(method: str, path: str) -> bool:
     for dm, rx in _DESTRUCTIVE:
         if dm == m and rx.search(path):
             return True
+    if m in ("POST", "PUT", "PATCH", "DELETE") and _DESTRUCTIVE_KEYWORDS_RE.search(path or ""):
+        return True
     return False
 
 

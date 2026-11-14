@@ -57,4 +57,61 @@ CONFIG_FILE = os.environ.get("SCHEDULER_CONFIG_PATH", os.path.join(_DATA_DIR, "s
 UPLOAD_FOLDER = os.path.join(_ROOT, "uploads")
 STATIC_TEMP_DIR = os.path.join(_ROOT, "static", "temp")
 
+_FORBIDDEN_SYSTEM_PREFIXES = (
+    "/etc",
+    "/proc",
+    "/sys",
+    "/root",
+    "/boot",
+    "/dev",
+    "/run",
+    "/var/log",
+    "/var/run",
+)
+
+
+def _has_traversal_segment(path_str):
+    parts = path_str.replace("\\", "/").split("/")
+    return ".." in parts
+
+
+def _is_forbidden_system_path(path_str):
+    normalized = os.path.normpath(path_str)
+    for prefix in _FORBIDDEN_SYSTEM_PREFIXES:
+        if normalized == prefix or normalized.startswith(prefix + "/"):
+            return True
+    return False
+
+
+def is_safe_cbz_path(file_path):
+    """Return True only when file_path is a non-symlink existing .cbz/.cbr file without traversal."""
+    if not file_path or not isinstance(file_path, str):
+        return False
+    if _has_traversal_segment(file_path):
+        return False
+    abs_path = os.path.abspath(file_path)
+    if os.path.islink(file_path) or os.path.islink(abs_path):
+        return False
+    real_path = os.path.realpath(abs_path)
+    if _is_forbidden_system_path(abs_path) or _is_forbidden_system_path(real_path):
+        return False
+    if not abs_path.lower().endswith((".cbz", ".cbr")):
+        return False
+    return os.path.isfile(abs_path)
+
+
+def is_safe_browse_dir(dir_path):
+    """Return True only when dir_path is a safe, non-symlink existing directory."""
+    if not dir_path or not isinstance(dir_path, str):
+        return False
+    if _has_traversal_segment(dir_path):
+        return False
+    abs_path = os.path.abspath(dir_path)
+    if os.path.islink(dir_path) or os.path.islink(abs_path):
+        return False
+    real_path = os.path.realpath(abs_path)
+    if _is_forbidden_system_path(abs_path) or _is_forbidden_system_path(real_path):
+        return False
+    return os.path.isdir(abs_path)
+
 

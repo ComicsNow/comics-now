@@ -63,7 +63,7 @@ for INPUT_PDF in "$@"; do
     fi
 
     # --- 2. Set up filenames ---
-    BASENAME=$(basename "$INPUT_PDF" .pdf)
+    BASENAME=$(basename -- "$INPUT_PDF" .pdf)
     OUTPUT_CBZ="${BASENAME}.cbz"
 
     if [ -f "$OUTPUT_CBZ" ]; then
@@ -81,7 +81,7 @@ for INPUT_PDF in "$@"; do
     echo "Converting PDF to images (DPI: $DPI, Quality: $JPEG_QUALITY)..."
 
     # Run pdftoppm. Add error handling in case it fails.
-    if ! pdftoppm -r $DPI -jpeg -jpegopt "quality=$JPEG_QUALITY" "$INPUT_PDF" "$TEMP_DIR/page"; then
+    if ! pdftoppm -r "$DPI" -jpeg -jpegopt "quality=$JPEG_QUALITY" -- "$INPUT_PDF" "$TEMP_DIR/page"; then
         echo "Error: pdftoppm failed for $INPUT_PDF."
         echo "Skipping."
         continue # Skip to the next file
@@ -96,14 +96,14 @@ for INPUT_PDF in "$@"; do
 
     # --- 5. Create the CBZ (zip) file ---
     echo "Creating CBZ archive: $OUTPUT_CBZ"
-    # -j: "Junks" the paths (stores files at the root of the zip)
-    zip -j "$OUTPUT_CBZ" "$TEMP_DIR"/page-*.jpg
+    # -j: "Junks" the paths (stores files at the root of the zip); -y: never dereference symlinks
+    zip -j -y -- "$OUTPUT_CBZ" "$TEMP_DIR"/page-*.jpg
 
     echo "Conversion successful!"
     echo "Output file: $OUTPUT_CBZ"
     if [ "${DELETE_ORIGINALS:-false}" = "true" ] && [ -f "$OUTPUT_CBZ" ]; then
         echo "Removing original $INPUT_PDF..."
-        rm "$INPUT_PDF"
+        rm -f -- "$INPUT_PDF"
     else
         echo "Keeping original $INPUT_PDF"
     fi

@@ -13,6 +13,19 @@ const { trimObjectStrings } = require('../../utils');
 const { cleanGenreAndTags, isTitleSameAsSeries } = require('./sanitizer');
 const { buildComicInfoXml } = require('./enricher');
 
+const MAX_XML_BYTES = 2 * 1024 * 1024;
+const UNSAFE_XML_DTD_RE = /<!(?:DOCTYPE|ENTITY)\b/i;
+
+async function parseSafeComicInfoXml(parser, xml) {
+  if (typeof xml !== 'string' || Buffer.byteLength(xml, 'utf8') > MAX_XML_BYTES) {
+    throw new Error('ComicInfo.xml exceeds 2MB limit');
+  }
+  if (UNSAFE_XML_DTD_RE.test(xml)) {
+    throw new Error('Unsafe DOCTYPE/ENTITY declaration in ComicInfo.xml');
+  }
+  return parser.parseStringPromise(xml);
+}
+
 async function getComicInfoFromArchive(comicPath) {
   const parser = new xml2js.Parser({ explicitArray: false, mergeAttrs: true });
 
@@ -22,8 +35,12 @@ async function getComicInfoFromArchive(comicPath) {
 
   if (fs.existsSync(sidecarPath)) {
     try {
+      const stat = await fs.promises.stat(sidecarPath);
+      if (stat.size > MAX_XML_BYTES) {
+        throw new Error('ComicInfo.xml sidecar exceeds 2MB limit');
+      }
       const xml = await fs.promises.readFile(sidecarPath, 'utf-8');
-      const result = await parser.parseStringPromise(xml);
+      const result = await parseSafeComicInfoXml(parser, xml);
       log('INFO', 'META', `📄 Read ComicInfo.xml metadata from sidecar for ${path.basename(comicPath)}`);
       const info = trimObjectStrings(result.ComicInfo || {});
       if (info.Title && (isTitleSameAsSeries(info.Title, info.Series) || (!info.Series && isTitleSameAsSeries(info.Title, '')))) {
@@ -55,9 +72,12 @@ async function getComicInfoFromArchive(comicPath) {
 
     if (infoEntry) {
       const buffer = await archive.readBuffer(infoEntry);
+      if (buffer.length > MAX_XML_BYTES) {
+        throw new Error('ComicInfo.xml entry exceeds 2MB limit');
+      }
       const xml = buffer.toString('utf-8');
       try {
-        const result = await parser.parseStringPromise(xml);
+        const result = await parseSafeComicInfoXml(parser, xml);
         const info = trimObjectStrings(result.ComicInfo || {});
         if (info.Title && (isTitleSameAsSeries(info.Title, info.Series) || (!info.Series && isTitleSameAsSeries(info.Title, '')))) {
           info.Title = '';

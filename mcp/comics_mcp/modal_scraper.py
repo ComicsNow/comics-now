@@ -1,3 +1,4 @@
+import ipaddress
 import os
 import re
 import json
@@ -11,8 +12,44 @@ HEADERS = {
 }
 
 
+def _is_safe_scrape_url(url: str) -> bool:
+    """Allow only public http/https URLs and block local/private/metadata SSRF targets."""
+    if not url or not isinstance(url, str):
+        return False
+    try:
+        parsed = urllib.parse.urlparse(url.strip())
+        if parsed.scheme not in ("http", "https"):
+            return False
+        host = (parsed.hostname or "").strip("[]").split("%")[0].lower()
+        if not host:
+            return False
+        if host in ("localhost", "metadata.google.internal") or host.endswith((".localhost", ".local", ".internal")):
+            return False
+        try:
+            ip_obj = ipaddress.ip_address(host)
+        except ValueError:
+            return True
+        mapped = getattr(ip_obj, "ipv4_mapped", None)
+        if mapped is not None:
+            ip_obj = mapped
+        if (
+            ip_obj.is_private
+            or ip_obj.is_loopback
+            or ip_obj.is_link_local
+            or ip_obj.is_unspecified
+            or ip_obj.is_reserved
+            or ip_obj.is_multicast
+        ):
+            return False
+        return True
+    except Exception:
+        return False
+
+
 def _http_get(url: str, timeout: int = 15) -> str:
     """Execute standard HTTP GET with browser User-Agent."""
+    if not _is_safe_scrape_url(url):
+        raise ValueError(f"Unsafe or restricted URL: {url}")
     req = urllib.request.Request(url, headers=HEADERS)
     with urllib.request.urlopen(req, timeout=timeout) as resp:
         return resp.read().decode("utf-8", errors="ignore")

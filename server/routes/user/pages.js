@@ -178,7 +178,8 @@ module.exports = function attach(router, deps) {
         // Fast path: serve a previously transcoded WebP straight from disk.
         const cachedWebp = await getPageCacheBuffer(webpCacheKey);
         if (cachedWebp) {
-          res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+          res.setHeader('Cache-Control', 'private, max-age=3600');
+          res.setHeader('Vary', 'Cookie, Authorization');
           res.setHeader('Content-Type', 'image/webp');
           return res.send(cachedWebp);
         }
@@ -216,14 +217,16 @@ module.exports = function attach(router, deps) {
           const webpBuffer = await transcode;
 
           if (res.writableEnded || req.destroyed) return;
-          res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+          res.setHeader('Cache-Control', 'private, max-age=3600');
+          res.setHeader('Vary', 'Cookie, Authorization');
           res.setHeader('Content-Type', 'image/webp');
           return res.send(webpBuffer);
         } catch (err) {
           // Corrupt/unsupported source: fall back to original bytes rather than 500.
           log('WARN', 'PAGES', `WebP transcode failed for ${pageName}, serving original: ${err.message}`);
           if (res.writableEnded || req.destroyed) return;
-          res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+          res.setHeader('Cache-Control', 'private, max-age=3600');
+          res.setHeader('Vary', 'Cookie, Authorization');
           res.setHeader('Content-Type', getMimeFromExt(pageName));
           return res.send(sourceBuffer);
         }
@@ -233,7 +236,8 @@ module.exports = function attach(router, deps) {
       try {
         const buffer = await getEntryBuffer(p, pageName);
         if (!buffer) return res.status(404).end();
-        res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+        res.setHeader('Cache-Control', 'private, max-age=3600');
+        res.setHeader('Vary', 'Cookie, Authorization');
         res.setHeader('Content-Type', getMimeFromExt(pageName));
         res.send(buffer);
       } catch (err) {

@@ -136,7 +136,7 @@ describe('User Pages Route - WebP Downscaling & Caching', () => {
     await imageHandler(req, res);
 
     expect(res.headers['Content-Type']).toBe('image/webp');
-    expect(res.headers['Cache-Control']).toContain('immutable');
+    expect(res.headers['Cache-Control']).toBe('private, max-age=3600');
 
     const meta = await sharp(res.sentData).metadata();
     expect(meta.format).toBe('webp');
@@ -275,5 +275,28 @@ describe('User Pages Route - WebP Downscaling & Caching', () => {
 
     expect(res2.statusCode).toBe(403);
     expect(res2.sentData).toBeNull();
+  });
+
+  test('sets private Cache-Control and Vary: Cookie, Authorization on WebP and fallback page responses', async () => {
+    getEntryBuffer.mockResolvedValue(sampleImageBuffer);
+
+    const reqWebp = makeReq({ page: '01.jpg', w: '1600' });
+    const resWebp1 = createMockRes();
+    await imageHandler(reqWebp, resWebp1);
+    expect(resWebp1.headers['Cache-Control']).toBe('private, max-age=3600');
+    expect(resWebp1.headers['Vary']).toBe('Cookie, Authorization');
+
+    // Cache hit path
+    const resWebp2 = createMockRes();
+    await imageHandler(reqWebp, resWebp2);
+    expect(resWebp2.headers['Cache-Control']).toBe('private, max-age=3600');
+    expect(resWebp2.headers['Vary']).toBe('Cookie, Authorization');
+
+    // Original/no-width path
+    const reqOrig = makeReq({ page: '01.jpg' });
+    const resOrig = createMockRes();
+    await imageHandler(reqOrig, resOrig);
+    expect(resOrig.headers['Cache-Control']).toBe('private, max-age=3600');
+    expect(resOrig.headers['Vary']).toBe('Cookie, Authorization');
   });
 });

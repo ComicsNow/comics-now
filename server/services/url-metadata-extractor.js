@@ -38,9 +38,13 @@ function isPrivateOrReservedIP(rawIp) {
   }
   if (version === 6) {
     if (ip === '::' || ip === '::1') return true;
-    if (ip.startsWith('fe80:') || ip.startsWith('fc') || ip.startsWith('fd')) return true;
-    if (ip.startsWith('::ffff:')) {
-      const mapped = ip.slice('::ffff:'.length);
+    if (/^0+:0+:0+:0+:0+:0+:0+:[01]$/.test(ip)) return true;
+    if (/^fe[89ab][0-9a-f]:/.test(ip) || /^f[cd][0-9a-f]{2}:/.test(ip) || /^ff[0-9a-f]{2}:/.test(ip)) {
+      return true;
+    }
+    const v4MappedMatch = ip.match(/^(?:::ffff:|(?:0{1,4}:){5}ffff:)(.+)$/i);
+    if (v4MappedMatch) {
+      const mapped = v4MappedMatch[1];
       if (net.isIPv4(mapped)) {
         return isPrivateOrReservedIPv4(mapped);
       }
@@ -54,6 +58,9 @@ function isPrivateOrReservedIP(rawIp) {
         }
       }
       return true;
+    }
+    if (ip.startsWith('::') && net.isIPv4(ip.slice(2))) {
+      return isPrivateOrReservedIPv4(ip.slice(2));
     }
     return false;
   }
@@ -343,5 +350,7 @@ module.exports = {
   fetchUrlAsMarkdown,
   buildUrlMetadataPrompt,
   extractMetadataFromUrl,
-  isSafeWebUrl
+  isSafeWebUrl,
+  isPrivateOrReservedIP,
+  assertSafeResolvedHost
 };

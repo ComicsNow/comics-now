@@ -5,6 +5,7 @@
  */
 const cryptoVault = require('../../../utils/crypto-vault');
 const { getConfig, getMetronPassword } = require('../../../config');
+const { isSafeWebUrl } = require('../../../services/url-metadata-extractor');
 
 function computeTextSimilarity(a, b) {
   if (!a || !b) return 0;
@@ -75,13 +76,14 @@ function attachCoverProxyRoutes(router, deps) {
     if (!sName) return null;
 
     async function fetchCoverBuffer(imgUrl) {
-      if (!imgUrl || typeof imgUrl !== 'string' || imgUrl.includes('comics.org')) return null;
+      if (!isSafeWebUrl(imgUrl) || imgUrl.includes('comics.org')) return null;
       try {
         const r = await fetch(imgUrl, {
           headers: {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
             'Accept': 'image/avif,image/webp,image/apng,image/*,*/*;q=0.8'
           },
+          redirect: 'error',
           signal: AbortSignal.timeout(5000)
         });
         if (!r.ok) return null;
@@ -229,8 +231,9 @@ function attachCoverProxyRoutes(router, deps) {
         'blackwells.co.uk'
       ];
 
-      const isAllowed = allowedHosts.some(h => parsed.hostname === h || parsed.hostname.endsWith('.' + h));
-      if (!isAllowed) {
+      const host = (parsed.hostname || '').toLowerCase();
+      const isAllowed = allowedHosts.some(h => host === h || host.endsWith('.' + h));
+      if (!isAllowed || !isSafeWebUrl(targetUrl)) {
         return res.status(403).end();
       }
 
@@ -249,6 +252,7 @@ function attachCoverProxyRoutes(router, deps) {
               'Accept': 'image/avif,image/webp,image/apng,image/*,*/*;q=0.8',
               'Referer': 'https://www.comics.org/'
             },
+            redirect: 'error',
             signal: AbortSignal.timeout(3000)
           });
           if (gcdRes.ok) {
@@ -293,6 +297,7 @@ function attachCoverProxyRoutes(router, deps) {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
             'Accept': 'image/avif,image/webp,image/apng,image/*,*/*;q=0.8'
           },
+          redirect: 'error',
           signal: AbortSignal.timeout(5000)
         });
         if (fetchRes.ok) {

@@ -15,8 +15,11 @@ Welcome to **Comics Now! v4.2.0** — feature, performance, and security release
 * **Sidecar Proxy Path Traversal Mitigation**: Added strict character and format validation on `:arcId` and `:comicId` parameters before dispatching upstream proxy requests to the Tag Comics Now service, preventing path traversal attacks.
 * **Access Control & Admin Route Alignment**: Enforced `requireAdmin` authentication across metadata synthesis, URL extraction, batch-tagger status/logs, and external search proxy endpoints.
 * **Thumbnail IDOR & Access Check Hardening**: Removed unguarded static thumbnail exposure and enforced per-user library access verification (`checkComicAccess`) across cached and on-demand thumbnail generation.
-* **Configuration Storage & Key Transport Hardening**: Enforced `0600` file permissions on `config.json` and `comics-now.db` upon creation and save; added support for passing Gemini API keys via `X-Gemini-Api-Key` HTTP header to prevent API key exposure in URL query parameters and proxy logs.
+* **Configuration Storage & Key Transport Hardening**: Enforced `0600` file permissions on `config.json`, `comics-now.db`, Gemini settings, and tagger scheduler state upon creation and save; added support for passing Gemini API keys via `X-Gemini-Api-Key` HTTP header to prevent API key exposure in URL query parameters and proxy logs.
 * **End-to-End Config & Tagger Secret Encryption**: Enforced automatic AES-256-GCM encryption (`enc:v1:...`) for all API keys and passwords in `config.json` on load, setter invocation, and save; added missing `gcdUser`, `gcdPassword`, and `googleBooksApiKey` settings hydration from SQLite; and scrubbed persisted plaintext secrets from `scheduler_config.json` while masking credentials in tagger scheduler API responses.
+* **Archive Conversion & Tagger Boundary Hardening**: Hardened CBR/PDF conversion scripts against filename option injection and archive symlinks (`--`, `-ol-`, `-y`), enforced directory/file containment and symlink checks plus optional internal bearer token verification (`TAGGER_INTERNAL_TOKEN`) in the tagger service, and failed closed on static HTML viewer authentication when auth is enabled.
+* **Multi-Layer SSRF, CORS, CSRF & Proxy Protections**: Extended IPv4/IPv6 private-range and redirect blocking across cover proxies, tagger cover comparison, and scraper utilities; restricted MCP server CORS origins (configurable via `MCP_ALLOWED_ORIGINS`) and expanded destructive HTTP verb/keyword guards; tightened Content Security Policy (`object-src`, `base-uri`, `frame-ancestors`); and added same-origin CSRF checks and rate limiting on outbound proxy endpoints.
+* **User Access Bounds, Cache Privacy, XSS & XML Hardening**: Marked page image responses `Cache-Control: private, max-age=3600` with `Vary: Cookie, Authorization`, cleared offline download caches and hardened cookie attributes on impersonation switches, bounded story-arc continuity/reading-directory/reading-list queries to user library permissions, escaped story-arc UI interpolations against XSS, and enforced a 2MB size limit with DTD/ENTITY blocking on `ComicInfo.xml` parsing.
 
 ### 3. Offline CBR/CBZ Playback, Service Worker Caching & Preloading Reliability
 * **Native Client-Side CBR & CBZ Extraction**: Added unified archive extraction (`archive-extractor.js` + `unrar.wasm`) using `JSZip` for `.cbz` and `node-unrar-js` WebAssembly for `.cbr`, enabling offline downloaded and local `.cbr` comics to open and stream pages natively in the browser without server-side transcoding.
@@ -52,14 +55,18 @@ Welcome to **Comics Now! v4.2.0** — feature, performance, and security release
 11. `feat(tagger-ui)`: add per-run Recent Scan Audits inspection with Successful/Failed/Skipped filtering and 21-day retention display
 12. `fix(gemini)`: remove 5-candidate cap and `lower_threshold` override in cover/tagger evaluation
 13. `fix(tagger)`: consolidate batch scan audit logs into one entry per run
+14. `security(scripts,tagger)`: harden archive conversion scripts against argument/symlink injection and enforce tagger path containment and internal token auth
+15. `security(ssrf,cors,csrf)`: tighten IPv6/redirect SSRF blocking, MCP CORS/destructive-action guards, Helmet CSP directives, outbound proxy rate limits, and same-origin CSRF checks
+16. `security(authz,cache,xss,xml)`: scope story-arc/reading-list access bounds, mark page caches private, clear SW caches on impersonation, escape story-arc UI templates, and reject DTD/ENTITY or >2MB `ComicInfo.xml` payloads
 
 ---
 
 ## 🧪 Verification & Test Results
-- **Full Jest suite**: `206 suites passed, 1565 tests passed, 1 snapshot passed (100% pass rate)`.
-- **Python tagger suite**: `255 passed (100% pass rate)`.
-- **Architectural invariants**: `tests/architectureRatchet.test.js` verified (100% pass rate).
-- **Security & route integration suites**: `tests/urlMetadataExtractor.test.js`, `tests/storyArcsSyncRoute.test.js`, `tests/metadataRoutes.test.js`, `tests/server/routes/static.test.js` verified.
+- **Full Jest suite**: `213 suites passed, 1595 tests passed, 1 snapshot passed (100% pass rate)`.
+- **Python tagger suite**: `265 passed (100% pass rate)`.
+- **MCP server suite**: `50 passed (100% pass rate)`.
+- **Architectural invariants**: `tests/architectureRatchet.test.js` (`5/5` passed, 100% pass rate).
+- **Security & route integration suites**: `tests/scripts/archiveConversionSecurity.test.js`, `tests/server/routes/coverProxySecurity.test.js`, `tests/server/routes/userAccessBounds.test.js`, `tests/server/middleware/securityGuards.test.js`, `tests/server/services/xmlAndConfigSecurity.test.js`, `tests/public/js/viewer/endStoryArcXss.test.js`, `tagger/tests/test_tagger_security.py`, `tests/urlMetadataExtractor.test.js`, `tests/storyArcsSyncRoute.test.js`, `tests/metadataRoutes.test.js`, `tests/server/routes/static.test.js` verified.
 - **Production build**: Tailwind CSS v4 and Vite client bundle compiled cleanly.
 
 ---

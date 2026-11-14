@@ -19,6 +19,20 @@ from tagger_app.core.metadata import (
 )
 
 
+MAX_XML_BYTES = 2 * 1024 * 1024
+_UNSAFE_XML_RE = re.compile(rb"<!(?:DOCTYPE|ENTITY)\b", re.IGNORECASE)
+
+
+def parse_safe_xml(xml_data):
+    """Parse ComicInfo XML after enforcing 2MB size limit and blocking DTD/ENTITY."""
+    raw = xml_data.encode("utf-8") if isinstance(xml_data, str) else xml_data
+    if len(raw) > MAX_XML_BYTES:
+        raise ValueError("ComicInfo.xml exceeds 2MB limit")
+    if _UNSAFE_XML_RE.search(raw):
+        raise ValueError("Unsafe DOCTYPE/ENTITY declaration in ComicInfo.xml")
+    return ET.fromstring(raw)
+
+
 def _read_comic_info_source(file_path):
     """Return raw ComicInfo.xml text/bytes from an adjacent sidecar or ZIP."""
     if not os.path.exists(file_path):
@@ -27,6 +41,9 @@ def _read_comic_info_source(file_path):
     sidecar = sidecar_path_for(file_path)
     if os.path.exists(sidecar):
         try:
+            if os.path.getsize(sidecar) > MAX_XML_BYTES:
+                print("[-] ComicInfo.xml sidecar exceeds 2MB limit")
+                return None
             with open(sidecar, "r", encoding="utf-8") as handle:
                 return handle.read()
         except Exception as e:
@@ -38,6 +55,9 @@ def _read_comic_info_source(file_path):
     try:
         with zipfile.ZipFile(file_path, 'r') as archive:
             if "ComicInfo.xml" in archive.namelist():
+                if archive.getinfo("ComicInfo.xml").file_size > MAX_XML_BYTES:
+                    print("[-] ComicInfo.xml archive entry exceeds 2MB limit")
+                    return None
                 return archive.read("ComicInfo.xml")
     except Exception as e:
         print(f"[-] Failed to read existing ComicInfo.xml: {e}")
@@ -55,7 +75,7 @@ def read_comic_info_xml(cbz_path):
         return None
 
     try:
-        root = ET.fromstring(xml_data)
+        root = parse_safe_xml(xml_data)
         metadata = {}
 
         tag_mappings = {

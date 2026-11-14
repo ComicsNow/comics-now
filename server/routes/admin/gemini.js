@@ -23,6 +23,11 @@ const {
   setGeminiThinkingLevel
 } = require('../../config');
 
+async function writePrivateConfig(filePath, serialized) {
+  await fs.promises.writeFile(filePath, serialized, { encoding: 'utf8', mode: 0o600 });
+  await fs.promises.chmod(filePath, 0o600);
+}
+
 module.exports = function attach(router, deps) {
   const {
     config: rawConfig = {},
@@ -108,7 +113,7 @@ module.exports = function attach(router, deps) {
 
       let configGetterKey = '';
       try {
-        configGetterKey = getGeminiApiKey();
+        if (!deps.paths?.CONFIG_FILE) configGetterKey = getGeminiApiKey();
       } catch (_) {}
 
       const plainDbApiKey = cryptoVault.decrypt(dbApiKey);
@@ -255,7 +260,7 @@ module.exports = function attach(router, deps) {
       if ((geminiApiKey || geminiCoverMatchEnabled) && !cfg.geminiTermsAccepted) {
         cfg.geminiCoverMatchEnabled = false;
         config.geminiCoverMatchEnabled = false;
-        await fs.promises.writeFile(configPath, JSON.stringify(cfg, null, 2), 'utf8');
+        await writePrivateConfig(configPath, JSON.stringify(cfg, null, 2));
         return res.status(400).json({
           error: 'Gemini compliance agreement must be accepted before enabling AI cataloging.',
           termsRequired: true
@@ -332,7 +337,7 @@ module.exports = function attach(router, deps) {
         }
       }
 
-      await fs.promises.writeFile(configPath, JSON.stringify(cfg, null, 2), 'utf8');
+      await writePrivateConfig(configPath, JSON.stringify(cfg, null, 2));
       if (typeof saveConfigToDisk === 'function') {
         saveConfigToDisk();
       }

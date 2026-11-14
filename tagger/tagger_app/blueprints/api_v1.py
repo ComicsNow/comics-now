@@ -1,6 +1,7 @@
 """Blueprint for REST API v1 endpoints (tagging, streaming, metadata search, health)."""
 
 import os
+from tagger_app.config import is_safe_cbz_path
 import sys
 import json
 import queue
@@ -66,8 +67,8 @@ def homepage_widget():
 def api_tag_file():
     data = request.json or {}
     file_path = data.get("path")
-    if not file_path or not os.path.exists(file_path):
-        return jsonify({"error": "Selected file does not exist."}), 400
+    if not is_safe_cbz_path(file_path):
+        return jsonify({"error": "Invalid or unsupported .cbz file path."}), 400
 
     try:
         comicvine_api_key = data.get("comicvine_api_key") or scheduler_config.get("comicvine_api_key")
@@ -120,8 +121,8 @@ def api_tag_file():
 def api_tag_file_stream():
     data = request.json or {}
     file_path = data.get("path")
-    if not file_path or not os.path.exists(file_path):
-        return jsonify({"error": "Selected file does not exist."}), 400
+    if not is_safe_cbz_path(file_path):
+        return jsonify({"error": "Invalid or unsupported .cbz file path."}), 400
 
     def generate():
         event_q = queue.Queue()
@@ -212,8 +213,8 @@ def api_apply_tag():
     data = request.json or {}
     file_path = data.get("path")
     metadata = data.get("metadata")
-    if not file_path or not os.path.exists(file_path):
-        return jsonify({"error": "Selected file does not exist."}), 400
+    if not is_safe_cbz_path(file_path):
+        return jsonify({"error": "Invalid or unsupported .cbz file path."}), 400
     if not metadata:
         return jsonify({"error": "Metadata is required."}), 400
 

@@ -1,6 +1,7 @@
 """Blueprint for interactive web UI search, manual tagging, and folder batch-tagging."""
 
 import os
+from tagger_app.config import is_safe_cbz_path, is_safe_browse_dir
 import json
 import queue
 import threading
@@ -150,6 +151,8 @@ def tag_comic():
 
     session_info = sessions[session_id]
     cbz_path = session_info["cbz_path"]
+    if not is_safe_cbz_path(cbz_path):
+        return jsonify({"error": "Invalid or unsupported .cbz file path."}), 400
     is_local = session_info.get("is_local", False)
 
     try:
@@ -205,8 +208,8 @@ def batch_tag_folder():
     enabled_sources = data.get("enabled_sources") or scheduler_config.get("enabled_sources")
     force_reprocess = bool(data.get("force_reprocess", scheduler_config.get("force_reprocess", False)))
 
-    if not folder_path or not os.path.exists(folder_path) or not os.path.isdir(folder_path):
-        return jsonify({"error": "Selected folder does not exist on the server."}), 400
+    if not is_safe_browse_dir(folder_path):
+        return jsonify({"error": "Selected folder does not exist or access is denied."}), 400
 
     try:
         cbz_files = sorted([

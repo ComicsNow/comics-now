@@ -9,6 +9,7 @@ import zipfile
 import xml.etree.ElementTree as ET
 
 from tagger_app.config import DB_TRACKING_PATH
+from tagger_app.core.comicinfo import MAX_XML_BYTES, parse_safe_xml
 
 
 def init_tracking_db():
@@ -81,8 +82,10 @@ def parse_sources_from_cbz_xml(file_path):
     try:
         with zipfile.ZipFile(file_path, 'r') as z:
             if "ComicInfo.xml" in z.namelist():
+                if z.getinfo("ComicInfo.xml").file_size > MAX_XML_BYTES:
+                    return sources
                 xml_data = z.read("ComicInfo.xml")
-                root = ET.fromstring(xml_data)
+                root = parse_safe_xml(xml_data)
                 notes_elem = root.find("Notes")
                 if notes_elem is not None and notes_elem.text:
                     notes_text = notes_elem.text
@@ -114,7 +117,7 @@ def parse_sources_from_cbz_xml(file_path):
                                     sources.add("src-googlebooks")
                                 else:
                                     sources.add("unknown")
-    except (zipfile.BadZipFile, ET.ParseError, KeyError):
+    except (zipfile.BadZipFile, ET.ParseError, KeyError, ValueError):
         pass
     except (OSError, PermissionError) as e:
         print(f"[-] Warning: Failed to read {file_path} for tracking signatures: {e}")

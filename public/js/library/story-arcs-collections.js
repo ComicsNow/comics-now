@@ -86,12 +86,12 @@ export function renderCollectionsGridView(modal, collections, onComicClick) {
     card.innerHTML = `
       <div class="relative w-full aspect-[13/20] bg-black overflow-hidden">
         ${col.coverImageUrl ? `
-          <img src="${col.coverImageUrl}" alt="${escapeHtml(col.title)}" class="w-full h-full object-cover">
+          <img src="${escapeHtml(col.coverImageUrl)}" alt="${escapeHtml(col.title)}" class="w-full h-full object-cover">
         ` : `
           <div class="w-full h-full flex items-center justify-center text-amber-500/40 text-3xl font-extrabold">📚</div>
         `}
         <div class="absolute top-2 left-2 px-2 py-0.5 rounded bg-black/80 backdrop-blur-xs text-[10px] font-bold text-amber-400 border border-amber-400/30">
-          Vol #${col.position}
+          Vol #${escapeHtml(col.position)}
         </div>
         <div class="absolute top-2 right-2">
           ${badgeHtml}
@@ -111,7 +111,7 @@ export function renderCollectionsGridView(modal, collections, onComicClick) {
         </div>
 
         <div class="flex items-center justify-between pt-2 border-t border-gray-800/80 text-[10px] text-gray-400">
-          <span>${col.releaseYear ? `Year: ${col.releaseYear}` : ''}</span>
+          <span>${col.releaseYear ? `Year: ${escapeHtml(col.releaseYear)}` : ''}</span>
           ${isOwned && col.comicId ? `
             <button class="col-read-btn px-2 py-1 rounded bg-amber-500 hover:bg-amber-400 text-black font-bold transition-colors cursor-pointer shadow-xs">
               ${col.readStatus === 'read' ? 'Re-read ↺' : 'Read ▶'}
@@ -179,7 +179,7 @@ export function renderCollectionsChecklistView(modal, collections, onComicClick)
     const badgeHtml = getReadStatusBadge(col.readStatus, col.lastReadPage, col.pageCount);
 
     tr.innerHTML = `
-      <td class="py-2.5 px-4 text-center font-mono text-amber-400 font-bold">${col.position}</td>
+      <td class="py-2.5 px-4 text-center font-mono text-amber-400 font-bold">${escapeHtml(col.position)}</td>
       <td class="py-2.5 px-4 font-semibold text-white">
         <div class="flex items-center gap-2">
           <span>${escapeHtml(col.title)}</span>
@@ -187,7 +187,7 @@ export function renderCollectionsChecklistView(modal, collections, onComicClick)
         </div>
         ${col.contentsRaw ? `<div class="text-[11px] text-gray-400 font-normal line-clamp-1">${escapeHtml(col.contentsRaw)}</div>` : ''}
       </td>
-      <td class="py-2.5 px-4 hidden sm:table-cell text-gray-400 text-xs">${col.releaseYear || '—'}</td>
+      <td class="py-2.5 px-4 hidden sm:table-cell text-gray-400 text-xs">${col.releaseYear ? escapeHtml(col.releaseYear) : '—'}</td>
       <td class="py-2.5 px-4 text-center">
         ${badgeHtml}
       </td>
@@ -226,7 +226,7 @@ export function getReadStatusBadge(status, lastReadPage, totalPages) {
     return `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-950/90 text-emerald-300 border border-emerald-500/50 shadow-xs">✓ Read</span>`;
   }
   if (status === 'reading') {
-    const pageText = totalPages > 0 ? `p. ${lastReadPage}/${totalPages}` : `p. ${lastReadPage}`;
+    const pageText = totalPages > 0 ? `p. ${escapeHtml(lastReadPage)}/${escapeHtml(totalPages)}` : `p. ${escapeHtml(lastReadPage)}`;
     return `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-sky-950/90 text-sky-300 border border-sky-500/50 shadow-xs">📖 ${pageText}</span>`;
   }
   if (status === 'unread') {

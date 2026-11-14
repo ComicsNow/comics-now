@@ -8,10 +8,11 @@ Decomposed modular Flask service with single-responsibility blueprints:
 - `tagger_app.blueprints.scheduler_routes`: Scheduler config, manual trigger & library enhance SSE.
 """
 
+import hmac
 import os
 import concurrent.futures
 import werkzeug.serving
-from flask import Flask
+from flask import Flask, jsonify, request
 
 from tagger_app.config import (
     UPLOAD_FOLDER,
@@ -69,6 +70,17 @@ from tagger_app.blueprints.story_arcs import story_arcs_bp
 
 # Flask Application Instance
 app = Flask(__name__)
+
+
+@app.before_request
+def enforce_internal_token():
+    expected_token = os.environ.get("TAGGER_INTERNAL_TOKEN", "")
+    if not expected_token or request.path == "/api/health":
+        return None
+    provided = request.headers.get("X-Tagger-Token", "")
+    if not provided or not hmac.compare_digest(provided, expected_token):
+        return jsonify({"error": "Unauthorized"}), 401
+    return None
 
 # Register Blueprints
 app.register_blueprint(ui_bp)

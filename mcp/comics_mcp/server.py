@@ -117,6 +117,21 @@ from comics_mcp.tools.story_arcs import (
 )
 
 
+def _get_cors_kwargs() -> dict:
+    """Return CORS middleware kwargs restricted to configured or localhost origins."""
+    raw = os.environ.get("MCP_ALLOWED_ORIGINS", "")
+    origins = [o.strip() for o in raw.split(",") if o.strip()] or [
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+    ]
+    return {
+        "allow_origins": origins,
+        "allow_credentials": False,
+        "allow_methods": ["GET", "POST", "OPTIONS"],
+        "allow_headers": ["Content-Type", "Authorization", "Mcp-Session-Id"],
+    }
+
+
 def main() -> None:
     transport = os.environ.get("MCP_TRANSPORT", "stdio")
     # Default to loopback (127.0.0.1) for security; only bind to 0.0.0.0 if explicitly requested
@@ -138,13 +153,7 @@ def main() -> None:
             ],
             lifespan=base_app.router.lifespan_context,
         )
-        starlette_app.add_middleware(
-            CORSMiddleware,
-            allow_origins=["*"],
-            allow_credentials=True,
-            allow_methods=["*"],
-            allow_headers=["*"],
-        )
+        starlette_app.add_middleware(CORSMiddleware, **_get_cors_kwargs())
 
         uvicorn.run(starlette_app, host=host, port=int(port_str))
     elif transport == "streamable-http" and port_str:
@@ -163,13 +172,7 @@ def main() -> None:
             ],
             lifespan=base_app.router.lifespan_context,
         )
-        starlette_app.add_middleware(
-            CORSMiddleware,
-            allow_origins=["*"],
-            allow_credentials=True,
-            allow_methods=["*"],
-            allow_headers=["*"],
-        )
+        starlette_app.add_middleware(CORSMiddleware, **_get_cors_kwargs())
 
         async def app(scope, receive, send):
             if scope["type"] == "http":

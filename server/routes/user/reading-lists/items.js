@@ -9,7 +9,7 @@ module.exports = function attachItemsRoutes(router, deps) {
     validateComicId
   } = deps;
 
-  const batchInsertReadingListItems = createBatchInserter(dbRun);
+  const batchInsertReadingListItems = createBatchInserter(dbRun, deps);
 
   // Bulk add comics across reading lists
   // Body: { listIds: string[], comicIds: string[] } or { operations: [{ listId, comicIds }] }
@@ -61,7 +61,7 @@ module.exports = function attachItemsRoutes(router, deps) {
         }
 
         if (itemsToInsert.length > 0) {
-          addedCount = await batchInsertReadingListItems(listId, itemsToInsert, true);
+          addedCount = await batchInsertReadingListItems(listId, itemsToInsert, true, req.user);
         }
 
         await dbRun('UPDATE reading_lists SET updated = ? WHERE id = ?', [now, listId]);
@@ -227,7 +227,7 @@ module.exports = function attachItemsRoutes(router, deps) {
       }
 
       if (itemsToInsert.length > 0) {
-        await batchInsertReadingListItems(req.params.id, itemsToInsert, true);
+        await batchInsertReadingListItems(req.params.id, itemsToInsert, true, req.user);
       }
 
       // Update list timestamp

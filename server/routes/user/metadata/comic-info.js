@@ -25,7 +25,7 @@ function attachComicInfoRoutes(router, deps) {
   async function resolveGeminiConfig() {
     const config = getConfig() || {};
     let enabled = config.geminiCoverMatchEnabled !== false;
-    let geminiApiKey = (process.env.NODE_ENV === 'test' ? '' : process.env.GEMINI_API_KEY) || config.geminiApiKey || '';
+    let geminiApiKey = process.env.NODE_ENV === 'test' ? '' : (process.env.GEMINI_API_KEY || config.geminiApiKey || '');
     let geminiModel = config.geminiModel || 'gemini-3.5-flash-lite';
     let dailyCap = parseInt(config.geminiCoverDailyCap || '450', 10);
 
