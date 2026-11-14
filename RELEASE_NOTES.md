@@ -36,6 +36,7 @@ Welcome to **Comics Now! v4.2.0** — feature, performance, and security release
 * **Library Preferences & Continuous Mode Fixes**: Normalized array-shaped user library preferences in Settings defaults so saved per-library reading modes load accurately, and persisted per-comic Continuous Scroll toggles to `/api/v1/comics/continuous-mode`.
 * **Reading List Filter & Template Hardening**: Fixed reading list modal search/publisher filtering to always reflect freshly reloaded lists, escaped cover/thumbnail URL attributes in reading list cards, and hardened offline/settings `safeHtml` fallback renderers against HTML injection.
 * **Module & Client Decoupling**: Replaced global `fetch` monkey-patching in the tagger bridge with an explicit `taggerFetch` client wrapper, fixed the Story Arcs publishers endpoint connection handling, broke a frontend UI module circular import, standardized top-level module imports across Node/Python services, and removed orphaned modules and unused `/_ext/*` route aliases.
+* **Navigation, Breadcrumb & Search Enhancements**: Moved underlined ancestor-only breadcrumbs between the app title and action buttons, positioned view titles directly below the search bar, removed the redundant series continuity strip, and added Reading Lists and Story Arcs to library search and the search field dropdown.
 
 ---
 

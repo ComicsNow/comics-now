@@ -1948,13 +1948,16 @@
 
   <div id="app" class="container mx-auto">
     <!-- Riso Logo Wordmark -->
-    <div class="relative mb-6">
+    <div class="relative mb-2">
       <div class="logo-container cursor-pointer select-none" onclick="window.goToInitialView && window.goToInitialView()">
         <h1 class="app-title-riso">
           COMICS <span class="text-vermilion">NOW</span><span class="logo-exclamation">!</span>
         </h1>
       </div>
     </div>
+
+    <!-- Breadcrumb navigation — shown whenever drilling below root (ancestors only) -->
+    <nav id="breadcrumb" aria-label="Breadcrumb" class="hidden flex items-center gap-1.5 text-sm mb-4 px-1 flex-wrap"></nav>
 
     <!-- Brutalist Buttons Container -->
     <div class="flex justify-between items-center mb-6 px-2">
@@ -2003,37 +2006,13 @@
           <option value="series">Series</option>
           <option value="publisher">Pub.</option>
           <option value="character">Char.</option>
+          <option value="reading-list">Reading Lists</option>
+          <option value="story-arc">Story Arcs</option>
         </select>
         <!-- Visually-hidden submit so the keyboard "Search" key (and Enter) reliably trigger submit -->
         <button type="submit" tabindex="-1" aria-hidden="true" style="position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0;">Search</button>
       </form>
     </div>
-
-    <div id="filters-container" class="flex flex-col items-center mb-6 gap-2">
-      <!-- Status Filters — narrow within whatever view + smart scope is active.
-           Mobile: All on its own row, then [Unread, In Progress, Read] wrapping next.
-           Desktop (sm+): single row, all four pills inline. -->
-      <div id="filter-buttons" class="flex flex-row flex-wrap items-center justify-center gap-2">
-        <button class="filter-btn pill-button active bg-gray-700 hover:bg-gray-600 text-white transition-colors" data-filter="all">
-          <span class="pill-label">All</span>
-        </button>
-        <button class="filter-btn pill-button bg-gray-700 hover:bg-gray-600 text-white transition-colors" data-filter="unread">
-          <span class="pill-label">Unread</span>
-          <span class="count-badge" id="unread-count">0</span>
-        </button>
-        <button class="filter-btn pill-button bg-gray-700 hover:bg-gray-600 text-white transition-colors" data-filter="in-progress">
-          <span class="pill-label">In Progress</span>
-          <span class="count-badge" id="in-progress-count">0</span>
-        </button>
-        <button class="filter-btn pill-button bg-gray-700 hover:bg-gray-600 text-white transition-colors" data-filter="read">
-          <span class="pill-label">Read</span>
-          <span class="count-badge" id="read-count">0</span>
-        </button>
-      </div>
-    </div>
-
-    <!-- Breadcrumb navigation — shown whenever drilling below root -->
-    <nav id="breadcrumb" class="hidden flex items-center gap-1.5 text-sm mb-4 px-1 flex-wrap"></nav>
 
     <!-- Smart filter host: lives offscreen by default; JS moves it into the active view's
          `.smart-filter-mount` slot so it appears immediately under that view's title.
@@ -2119,6 +2098,7 @@
           </button>
         </div>
       </div>
+      <div class="filters-mount"></div>
       <div id="search-results-container" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6"></div>
     </div>
 
@@ -2127,12 +2107,37 @@
       <div class="w-full flex justify-between items-center mb-4">
         <h2 id="smart-list-title" class="text-2xl font-bold truncate view-title"></h2>
       </div>
+      <div class="filters-mount"></div>
       <div class="smart-filter-mount"></div>
       <div id="smart-list-container" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6"></div>
     </div>
 
     <!-- Root Folder View -->
     <div id="root-folder-list">
+      <div class="filters-mount">
+        <div id="filters-container" class="flex flex-col items-center mb-6 gap-2">
+          <!-- Status Filters — narrow within whatever view + smart scope is active.
+               Mobile: All on its own row, then [Unread, In Progress, Read] wrapping next.
+               Desktop (sm+): single row, all four pills inline. -->
+          <div id="filter-buttons" class="flex flex-row flex-wrap items-center justify-center gap-2">
+            <button class="filter-btn pill-button active bg-gray-700 hover:bg-gray-600 text-white transition-colors" data-filter="all">
+              <span class="pill-label">All</span>
+            </button>
+            <button class="filter-btn pill-button bg-gray-700 hover:bg-gray-600 text-white transition-colors" data-filter="unread">
+              <span class="pill-label">Unread</span>
+              <span class="count-badge" id="unread-count">0</span>
+            </button>
+            <button class="filter-btn pill-button bg-gray-700 hover:bg-gray-600 text-white transition-colors" data-filter="in-progress">
+              <span class="pill-label">In Progress</span>
+              <span class="count-badge" id="in-progress-count">0</span>
+            </button>
+            <button class="filter-btn pill-button bg-gray-700 hover:bg-gray-600 text-white transition-colors" data-filter="read">
+              <span class="pill-label">Read</span>
+              <span class="count-badge" id="read-count">0</span>
+            </button>
+          </div>
+        </div>
+      </div>
       <div class="smart-filter-mount"></div>
       <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6" id="root-folder-list-container">
         <div class="skeleton-card"><div class="skeleton-img"></div><div class="p-2 mt-1 space-y-1.5"><div class="skeleton-line w-3/4"></div><div class="skeleton-line w-1/2 mt-1"></div></div></div>
@@ -2147,6 +2152,7 @@
       <div class="w-full flex justify-between items-center mb-4">
         <h2 id="folder-list-title" class="text-2xl font-bold truncate view-title"></h2>
       </div>
+      <div class="filters-mount"></div>
       <div class="smart-filter-mount"></div>
       <div class="edge-index-container flex justify-end">
         <div id="folder-alpha-filter" class="edge-index flex flex-wrap gap-2 justify-center"></div>
@@ -2158,6 +2164,7 @@
     <!-- Publisher List View -->
     <div id="publisher-list" class="hidden">
       <h2 id="publisher-title" class="text-2xl font-bold truncate text-center mb-4 view-title"></h2>
+      <div class="filters-mount"></div>
       <div class="smart-filter-mount"></div>
       <div class="edge-index-container flex justify-end">
         <div id="publisher-alpha-filter" class="edge-index flex flex-wrap gap-2 justify-center"></div>
@@ -2168,6 +2175,7 @@
     <!-- Series List View -->
     <div id="series-list" class="hidden">
       <h2 id="series-title" class="text-2xl font-bold truncate text-center mb-4 view-title"></h2>
+      <div class="filters-mount"></div>
       <div class="smart-filter-mount"></div>
       <div class="edge-index-container flex justify-end">
         <div id="series-alpha-filter" class="edge-index flex flex-wrap gap-2 justify-center"></div>
@@ -2189,6 +2197,7 @@
     <!-- Comic List View -->
     <div id="comic-list" class="hidden">
       <h2 id="comic-list-title" class="text-2xl font-bold truncate text-center mb-4 view-title"></h2>
+      <div class="filters-mount"></div>
       <div class="smart-filter-mount"></div>
       <div class="edge-index-container flex justify-end">
         <div id="comic-alpha-filter" class="edge-index flex flex-wrap gap-2 justify-center"></div>

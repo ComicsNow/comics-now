@@ -255,7 +255,13 @@ export function showView(targetView) {
     filtersContainer?.classList.add('hidden');
   } else {
     searchContainer?.classList.remove('hidden');
-    filtersContainer?.classList.remove('hidden');
+    if (filtersContainer) {
+      const filtersMount = targetView?.querySelector?.('.filters-mount');
+      if (filtersMount && filtersContainer.parentElement !== filtersMount) {
+        filtersMount.appendChild(filtersContainer);
+      }
+      filtersContainer.classList.remove('hidden');
+    }
   }
 
   const rootFolderListDiv = document.getElementById('root-folder-list');

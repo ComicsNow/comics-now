@@ -259,108 +259,111 @@ export async function renderPublisherStoryArcs(publisherName = null, containerOv
     }
 
     for (const arc of filteredArcs) {
-      const card = document.createElement('div');
-      card.className = 'story-arc-card bg-gradient-to-b from-gray-900 via-gray-900 to-gray-950 rounded-2xl shadow-2xl overflow-hidden border border-amber-500/30 hover:border-amber-400/80 transition-all duration-300 group flex flex-col justify-between cursor-pointer';
-
-      const isCollection = arc.edition === 'collection' || currentEdition === 'collections';
-      const totalCount = isCollection ? (arc.totalCollections || 0) : (arc.totalIssues || 0);
-      const unitLabel = isCollection ? 'Volumes' : 'Issues';
-      const editionBadge = isCollection ? '📚 Collected Editions' : '⚡ Single Issues';
-      const isComplete = arc.completenessPercent === 100;
-      const thumbUrl = arc.coverImage || null;
-      const hasRead = (arc.readCount || 0) > 0;
-      const readPct = arc.readPercent || 0;
-
-      renderContent(card, safeHtml`
-        <div class="relative h-56 w-full overflow-hidden bg-black/60 border-b border-amber-500/20">
-          ${safeRaw(thumbUrl ? `
-            <img src="${thumbUrl}" alt="${escapeHtml(arc.title)}" class="w-full h-full object-cover object-top opacity-70 group-hover:opacity-95 group-hover:scale-105 transition-all duration-500" loading="lazy">
-          ` : `
-            <div class="w-full h-full flex items-center justify-center bg-gradient-to-br from-amber-950/40 via-gray-900 to-black">
-              <span class="text-4xl opacity-30 group-hover:scale-110 transition-transform">⚡</span>
-            </div>
-          `)}
-          <div class="absolute inset-0 bg-gradient-to-t from-gray-950 via-gray-900/60 to-transparent"></div>
-
-          <!-- Top Badges -->
-          <div class="absolute top-3 left-3 right-3 flex items-center justify-between gap-2 pointer-events-none">
-            <span class="px-2.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider bg-amber-500 text-black shadow-md">
-              ${editionBadge}
-            </span>
-            <div class="flex items-center gap-1.5 pointer-events-auto">
-              <span class="text-xs px-2.5 py-0.5 rounded-full bg-black/70 text-amber-300 font-semibold backdrop-blur-sm border border-amber-500/30 shrink-0">
-                ${totalCount} ${unitLabel.toLowerCase()}
-              </span>
-            </div>
-          </div>
-
-          <!-- Title & Subtitle in Cover Header -->
-          <div class="absolute bottom-3 left-3 right-3">
-            <h3 class="font-extrabold text-xl text-white group-hover:text-amber-300 transition-colors leading-snug line-clamp-1">
-              ${arc.title}
-            </h3>
-            <div class="text-xs text-gray-400 flex items-center gap-2 mt-1">
-              <span>${arc.publisher || publisherName}</span>
-              ${safeRaw(isCollection ? `<span>•</span><span class="text-amber-400 font-semibold">📚 ${arc.totalCollections} Volumes</span>` : (arc.totalCollections > 0 ? `<span>•</span><span class="text-amber-400 font-semibold">📚 ${arc.totalCollections} Volumes</span>` : ''))}
-            </div>
-          </div>
-        </div>
-
-        <!-- Card Body -->
-        <div class="p-4 flex-1 flex flex-col justify-between gap-3">
-          ${safeRaw(arc.description ? `
-            <p class="text-xs sm:text-sm text-gray-300 line-clamp-2 leading-relaxed font-normal">${escapeHtml(arc.description)}</p>
-          ` : '')}
-
-          <div class="mt-auto space-y-2 pt-3 border-t border-gray-800">
-            <!-- 1. Library Ownership Progress -->
-            <div>
-              <div class="flex justify-between items-center text-xs mb-1 font-semibold">
-                <span class="flex items-center gap-1 ${isComplete ? 'text-emerald-400' : 'text-amber-400'}">
-                  <span>📁 In Library</span>
-                </span>
-                <span class="${isComplete ? 'text-emerald-400' : 'text-amber-400'}">
-                  ${arc.ownedCount}/${totalCount} ${unitLabel} In Library (${arc.completenessPercent}%)
-                </span>
-              </div>
-              <div class="w-full bg-gray-800 h-1.5 rounded-full overflow-hidden">
-                <div class="h-full rounded-full transition-all duration-300 ${isComplete ? 'bg-gradient-to-r from-emerald-500 to-teal-400' : 'bg-gradient-to-r from-amber-500 to-orange-500'}" style="width: ${arc.completenessPercent}%;"></div>
-              </div>
-            </div>
-
-            <!-- 2. Reading Status Progress -->
-            <div>
-              <div class="flex justify-between items-center text-xs mb-1 font-semibold">
-                <span class="flex items-center gap-1 ${hasRead ? 'text-sky-300' : 'text-gray-400'}">
-                  <span>${hasRead ? '✓ Reading Progress' : 'Unread'}</span>
-                </span>
-                <span class="${hasRead ? 'text-sky-300' : 'text-gray-500'}">
-                  ${arc.readCount || 0}/${arc.ownedCount || 0} ${unitLabel} Read (${readPct}%)
-                </span>
-              </div>
-              <div class="w-full bg-gray-800 h-1.5 rounded-full overflow-hidden">
-                <div class="h-full rounded-full transition-all duration-300 bg-gradient-to-r from-sky-500 to-indigo-400" style="width: ${readPct}%;"></div>
-              </div>
-            </div>
-          </div>
-        </div>
-      `);
-
-      // Wire card click
-      card.addEventListener('click', (e) => {
-        e.preventDefault();
-        const fn = state.showStoryArcDetail || (typeof window !== 'undefined' && window.showStoryArcDetail) || showStoryArcDetail;
-        if (typeof fn === 'function') {
-          const targetArcId = arc.arcId || (arc.id ? arc.id.replace('__collections', '') : arc.id);
-          const initialFormat = isCollection ? 'collections' : 'issues';
-          fn(targetArcId, arc.title, 'grid', initialFormat);
-        }
-      });
-
-      container.appendChild(card);
+      container.appendChild(createStoryArcCard(arc, publisherName, currentEdition));
     }
   };
 
   renderStoryArcsFilterBar(container, storyArcs, renderCards);
   renderCards();
+}
+
+export function createStoryArcCard(arc, publisherName = '', editionOverride = null) {
+  const card = document.createElement('div');
+  card.className = 'story-arc-card bg-gradient-to-b from-gray-900 via-gray-900 to-gray-950 rounded-2xl shadow-2xl overflow-hidden border border-amber-500/30 hover:border-amber-400/80 transition-all duration-300 group flex flex-col justify-between cursor-pointer';
+
+  const isCollection = arc.edition === 'collection' || editionOverride === 'collections';
+  const totalCount = isCollection ? (arc.totalCollections || 0) : (arc.totalIssues || 0);
+  const unitLabel = isCollection ? 'Volumes' : 'Issues';
+  const editionBadge = isCollection ? '📚 Collected Editions' : '⚡ Single Issues';
+  const isComplete = arc.completenessPercent === 100;
+  const thumbUrl = arc.coverImage || null;
+  const hasRead = (arc.readCount || 0) > 0;
+  const readPct = arc.readPercent || 0;
+
+  renderContent(card, safeHtml`
+    <div class="relative h-56 w-full overflow-hidden bg-black/60 border-b border-amber-500/20">
+      ${safeRaw(thumbUrl ? `
+        <img src="${thumbUrl}" alt="${escapeHtml(arc.title)}" class="w-full h-full object-cover object-top opacity-70 group-hover:opacity-95 group-hover:scale-105 transition-all duration-500" loading="lazy">
+      ` : `
+        <div class="w-full h-full flex items-center justify-center bg-gradient-to-br from-amber-950/40 via-gray-900 to-black">
+          <span class="text-4xl opacity-30 group-hover:scale-110 transition-transform">⚡</span>
+        </div>
+      `)}
+      <div class="absolute inset-0 bg-gradient-to-t from-gray-950 via-gray-900/60 to-transparent"></div>
+
+      <!-- Top Badges -->
+      <div class="absolute top-3 left-3 right-3 flex items-center justify-between gap-2 pointer-events-none">
+        <span class="px-2.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider bg-amber-500 text-black shadow-md">
+          ${editionBadge}
+        </span>
+        <div class="flex items-center gap-1.5 pointer-events-auto">
+          <span class="text-xs px-2.5 py-0.5 rounded-full bg-black/70 text-amber-300 font-semibold backdrop-blur-sm border border-amber-500/30 shrink-0">
+            ${totalCount} ${unitLabel.toLowerCase()}
+          </span>
+        </div>
+      </div>
+
+      <!-- Title & Subtitle in Cover Header -->
+      <div class="absolute bottom-3 left-3 right-3">
+        <h3 class="font-extrabold text-xl text-white group-hover:text-amber-300 transition-colors leading-snug line-clamp-1">
+          ${arc.title}
+        </h3>
+        <div class="text-xs text-gray-400 flex items-center gap-2 mt-1">
+          <span>${arc.publisher || publisherName}</span>
+          ${safeRaw(isCollection ? `<span>•</span><span class="text-amber-400 font-semibold">📚 ${arc.totalCollections} Volumes</span>` : (arc.totalCollections > 0 ? `<span>•</span><span class="text-amber-400 font-semibold">📚 ${arc.totalCollections} Volumes</span>` : ''))}
+        </div>
+      </div>
+    </div>
+
+    <!-- Card Body -->
+    <div class="p-4 flex-1 flex flex-col justify-between gap-3">
+      ${safeRaw(arc.description ? `
+        <p class="text-xs sm:text-sm text-gray-300 line-clamp-2 leading-relaxed font-normal">${escapeHtml(arc.description)}</p>
+      ` : '')}
+
+      <div class="mt-auto space-y-2 pt-3 border-t border-gray-800">
+        <!-- 1. Library Ownership Progress -->
+        <div>
+          <div class="flex justify-between items-center text-xs mb-1 font-semibold">
+            <span class="flex items-center gap-1 ${isComplete ? 'text-emerald-400' : 'text-amber-400'}">
+              <span>📁 In Library</span>
+            </span>
+            <span class="${isComplete ? 'text-emerald-400' : 'text-amber-400'}">
+              ${arc.ownedCount || 0}/${totalCount} ${unitLabel} In Library (${arc.completenessPercent || 0}%)
+            </span>
+          </div>
+          <div class="w-full bg-gray-800 h-1.5 rounded-full overflow-hidden">
+            <div class="h-full rounded-full transition-all duration-300 ${isComplete ? 'bg-gradient-to-r from-emerald-500 to-teal-400' : 'bg-gradient-to-r from-amber-500 to-orange-500'}" style="width: ${arc.completenessPercent || 0}%;"></div>
+          </div>
+        </div>
+
+        <!-- 2. Reading Status Progress -->
+        <div>
+          <div class="flex justify-between items-center text-xs mb-1 font-semibold">
+            <span class="flex items-center gap-1 ${hasRead ? 'text-sky-300' : 'text-gray-400'}">
+              <span>${hasRead ? '✓ Reading Progress' : 'Unread'}</span>
+            </span>
+            <span class="${hasRead ? 'text-sky-300' : 'text-gray-500'}">
+              ${arc.readCount || 0}/${arc.ownedCount || 0} ${unitLabel} Read (${readPct}%)
+            </span>
+          </div>
+          <div class="w-full bg-gray-800 h-1.5 rounded-full overflow-hidden">
+            <div class="h-full rounded-full transition-all duration-300 bg-gradient-to-r from-sky-500 to-indigo-400" style="width: ${readPct}%;"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  `);
+
+  card.addEventListener('click', (e) => {
+    e.preventDefault();
+    const fn = state.showStoryArcDetail || (typeof window !== 'undefined' && window.showStoryArcDetail) || showStoryArcDetail;
+    if (typeof fn === 'function') {
+      const targetArcId = arc.arcId || (arc.id ? arc.id.replace('__collections', '') : arc.id);
+      const initialFormat = isCollection ? 'collections' : 'issues';
+      fn(targetArcId, arc.title, 'grid', initialFormat);
+    }
+  });
+
+  return card;
 }

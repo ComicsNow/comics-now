@@ -17,6 +17,13 @@ import {
   comicListDiv
 } from '../globals.js';
 import { comicIdMap } from './data.js';
+import {
+  filterReadingListsByQuery,
+  filterStoryArcsByQuery,
+  fetchMatchingReadingLists,
+  fetchMatchingStoryArcs,
+  renderCollectionSearchResults
+} from './search-collections.js';
 
 const clear = typeof clearElement === 'function' ? clearElement : (el) => { if (el) { if (typeof el.replaceChildren === 'function') el.replaceChildren(); else el.innerHTML = ''; } };
 const renderContent = typeof render === 'function' ? render : (el, content) => {
@@ -80,20 +87,44 @@ export async function showSearchView(query, field, useCache = false) {
   state.currentView = 'search';
   window.currentView = 'search';
   
-  if (rootFolderListDiv) rootFolderListDiv.classList.add('hidden');
-  if (publisherListDiv) publisherListDiv.classList.add('hidden');
-  if (seriesListDiv) seriesListDiv.classList.add('hidden');
-  if (comicListDiv) comicListDiv.classList.add('hidden');
-  
-  if (searchResultsView) {
-    searchResultsView.classList.remove('hidden');
+  const showViewFn = state.showView || (typeof window !== 'undefined' && window.showView);
+  if (typeof showViewFn === 'function' && searchResultsView) {
+    showViewFn(searchResultsView);
+  } else {
+    if (rootFolderListDiv) rootFolderListDiv.classList.add('hidden');
+    if (publisherListDiv) publisherListDiv.classList.add('hidden');
+    if (seriesListDiv) seriesListDiv.classList.add('hidden');
+    if (comicListDiv) comicListDiv.classList.add('hidden');
+
+    if (searchResultsView) {
+      searchResultsView.classList.remove('hidden');
+    }
   }
 
   if (searchResultsTitle) {
     searchResultsTitle.textContent = `Search Results for "${state.lastSearchQuery}"`;
   }
 
-  const renderResults = (comics) => {
+  const renderResults = (payload) => {
+    const comics = Array.isArray(payload) ? payload : (payload?.comics || []);
+    const readingLists = Array.isArray(payload) ? [] : (payload?.readingLists || []);
+    const storyArcs = Array.isArray(payload) ? [] : (payload?.storyArcs || []);
+
+    if (readingLists.length > 0 || storyArcs.length > 0) {
+      renderCollectionSearchResults(searchResultsContainer, {
+        readingLists,
+        storyArcs,
+        comics,
+        renderComicsFn: (items, targetGrid) => {
+          const renderComicCards = state.renderComicCards || window.renderComicCards;
+          if (typeof renderComicCards === 'function') {
+            renderComicCards(items, 'search', targetGrid);
+          }
+        }
+      });
+      return;
+    }
+
     const mode = state.searchViewMode || window.searchViewMode || 'list';
     if (mode === 'folders') {
       renderSearchResultsAsFolders(comics);
@@ -114,35 +145,57 @@ export async function showSearchView(query, field, useCache = false) {
     renderContent(searchResultsContainer, createLoadingMessage('Searching...'));
   }
 
+  const activeField = String(state.lastSearchField || 'all').toLowerCase().trim();
+  const includeReadingLists = activeField === 'all' || activeField === 'reading-list';
+  const includeStoryArcs = activeField === 'all' || activeField === 'story-arc';
+  const includeComics = activeField !== 'reading-list' && activeField !== 'story-arc';
+
   if (!navigator.onLine) {
-    const comics = searchLibraryLocally(state.lastSearchQuery, state.lastSearchField);
-    state.lastSearchResults = comics;
-    window.lastSearchResults = comics;
-    if (comics.length === 0) {
+    const comics = includeComics ? searchLibraryLocally(state.lastSearchQuery, activeField) : [];
+    const readingLists = includeReadingLists ? filterReadingListsByQuery(state.cachedReadingLists || [], state.lastSearchQuery) : [];
+    const storyArcs = includeStoryArcs ? filterStoryArcsByQuery(state.cachedStoryArcs || [], state.lastSearchQuery) : [];
+    const payload = (includeReadingLists || includeStoryArcs) ? { comics, readingLists, storyArcs } : comics;
+    state.lastSearchResults = payload;
+    window.lastSearchResults = payload;
+    if (comics.length === 0 && readingLists.length === 0 && storyArcs.length === 0) {
       if (searchResultsContainer) {
         renderContent(searchResultsContainer, createEmptyMessage('No results found.'));
       }
       return;
     }
-    renderResults(comics);
+    renderResults(payload);
     return;
   }
 
   try {
     const baseUrl = state.API_BASE_URL || window.API_BASE_URL || '';
-    const response = await fetch(`${baseUrl}/api/v1/search?query=${encodeURIComponent(state.lastSearchQuery)}&field=${state.lastSearchField}`);
-    const comics = await response.json();
-    state.lastSearchResults = comics;
-    window.lastSearchResults = comics;
-    
-    if (comics.length === 0) {
+    const [comics, readingLists, storyArcs] = await Promise.all([
+      includeComics
+        ? fetch(`${baseUrl}/api/v1/search?query=${encodeURIComponent(state.lastSearchQuery)}&field=${encodeURIComponent(activeField)}`).then((r) => r.json())
+        : Promise.resolve([]),
+      includeReadingLists
+        ? fetchMatchingReadingLists(state.lastSearchQuery, baseUrl)
+        : Promise.resolve([]),
+      includeStoryArcs
+        ? fetchMatchingStoryArcs(state.lastSearchQuery, baseUrl)
+        : Promise.resolve([])
+    ]);
+
+    const safeComics = Array.isArray(comics) ? comics : [];
+    const payload = (includeReadingLists || includeStoryArcs)
+      ? { comics: safeComics, readingLists, storyArcs }
+      : safeComics;
+    state.lastSearchResults = payload;
+    window.lastSearchResults = payload;
+
+    if (safeComics.length === 0 && readingLists.length === 0 && storyArcs.length === 0) {
       if (searchResultsContainer) {
         renderContent(searchResultsContainer, createEmptyMessage('No results found.'));
       }
       return;
     }
 
-    renderResults(comics);
+    renderResults(payload);
   } catch (error) {
     console.error('[search] Error:', error);
     if (searchResultsContainer) {
