@@ -126,6 +126,7 @@ async function runComicTagger(options = {}) {
     let failedCount = 0;
     const itemDurations = [];
     const failedDbUpdates = [];
+    const runResults = [];
 
     let publisherCodex = [];
     try {
@@ -160,6 +161,12 @@ async function runComicTagger(options = {}) {
       const gateResult = await evaluateFileGates(filePath, entry.name, stats, existing, mode, publisherCodex);
       if (gateResult.skip) {
         skippedCount++;
+        runResults.push({
+          filename: entry.name,
+          file_path: filePath,
+          status: 'skipped',
+          reason: gateResult.reason || 'Skipped by scan gate'
+        });
         itemDurations.push(Date.now() - itemStart);
         if (gateResult.reason) ctLog(gateResult.reason);
         continue;
@@ -177,13 +184,16 @@ async function runComicTagger(options = {}) {
       ctLog(`[${fileIndex}/${totalFiles}] Processing: ${entry.name} (${percent}% complete${etaStr})`);
       
       const coverPath = isCbr ? await resolveCoverPath({ comic: existing, filePath }) : null;
-      const request = buildTaggerRequest({
-        filePath,
-        isCbr,
-        forceReprocess,
-        publisherCodex,
-        coverPath
-      });
+      const request = {
+        ...buildTaggerRequest({
+          filePath,
+          isCbr,
+          forceReprocess,
+          publisherCodex,
+          coverPath
+        }),
+        skip_scan_log: true
+      };
 
       let res;
       try {
@@ -204,6 +214,12 @@ async function runComicTagger(options = {}) {
         }
         ctLog(`✗ Error calling tagger engine for ${entry.name}: ${err.message}`);
         failedCount++;
+        runResults.push({
+          filename: entry.name,
+          file_path: filePath,
+          status: 'failed',
+          error: err.message
+        });
         failedDbUpdates.push([id, filePath, entry.name, existing?.publisher || 'Unknown Publisher', existing?.series || 'Unknown Series', 'metadata', 'failed', null]);
         itemDurations.push(Date.now() - itemStart);
         continue;
@@ -215,10 +231,25 @@ async function runComicTagger(options = {}) {
           const { isSuccessful } = await persist.recordTaggedComic(filePath, entry.name, res, existing, publisherCodex, newStats);
           if (isSuccessful) {
             taggedCount++;
+            runResults.push({
+              filename: entry.name,
+              file_path: filePath,
+              status: 'tagged',
+              matched_title: res.matched_title,
+              confidence: res.confidence,
+              source: res.source || res.matching_url,
+              metadata: res.metadata
+            });
             ctLog(`✓ SUCCESS → Auto-tagged: ${res.matched_title || entry.name} (${res.confidence || 100}% confidence)`);
             await companionSync.syncCompanionTag(comicId);
           } else {
             failedCount++;
+            runResults.push({
+              filename: entry.name,
+              file_path: filePath,
+              status: 'failed',
+              error: 'Missing required metadata fields in final file'
+            });
             ctLog(`⚠ WARNING → Auto-tagged file but missing required fields in final file (marked failed): ${entry.name}`);
           }
           hasChanges = true;
@@ -227,6 +258,14 @@ async function runComicTagger(options = {}) {
         }
       } else if (res.status === 'review') {
         reviewCount++;
+        runResults.push({
+          filename: entry.name,
+          file_path: filePath,
+          status: 'review',
+          matched_title: res.matched_title,
+          confidence: res.confidence,
+          reason: 'Review required'
+        });
         ctLog(`ⓘ Review required for: ${entry.name} (Confidence: ${res.confidence}%)`);
         
         const reviewObj = review.buildReviewState(entry.name, filePath, res.candidates, {
@@ -257,6 +296,13 @@ async function runComicTagger(options = {}) {
         } else {
           skippedCount++;
         }
+        runResults.push({
+          filename: entry.name,
+          file_path: filePath,
+          status: res.status === 'failed' ? 'failed' : 'skipped',
+          reason: res.reason || 'No match above threshold',
+          error: res.error
+        });
         try {
           await persist.recordUnmatchedComic(filePath, entry.name, existing, stats, res.status === 'failed');
         } catch (err) {}
@@ -268,6 +314,18 @@ async function runComicTagger(options = {}) {
 
     if (failedDbUpdates.length > 0) {
       persist.batchUpdateFailedComics(failedDbUpdates);
+    }
+
+    if (runResults.length > 0 && typeof engineClient.saveRunScanLog === 'function') {
+      await engineClient.saveRunScanLog({
+        type: mode === 'default' ? 'library' : mode,
+        target: dir,
+        total_files: totalFiles,
+        tagged_count: taggedCount,
+        skipped_count: skippedCount + reviewCount,
+        failed_count: failedCount,
+        results: runResults
+      });
     }
 
     if (hasChanges) {

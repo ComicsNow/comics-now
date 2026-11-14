@@ -26,7 +26,7 @@ Welcome to **Comics Now! v4.2.0** — feature, performance, and security release
 ### 4. Story Arcs Continuity, Per-Run Scan Audits & Metadata Reliability
 * **Multi-Arc `<StoryArcs>` Metadata & Scoped Batch Enrichment**: Added `<StoryArcs>` XML serialization and SQLite metadata persistence for comics spanning multiple story arcs (preserving `<StoryArc>` and `<StoryArcNumber>` for the primary arc while merging all matched arcs), added incremental batch enrichment scopes (`all`, `since_last_run`, `since_date`, `new_arcs`) with persisted watermark state, and removed legacy `dryRun` simulation paths.
 * **Persistent Story Arcs Sync Timestamp**: Persisted `last_sync_time` and `sitemap_etag` in `reading_order_meta` across service restarts (with automatic recovery from existing sync timestamps) and fixed Unix seconds-to-milliseconds formatting in the Settings UI.
-* **Per-Run Recent Scan Audits & Status Filtering**: Made **Recent Scan Audits** expandable per run to inspect individual comic results, added **All**, **Successful**, **Failed**, and **Skipped** per-run filter controls, and surfaced the 21-day log retention policy.
+* **Per-Run Recent Scan Audits & Status Filtering**: Consolidated batch tagger scans into a single `scan_log_<id>.json` entry per run via `POST /api/logs` (suppressing per-comic log writes with `skip_scan_log`), made **Recent Scan Audits** expandable per run to inspect individual comic results, added **All**, **Successful**, **Failed**, and **Skipped** per-run filter controls, and surfaced the 21-day log retention policy.
 * **Gemini Cover & Tagger Candidate Evaluation**: Removed the 5-candidate cap and `lower_threshold: 0.30` override so Gemini evaluation considers full candidate sets cleanly.
 
 ---
@@ -51,12 +51,13 @@ Welcome to **Comics Now! v4.2.0** — feature, performance, and security release
 10. `feat(story-arcs)`: add multi-arc `<StoryArcs>` XML/DB persistence, scoped batch enrichment, and persistent sync timestamp
 11. `feat(tagger-ui)`: add per-run Recent Scan Audits inspection with Successful/Failed/Skipped filtering and 21-day retention display
 12. `fix(gemini)`: remove 5-candidate cap and `lower_threshold` override in cover/tagger evaluation
+13. `fix(tagger)`: consolidate batch scan audit logs into one entry per run
 
 ---
 
 ## 🧪 Verification & Test Results
-- **Full Jest suite**: `205 suites passed, 1564 tests passed, 1 snapshot passed (100% pass rate)`.
-- **Python tagger suite**: `253 passed (100% pass rate)`.
+- **Full Jest suite**: `206 suites passed, 1565 tests passed, 1 snapshot passed (100% pass rate)`.
+- **Python tagger suite**: `255 passed (100% pass rate)`.
 - **Architectural invariants**: `tests/architectureRatchet.test.js` verified (100% pass rate).
 - **Security & route integration suites**: `tests/urlMetadataExtractor.test.js`, `tests/storyArcsSyncRoute.test.js`, `tests/metadataRoutes.test.js`, `tests/server/routes/static.test.js` verified.
 - **Production build**: Tailwind CSS v4 and Vite client bundle compiled cleanly.

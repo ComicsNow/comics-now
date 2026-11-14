@@ -81,6 +81,7 @@ def api_tag_file():
         metadata_storage = data.get("metadata_storage") or scheduler_config.get("metadata_storage", "archive")
         publisher_codex = data.get("publisher_codex")
         cover_path = data.get("cover_path")
+        skip_scan_log = bool(data.get("skip_scan_log", False))
 
         res = process_single_cbz_file(
             file_path=file_path,
@@ -98,15 +99,16 @@ def api_tag_file():
             cover_path=cover_path
         )
 
-        write_scan_log(
-            scan_type="single",
-            target=file_path,
-            total_files=1,
-            tagged_count=1 if res.get("status") == "tagged" else 0,
-            skipped_count=1 if res.get("status") in ["skipped", "review"] else 0,
-            failed_count=1 if res.get("status") == "failed" else 0,
-            results=[res]
-        )
+        if not skip_scan_log:
+            write_scan_log(
+                scan_type="single",
+                target=file_path,
+                total_files=1,
+                tagged_count=1 if res.get("status") == "tagged" else 0,
+                skipped_count=1 if res.get("status") in ["skipped", "review"] else 0,
+                failed_count=1 if res.get("status") == "failed" else 0,
+                results=[res]
+            )
 
         return jsonify(res)
     except Exception as e:
@@ -146,6 +148,7 @@ def api_tag_file_stream():
                 metadata_storage = data.get("metadata_storage") or scheduler_config.get("metadata_storage", "archive")
                 publisher_codex = data.get("publisher_codex")
                 cover_path = data.get("cover_path")
+                skip_scan_log = bool(data.get("skip_scan_log", False))
 
                 res = process_single_cbz_file(
                     file_path=file_path,
@@ -165,15 +168,16 @@ def api_tag_file_stream():
                 )
                 worker_res["result"] = res
 
-                write_scan_log(
-                    scan_type="single",
-                    target=file_path,
-                    total_files=1,
-                    tagged_count=1 if res.get("status") == "tagged" else 0,
-                    skipped_count=1 if res.get("status") in ["skipped", "review"] else 0,
-                    failed_count=1 if res.get("status") == "failed" else 0,
-                    results=[res]
-                )
+                if not skip_scan_log:
+                    write_scan_log(
+                        scan_type="single",
+                        target=file_path,
+                        total_files=1,
+                        tagged_count=1 if res.get("status") == "tagged" else 0,
+                        skipped_count=1 if res.get("status") in ["skipped", "review"] else 0,
+                        failed_count=1 if res.get("status") == "failed" else 0,
+                        results=[res]
+                    )
             except Exception as e:
                 worker_err["error"] = str(e)
             finally:

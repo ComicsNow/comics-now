@@ -151,11 +151,29 @@ async function clearEnhancedTracking() {
   return pyResult || { ok: true };
 }
 
+async function saveRunScanLog(payload) {
+  const serviceUrl = getTaggerServiceUrl() || 'http://127.0.0.1:5000';
+  try {
+    const res = await fetch(`${serviceUrl}/api/logs`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      signal: AbortSignal.timeout(5000),
+      body: JSON.stringify(payload || {})
+    });
+    if (!res.ok) return { ok: false, status: res.status };
+    return await res.json();
+  } catch (err) {
+    ctLog(`⚠ Failed to persist run scan audit log: ${err.message}`);
+    return { ok: false, error: err.message };
+  }
+}
+
 module.exports = {
   formatDuration,
   callTaggerEngineWithProgress,
   searchExternal,
   getScanLogsList,
   getScanLogDetail,
-  clearEnhancedTracking
+  clearEnhancedTracking,
+  saveRunScanLog
 };

@@ -4,11 +4,11 @@ import os
 import re
 import json
 import sqlite3
-from flask import Blueprint, jsonify
+from flask import Blueprint, jsonify, request
 from werkzeug.utils import secure_filename
 
 from tagger_app.config import LOGS_DIR, DB_TRACKING_PATH
-from tagger_app.persistence.scan_logs import prune_scan_logs
+from tagger_app.persistence.scan_logs import prune_scan_logs, write_scan_log
 from tagger_app.scheduler.state import scheduler_config, save_scheduler_data
 
 logs_bp = Blueprint('logs', __name__)
@@ -41,6 +41,25 @@ def get_logs():
                     print(f"[-] Error reading log file {f}: {e}")
     logs.sort(key=lambda x: x["timestamp"], reverse=True)
     return jsonify({"success": True, "logs": logs})
+
+
+@logs_bp.route('/api/logs', methods=['POST'])
+def create_run_log():
+    """Persist one consolidated scan_log_<id>.json entry for an entire scan run."""
+    data = request.get_json(silent=True) or {}
+    results = data.get("results")
+    if not isinstance(results, list):
+        return jsonify({"error": "results list is required"}), 400
+    write_scan_log(
+        scan_type=str(data.get("type") or "library"),
+        target=str(data.get("target") or ""),
+        total_files=int(data.get("total_files") or len(results)),
+        tagged_count=int(data.get("tagged_count") or 0),
+        skipped_count=int(data.get("skipped_count") or 0),
+        failed_count=int(data.get("failed_count") or 0),
+        results=results,
+    )
+    return jsonify({"success": True})
 
 
 @logs_bp.route('/api/logs/<log_id>', methods=['GET'])
