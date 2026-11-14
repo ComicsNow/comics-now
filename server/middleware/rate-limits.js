@@ -93,8 +93,6 @@ function setupRateLimits(app, baseUrl = '/') {
   app.use(pathJoin(baseUrl, 'api/v1/comics/pages/image'), pagesLimiter);
   app.use(pathJoin(baseUrl, 'api/v1/proxy/cover'), outboundProxyLimiter);
   app.use(pathJoin(baseUrl, 'api/v1/metadata/extract-from-url'), outboundProxyLimiter);
-  app.use(pathJoin(baseUrl, 'api/v1/tracker-proxy'), outboundProxyLimiter);
-  app.use(pathJoin(baseUrl, 'api/v1/aria-rpc'), outboundProxyLimiter);
 
   app.use(baseUrl, (req, res, next) => {
     const relativePath = req.path.startsWith(baseUrl) ? req.path.slice(baseUrl.length) || '/' : req.path;

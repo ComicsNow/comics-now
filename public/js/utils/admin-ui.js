@@ -29,6 +29,14 @@ export function hideAdminUI() {
     ctButton.style.display = 'none';
   }
 
+  // Hide optional admin-only header tools and views
+  ['tracker-button', 'tracker-view', 'aria-button', 'aria-view'].forEach((id) => {
+    const el = document.getElementById(id);
+    if (el) {
+      el.remove();
+    }
+  });
+
   // Hide Story Arcs Sync toolbar button (admin only)
   const storyArcSyncBtn = document.getElementById('sync-story-arcs-toolbar-btn');
   if (storyArcSyncBtn) {

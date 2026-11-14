@@ -69,7 +69,7 @@ Welcome to **Comics Now! v4.2.0** — feature, performance, and security release
 ---
 
 ## 🧪 Verification & Test Results
-- **Full Jest suite**: `214 suites passed, 1604 tests passed, 1 snapshot passed (100% pass rate)`.
+- **Full Jest suite**: `213 suites passed, 1602 tests passed, 1 snapshot passed (100% pass rate)`.
 - **Python tagger suite**: `266 passed (100% pass rate)`.
 - **MCP server suite**: `50 passed (100% pass rate)`.
 - **Architectural invariants**: `tests/architectureRatchet.test.js` (`5/5` passed, 100% pass rate).

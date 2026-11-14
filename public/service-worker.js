@@ -93,10 +93,14 @@ self.addEventListener('fetch', event => {
     return;
   }
 
-  // PLUGIN BYPASS: Private plugin bundles are never PWA-cached. Their loader
-  // script skips them offline, and they must not be served from cache in any
-  // other case either.
-  if (url.pathname.includes('/plugins/')) {
+  // PLUGIN BYPASS: Private plugin bundles and endpoints are never PWA-cached or intercepted.
+  if (
+    url.pathname.includes('/plugins/') ||
+    url.pathname.includes('/tracker-app') ||
+    url.pathname.includes('/tracker-proxy') ||
+    url.pathname.includes('/aria-app') ||
+    url.pathname.includes('/aria-rpc')
+  ) {
     return;
   }
 
