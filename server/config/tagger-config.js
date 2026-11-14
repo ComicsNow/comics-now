@@ -1,13 +1,41 @@
 const cryptoVault = require('../utils/crypto-vault');
 const { DEFAULT_NAMING_RULES, DEFAULT_FOLDER_RULES } = require('../constants');
 
+const CONFIG_SECRET_KEYS = [
+  'comicVineApiKey',
+  'googleBooksApiKey',
+  'metronPassword',
+  'gcdPassword',
+  'geminiApiKey'
+];
+
+function encryptSecret(val) {
+  if (val === null || val === undefined) return '';
+  const trimmed = String(val).trim();
+  if (!trimmed) return '';
+  return cryptoVault.encrypt(trimmed);
+}
+
+function encryptConfigSecretsInPlace(targetConfig) {
+  if (!targetConfig || typeof targetConfig !== 'object') return false;
+  let mutated = false;
+  for (const key of CONFIG_SECRET_KEYS) {
+    const val = targetConfig[key];
+    if (typeof val === 'string' && val.trim() !== '' && !val.startsWith('enc:v1:')) {
+      targetConfig[key] = cryptoVault.encrypt(val.trim());
+      mutated = true;
+    }
+  }
+  return mutated;
+}
+
 function createTaggerConfigAccessors(config, saveConfigToDisk) {
   function getComicVineApiKey() {
     return cryptoVault.decrypt(config.comicVineApiKey) || '';
   }
 
   function setComicVineApiKey(key, skipSave = false) {
-    config.comicVineApiKey = key || '';
+    config.comicVineApiKey = encryptSecret(key);
     if (!skipSave) {
       saveConfigToDisk();
     }
@@ -86,7 +114,7 @@ function createTaggerConfigAccessors(config, saveConfigToDisk) {
   }
 
   function setMetronPassword(val, skipSave = false) {
-    config.metronPassword = typeof val === 'string' ? val.trim() : '';
+    config.metronPassword = encryptSecret(val);
     if (!skipSave) saveConfigToDisk();
   }
 
@@ -104,7 +132,7 @@ function createTaggerConfigAccessors(config, saveConfigToDisk) {
   }
 
   function setGcdPassword(val, skipSave = false) {
-    config.gcdPassword = typeof val === 'string' ? val.trim() : '';
+    config.gcdPassword = encryptSecret(val);
     if (!skipSave) saveConfigToDisk();
   }
 
@@ -113,7 +141,7 @@ function createTaggerConfigAccessors(config, saveConfigToDisk) {
   }
 
   function setGoogleBooksApiKey(key, skipSave = false) {
-    config.googleBooksApiKey = typeof key === 'string' ? key.trim() : '';
+    config.googleBooksApiKey = encryptSecret(key);
     if (!skipSave) saveConfigToDisk();
   }
 
@@ -149,7 +177,7 @@ function createTaggerConfigAccessors(config, saveConfigToDisk) {
   }
 
   function setGeminiApiKey(key, skipSave = false) {
-    config.geminiApiKey = key ? String(key).trim() : '';
+    config.geminiApiKey = encryptSecret(key);
     if (!skipSave) saveConfigToDisk();
   }
 
@@ -246,5 +274,7 @@ function createTaggerConfigAccessors(config, saveConfigToDisk) {
 }
 
 module.exports = {
+  CONFIG_SECRET_KEYS,
+  encryptConfigSecretsInPlace,
   createTaggerConfigAccessors
 };

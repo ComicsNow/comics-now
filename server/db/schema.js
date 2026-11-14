@@ -1,7 +1,7 @@
 const { db, dbRun, dbAll, dbGet } = require('./connection');
 const { log } = require('../logger');
 const { isTitleSameAsSeries, resolveCreatorRoles } = require('../services/metadata');
-const { migratePlaintextSecrets } = require('../services/secrets-migrator');
+const { migratePlaintextSecrets, scrubSchedulerConfigSecrets } = require('../services/secrets-migrator');
 
 /**
  * Adds comics.originalPath to databases created before the column existed.
@@ -300,18 +300,18 @@ async function initializeDatabase() {
       }
     }
 
-    // Secrets encryption migration v1
-    const secretsMigrationFlag = await dbGet("SELECT value FROM settings WHERE key = 'migration_secrets_encryption_v1'");
-    if (!secretsMigrationFlag) {
-      try {
-        const stats = await migratePlaintextSecrets({ all: dbAll, run: dbRun });
-        await dbRun("INSERT OR REPLACE INTO settings (key, value) VALUES ('migration_secrets_encryption_v1', '1')");
-        if (stats.migratedCount > 0) {
-          log('INFO', 'DB', `Encrypted ${stats.migratedCount} legacy plaintext secret(s) at rest with AES-256-GCM`);
-        }
-      } catch (e) {
-        log('WARN', 'DB', `Secrets encryption migration error: ${e.message}`);
+    // Secrets encryption migration (idempotent on every boot)
+    try {
+      const stats = await migratePlaintextSecrets({ all: dbAll, run: dbRun });
+      const scrubbed = scrubSchedulerConfigSecrets();
+      if (stats.migratedCount > 0) {
+        log('INFO', 'DB', `Encrypted ${stats.migratedCount} legacy plaintext secret(s) at rest with AES-256-GCM`);
       }
+      if (scrubbed > 0) {
+        log('INFO', 'DB', `Scrubbed plaintext secret(s) from ${scrubbed} scheduler_config.json file(s)`);
+      }
+    } catch (e) {
+      log('WARN', 'DB', `Secrets encryption migration error: ${e.message}`);
     }
   } catch (err) {
     await dbRun('ROLLBACK').catch(() => {});

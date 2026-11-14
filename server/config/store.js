@@ -15,7 +15,7 @@ const {
   getLibraryIdFromPath: getLibIdFromPath
 } = require('./paths');
 const { applyEnvOverrides } = require('./env');
-const { createTaggerConfigAccessors } = require('./tagger-config');
+const { createTaggerConfigAccessors, encryptConfigSecretsInPlace } = require('./tagger-config');
 const { createStoryArcsConfigAccessors } = require('./story-arcs-config');
 
 const DEFAULT_CONFIG = {
@@ -81,6 +81,7 @@ function saveConfigToDisk() {
     } catch (_) {}
     const { comicsDirectories, ...safeConfig } = config;
     const merged = { ...diskConfig, ...safeConfig };
+    encryptConfigSecretsInPlace(merged);
     fs.writeFileSync(CONFIG_FILE, JSON.stringify(merged, null, 2), { mode: 0o600 });
     try { fs.chmodSync(CONFIG_FILE, 0o600); } catch (_) {}
     log('INFO', 'SERVER', `Saved config to ${CONFIG_FILE}`);
@@ -103,9 +104,14 @@ async function loadConfigFromDisk() {
     }
     
     delete parsed.comicsDirectories;
+    const hadPlaintextSecrets = encryptConfigSecretsInPlace(parsed);
     Object.keys(config).forEach(k => delete config[k]);
     Object.assign(config, DEFAULT_CONFIG, parsed);
     config.libraries = sanitizeDirectories(config.libraries);
+    if (hadPlaintextSecrets) {
+      saveConfigToDisk();
+      log('INFO', 'SERVER', `Auto-encrypted plaintext secret(s) in ${CONFIG_FILE}`);
+    }
     applyEnvOverrides(config);
   } catch (e) {
     log('ERROR', 'SERVER', `Bad config.json; using defaults. ${e.message}`);

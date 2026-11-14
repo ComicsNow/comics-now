@@ -368,5 +368,25 @@ describe('Admin Settings Routes', () => {
       expect(config.getGeminiCoverDailyCap()).toBe(300);
       expect(config.getGeminiTermsAccepted()).toBe(true);
     });
+
+    it('should load gcdUser, gcdPassword, and googleBooksApiKey from DB into config', async () => {
+      const { loadSettings } = require('../server/settings');
+      const db = require('../server/db');
+      const config = require('../server/config');
+
+      jest.spyOn(db, 'dbAll').mockResolvedValueOnce([
+        { key: 'gcdUser', value: JSON.stringify('mock-gcd-user@example.com') },
+        { key: 'gcdPassword', value: JSON.stringify('mock-gcd-pass-123') },
+        { key: 'googleBooksApiKey', value: JSON.stringify('AIzaSyMockGoogleBooksKeyTest01') }
+      ]);
+
+      await loadSettings();
+
+      expect(config.getGcdUser()).toBe('mock-gcd-user@example.com');
+      expect(config.getGcdPassword()).toBe('mock-gcd-pass-123');
+      expect(config.getGoogleBooksApiKey()).toBe('AIzaSyMockGoogleBooksKeyTest01');
+      expect(config.getConfig().gcdPassword).toMatch(/^enc:v1:/);
+      expect(config.getConfig().googleBooksApiKey).toMatch(/^enc:v1:/);
+    });
   });
 });

@@ -56,11 +56,46 @@ def load_scheduler_data():
         except Exception as e:
             print(f"[-] Failed to load scheduler config: {e}")
 
+SECRET_CONFIG_KEYS = (
+    "comicvine_api_key",
+    "google_books_api_key",
+    "metron_pass",
+    "gcd_pass",
+)
+
+
+def mask_secret(value):
+    if not value or not isinstance(value, str):
+        return ""
+    if len(value) <= 8:
+        return "••••••••"
+    return "••••••••••••" + value[-4:]
+
+
+def is_masked(value):
+    return isinstance(value, str) and "••••" in value
+
+
+def masked_config_for_api():
+    safe = dict(scheduler_config)
+    for key in SECRET_CONFIG_KEYS:
+        if safe.get(key):
+            safe[key] = mask_secret(safe[key])
+    return safe
+
+
+def _sanitized_config_for_disk():
+    safe = dict(scheduler_config)
+    for key in SECRET_CONFIG_KEYS:
+        safe[key] = ""
+    return safe
+
+
 def save_scheduler_data():
     try:
         with open(CONFIG_FILE, 'w') as f:
             json.dump({
-                "config": scheduler_config,
+                "config": _sanitized_config_for_disk(),
                 "status": {
                     "last_run": scheduler_status["last_run"],
                     "next_run": scheduler_status["next_run"],

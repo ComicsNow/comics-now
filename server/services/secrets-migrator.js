@@ -1,4 +1,14 @@
+const fs = require('node:fs');
+const path = require('node:path');
 const defaultVault = require('../utils/crypto-vault');
+const { ROOT_DIR } = require('../constants');
+
+const SCHEDULER_SECRET_KEYS = [
+  'comicvine_api_key',
+  'google_books_api_key',
+  'metron_pass',
+  'gcd_pass'
+];
 
 const KNOWN_SECRET_KEYS = new Set([
   'geminiApiKey',
@@ -76,7 +86,61 @@ async function migratePlaintextSecrets(db, vault = defaultVault) {
   return { migratedCount, untouchedCount };
 }
 
+/**
+ * Strips any plaintext API keys or passwords from Python tagger scheduler_config.json files.
+ * Credentials are passed per-request from the Node.js encrypted vault in memory and must
+ * not persist in plaintext inside scheduler_config.json on disk.
+ *
+ * @param {string[]} [targetPaths] - Optional list of scheduler_config.json paths
+ * @returns {number} Number of files scrubbed
+ */
+function scrubSchedulerConfigSecrets(targetPaths) {
+  const dataDir = process.env.DATA_DIR || ROOT_DIR;
+  const candidates = Array.isArray(targetPaths) && targetPaths.length > 0
+    ? targetPaths
+    : [
+        path.join(ROOT_DIR, 'tagger', 'scheduler_config.json'),
+        path.join(dataDir, 'scheduler_config.json')
+      ];
+
+  let scrubbedFiles = 0;
+  const seen = new Set();
+
+  for (const filePath of candidates) {
+    if (!filePath || seen.has(filePath)) continue;
+    seen.add(filePath);
+
+    try {
+      if (!fs.existsSync(filePath)) continue;
+      const raw = fs.readFileSync(filePath, 'utf8');
+      const parsed = JSON.parse(raw);
+      if (!parsed || typeof parsed !== 'object' || !parsed.config || typeof parsed.config !== 'object') {
+        continue;
+      }
+
+      let changed = false;
+      for (const key of SCHEDULER_SECRET_KEYS) {
+        if (typeof parsed.config[key] === 'string' && parsed.config[key] !== '') {
+          parsed.config[key] = '';
+          changed = true;
+        }
+      }
+
+      if (changed) {
+        fs.writeFileSync(filePath, JSON.stringify(parsed, null, 4), { mode: 0o600 });
+        scrubbedFiles++;
+      }
+    } catch (err) {
+      console.error(`[SECRETS-MIGRATION] Failed to scrub ${filePath}: ${err.message}`);
+    }
+  }
+
+  return scrubbedFiles;
+}
+
 module.exports = {
   KNOWN_SECRET_KEYS,
-  migratePlaintextSecrets
+  SCHEDULER_SECRET_KEYS,
+  migratePlaintextSecrets,
+  scrubSchedulerConfigSecrets
 };

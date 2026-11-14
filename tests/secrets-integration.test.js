@@ -129,4 +129,34 @@ describe('Full Secrets Migration & Integration Suite', () => {
       expect(getter().startsWith('enc:v1:')).toBe(false);
     }
   });
+
+  test('scrubSchedulerConfigSecrets removes plaintext API keys and passwords from scheduler_config.json', () => {
+    const schedPath = path.join(tempDir, 'scheduler_config.json');
+    fs.writeFileSync(schedPath, JSON.stringify({
+      config: {
+        default_directory: '/comics',
+        comicvine_api_key: 'mock-plaintext-cv-key-1234',
+        google_books_api_key: 'mock-plaintext-gb-key-5678',
+        metron_user: 'mockMetronUser',
+        metron_pass: 'mock-plaintext-metron-pass',
+        gcd_user: 'mockGcdUser',
+        gcd_pass: 'mock-plaintext-gcd-pass'
+      },
+      status: { last_run: null }
+    }, null, 2));
+
+    const { scrubSchedulerConfigSecrets } = require('../server/services/secrets-migrator');
+    const scrubbed = scrubSchedulerConfigSecrets([schedPath]);
+
+    expect(scrubbed).toBe(1);
+    const updated = JSON.parse(fs.readFileSync(schedPath, 'utf8'));
+    expect(updated.config.comicvine_api_key).toBe('');
+    expect(updated.config.google_books_api_key).toBe('');
+    expect(updated.config.metron_pass).toBe('');
+    expect(updated.config.gcd_pass).toBe('');
+    // Non-secrets and usernames remain untouched
+    expect(updated.config.default_directory).toBe('/comics');
+    expect(updated.config.metron_user).toBe('mockMetronUser');
+    expect(updated.config.gcd_user).toBe('mockGcdUser');
+  });
 });

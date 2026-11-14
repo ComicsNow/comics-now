@@ -16,6 +16,7 @@ Welcome to **Comics Now! v4.2.0** — feature and security release introducing c
 * **Access Control & Admin Route Alignment**: Enforced `requireAdmin` authentication across metadata synthesis, URL extraction, batch-tagger status/logs, and external search proxy endpoints.
 * **Thumbnail IDOR & Access Check Hardening**: Removed unguarded static thumbnail exposure and enforced per-user library access verification (`checkComicAccess`) across cached and on-demand thumbnail generation.
 * **Configuration Storage & Key Transport Hardening**: Enforced `0600` file permissions on `config.json` and `comics-now.db` upon creation and save; added support for passing Gemini API keys via `X-Gemini-Api-Key` HTTP header to prevent API key exposure in URL query parameters and proxy logs.
+* **End-to-End Config & Tagger Secret Encryption**: Enforced automatic AES-256-GCM encryption (`enc:v1:...`) for all API keys and passwords in `config.json` on load, setter invocation, and save; added missing `gcdUser`, `gcdPassword`, and `googleBooksApiKey` settings hydration from SQLite; and scrubbed persisted plaintext secrets from `scheduler_config.json` while masking credentials in tagger scheduler API responses.
 
 ---
 
@@ -33,11 +34,13 @@ Welcome to **Comics Now! v4.2.0** — feature and security release introducing c
 4. `security(auth)`: enforce admin guard on metadata synthesis, external search, and batch-tagger endpoints
 5. `security(thumbnails)`: enforce per-user library access checks on thumbnail generation and serving
 6. `security(config)`: restrict configuration and database file permissions to 0600
+7. `security(secrets)`: auto-encrypt plaintext secrets in config.json on load/save and scrub/mask tagger scheduler_config.json credentials
 
 ---
 
 ## 🧪 Verification & Test Results
-- **Full Jest suite**: `197 suites passed, 1533 tests passed (100% pass rate)`.
+- **Full Jest suite**: `197 suites passed, 1537 tests passed (100% pass rate)`.
+- **Targeted Python tagger suites**: `tagger/tests/test_scheduler.py` and `tagger/tests/test_web_endpoints.py` (`16 passed`).
 - **Architectural invariants**: `tests/architectureRatchet.test.js` verified (100% pass rate).
 - **Security & route integration suites**: `tests/urlMetadataExtractor.test.js`, `tests/storyArcsSyncRoute.test.js`, `tests/metadataRoutes.test.js`, `tests/server/routes/static.test.js` verified.
 - **Production build**: Tailwind CSS v4 and Vite client bundle compiled cleanly.

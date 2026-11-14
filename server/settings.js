@@ -16,6 +16,9 @@ const {
   setTaggerEnabledSources,
   setMetronUser,
   setMetronPassword,
+  setGcdUser,
+  setGcdPassword,
+  setGoogleBooksApiKey,
   setNamingRules,
   setFolderRules,
   setGeminiApiKey,
@@ -128,6 +131,21 @@ async function loadSettings() {
         let val;
         try { val = JSON.parse(row.value); } catch { val = row.value; }
         setMetronPassword(val, true);
+      }
+      if (row.key === 'gcdUser') {
+        let val;
+        try { val = JSON.parse(row.value); } catch { val = row.value; }
+        setGcdUser(val, true);
+      }
+      if (row.key === 'gcdPassword') {
+        let val;
+        try { val = JSON.parse(row.value); } catch { val = row.value; }
+        setGcdPassword(val, true);
+      }
+      if (row.key === 'googleBooksApiKey') {
+        let val;
+        try { val = JSON.parse(row.value); } catch { val = row.value; }
+        setGoogleBooksApiKey(val, true);
       }
       if (row.key === 'namingRules') {
         let val;

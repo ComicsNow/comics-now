@@ -12,6 +12,8 @@ from tagger_app.scheduler.state import (
     scheduler_status,
     save_scheduler_data,
     calculate_next_run,
+    masked_config_for_api,
+    is_masked,
 )
 from tagger_app.scheduler.scanner import (
     run_scheduled_scan,
@@ -27,7 +29,7 @@ scheduler_bp = Blueprint('scheduler', __name__)
 def get_scheduler_info():
     return jsonify({
         "success": True,
-        "config": scheduler_config,
+        "config": masked_config_for_api(),
         "status": scheduler_status
     })
 
@@ -41,10 +43,12 @@ def update_scheduler():
     scheduler_config["interval_value"] = int(data.get("interval_value", 1))
     scheduler_config["interval_unit"] = data.get("interval_unit", "day")
     scheduler_config["enabled"] = bool(data.get("enabled", False))
-    scheduler_config["comicvine_api_key"] = data.get("comicvine_api_key", "").strip()
-    scheduler_config["google_books_api_key"] = data.get("google_books_api_key", "").strip()
+    for secret_key in ("comicvine_api_key", "google_books_api_key", "metron_pass", "gcd_pass"):
+        if secret_key in data:
+            incoming = str(data.get(secret_key) or "").strip()
+            if not is_masked(incoming):
+                scheduler_config[secret_key] = incoming
     scheduler_config["metron_user"] = data.get("metron_user", "").strip()
-    scheduler_config["metron_pass"] = data.get("metron_pass", "").strip()
     scheduler_config["confidence_threshold"] = float(data.get("confidence_threshold", 0.9))
     scheduler_config["lower_threshold"] = float(data.get("lower_threshold", 0.80))
     scheduler_config["upper_threshold"] = float(data.get("upper_threshold", 0.90))
@@ -63,7 +67,7 @@ def update_scheduler():
     return jsonify({
         "success": True,
         "message": "Scheduler settings updated successfully.",
-        "config": scheduler_config,
+        "config": masked_config_for_api(),
         "status": scheduler_status
     })
 
