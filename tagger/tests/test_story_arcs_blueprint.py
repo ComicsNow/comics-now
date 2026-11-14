@@ -47,3 +47,26 @@ def test_list_story_arcs_endpoint(client):
     assert res.status_code == 200
     data = res.get_json()
     assert isinstance(data, list)
+
+
+def test_get_publishers_endpoint(client, monkeypatch, tmp_path):
+    from tagger_app.continuity.db import get_connection, init_continuity_db
+
+    db_file = tmp_path / "ro.db"
+    setup_conn = get_connection(db_file)
+    init_continuity_db(setup_conn)
+    setup_conn.execute(
+        "INSERT INTO reading_orders (id, title, publisher) VALUES ('ro1', 'Knightfall', 'DC Comics')"
+    )
+    setup_conn.execute(
+        "INSERT INTO reading_orders (id, title, publisher) VALUES ('ro2', 'Annihilation', 'Marvel')"
+    )
+    setup_conn.commit()
+    setup_conn.close()
+
+    monkeypatch.setattr("tagger_app.blueprints.story_arcs.get_connection", lambda: get_connection(db_file))
+    res = client.get("/api/story-arcs/batch-tag/publishers")
+    assert res.status_code == 200
+    data = res.get_json()
+    assert data["ok"] is True
+    assert data["publishers"] == ["DC Comics", "Marvel"]

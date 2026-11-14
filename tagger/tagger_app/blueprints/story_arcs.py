@@ -13,6 +13,7 @@ from flask import Blueprint, request, jsonify, Response
 
 from tagger_app.continuity.crawler import continuity_crawler
 from tagger_app.continuity.batch_tagger import continuity_batch_tagger
+from tagger_app.continuity.db import get_connection, init_continuity_db
 from tagger_app.continuity.matcher import (
     get_story_arcs_with_completeness,
     get_story_arc_detail,
@@ -191,14 +192,17 @@ def api_batch_tag_stream():
 @story_arcs_bp.route("/api/story-arcs/publishers", methods=["GET"])
 def api_get_publishers():
     """Return distinct publishers available in reading orders DB."""
-    from tagger_app.continuity.db import get_reading_orders_db
-    conn = get_reading_orders_db()
-    rows = conn.execute(
-        "SELECT DISTINCT publisher FROM reading_orders "
-        "WHERE publisher IS NOT NULL AND publisher != '' ORDER BY publisher"
-    ).fetchall()
-    pubs = [r[0] for r in rows]
-    return jsonify({"ok": True, "publishers": pubs})
+    conn = get_connection()
+    try:
+        init_continuity_db(conn)
+        rows = conn.execute(
+            "SELECT DISTINCT publisher FROM reading_orders "
+            "WHERE publisher IS NOT NULL AND publisher != '' ORDER BY publisher"
+        ).fetchall()
+        pubs = [r[0] for r in rows]
+        return jsonify({"ok": True, "publishers": pubs})
+    finally:
+        conn.close()
 
 
 @story_arcs_bp.route("/api/story-arcs/logs", methods=["GET"])

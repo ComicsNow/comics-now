@@ -1,5 +1,6 @@
 const db = require('../../db');
 const { ctLog } = require('../../logger');
+const { taggerFetch } = require('../gemini-tagger');
 const {
   getTaggerServiceUrl,
   getComicVineApiKey,
@@ -21,7 +22,7 @@ function formatDuration(msVal) {
 
 async function callTaggerEngineWithProgress(serviceUrl, reqBody, abortSignal, onProgress) {
   try {
-    const fetchRes = await fetch(`${serviceUrl}/api/tag-file-stream`, {
+    const fetchRes = await taggerFetch(`${serviceUrl}/api/tag-file-stream`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       signal: abortSignal,
@@ -68,7 +69,7 @@ async function callTaggerEngineWithProgress(serviceUrl, reqBody, abortSignal, on
   }
 
   // Fallback to non-streaming POST
-  const fallbackRes = await fetch(`${serviceUrl}/api/tag-file`, {
+  const fallbackRes = await taggerFetch(`${serviceUrl}/api/tag-file`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     signal: abortSignal,

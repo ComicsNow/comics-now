@@ -1,4 +1,4 @@
-import { escapeHtml as canonicalEscapeHtml } from '../globals.js';
+import { escapeHtml as canonicalEscapeHtml } from '../core/dom-utils.js';
 
 const escapeHtml = typeof canonicalEscapeHtml === 'function'
   ? canonicalEscapeHtml

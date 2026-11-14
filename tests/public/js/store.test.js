@@ -373,12 +373,12 @@ describe('Store Architecture (Phase 1)', () => {
       );
     });
 
-    it('loads dom.js and safely retrieves elements or null without throwing', () => {
+    it('loads core/elements.js and safely retrieves elements or null without throwing', () => {
       sandbox.document = {
         getElementById: jest.fn(id => ({ id, nodeType: 1 })),
         querySelector: jest.fn(() => null)
       };
-      loadModuleInVm('public/js/dom.js', sandbox);
+      loadModuleInVm('public/js/core/elements.js', sandbox);
 
       expect(sandbox.getElement).toBeDefined();
       const el = sandbox.getElement('comic-viewer');

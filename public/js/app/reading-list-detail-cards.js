@@ -148,14 +148,14 @@ export function createReadingListComicCard({
         ${statusBanner}
         <div class="aspect-2/3 w-full bg-gray-700 overflow-hidden flex items-center justify-center">
           ${comic.thumbnailPath ? 
-            `<img src="${coverUrl}" alt="${escapeHtml(title)}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" loading="lazy">` :
+            `<img src="${escapeHtml(coverUrl)}" alt="${escapeHtml(title)}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" loading="lazy">` :
             (isLocal ? 
               `<div class="text-purple-500">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
                 </svg>
               </div>` :
-              `<img src="${coverUrl}" alt="${escapeHtml(title)}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" loading="lazy">`
+              `<img src="${escapeHtml(coverUrl)}" alt="${escapeHtml(title)}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" loading="lazy">`
             )
           }
         </div>

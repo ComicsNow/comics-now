@@ -1,8 +1,10 @@
 import os
 import time
 import json
+import uuid
 import sqlite3
 from typing import Optional, Dict, Any, List
+import httpx
 
 DEFAULT_DB_PATH = "/opt/comics-now/comics-now.db"
 
@@ -99,7 +101,6 @@ def get_all_library_comics(unassigned_only: bool = False, db_path: Optional[str]
 def commit_reading_list(name: str, description: str, comic_ids: List[str], db_path: Optional[str] = None) -> bool:
     """Create reading list in comics-now.db and sync across all users."""
     try:
-        import httpx
         base_url = os.environ.get("COMICS_BASE_URL", "http://localhost:3000")
         headers = json.loads(os.environ.get("COMICS_EXTRA_HEADERS", "{}"))
         
@@ -120,7 +121,6 @@ def commit_reading_list(name: str, description: str, comic_ids: List[str], db_pa
 
     # Fallback to direct SQLite insertion if API unreachable
     try:
-        import uuid
         target_db = db_path if db_path is not None else get_db_path()
         conn = sqlite3.connect(target_db, timeout=5.0)
         cur = conn.cursor()

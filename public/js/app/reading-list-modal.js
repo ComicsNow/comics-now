@@ -8,6 +8,7 @@ import { closeReadingListModal, deleteReadingList } from './reading-list-actions
 import { showReadingListDetail } from './reading-list-detail.js';
 
 let isListEditMode = false;
+let currentModalLists = [];
 
 export function getIsListEditMode() {
   return isListEditMode;
@@ -58,6 +59,7 @@ export async function refreshReadingListModal() {
   // Fetch lists from API
   if (typeof appGlobal.ReadingLists !== 'undefined' && typeof appGlobal.ReadingLists.fetchReadingLists === 'function') {
     const lists = await appGlobal.ReadingLists.fetchReadingLists();
+    currentModalLists = lists;
 
     // Populate publisher dropdown
     const pubSelect = document.getElementById('reading-list-publisher-filter');
@@ -78,7 +80,7 @@ export async function refreshReadingListModal() {
     const searchEl = document.getElementById('reading-list-search');
     if (searchEl && !searchEl.dataset.rlFilterBound) {
       searchEl.dataset.rlFilterBound = '1';
-      const rerender = () => renderFilteredLists(lists, listsContainer);
+      const rerender = () => renderFilteredLists(currentModalLists, listsContainer);
       searchEl.addEventListener('input', rerender);
       if (pubSelect) pubSelect.addEventListener('change', rerender);
     }
@@ -136,7 +138,7 @@ export async function refreshReadingListModal() {
 
               <div class="relative w-14 h-20 sm:w-16 sm:h-22 shrink-0 rounded-lg overflow-hidden bg-gray-950 border border-gray-700/60 shadow group-hover:border-purple-500/50 transition-all">
                 ${thumbUrl ? `
-                  <img src="${thumbUrl}" alt="${escapeHtml(list.name)}" class="w-full h-full object-cover object-top opacity-85 group-hover:opacity-100 group-hover:scale-105 transition-all duration-300" loading="lazy">
+                  <img src="${escapeHtml(thumbUrl)}" alt="${escapeHtml(list.name)}" class="w-full h-full object-cover object-top opacity-85 group-hover:opacity-100 group-hover:scale-105 transition-all duration-300" loading="lazy">
                   <div class="absolute inset-0 bg-gradient-to-t from-gray-950/70 via-transparent to-transparent"></div>
                 ` : `
                   <div class="w-full h-full flex items-center justify-center text-xl bg-purple-950/40 text-purple-400">📚</div>

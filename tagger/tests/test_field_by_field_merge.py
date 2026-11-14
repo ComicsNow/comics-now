@@ -5,7 +5,7 @@ from tagger_app.core.metadata import (
     merge_best_metadata_fields,
     clean_description,
 )
-from app import consolidate_all_candidates, enrich_metadata_from_other_sources
+from tagger_app.core.enrichment import consolidate_all_candidates, enrich_metadata_from_other_sources
 
 
 # ---------------------------------------------------------------------------

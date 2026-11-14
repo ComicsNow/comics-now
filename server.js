@@ -11,12 +11,14 @@ const cors = require('cors');
 const helmet = require('helmet');
 const fs = require('fs');
 
+const serverConstants = require('./server/constants');
 const {
   LOGOS_DIRECTORY,
   ICONS_DIRECTORY,
   THUMBNAILS_DIRECTORY,
   PAGE_CACHE_DIRECTORY
-} = require('./server/constants');
+} = serverConstants;
+const { configureGeminiTagger } = require('./server/services/gemini-tagger');
 const { initPageCache } = require('./server/services/page-cache');
 const { cleanupStaleRarTempDirs } = require('./server/services/archive-utils');
 
@@ -131,19 +133,12 @@ const dbReady = initializeDatabase();
   const apiRouter = createConfiguredApiRouter();
   app.use(baseUrl, apiRouter);
 
-  // Optional local extensions (no-op if absent)
+  // Configure Gemini Vision cover matcher for tagger client requests
   try {
-    const { installGeminiTagger } = require('./server/services/gemini-tagger');
-    installGeminiTagger({
-      app,
+    configureGeminiTagger({
       config,
       db: { dbGet, dbRun, dbAll, closeDb },
-      paths: require('./server/constants'),
-      services: {
-        metadata: require('./server/services/metadata'),
-        tagger: require('./server/services/tagger'),
-        library: require('./server/services/library')
-      },
+      paths: serverConstants,
       log
     });
   } catch (err) {

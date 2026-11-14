@@ -9,6 +9,7 @@ from tagger_app.sources import (
     comicvine, metron, gcd, lcg, goodreads, blackwells, waterstones, googlebooks, amazon,
     forbiddenplanet,
 )
+from tagger_app.core.enrichment import query_all_sources_sequentially
 from tagger_app.sources.registry import SOURCES
 
 
@@ -86,9 +87,9 @@ def record_resolvers(monkeypatch):
     return calls
 
 
-def test_orchestrator_runs_only_enabled(app_module, record_resolvers):
+def test_orchestrator_runs_only_enabled(record_resolvers):
     progress = []
-    app_module.query_all_sources_sequentially(
+    query_all_sources_sequentially(
         "Some Comic v01 (2025).cbz",
         enabled_sources=["src-comicvine", "src-gcd"],
         on_progress=lambda fn, src, msg: progress.append((src, msg)),
@@ -101,8 +102,8 @@ def test_orchestrator_runs_only_enabled(app_module, record_resolvers):
     assert ("ComicVine", "Searching ComicVine...") in progress
 
 
-def test_orchestrator_passes_credentials(app_module, record_resolvers):
-    app_module.query_all_sources_sequentially(
+def test_orchestrator_passes_credentials(record_resolvers):
+    query_all_sources_sequentially(
         "x.cbz",
         comicvine_api_key="CVKEY",
         google_books_api_key="GBKEY",
@@ -119,14 +120,14 @@ def test_orchestrator_passes_credentials(app_module, record_resolvers):
     assert by_name["metron"][3].get("metron_pass") == "p"
 
 
-def test_orchestrator_survives_source_exception(app_module, monkeypatch):
+def test_orchestrator_survives_source_exception(monkeypatch):
     def boom(*a, **k):
         raise RuntimeError("upstream down")
     monkeypatch.setattr(comicvine, "resolve_comicvine", boom)
     monkeypatch.setattr(gcd, "resolve_gcd", lambda *a, **k: [])
     progress = []
     # should not raise despite ComicVine blowing up
-    app_module.query_all_sources_sequentially(
+    query_all_sources_sequentially(
         "x.cbz", enabled_sources=["src-comicvine", "src-gcd"],
         on_progress=lambda fn, src, msg: progress.append((src, msg)),
     )

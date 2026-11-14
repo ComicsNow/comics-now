@@ -173,3 +173,12 @@ export function resetFullscreenZoom() {
     curState.syncZoomToggleButton();
   }
 }
+
+const elementCache = new Map();
+export function getElement(id) {
+  if (!elementCache.has(id)) {
+    const currentDoc = typeof document !== 'undefined' ? document : doc;
+    elementCache.set(id, currentDoc.getElementById(id));
+  }
+  return elementCache.get(id);
+}

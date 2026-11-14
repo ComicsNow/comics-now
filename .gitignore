@@ -78,6 +78,8 @@ bench_test_dir2/
 
 # Modal & Colab tests, fixtures, notebooks, and scripts (contain copyrighted comic pages)
 scripts/modal/tests/
+scripts/modal/*.log
+scripts/modal/*_state*.json*
 scripts/colab/
 *speaker_attribution*
 *paligemma*

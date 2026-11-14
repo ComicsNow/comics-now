@@ -43,11 +43,12 @@ def test_process_single_cbz_file_auto_enriches_story_arc(tmp_path):
     with patch("tagger_app.core.tagger.query_all_sources_sequentially", return_value=mock_sources), \
          patch("tagger_app.core.tagger.is_already_enhanced", return_value=False), \
          patch("tagger_app.core.tagger.check_comic_info_completeness", return_value=(True, [])), \
-         patch("tagger_app.continuity.enricher.get_matcher") as mock_get_matcher:
+         patch("tagger_app.continuity.gemini_batch_tagger.get_gemini_tagger") as mock_get_tagger:
 
-        matcher_inst = MagicMock()
-        matcher_inst.match_comic.return_value = mock_arc_match
-        mock_get_matcher.return_value = matcher_inst
+        tagger_inst = MagicMock()
+        tagger_inst.config = {"api_key": "mock-api-key-test-001"}
+        tagger_inst.match_single_comic.return_value = mock_arc_match
+        mock_get_tagger.return_value = tagger_inst
 
         res = process_single_cbz_file(
             str(cbz_file),

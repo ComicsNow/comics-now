@@ -32,6 +32,11 @@ Welcome to **Comics Now! v4.2.0** — feature, performance, and security release
 * **Per-Run Recent Scan Audits & Status Filtering**: Consolidated batch tagger scans into a single `scan_log_<id>.json` entry per run via `POST /api/logs` (suppressing per-comic log writes with `skip_scan_log`), made **Recent Scan Audits** expandable per run to inspect individual comic results, added **All**, **Successful**, **Failed**, and **Skipped** per-run filter controls, and surfaced the 21-day log retention policy.
 * **Gemini Cover & Tagger Candidate Evaluation**: Removed the 5-candidate cap and `lower_threshold: 0.30` override so Gemini evaluation considers full candidate sets cleanly.
 
+### 5. Reliability, Bug Fixes & Code Architecture Refinements
+* **Library Preferences & Continuous Mode Fixes**: Normalized array-shaped user library preferences in Settings defaults so saved per-library reading modes load accurately, and persisted per-comic Continuous Scroll toggles to `/api/v1/comics/continuous-mode`.
+* **Reading List Filter & Template Hardening**: Fixed reading list modal search/publisher filtering to always reflect freshly reloaded lists, escaped cover/thumbnail URL attributes in reading list cards, and hardened offline/settings `safeHtml` fallback renderers against HTML injection.
+* **Module & Client Decoupling**: Replaced global `fetch` monkey-patching in the tagger bridge with an explicit `taggerFetch` client wrapper, fixed the Story Arcs publishers endpoint connection handling, broke a frontend UI module circular import, standardized top-level module imports across Node/Python services, and removed orphaned modules and unused `/_ext/*` route aliases.
+
 ---
 
 ## ⬆️ Upgrade Notes
@@ -58,15 +63,17 @@ Welcome to **Comics Now! v4.2.0** — feature, performance, and security release
 14. `security(scripts,tagger)`: harden archive conversion scripts against argument/symlink injection and enforce tagger path containment and internal token auth
 15. `security(ssrf,cors,csrf)`: tighten IPv6/redirect SSRF blocking, MCP CORS/destructive-action guards, Helmet CSP directives, outbound proxy rate limits, and same-origin CSRF checks
 16. `security(authz,cache,xss,xml)`: scope story-arc/reading-list access bounds, mark page caches private, clear SW caches on impersonation, escape story-arc UI templates, and reject DTD/ENTITY or >2MB `ComicInfo.xml` payloads
+17. `fix(ui,settings)`: normalize array library preferences, persist per-comic continuous mode toggles, fix stale reading-list modal filters, and harden `safeHtml`/image attribute escaping
+18. `refactor(core,tagger,mcp)`: replace global `fetch` monkey-patching with explicit `taggerFetch`, fix Story Arcs publishers DB connection handling, eliminate circular/inline imports, and prune orphaned modules and `/_ext/*` aliases
 
 ---
 
 ## 🧪 Verification & Test Results
-- **Full Jest suite**: `213 suites passed, 1595 tests passed, 1 snapshot passed (100% pass rate)`.
-- **Python tagger suite**: `265 passed (100% pass rate)`.
+- **Full Jest suite**: `214 suites passed, 1604 tests passed, 1 snapshot passed (100% pass rate)`.
+- **Python tagger suite**: `266 passed (100% pass rate)`.
 - **MCP server suite**: `50 passed (100% pass rate)`.
 - **Architectural invariants**: `tests/architectureRatchet.test.js` (`5/5` passed, 100% pass rate).
-- **Security & route integration suites**: `tests/scripts/archiveConversionSecurity.test.js`, `tests/server/routes/coverProxySecurity.test.js`, `tests/server/routes/userAccessBounds.test.js`, `tests/server/middleware/securityGuards.test.js`, `tests/server/services/xmlAndConfigSecurity.test.js`, `tests/public/js/viewer/endStoryArcXss.test.js`, `tagger/tests/test_tagger_security.py`, `tests/urlMetadataExtractor.test.js`, `tests/storyArcsSyncRoute.test.js`, `tests/metadataRoutes.test.js`, `tests/server/routes/static.test.js` verified.
+- **Security & route integration suites**: `tests/scripts/archiveConversionSecurity.test.js`, `tests/server/routes/coverProxySecurity.test.js`, `tests/server/routes/userAccessBounds.test.js`, `tests/server/middleware/securityGuards.test.js`, `tests/server/services/xmlAndConfigSecurity.test.js`, `tests/public/js/viewer/endStoryArcXss.test.js`, `tests/refactorFixes.test.js`, `tests/geminiTaggerHook.test.js`, `tagger/tests/test_tagger_security.py`, `tests/urlMetadataExtractor.test.js`, `tests/storyArcsSyncRoute.test.js`, `tests/metadataRoutes.test.js`, `tests/server/routes/static.test.js` verified.
 - **Production build**: Tailwind CSS v4 and Vite client bundle compiled cleanly.
 
 ---

@@ -69,8 +69,8 @@ def test_active_scan_idle(client):
 
 
 def test_search_forbiddenplanet(client, monkeypatch):
-    import app
-    monkeypatch.setattr(app, "search_forbiddenplanet_multi", lambda q: [{"title": "Batman #1", "issue": "1"}])
+    from tagger_app.blueprints import api_v1
+    monkeypatch.setattr(api_v1, "search_forbiddenplanet_multi", lambda q: [{"title": "Batman #1", "issue": "1"}])
     resp = client.post("/api/search", json={"source": "forbiddenplanet", "query": "Batman"})
     assert resp.status_code == 200
     results = resp.get_json()
@@ -79,17 +79,17 @@ def test_search_forbiddenplanet(client, monkeypatch):
 
 
 def test_search_all_includes_forbiddenplanet(client, monkeypatch):
-    import app
+    from tagger_app.blueprints import api_v1
     called = []
     # Mock other network sources to keep the test instant
-    monkeypatch.setattr(app, "search_gcd_multi", lambda q: [])
-    monkeypatch.setattr(app, "search_lcg_multi", lambda q: [])
-    monkeypatch.setattr(app, "search_goodreads_multi", lambda q: [])
-    monkeypatch.setattr(app, "search_blackwells_multi", lambda q: [])
-    monkeypatch.setattr(app, "search_waterstones_multi", lambda q: [])
-    monkeypatch.setattr(app, "search_googlebooks_multi", lambda q, **kwargs: [])
-    monkeypatch.setattr(app, "search_amazon_multi", lambda q: [])
-    monkeypatch.setattr(app, "search_forbiddenplanet_multi", lambda q: called.append(q) or [{"title": "FP Result"}])
+    monkeypatch.setattr(api_v1, "search_gcd_multi", lambda q: [])
+    monkeypatch.setattr(api_v1, "search_lcg_multi", lambda q: [])
+    monkeypatch.setattr(api_v1, "search_goodreads_multi", lambda q: [])
+    monkeypatch.setattr(api_v1, "search_blackwells_multi", lambda q: [])
+    monkeypatch.setattr(api_v1, "search_waterstones_multi", lambda q: [])
+    monkeypatch.setattr(api_v1, "search_googlebooks_multi", lambda q, **kwargs: [])
+    monkeypatch.setattr(api_v1, "search_amazon_multi", lambda q: [])
+    monkeypatch.setattr(api_v1, "search_forbiddenplanet_multi", lambda q: called.append(q) or [{"title": "FP Result"}])
     resp = client.post("/api/search", json={"source": "all", "query": "Batman"})
     assert resp.status_code == 200
     results = resp.get_json()

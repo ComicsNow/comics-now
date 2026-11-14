@@ -2,7 +2,6 @@
 
 import os
 from tagger_app.config import is_safe_cbz_path
-import sys
 import json
 import queue
 import threading
@@ -29,14 +28,6 @@ from tagger_app.sources.amazon import search_amazon_multi
 from tagger_app.sources.forbiddenplanet import search_forbiddenplanet_multi
 
 api_v1_bp = Blueprint('api_v1', __name__)
-
-
-def _get_search_func(name, default_func):
-    """Retrieve search function from app module if monkeypatched, else default."""
-    app_mod = sys.modules.get('app')
-    if app_mod and hasattr(app_mod, name):
-        return getattr(app_mod, name)
-    return default_func
 
 
 @api_v1_bp.route('/api/health', methods=['GET'])
@@ -246,16 +237,16 @@ def api_search_external():
     if not source or not query:
         return jsonify({"error": "source and query are required."}), 400
 
-    _fn_cv = _get_search_func("search_comicvine_multi", search_comicvine_multi)
-    _fn_gcd = _get_search_func("search_gcd_multi", search_gcd_multi)
-    _fn_lcg = _get_search_func("search_lcg_multi", search_lcg_multi)
-    _fn_metron = _get_search_func("search_metron_multi", search_metron_multi)
-    _fn_goodreads = _get_search_func("search_goodreads_multi", search_goodreads_multi)
-    _fn_blackwells = _get_search_func("search_blackwells_multi", search_blackwells_multi)
-    _fn_waterstones = _get_search_func("search_waterstones_multi", search_waterstones_multi)
-    _fn_googlebooks = _get_search_func("search_googlebooks_multi", search_googlebooks_multi)
-    _fn_amazon = _get_search_func("search_amazon_multi", search_amazon_multi)
-    _fn_forbiddenplanet = _get_search_func("search_forbiddenplanet_multi", search_forbiddenplanet_multi)
+    _fn_cv = search_comicvine_multi
+    _fn_gcd = search_gcd_multi
+    _fn_lcg = search_lcg_multi
+    _fn_metron = search_metron_multi
+    _fn_goodreads = search_goodreads_multi
+    _fn_blackwells = search_blackwells_multi
+    _fn_waterstones = search_waterstones_multi
+    _fn_googlebooks = search_googlebooks_multi
+    _fn_amazon = search_amazon_multi
+    _fn_forbiddenplanet = search_forbiddenplanet_multi
 
     try:
         results = []

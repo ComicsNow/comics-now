@@ -273,13 +273,26 @@ export async function disableContinuousMode() {
 }
 
 /**
- * Toggle continuous mode (local state only)
+ * Toggle continuous mode and persist per-comic state to the server when online.
  * @param {string} comicId - The comic ID
  * @param {boolean} currentMode - Current continuous mode state
  * @returns {boolean} - New continuous mode state
  */
 export function toggleContinuousMode(comicId, currentMode) {
-  return !currentMode;
+  const newMode = !currentMode;
+  const apiBaseUrl = state.API_BASE_URL || (typeof window !== 'undefined' && window.API_BASE_URL) || '';
+
+  if (comicId && typeof fetch === 'function') {
+    Promise.resolve(
+      fetch(`${apiBaseUrl}/api/v1/comics/continuous-mode`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ comicId, continuousMode: newMode })
+      })
+    ).catch(() => {});
+  }
+
+  return newMode;
 }
 
 /**

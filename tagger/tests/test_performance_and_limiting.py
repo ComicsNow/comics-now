@@ -4,6 +4,7 @@ from unittest.mock import patch, MagicMock
 
 from tagger_app.core.limiter import DomainRateLimiter
 from tagger_app.core.cache import TaggerCache, tagger_cache
+from tagger_app.core.enrichment import query_all_sources_sequentially
 from tagger_app.sources import comicvine, gcd
 
 
@@ -203,8 +204,6 @@ def test_gcd_series_fuzzy_filtering_skips_irrelevant_series():
 
 def test_all_enabled_sources_queried_regardless_of_score():
     """Verify that all enabled sources are queried regardless of high-confidence Tier 1 score."""
-    from app import query_all_sources_sequentially
-
     # Mock Tier 1 (ComicVine) returning high confidence complete match
     mock_tier1_candidate = {
         "title": "Watchmen #1",

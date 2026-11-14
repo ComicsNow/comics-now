@@ -19,22 +19,21 @@ const { getConfig, checkAndIncrementQuota } = require('./gemini-tag/resolver');
 const { evaluateWithGemini } = require('./gemini-tag/evaluator');
 
 let isHookInstalled = false;
+let configuredTaggerFetch = null;
 
-function installTaggerHook(ctx) {
-  if (isHookInstalled && globalThis.fetch && globalThis.fetch._isGeminiTaggerHook) return;
-  isHookInstalled = true;
-
-  const originalFetch = globalThis.fetch;
-  const logger = ctx.log || (() => {});
-
-  if (ctx.db) {
+function startSchedulerIfConfigured(ctx, logger) {
+  if (ctx?.db) {
     try {
       startMidnightPacificScheduler({ db: ctx.db, log: logger });
     } catch (_) {}
   }
+}
 
-  // Override global fetch
-  globalThis.fetch = async function hookFetch(input, init) {
+function createTaggerFetch(ctx, getBaseFetch = () => globalThis.fetch) {
+  const logger = ctx.log || (() => {});
+
+  return async function hookFetch(input, init) {
+    const originalFetch = getBaseFetch();
     const urlStr = typeof input === 'string' ? input : (input?.url || input?.toString() || '');
 
     const isStream = urlStr.includes('/api/tag-file-stream');
@@ -221,12 +220,46 @@ function installTaggerHook(ctx) {
       });
     }
   };
+}
 
+function configureGeminiTagger(ctx) {
+  if (!ctx) {
+    configuredTaggerFetch = null;
+    return;
+  }
+  const logger = ctx.log || (() => {});
+  startSchedulerIfConfigured(ctx, logger);
+  configuredTaggerFetch = createTaggerFetch(ctx, () => globalThis.fetch);
+  logger('INFO', 'EXT_COVER', '✓ Gemini Vision cover matcher configured for Tag Comics Now! requests.');
+}
+
+function taggerFetch(input, init) {
+  if (globalThis.fetch && globalThis.fetch._isGeminiTaggerHook) {
+    return globalThis.fetch(input, init);
+  }
+  if (configuredTaggerFetch) {
+    return configuredTaggerFetch(input, init);
+  }
+  return globalThis.fetch(input, init);
+}
+
+function installTaggerHook(ctx) {
+  if (isHookInstalled && globalThis.fetch && globalThis.fetch._isGeminiTaggerHook) return;
+  isHookInstalled = true;
+
+  const originalFetch = globalThis.fetch;
+  const logger = ctx.log || (() => {});
+  startSchedulerIfConfigured(ctx, logger);
+
+  globalThis.fetch = createTaggerFetch(ctx, () => originalFetch);
   globalThis.fetch._isGeminiTaggerHook = true;
   logger('INFO', 'EXT_COVER', '✓ Gemini Vision transparent cover matcher hooked into Tag Comics Now! scan.');
 }
 
 module.exports = {
   installTaggerHook,
-  installGeminiTagger: installTaggerHook
+  installGeminiTagger: installTaggerHook,
+  configureGeminiTagger,
+  createTaggerFetch,
+  taggerFetch
 };

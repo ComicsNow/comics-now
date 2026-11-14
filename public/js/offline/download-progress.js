@@ -14,12 +14,18 @@ const renderContent = (typeof render === 'function' && render.length >= 2) ? ren
   el.innerHTML = toStr(content);
 };
 const safeHtml = (typeof html !== 'undefined' && typeof html === 'function' && html.length > 0) ? html : (strings, ...values) => {
+  const esc = (s) => String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
   const formatVal = (v) => {
     if (v === null || v === undefined) return '';
     if (Array.isArray(v)) return v.map(formatVal).join('');
     if (typeof v === 'object' && v.__isRawHtml) return v.html;
     if (typeof v === 'object' && typeof v.toHTML === 'function') return v.toHTML();
-    return String(v);
+    return esc(v);
   };
   let out = '';
   for (let i = 0; i < strings.length; i++) {

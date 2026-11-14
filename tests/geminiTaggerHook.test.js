@@ -1,4 +1,4 @@
-const { installTaggerHook } = require('../server/services/gemini-tagger');
+const { installTaggerHook, configureGeminiTagger, taggerFetch } = require('../server/services/gemini-tagger');
 
 describe('Tagger Hook', () => {
   let originalFetch;
@@ -176,6 +176,45 @@ describe('Tagger Hook', () => {
     expect(forwardedBody.lower_threshold).toBe(0.80);
     expect(forwardedBody.upper_threshold).toBe(1.01);
 
+    fs.existsSync.mockRestore();
+    fs.readFileSync.mockRestore();
+  });
+
+  test('configureGeminiTagger and taggerFetch intercept tag-file without mutating globalThis.fetch', async () => {
+    const fs = require('fs');
+    jest.spyOn(fs, 'existsSync').mockReturnValue(true);
+    jest.spyOn(fs, 'readFileSync').mockReturnValue(JSON.stringify({
+      geminiApiKey: 'test-key',
+      geminiCoverMatchEnabled: true,
+      geminiTermsAccepted: true
+    }));
+
+    mockDb.dbGet.mockImplementation(async (sql) => {
+      if (sql.includes("key = 'geminiCoverMatchEnabled'")) return { value: 'true' };
+      if (sql.includes("key = 'geminiTermsAccepted'")) return { value: 'true' };
+      return { value: '0' };
+    });
+
+    const mockResponse = new Response(JSON.stringify({ candidates: [] }), { status: 200 });
+    const baseFetchMock = jest.fn().mockResolvedValue(mockResponse);
+    globalThis.fetch = baseFetchMock;
+
+    configureGeminiTagger(ctx);
+
+    // globalThis.fetch must remain untouched
+    expect(globalThis.fetch).toBe(baseFetchMock);
+    expect(globalThis.fetch._isGeminiTaggerHook).toBeUndefined();
+
+    await taggerFetch('http://127.0.0.1:5000/api/tag-file', {
+      method: 'POST',
+      body: JSON.stringify({ path: '/tmp/test.cbz', upper_threshold: 0.90, lower_threshold: 0.80 })
+    });
+
+    expect(baseFetchMock).toHaveBeenCalledTimes(1);
+    const forwardedBody = JSON.parse(baseFetchMock.mock.calls[0][1].body);
+    expect(forwardedBody.upper_threshold).toBe(1.01);
+
+    configureGeminiTagger(null);
     fs.existsSync.mockRestore();
     fs.readFileSync.mockRestore();
   });

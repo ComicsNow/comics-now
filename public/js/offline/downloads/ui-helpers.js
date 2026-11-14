@@ -25,14 +25,21 @@ export const renderContent = (typeof render === 'function' && render.length >= 2
 export const safeHtml = (typeof html !== 'undefined' && typeof html === 'function' && html.length > 0)
   ? html
   : (strings, ...values) => {
+      const esc = (s) => String(s)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
       let out = '';
       for (let i = 0; i < strings.length; i++) {
         out += strings[i];
         if (i < values.length) {
           const v = values[i];
+          if (v === null || v === undefined) continue;
           if (v && typeof v === 'object' && v.__isRawHtml) out += v.html;
           else if (v && typeof v === 'object' && typeof v.toHTML === 'function') out += v.toHTML();
-          else out += (v ?? '');
+          else out += esc(v);
         }
       }
       return { toHTML: () => out, html: out, __isRawHtml: true };

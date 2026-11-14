@@ -14,51 +14,8 @@ import concurrent.futures
 import werkzeug.serving
 from flask import Flask, jsonify, request
 
-from tagger_app.config import (
-    UPLOAD_FOLDER,
-    STATIC_TEMP_DIR,
-    LOGS_DIR,
-    DB_TRACKING_PATH,
-)
-from tagger_app.persistence.tracking_db import (
-    init_tracking_db,
-    mark_as_enhanced,
-    is_already_enhanced,
-)
-from tagger_app.persistence.scan_logs import write_scan_log
-from tagger_app.core.enrichment import (
-    consolidate_all_candidates,
-    enrich_metadata_from_other_sources,
-    query_all_sources_sequentially,
-    check_comic_info_completeness,
-)
-from tagger_app.core.tagger import process_single_cbz_file
-from tagger_app.core.enhancer import enhance_single_cbz_file
-from tagger_app.core.comicinfo import (
-    generate_comic_info_xml,
-    write_comic_info,
-    write_comic_info_to_cbz,
-    read_comic_info_xml,
-)
-from tagger_app.scheduler.scanner import (
-    start_scheduler,
-    run_scheduled_scan,
-    run_library_enhance_background,
-    sessions,
-    active_scans,
-    active_scans_lock,
-)
-from tagger_app.core.metadata import normalize_metadata
-from tagger_app.sources.comicvine import search_comicvine_multi
-from tagger_app.sources.gcd import search_gcd_multi
-from tagger_app.sources.lcg import search_lcg_multi
-from tagger_app.sources.metron import search_metron_multi
-from tagger_app.sources.goodreads import search_goodreads_multi
-from tagger_app.sources.blackwells import search_blackwells_multi
-from tagger_app.sources.waterstones import search_waterstones_multi
-from tagger_app.sources.googlebooks import search_googlebooks_multi
-from tagger_app.sources.amazon import search_amazon_multi
-from tagger_app.sources.forbiddenplanet import search_forbiddenplanet_multi
+from tagger_app.persistence.tracking_db import init_tracking_db
+from tagger_app.scheduler.scanner import start_scheduler
 
 # Import Blueprints
 from tagger_app.blueprints.ui import ui_bp

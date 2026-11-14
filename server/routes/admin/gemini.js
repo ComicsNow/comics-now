@@ -358,11 +358,4 @@ module.exports = function attach(router, deps) {
   router.get('/api/v1/gemini/config', handleGetConfig);
   router.post('/api/v1/gemini/config', handlePostConfig);
   router.get('/api/v1/gemini/models', handleGetModels);
-
-  // Backwards compatibility aliases
-  router.get('/api/v1/_ext/gemini/config', handleGetConfig);
-  router.post('/api/v1/_ext/gemini/config', handlePostConfig);
-  router.get('/api/v1/_ext/gemini/models', handleGetModels);
-  router.get('/api/v1/_ext/cover-match/config', handleGetConfig);
-  router.post('/api/v1/_ext/cover-match/config', handlePostConfig);
 };
