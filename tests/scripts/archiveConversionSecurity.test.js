@@ -25,8 +25,9 @@ describe('Archive conversion script security hardening [C-1]', () => {
       expect(zipIdx).toBeGreaterThan(findIdx);
     });
 
-    it('runs zip with -y (do not dereference symlinks) and -- option terminator', () => {
-      expect(cbrScript).toMatch(/zip\s+-0\s+-r\s+-q\s+-y\s+--\s+"\.\.\/\$cbz_file"\s+\./);
+    it('runs zip with -y (do not dereference symlinks) and safe ../ archive prefix without -- before archive name', () => {
+      expect(cbrScript).toMatch(/zip\s+-0\s+-r\s+-q\s+-y\s+"\.\.\/\$cbz_file"\s+\./);
+      expect(cbrScript).not.toMatch(/zip\s+[^\n]*--\s+"\.\.\/\$cbz_file"/);
     });
 
     it('terminates options with -- on basename and rm commands', () => {
@@ -37,10 +38,10 @@ describe('Archive conversion script security hardening [C-1]', () => {
   });
 
   describe('pdf2cbz.sh', () => {
-    it('terminates options with -- on basename, pdftoppm, zip (-y), and rm commands', () => {
+    it('terminates options with -- on basename, pdftoppm, zip (-y with ./ prefix and -- after archive), and rm commands', () => {
       expect(pdfScript).toMatch(/basename\s+--\s+"\$INPUT_PDF"/);
       expect(pdfScript).toMatch(/pdftoppm\s+[^\n]*--\s+"\$INPUT_PDF"/);
-      expect(pdfScript).toMatch(/zip\s+-j\s+-y\s+--\s+"\$OUTPUT_CBZ"/);
+      expect(pdfScript).toMatch(/zip\s+-j\s+-y\s+"\.\/\$OUTPUT_CBZ"\s+--/);
       expect(pdfScript).toMatch(/rm\s+-f\s+--\s+"\$INPUT_PDF"/);
     });
   });

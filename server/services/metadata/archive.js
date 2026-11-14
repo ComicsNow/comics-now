@@ -141,8 +141,10 @@ function writeComicInfoNative(cbzPath, metadataXml) {
           return reject(err);
         }
 
+        const safeCbzPath = path.resolve(cbzPath);
+
         const runZipAdd = () => {
-          execFile('zip', ['-j', '--', cbzPath, tempXmlPath], (zipErr) => {
+          execFile('zip', ['-j', safeCbzPath, '--', tempXmlPath], (zipErr) => {
             fs.rm(uniqueSubDir, { recursive: true, force: true }, () => {});
 
             if (zipErr) {
@@ -153,7 +155,7 @@ function writeComicInfoNative(cbzPath, metadataXml) {
         };
 
         if (existingPath) {
-          execFile('zip', ['-d', '--', cbzPath, existingPath], () => {
+          execFile('zip', ['-d', safeCbzPath, '--', existingPath], () => {
             runZipAdd();
           });
         } else {
@@ -270,6 +272,7 @@ function createSaveMetadataToComic(getWriter) {
 
 module.exports = {
   getComicInfoFromArchive,
+  writeComicInfoNative,
   writeComicInfoToCbz,
   createSaveMetadataToComic
 };

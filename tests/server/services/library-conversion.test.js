@@ -1,12 +1,11 @@
 const fs = require('fs');
+const os = require('os');
 const path = require('path');
 const { spawn } = require('child_process');
 const { log } = require('../../../server/logger');
-const { t0, ms } = require('../../../server/utils');
 const { convertCbrToCbz, convertPdfToCbz } = require('../../../server/services/library-conversion');
 const EventEmitter = require('events');
 
-jest.mock('fs');
 jest.mock('child_process');
 jest.mock('../../../server/logger', () => ({
   log: jest.fn()
@@ -16,161 +15,218 @@ jest.mock('../../../server/utils', () => ({
   ms: jest.fn(() => 500)
 }));
 
+function makeMockProc(onSpawn) {
+  const proc = new EventEmitter();
+  proc.stdout = new EventEmitter();
+  proc.stderr = new EventEmitter();
+  proc.kill = jest.fn();
+  if (onSpawn) {
+    process.nextTick(() => onSpawn(proc));
+  }
+  return proc;
+}
+
 describe('library-conversion', () => {
-  let mockProcess;
   let originalDateNow;
 
   beforeEach(() => {
     jest.clearAllMocks();
-
-    mockProcess = new EventEmitter();
-    mockProcess.stdout = new EventEmitter();
-    mockProcess.stderr = new EventEmitter();
-    spawn.mockReturnValue(mockProcess);
-
-    fs.existsSync.mockReturnValue(true);
-
     originalDateNow = Date.now;
+
+    jest.spyOn(fs, 'existsSync').mockReturnValue(true);
+    jest.spyOn(fs.promises, 'mkdtemp').mockResolvedValue('/tmp/comics-now-conv-123');
+    jest.spyOn(fs.promises, 'readdir').mockResolvedValue([]);
+    jest.spyOn(fs.promises, 'unlink').mockResolvedValue(undefined);
+    jest.spyOn(fs.promises, 'rm').mockResolvedValue(undefined);
   });
 
   afterEach(() => {
     Date.now = originalDateNow;
+    jest.restoreAllMocks();
   });
 
   describe('convertCbrToCbz', () => {
-    it('should return cbz path on successful conversion', async () => {
-      const promise = convertCbrToCbz('/fake/path/comic.cbr');
-      mockProcess.emit('close', 0);
+    it('extracts with unrar, strips symlinks, packs with zip (archive before --), and cleans temp dir', async () => {
+      spawn
+        .mockImplementationOnce(() => makeMockProc((p) => p.emit('close', 0)))
+        .mockImplementationOnce(() => makeMockProc((p) => p.emit('close', 0)));
 
-      const result = await promise;
+      fs.promises.readdir.mockResolvedValueOnce([
+        { name: 'page01.jpg', isSymbolicLink: () => false, isDirectory: () => false },
+        { name: 'evil-link', isSymbolicLink: () => true, isDirectory: () => false }
+      ]);
+
+      const result = await convertCbrToCbz('/fake/path/comic.cbr');
       expect(result).toBe('/fake/path/comic.cbz');
-      expect(spawn).toHaveBeenCalledWith(
-        expect.stringContaining('convert_cbr_to_cbz.sh'),
-        ['/fake/path/comic.cbr'],
+
+      expect(spawn).toHaveBeenNthCalledWith(
+        1,
+        'unrar',
+        ['x', '-o+', '-y', '-ol-', '--', '/fake/path/comic.cbr', `/tmp/comics-now-conv-123${path.sep}`],
         expect.objectContaining({ cwd: '/fake/path' })
       );
+      expect(fs.promises.unlink).toHaveBeenCalledWith('/tmp/comics-now-conv-123/evil-link');
+      expect(spawn).toHaveBeenNthCalledWith(
+        2,
+        'zip',
+        ['-0', '-r', '-q', '-y', '/fake/path/comic.cbz', '--', '.'],
+        expect.objectContaining({ cwd: '/tmp/comics-now-conv-123' })
+      );
+      expect(fs.promises.rm).toHaveBeenCalledWith('/tmp/comics-now-conv-123', { recursive: true, force: true });
       expect(log).toHaveBeenCalledWith('INFO', 'CONVERT', '✅ Created: comic.cbz in 500 ms');
     });
 
-    it('should return null if script not found', async () => {
-      const promise = convertCbrToCbz('/fake/path/comic.cbr');
+    it('deletes original cbr when deleteOriginals is true', async () => {
+      spawn
+        .mockImplementationOnce(() => makeMockProc((p) => p.emit('close', 0)))
+        .mockImplementationOnce(() => makeMockProc((p) => p.emit('close', 0)));
 
-      const error = new Error('ENOENT');
-      error.code = 'ENOENT';
-      mockProcess.emit('error', error);
-
-      const result = await promise;
-      expect(result).toBeNull();
-      expect(log).toHaveBeenCalledWith('ERROR', 'CONVERT', expect.stringContaining('Conversion script not found'));
+      const result = await convertCbrToCbz('/fake/path/comic.cbr', { deleteOriginals: true });
+      expect(result).toBe('/fake/path/comic.cbz');
+      expect(fs.promises.unlink).toHaveBeenCalledWith('/fake/path/comic.cbr');
     });
 
-    it('should return null if conversion script fails', async () => {
-      const promise = convertCbrToCbz('/fake/path/comic.cbr');
+    it('returns null and cleans temp dir if unrar binary is missing (ENOENT)', async () => {
+      spawn.mockImplementationOnce(() => makeMockProc((p) => {
+        const error = new Error('spawn unrar ENOENT');
+        error.code = 'ENOENT';
+        p.emit('error', error);
+      }));
 
-      mockProcess.stderr.emit('data', 'Some error message');
-      mockProcess.emit('close', 1);
-
-      const result = await promise;
+      const result = await convertCbrToCbz('/fake/path/comic.cbr');
       expect(result).toBeNull();
-      expect(log).toHaveBeenCalledWith('ERROR', 'CONVERT', '❌ Failed comic.cbr: Some error message after 500 ms');
+      expect(fs.promises.rm).toHaveBeenCalledWith('/tmp/comics-now-conv-123', { recursive: true, force: true });
+      expect(log).toHaveBeenCalledWith('ERROR', 'CONVERT', expect.stringContaining('unrar'));
     });
 
-    it('should return null if cbz file is not created despite exit code 0', async () => {
+    it('returns null if zip fails', async () => {
+      spawn
+        .mockImplementationOnce(() => makeMockProc((p) => p.emit('close', 0)))
+        .mockImplementationOnce(() => makeMockProc((p) => {
+          p.stderr.emit('data', 'zip error: Invalid command arguments');
+          p.emit('close', 16);
+        }));
+
+      const result = await convertCbrToCbz('/fake/path/comic.cbr');
+      expect(result).toBeNull();
+      expect(fs.promises.rm).toHaveBeenCalledWith('/tmp/comics-now-conv-123', { recursive: true, force: true });
+      expect(log).toHaveBeenCalledWith('ERROR', 'CONVERT', '❌ Failed comic.cbr: zip error: Invalid command arguments after 500 ms');
+    });
+
+    it('returns null if cbz file is not created despite exit code 0', async () => {
       fs.existsSync.mockReturnValue(false);
+      spawn
+        .mockImplementationOnce(() => makeMockProc((p) => p.emit('close', 0)))
+        .mockImplementationOnce(() => makeMockProc((p) => p.emit('close', 0)));
 
-      const promise = convertCbrToCbz('/fake/path/comic.cbr');
-      mockProcess.emit('close', 0);
-
-      const result = await promise;
+      const result = await convertCbrToCbz('/fake/path/comic.cbr');
       expect(result).toBeNull();
       expect(log).toHaveBeenCalledWith('ERROR', 'CONVERT', '❌ Failed comic.cbr: CBZ file not created after 500 ms');
     });
 
-    it('should log progress periodically', async () => {
+    it('logs progress periodically during conversion', async () => {
       let currentTime = 10000;
       Date.now = jest.fn(() => currentTime);
 
-      const promise = convertCbrToCbz('/fake/path/comic.cbr');
+      spawn
+        .mockImplementationOnce(() => makeMockProc((p) => {
+          p.stdout.emit('data', 'chunk 1');
+          currentTime = 16000;
+          p.stdout.emit('data', 'chunk 2');
+          p.emit('close', 0);
+        }))
+        .mockImplementationOnce(() => makeMockProc((p) => p.emit('close', 0)));
 
-      // first chunk, no progress logged yet because it's the exact same time
-      mockProcess.stdout.emit('data', 'chunk 1');
-
-      // advance time by more than 5000ms
-      currentTime = 16000;
-      mockProcess.stdout.emit('data', 'chunk 2');
-
-      mockProcess.emit('close', 0);
-      await promise;
-
+      await convertCbrToCbz('/fake/path/comic.cbr');
       expect(log).toHaveBeenCalledWith('INFO', 'CONVERT', 'Progress: comic.cbr');
     });
   });
 
   describe('convertPdfToCbz', () => {
-    it('should return cbz path on successful conversion', async () => {
-      const promise = convertPdfToCbz('/fake/path/document.pdf');
-      mockProcess.emit('close', 0);
+    it('renders pages with pdftoppm, packs with zip (archive before --), and cleans temp dir', async () => {
+      spawn
+        .mockImplementationOnce(() => makeMockProc((p) => p.emit('close', 0)))
+        .mockImplementationOnce(() => makeMockProc((p) => p.emit('close', 0)));
 
-      const result = await promise;
+      fs.promises.readdir.mockResolvedValueOnce([
+        { name: 'page-02.jpg', isFile: () => true },
+        { name: 'page-01.jpg', isFile: () => true }
+      ]);
+
+      const result = await convertPdfToCbz('/fake/path/document.pdf');
       expect(result).toBe('/fake/path/document.cbz');
-      expect(spawn).toHaveBeenCalledWith(
-        expect.stringContaining('pdf2cbz.sh'),
-        ['/fake/path/document.pdf'],
+
+      expect(spawn).toHaveBeenNthCalledWith(
+        1,
+        'pdftoppm',
+        ['-r', '300', '-jpeg', '-jpegopt', 'quality=100', '--', '/fake/path/document.pdf', '/tmp/comics-now-conv-123/page'],
         expect.objectContaining({ cwd: '/fake/path' })
       );
+      expect(spawn).toHaveBeenNthCalledWith(
+        2,
+        'zip',
+        ['-j', '-y', '/fake/path/document.cbz', '--', 'page-01.jpg', 'page-02.jpg'],
+        expect.objectContaining({ cwd: '/tmp/comics-now-conv-123' })
+      );
+      expect(fs.promises.rm).toHaveBeenCalledWith('/tmp/comics-now-conv-123', { recursive: true, force: true });
       expect(log).toHaveBeenCalledWith('INFO', 'CONVERT', '✅ Created: document.cbz in 500 ms');
     });
 
-    it('should return null if script not found', async () => {
-      const promise = convertPdfToCbz('/fake/path/document.pdf');
+    it('returns null if pdftoppm produces no images', async () => {
+      spawn.mockImplementationOnce(() => makeMockProc((p) => p.emit('close', 0)));
+      fs.promises.readdir.mockResolvedValueOnce([]);
 
-      const error = new Error('ENOENT');
-      error.code = 'ENOENT';
-      mockProcess.emit('error', error);
-
-      const result = await promise;
+      const result = await convertPdfToCbz('/fake/path/document.pdf');
       expect(result).toBeNull();
-      expect(log).toHaveBeenCalledWith('ERROR', 'CONVERT', expect.stringContaining('Conversion script not found'));
+      expect(spawn).toHaveBeenCalledTimes(1);
+      expect(fs.promises.rm).toHaveBeenCalledWith('/tmp/comics-now-conv-123', { recursive: true, force: true });
+      expect(log).toHaveBeenCalledWith('ERROR', 'CONVERT', '❌ Failed document.pdf: No images were created by pdftoppm after 500 ms');
     });
 
-    it('should return null if conversion script fails', async () => {
-      const promise = convertPdfToCbz('/fake/path/document.pdf');
+    it('returns null if pdftoppm fails', async () => {
+      spawn.mockImplementationOnce(() => makeMockProc((p) => {
+        p.stderr.emit('data', 'pdf error');
+        p.emit('close', 1);
+      }));
 
-      mockProcess.stderr.emit('data', 'pdf error');
-      mockProcess.emit('close', 1);
-
-      const result = await promise;
+      const result = await convertPdfToCbz('/fake/path/document.pdf');
       expect(result).toBeNull();
+      expect(fs.promises.rm).toHaveBeenCalledWith('/tmp/comics-now-conv-123', { recursive: true, force: true });
       expect(log).toHaveBeenCalledWith('ERROR', 'CONVERT', '❌ Failed document.pdf: pdf error after 500 ms');
     });
 
-    it('should return null if cbz file is not created despite exit code 0', async () => {
+    it('returns null if cbz file is not created despite exit code 0', async () => {
       fs.existsSync.mockReturnValue(false);
+      spawn
+        .mockImplementationOnce(() => makeMockProc((p) => p.emit('close', 0)))
+        .mockImplementationOnce(() => makeMockProc((p) => p.emit('close', 0)));
+      fs.promises.readdir.mockResolvedValueOnce([{ name: 'page-01.jpg', isFile: () => true }]);
 
-      const promise = convertPdfToCbz('/fake/path/document.pdf');
-      mockProcess.emit('close', 0);
-
-      const result = await promise;
+      const result = await convertPdfToCbz('/fake/path/document.pdf');
       expect(result).toBeNull();
       expect(log).toHaveBeenCalledWith('ERROR', 'CONVERT', '❌ Failed document.pdf: CBZ file not created after 500 ms');
     });
 
-    it('should log progress periodically', async () => {
+    it('logs progress periodically during PDF conversion', async () => {
       let currentTime = 10000;
       Date.now = jest.fn(() => currentTime);
 
-      const promise = convertPdfToCbz('/fake/path/document.pdf');
+      spawn
+        .mockImplementationOnce(() => makeMockProc((p) => {
+          p.stdout.emit('data', 'chunk 1');
+          currentTime = 16000;
+          p.stdout.emit('data', 'chunk 2');
+          p.emit('close', 0);
+        }))
+        .mockImplementationOnce(() => makeMockProc((p) => p.emit('close', 0)));
+      fs.promises.readdir.mockResolvedValueOnce([{ name: 'page-01.jpg', isFile: () => true }]);
 
-      mockProcess.stdout.emit('data', 'chunk 1');
-
-      // advance time by more than 5000ms
-      currentTime = 16000;
-      mockProcess.stdout.emit('data', 'chunk 2');
-
-      mockProcess.emit('close', 0);
-      await promise;
-
+      await convertPdfToCbz('/fake/path/document.pdf');
       expect(log).toHaveBeenCalledWith('INFO', 'CONVERT', 'Progress: document.pdf');
     });
+  });
+
+  it('keeps os.tmpdir available', () => {
+    expect(typeof os.tmpdir()).toBe('string');
   });
 });

@@ -97,7 +97,7 @@ for INPUT_PDF in "$@"; do
     # --- 5. Create the CBZ (zip) file ---
     echo "Creating CBZ archive: $OUTPUT_CBZ"
     # -j: "Junks" the paths (stores files at the root of the zip); -y: never dereference symlinks
-    zip -j -y -- "$OUTPUT_CBZ" "$TEMP_DIR"/page-*.jpg
+    zip -j -y "./$OUTPUT_CBZ" -- "$TEMP_DIR"/page-*.jpg
 
     echo "Conversion successful!"
     echo "Output file: $OUTPUT_CBZ"

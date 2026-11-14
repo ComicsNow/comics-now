@@ -21,6 +21,7 @@ const {
   isTitleSameAsSeries,
   sanitizeMetadata
 } = require('../../../server/services/metadata');
+const { writeComicInfoNative } = require('../../../server/services/metadata/archive');
 
 // Utility helper to create a real ZIP archive with internal ComicInfo.xml
 function createRealCbzFile(filePath, internalXmlContent) {
@@ -311,6 +312,16 @@ describe('Metadata Service - Real Integration Tests (No Mock filesystem)', () =>
 
       const content = fs.readFileSync(comicPath, 'utf-8');
       expect(content).toBe('dummy-cbr-data');
+    });
+
+    it('writes and updates ComicInfo.xml using native zip without placing -- before the archive path', async () => {
+      const comicPath = path.join(tempDir, '-dash-test.cbz');
+      await createRealCbzFile(comicPath, '<ComicInfo><Series>Old</Series></ComicInfo>');
+
+      await writeComicInfoNative(comicPath, '<ComicInfo><Series>New</Series><Number>2</Number></ComicInfo>');
+      const parsed = await getComicInfoFromArchive(comicPath);
+      expect(parsed.Series).toBe('New');
+      expect(parsed.Number).toBe('2');
     });
 
     it('should skip save if metadata object is empty', async () => {

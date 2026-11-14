@@ -72,7 +72,7 @@ for cbr_file in "$@"; do
 
     # 3. Create the new CBZ (Zip) file with 0 compression (never dereference symlinks)
     echo "Creating $cbz_file (store-only)..."
-    zip_output=$(zip -0 -r -q -y -- "../$cbz_file" . 2>&1)
+    zip_output=$(zip -0 -r -q -y "../$cbz_file" . 2>&1)
     zip_success=$?
 
     # 4. Change back to the original directory
