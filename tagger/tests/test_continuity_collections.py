@@ -144,14 +144,14 @@ def test_batch_tagger_scopes_only_supported_publishers_and_matches_collections(t
     cn_conn.close()
 
     tagger = ContinuityBatchTagger(cn_db_path=str(cn_path), ro_db_path=mock_ro_db_with_collections)
-    res = tagger.start_batch_tag(target_publisher="all", run_async=False, dry_run=True)
+    res = tagger.start_batch_tag(target_publisher="all", run_async=False, engine="rules")
 
     assert res.get("completed") is True
     # Only 1 candidate comic should be inspected (the DC one); Europe Comics should be omitted!
     assert res["progress"]["total"] == 1
     assert res["progress"]["updated"] == 1
 
-    results = tagger.get_dry_run_results()
-    assert len(results) == 1
-    assert results[0]["matchedArc"] == "Knight Terrors"
-    assert results[0]["storyArcNumber"] == "3"
+    cn_check = sqlite3.connect(str(cn_path))
+    row = cn_check.execute("SELECT metadata FROM comics WHERE id = 'c_kt'").fetchone()
+    cn_check.close()
+    assert "Knight Terrors" in row[0]

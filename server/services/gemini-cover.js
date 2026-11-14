@@ -313,7 +313,7 @@ function parseGeminiResponse(rawText, candidateCount) {
  *
  * @param {Object} options
  * @param {string} options.localCoverPath - Absolute path to local cover image file
- * @param {Array<Object>} options.candidates - List of candidate metadata objects (<=5 evaluated)
+ * @param {Array<Object>} options.candidates - List of candidate metadata objects to evaluate
  * @param {string} [options.apiKey] - Google Gemini API key
  * @param {string} [options.model] - Gemini model identifier (strictly: gemini-3.5-flash-lite)
  * @param {number} [options.throttleMs] - Throttle spacing in ms (default: 4000)
@@ -368,8 +368,8 @@ async function matchCoverToCandidates({
     };
   }
 
-  // 2. Fetch candidate cover images (up to 5)
-  const topCandidates = candidates.slice(0, 5);
+  // 2. Fetch candidate cover images for all matching candidates
+  const topCandidates = candidates;
   const candidatesWithImages = await Promise.all(
     topCandidates.map(async (c) => {
       const coverUrl = c.coverUrl || c.cover_image_url || c.metadata?.cover_image_url || c.metadata?.cover_url;

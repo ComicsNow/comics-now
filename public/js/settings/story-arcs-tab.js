@@ -12,6 +12,7 @@ import {
   initBatchTaggerListeners
 } from './story-arcs-batch-tagger.js';
 import { clearStoryArcsCache, fetchAllStoryArcs } from '../library/smartlists/story-arcs.js';
+import { formatLastSyncTimestamp } from './story-arcs-settings.js';
 
 const global = typeof canonicalGlobal !== 'undefined' ? canonicalGlobal : new Proxy(typeof window !== 'undefined' ? window : globalThis, {
   get: (t, p) => (typeof state !== 'undefined' && p in state) ? state[p] : t[p],
@@ -95,12 +96,7 @@ export async function refreshStoryArcsStatus() {
     }
 
     if (lastSyncText) {
-      if (data.lastSyncTime) {
-        const d = new Date(data.lastSyncTime);
-        lastSyncText.textContent = `${d.toLocaleDateString()} ${d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
-      } else {
-        lastSyncText.textContent = 'Never';
-      }
+      lastSyncText.textContent = formatLastSyncTimestamp(data.lastSyncTime);
     }
 
     if (detailsText) {

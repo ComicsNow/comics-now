@@ -23,6 +23,12 @@ Welcome to **Comics Now! v4.2.0** — feature, performance, and security release
 * **Cache-First Service Worker Media Delivery & Schema Parity**: Switched `/api/v1/comics/pages/image` and `/thumbnails/` to Cache-First with bounded cache trimming (800 entries), added a 1500ms timeout guard on `/guided-view` network-first fetches, removed dead Service Worker Background Sync stubs, and aligned `openDownloadDB()` to initialize all 8 IndexedDB object stores.
 * **Deduplicated Preloading, Memory-First Cache & Object URL Cleanup**: Shared in-flight `Image` loads between background preloading and `renderPage()`, checked in-memory archive caches before reading IndexedDB/File handles, revoked evicted `blob:` URLs via `URL.revokeObjectURL()`, enabled lookahead preloading for local device comics, added next-issue cover prefetching on the final two pages, and retained unsynced offline progress records on transient path lookup failures.
 
+### 4. Story Arcs Continuity, Per-Run Scan Audits & Metadata Reliability
+* **Multi-Arc `<StoryArcs>` Metadata & Scoped Batch Enrichment**: Added `<StoryArcs>` XML serialization and SQLite metadata persistence for comics spanning multiple story arcs (preserving `<StoryArc>` and `<StoryArcNumber>` for the primary arc while merging all matched arcs), added incremental batch enrichment scopes (`all`, `since_last_run`, `since_date`, `new_arcs`) with persisted watermark state, and removed legacy `dryRun` simulation paths.
+* **Persistent Story Arcs Sync Timestamp**: Persisted `last_sync_time` and `sitemap_etag` in `reading_order_meta` across service restarts (with automatic recovery from existing sync timestamps) and fixed Unix seconds-to-milliseconds formatting in the Settings UI.
+* **Per-Run Recent Scan Audits & Status Filtering**: Made **Recent Scan Audits** expandable per run to inspect individual comic results, added **All**, **Successful**, **Failed**, and **Skipped** per-run filter controls, and surfaced the 21-day log retention policy.
+* **Gemini Cover & Tagger Candidate Evaluation**: Removed the 5-candidate cap and `lower_threshold: 0.30` override so Gemini evaluation considers full candidate sets cleanly.
+
 ---
 
 ## ⬆️ Upgrade Notes
@@ -42,12 +48,15 @@ Welcome to **Comics Now! v4.2.0** — feature, performance, and security release
 7. `security(secrets)`: auto-encrypt plaintext secrets in config.json on load/save and scrub/mask tagger scheduler_config.json credentials
 8. `feat(offline)`: native client-side CBR/CBZ extraction via WebAssembly and offline progress retention
 9. `perf(viewer)`: Cache-First SW image delivery, deduplicated in-flight page preloading, blob URL cleanup, and next-issue cover prefetching
+10. `feat(story-arcs)`: add multi-arc `<StoryArcs>` XML/DB persistence, scoped batch enrichment, and persistent sync timestamp
+11. `feat(tagger-ui)`: add per-run Recent Scan Audits inspection with Successful/Failed/Skipped filtering and 21-day retention display
+12. `fix(gemini)`: remove 5-candidate cap and `lower_threshold` override in cover/tagger evaluation
 
 ---
 
 ## 🧪 Verification & Test Results
-- **Full Jest suite**: `203 suites passed, 1555 tests passed (100% pass rate)`.
-- **Targeted Python tagger suites**: `tagger/tests/test_scheduler.py` and `tagger/tests/test_web_endpoints.py` (`16 passed`).
+- **Full Jest suite**: `205 suites passed, 1564 tests passed, 1 snapshot passed (100% pass rate)`.
+- **Python tagger suite**: `253 passed (100% pass rate)`.
 - **Architectural invariants**: `tests/architectureRatchet.test.js` verified (100% pass rate).
 - **Security & route integration suites**: `tests/urlMetadataExtractor.test.js`, `tests/storyArcsSyncRoute.test.js`, `tests/metadataRoutes.test.js`, `tests/server/routes/static.test.js` verified.
 - **Production build**: Tailwind CSS v4 and Vite client bundle compiled cleanly.

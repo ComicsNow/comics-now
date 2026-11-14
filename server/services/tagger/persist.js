@@ -35,6 +35,7 @@ function buildTaggedDbMeta(info, overrides = {}) {
     Locations: info.Locations || '',
     StoryArc: info.StoryArc || '',
     StoryArcNumber: info.StoryArcNumber || '',
+    StoryArcs: info.StoryArcs || '',
     AgeRating: info.AgeRating || '',
     Web: info.Web || '',
     PageCount: info.PageCount || '',

@@ -7,12 +7,12 @@ import os
 import sys
 import json
 import time
-import sqlite3
 import argparse
 import re
 from pathlib import Path
 from typing import Optional, Dict, Any, List, Tuple, Callable
 
+from tagger_app.continuity.arc_backfill import apply_arc_tag_to_comic
 from tagger_app.continuity.crypto_utils import load_continuity_gemini_config, TokenRateLimiter
 from tagger_app.continuity.review_formatter import format_cli_review, format_library_batch_review
 from tagger_app.continuity.cluster_builder import (
@@ -22,11 +22,6 @@ from tagger_app.continuity.cluster_builder import (
     find_candidate_arcs_for_comic,
     build_arc_target_prompt,
     parse_arc_matches,
-)
-from tagger_app.core.comicinfo import (
-    read_comic_info_xml,
-    write_comic_info,
-    generate_comic_info_xml,
 )
 
 _r3 = Path(__file__).resolve().parents[3]
@@ -80,52 +75,18 @@ class GeminiStoryArcTagger:
                 else:
                     raise e
 
-    def _apply_tag(self, comic: Dict[str, Any], arc_title: str, pos: int, dry_run: bool) -> str:
-        """Apply StoryArc tags to comic or return would-be action description."""
-        storage_mode = self.config["metadata_storage"]
-        file_path = comic.get("path") or ""
-        file_stem = Path(file_path).stem if file_path else comic.get("name", "")
-
-        action = (
-            f"Would write sidecar: {file_stem}.ComicInfo.xml"
-            if storage_mode == "sidecar"
-            else (f"Would embed inside archive: {comic.get('name')}" if storage_mode == "archive" else "Would update SQLite database only")
+    def _apply_tag(self, comic: Dict[str, Any], arc_title: str, pos: int) -> str:
+        """Merge StoryArc/StoryArcs tags into comic DB metadata and ComicInfo.xml."""
+        return apply_arc_tag_to_comic(
+            self.cn_db_path, self.config["metadata_storage"], comic, arc_title, pos
         )
-
-        if not dry_run:
-            c_id = comic["id"]
-            meta_to_write = {
-                **comic.get("metadata", {}),
-                "StoryArc": arc_title,
-                "StoryArcNumber": str(pos),
-            }
-            now_ms = int(time.time() * 1000)
-            conn = sqlite3.connect(self.cn_db_path, timeout=5.0)
-            conn.execute(
-                "UPDATE comics SET metadata = ?, updatedAt = ? WHERE id = ?",
-                (json.dumps(meta_to_write), now_ms, c_id),
-            )
-            conn.commit()
-            conn.close()
-
-            if storage_mode in ("sidecar", "archive") and file_path and os.path.exists(file_path):
-                try:
-                    existing_xml = read_comic_info_xml(file_path) or {}
-                    merged_meta = {**existing_xml, "StoryArc": arc_title, "StoryArcNumber": str(pos)}
-                    xml_str = generate_comic_info_xml(merged_meta)
-                    write_comic_info(file_path, xml_str, storage_mode=storage_mode)
-                    action = f"Wrote {storage_mode} for {file_stem}"
-                except Exception as err:
-                    action = f"Error writing {storage_mode}: {err}"
-
-        return action
 
     def tag_arc(
         self,
         arc_id: str,
-        dry_run: bool = False,
         preloaded_comics: Optional[List[Dict[str, Any]]] = None,
         log_fn: Optional[Callable[[str, str], None]] = None,
+        write_tags: bool = True,
     ) -> Dict[str, Any]:
         """Evaluate matching library comics for a single story arc."""
         all_arcs = load_all_reading_orders(self.ro_db_path)
@@ -142,7 +103,7 @@ class GeminiStoryArcTagger:
             return {
                 "arcId": arc_id, "arcTitle": arc["clean_title"], "publisher": arc["publisher"],
                 "totalChecklist": len(arc["checklist"]), "rawMatchesCount": 0, "totalMatches": 0,
-                "appliedCount": 0, "dryRun": dry_run, "storageMode": self.config["metadata_storage"],
+                "appliedCount": 0, "storageMode": self.config["metadata_storage"],
                 "matches": [], "unmatched": arc["checklist"], "status": "no_candidates",
             }
 
@@ -169,7 +130,7 @@ class GeminiStoryArcTagger:
         for m in matches:
             matched_positions.add(m["position"])
             c = candidates_by_id[m["comic_id"]]
-            action = self._apply_tag(c, arc["clean_title"], m["position"], dry_run)
+            action = self._apply_tag(c, arc["clean_title"], m["position"]) if write_tags else "Match preview"
             detailed_matches.append({
                 "position": m["position"],
                 "checklistTitle": m["checklist_item"].get("title") or "",
@@ -197,7 +158,6 @@ class GeminiStoryArcTagger:
             "rawMatchesCount": raw_count,
             "totalMatches": len(detailed_matches),
             "appliedCount": len(detailed_matches),
-            "dryRun": dry_run,
             "storageMode": self.config["metadata_storage"],
             "matches": detailed_matches,
             "unmatched": unmatched,
@@ -229,7 +189,7 @@ class GeminiStoryArcTagger:
         }
 
         for arc in cand_arcs[:3]:
-            res = self.tag_arc(arc["id"], dry_run=True, preloaded_comics=[cand_item])
+            res = self.tag_arc(arc["id"], preloaded_comics=[cand_item], write_tags=False)
             if res.get("totalMatches", 0) > 0:
                 best = max(res["matches"], key=lambda m: m["confidence"])
                 return {
@@ -244,24 +204,42 @@ class GeminiStoryArcTagger:
 
     def tag_all_library(
         self,
-        dry_run: bool = True,
         target_publisher: Optional[str] = None,
+        since_ms: Optional[int] = None,
+        scraped_since_sec: Optional[int] = None,
         log_fn: Optional[Callable[[str, str], None]] = None,
         progress_fn: Optional[Callable[[int, int, str, int], None]] = None,
         is_cancelled_fn: Optional[Callable[[], bool]] = None,
     ) -> Dict[str, Any]:
-        """Evaluate entire library against all story arcs with quota-safe dynamic scoping."""
-        all_arcs = load_all_reading_orders(self.ro_db_path)
+        """Evaluate library against story arcs with incremental filtering and quota protection."""
+        all_arcs = load_all_reading_orders(self.ro_db_path, scraped_since_sec=scraped_since_sec)
         if not all_arcs:
-            return {"error": "No reading orders found in database"}
+            msg = "No reading orders matched the selected scope."
+            if log_fn:
+                log_fn("INFO", msg)
+            return {
+                "model": self.config["model"],
+                "storageMode": self.config["metadata_storage"],
+                "totalArcs": 0,
+                "arcsEvaluatedWithAI": 0,
+                "arcsSkippedNoCandidates": 0,
+                "arcsWithMatches": 0,
+                "totalMatches": 0,
+                "matchedArcs": {},
+                "unmatchedArcs": [],
+            }
 
         if target_publisher and target_publisher != "all":
             all_arcs = [a for a in all_arcs if target_publisher.lower() in a["publisher"].lower()]
 
         if log_fn:
             log_fn("INFO", "Pre-loading comic library catalogs for DC and Marvel...")
-        dc_comics = load_all_publisher_comics(self.cn_db_path, "DC Comics")
-        marvel_comics = load_all_publisher_comics(self.cn_db_path, "Marvel Comics")
+        dc_comics = load_all_publisher_comics(
+            self.cn_db_path, "DC Comics", since_ms=since_ms
+        )
+        marvel_comics = load_all_publisher_comics(
+            self.cn_db_path, "Marvel Comics", since_ms=since_ms
+        )
         comics_by_pub = {"DC Comics": dc_comics, "Marvel Comics": marvel_comics}
 
         all_matches_by_arc: Dict[str, Any] = {}
@@ -280,10 +258,25 @@ class GeminiStoryArcTagger:
                 skipped_no_cands_count += 1
                 unmatched_arcs.append({"id": arc["id"], "title": arc["clean_title"], "publisher": arc["publisher"]})
 
-        msg = f"Library Analysis: {len(all_arcs)} total arcs | {len(candidate_arcs)} arcs with matching library candidates | {skipped_no_cands_count} skipped"
+        msg = f"Library Analysis: {len(all_arcs)} arcs | {len(candidate_arcs)} arcs with matching candidates | {skipped_no_cands_count} skipped"
         if log_fn:
             log_fn("INFO", msg)
         print(f"[*] {msg}")
+
+        if not candidate_arcs:
+            if log_fn:
+                log_fn("INFO", "No new comics or story arcs matched the selected scope. Nothing to evaluate.")
+            return {
+                "model": self.config["model"],
+                "storageMode": self.config["metadata_storage"],
+                "totalArcs": len(all_arcs),
+                "arcsEvaluatedWithAI": 0,
+                "arcsSkippedNoCandidates": skipped_no_cands_count,
+                "arcsWithMatches": 0,
+                "totalMatches": 0,
+                "matchedArcs": {},
+                "unmatchedArcs": unmatched_arcs,
+            }
 
         for idx, (arc, cands) in enumerate(candidate_arcs, start=1):
             if is_cancelled_fn and is_cancelled_fn():
@@ -300,7 +293,7 @@ class GeminiStoryArcTagger:
             if progress_fn:
                 progress_fn(idx, len(candidate_arcs), arc["clean_title"], total_matches_count)
 
-            res = self.tag_arc(arc["id"], dry_run=dry_run, preloaded_comics=cands, log_fn=log_fn)
+            res = self.tag_arc(arc["id"], preloaded_comics=cands, log_fn=log_fn)
             ai_evaluated_count += 1
 
             if res.get("totalMatches", 0) > 0:
@@ -327,7 +320,6 @@ class GeminiStoryArcTagger:
         return {
             "model": self.config["model"],
             "storageMode": self.config["metadata_storage"],
-            "dryRun": dry_run,
             "totalArcs": len(all_arcs),
             "arcsEvaluatedWithAI": ai_evaluated_count,
             "arcsSkippedNoCandidates": skipped_no_cands_count,
@@ -341,17 +333,15 @@ class GeminiStoryArcTagger:
 def main():
     parser = argparse.ArgumentParser(description="Tag Comics Now! Story Arcs with Gemini Flash.")
     parser.add_argument("--arc", help="Specific reading order ID (e.g. absolute-universe)")
-    parser.add_argument("--live", action="store_true", help="Execute live metadata writes")
     args = parser.parse_args()
 
-    is_dry_run = not args.live
     tagger = GeminiStoryArcTagger()
     if args.arc:
-        res = tagger.tag_arc(args.arc, dry_run=is_dry_run)
+        res = tagger.tag_arc(args.arc)
         print(format_cli_review(res) if "error" not in res else res["error"])
     else:
-        print(f"[*] Starting full library story arc evaluation (Dry-Run: {is_dry_run})...")
-        res = tagger.tag_all_library(dry_run=is_dry_run)
+        print("[*] Starting full library story arc evaluation...")
+        res = tagger.tag_all_library()
         print(format_library_batch_review(res))
 
 

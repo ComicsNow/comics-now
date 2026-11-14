@@ -71,6 +71,7 @@ def _load_library_comics(
         has_total_pages = "totalPages" in comic_cols
         has_page_count = "pageCount" in comic_cols
         has_last_read = "lastReadPage" in comic_cols
+        path_col = ", c.path" if "path" in comic_cols else ""
 
         pages_col = "c.totalPages" if has_total_pages else ("c.pageCount" if has_page_count else "0")
         read_col = "c.lastReadPage" if has_last_read else "0"
@@ -78,7 +79,7 @@ def _load_library_comics(
         if has_ucs:
             query = f"""
                 SELECT 
-                    c.id, c.name, c.series, c.publisher, c.metadata,
+                    c.id, c.name, c.series, c.publisher, c.metadata{path_col},
                     COALESCE(ucs.totalPages, {pages_col}, 0) as pageCount,
                     COALESCE(ucs.lastReadPage, {read_col}, 0) as lastReadPage
                 FROM comics c
@@ -87,7 +88,7 @@ def _load_library_comics(
         else:
             query = f"""
                 SELECT 
-                    c.id, c.name, c.series, c.publisher, c.metadata,
+                    c.id, c.name, c.series, c.publisher, c.metadata{path_col},
                     {pages_col} as pageCount,
                     {read_col} as lastReadPage
                 FROM comics c

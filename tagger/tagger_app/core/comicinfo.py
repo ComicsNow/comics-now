@@ -86,6 +86,7 @@ def read_comic_info_xml(cbz_path):
             "Locations": "locations",
             "StoryArc": "story_arc",
             "StoryArcNumber": "story_arc_number",
+            "StoryArcs": "story_arcs",
             "Web": "web",
             "AgeRating": "age_rating"
         }
@@ -312,6 +313,12 @@ def generate_comic_info_xml(metadata, enabled_fields=None):
         arc_num_val = _clean_str(metadata.get("story_arc_number") or metadata.get("StoryArcNumber"))
         if arc_num_val:
             ET.SubElement(root, "StoryArcNumber").text = arc_num_val
+
+    # 14b. StoryArcs (custom multi-arc list: "Arc A (#1); Arc B (#4)")
+    if enabled_fields is None or "StoryArc" in enabled_fields or "StoryArcs" in enabled_fields:
+        arcs_val = _clean_str(metadata.get("story_arcs") or metadata.get("StoryArcs"))
+        if arcs_val:
+            ET.SubElement(root, "StoryArcs").text = arcs_val
 
     # 15. Web
     if enabled_fields is None or "Web" in enabled_fields:

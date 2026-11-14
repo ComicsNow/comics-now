@@ -1109,28 +1109,31 @@
                   <span class="text-amber-400">🏷️</span> ComicInfo.xml Story Arc Enrichment
                 </h5>
                 <p class="text-xs text-gray-400 mt-0.5">
-                  Updates <span class="text-amber-300 font-mono">&lt;StoryArc&gt;</span>, <span class="text-amber-300 font-mono">&lt;StoryArcNumber&gt;</span>, and <span class="text-amber-300 font-mono">&lt;SeriesGroup&gt;</span> in ComicInfo.xml for all library comics matching canonical reading orders. Strictly preserves all creator, character, date, and description metadata.
+                  Updates <span class="text-amber-300 font-mono">&lt;StoryArc&gt;</span>, <span class="text-amber-300 font-mono">&lt;StoryArcNumber&gt;</span>, <span class="text-amber-300 font-mono">&lt;StoryArcs&gt;</span>, and <span class="text-amber-300 font-mono">&lt;SeriesGroup&gt;</span> in ComicInfo.xml. Strictly preserves all creator, character, date, and description metadata.
                 </p>
               </div>
-              <span id="story-arcs-batch-status-badge" class="text-xs px-2.5 py-1 rounded-full bg-gray-700/60 text-gray-300 border border-gray-600 font-semibold self-start sm:self-center">
-                Idle
-              </span>
+              <div class="flex items-center gap-2 self-start sm:self-center">
+                <span id="story-arcs-batch-last-run-text" class="text-[11px] text-gray-400">Last Run: Never</span>
+                <span id="story-arcs-batch-status-badge" class="text-xs px-2.5 py-1 rounded-full bg-gray-700/60 text-gray-300 border border-gray-600 font-semibold">
+                  Idle
+                </span>
+              </div>
             </div>
 
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
               <div>
-                <label for="story-arcs-engine-select" class="block text-xs font-medium text-gray-300 mb-1">
-                  Enrichment Engine
+                <label for="story-arcs-batch-scope-select" class="block text-xs font-medium text-gray-300 mb-1">
+                  Enrichment Scope
                 </label>
-                <div class="w-full bg-gray-700/80 border border-gray-600 text-white p-2 rounded-lg text-xs flex items-center justify-between">
-                  <div class="flex items-center gap-2">
-                    <span class="text-amber-400">🤖</span>
-                    <span class="font-medium text-white">Gemini Flash AI</span>
-                  </div>
-                  <span class="text-[10px] px-2 py-0.5 rounded bg-emerald-900/60 text-emerald-300 border border-emerald-700/50 font-semibold">Exclusive</span>
-                </div>
+                <select id="story-arcs-batch-scope-select"
+                  class="w-full bg-gray-700 text-white p-2 rounded-lg text-xs focus:outline-hidden focus:ring-2 focus:ring-amber-500">
+                  <option value="all" selected>Full Library Rescan (All Comics &amp; Arcs)</option>
+                  <option value="since_last_run">Comics Added/Updated Since Last Scan</option>
+                  <option value="since_date">Comics Added/Updated Since Date…</option>
+                  <option value="new_arcs">Newly Synced Story Arcs Only</option>
+                </select>
+                <span class="text-[11px] text-gray-400 mt-0.5 block">Controls which comics or newly synced arcs are evaluated.</span>
                 <input type="hidden" id="story-arcs-engine-select" value="gemini">
-                <span class="text-[11px] text-gray-400 mt-0.5 block">Story Arc matching strictly uses Gemini Flash AI (no heuristic fallback).</span>
               </div>
               <div>
                 <label for="story-arcs-batch-publisher-select" class="block text-xs font-medium text-gray-300 mb-1">
@@ -1144,7 +1147,15 @@
               </div>
             </div>
 
-            <div class="flex items-center justify-end gap-3 mb-3 pt-1">
+            <div id="story-arcs-batch-since-date-wrap" class="hidden mb-3">
+              <label for="story-arcs-batch-since-date" class="block text-xs font-medium text-gray-300 mb-1">
+                Include Comics Added/Updated Since
+              </label>
+              <input type="datetime-local" id="story-arcs-batch-since-date"
+                class="w-full sm:w-auto bg-gray-700 text-white p-2 rounded-lg text-xs focus:outline-hidden focus:ring-2 focus:ring-amber-500">
+            </div>
+
+            <div class="flex flex-wrap items-center justify-end gap-2 mb-3 pt-1">
               <button type="button" id="start-story-arcs-batch-btn"
                 class="bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-white text-xs font-semibold py-2.5 px-5 rounded-lg transition-colors flex items-center justify-center gap-2 shadow-xs cursor-pointer w-full sm:w-auto">
                 <span>🏷️</span>
@@ -1297,8 +1308,11 @@
         <!-- Scan Logs Tab -->
         <div id="ct-content-logs" class="hidden">
           <div class="flex justify-between items-center mb-3">
-            <h4 class="font-semibold text-white text-sm">Recent Scan Audits</h4>
-            <button id="ct-refresh-logs-btn" class="text-xs bg-gray-700 hover:bg-gray-600 text-white px-3 py-1 rounded transition-colors">Refresh</button>
+            <div>
+              <h4 class="font-semibold text-white text-sm">Recent Scan Audits</h4>
+              <p class="text-[11px] text-gray-400">Per-run comic audit history • Logs retained for 21 days</p>
+            </div>
+            <button id="ct-refresh-logs-btn" class="text-xs bg-gray-700 hover:bg-gray-600 text-white px-3 py-1 rounded transition-colors cursor-pointer">Refresh</button>
           </div>
           <div id="ct-logs-container" class="min-h-[250px] max-h-[450px] overflow-y-auto space-y-2">
             <div id="ct-logs-empty" class="text-gray-500 text-sm text-center py-10">No past scan logs found.</div>

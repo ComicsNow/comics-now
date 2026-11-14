@@ -32,6 +32,13 @@ from tagger_app.core.comicinfo import (
     write_comic_info,
     generate_comic_info_xml,
 )
+from tagger_app.continuity.arc_backfill import merge_story_arcs_meta
+from tagger_app.continuity.batch_state import (
+    load_batch_watermark,
+    resolve_batch_scope_filters,
+    save_batch_watermark,
+)
+from tagger_app.continuity.crypto_utils import load_continuity_gemini_config
 from tagger_app.continuity.gemini_batch_tagger import get_gemini_tagger
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -50,8 +57,6 @@ class ContinuityBatchTagger:
 
         self.is_running = False
         self.is_cancelled = False
-        self.dry_run = False
-        self.dry_run_results: List[Dict[str, Any]] = []
         self.status = "idle"  # idle | running | complete | error
         self.progress = {
             "current": 0,
@@ -61,11 +66,11 @@ class ContinuityBatchTagger:
             "errors": 0,
             "currentComic": "",
         }
-        self.last_run_time = None
         self._lock = threading.Lock()
         self._thread: Optional[threading.Thread] = None
         self._logs: List[Dict[str, Any]] = []
         self._log_subscribers = []
+        self.last_run_time: Optional[int] = load_batch_watermark(self.ro_db_path)
 
     def log(self, level: str, message: str) -> None:
         """Append log entry and broadcast to SSE subscribers."""
@@ -95,16 +100,10 @@ class ContinuityBatchTagger:
         return {
             "status": self.status,
             "isRunning": self.is_running,
-            "dryRun": self.dry_run,
-            "dryRunResultsCount": len(self.dry_run_results),
+            "isCancelled": self.is_cancelled,
             "progress": dict(self.progress),
             "lastRunTime": self.last_run_time,
         }
-
-    def get_dry_run_results(self) -> List[Dict[str, Any]]:
-        """Return results of the last dry run simulation."""
-        with self._lock:
-            return list(self.dry_run_results)
 
     def cancel_tagging(self) -> None:
         """Request cooperative cancellation."""
@@ -115,17 +114,19 @@ class ContinuityBatchTagger:
         self,
         target_publisher: Optional[str] = None,
         run_async: bool = True,
-        dry_run: bool = False,
         engine: str = "gemini",
+        scope: str = "all",
+        since_timestamp: Optional[int] = None,
     ) -> Dict[str, Any]:
-        """Trigger batch tagging run using Gemini exclusively (no rule-based fallback)."""
+        """Trigger scoped batch tagging run."""
+        filters = resolve_batch_scope_filters(
+            scope, self.last_run_time, since_timestamp
+        )
         with self._lock:
             if self.is_running:
                 raise RuntimeError("Batch Story Arc tagging is already running.")
             self.is_running = True
             self.is_cancelled = False
-            self.dry_run = dry_run
-            self.dry_run_results = []
             self.status = "running"
             self.progress = {
                 "current": 0,
@@ -140,18 +141,20 @@ class ContinuityBatchTagger:
         if run_async:
             self._thread = threading.Thread(
                 target=target_fn,
-                args=(target_publisher, dry_run),
+                args=(target_publisher, filters),
                 daemon=True,
             )
             self._thread.start()
-            return {"started": True, "targetPublisher": target_publisher, "dryRun": dry_run, "engine": engine}
-        else:
-            return target_fn(target_publisher, dry_run)
+            return {"started": True, "targetPublisher": target_publisher, "engine": engine, **filters}
+        return target_fn(target_publisher, filters)
 
-    def _run_gemini_batch(self, target_publisher: Optional[str], dry_run: bool = False) -> Dict[str, Any]:
+    def _run_gemini_batch(self, target_publisher: Optional[str], filters: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """Execute Gemini Flash Story Arc batch tagging with live SSE log broadcasting."""
-        mode_label = "DRY-RUN simulation" if dry_run else "live write"
-        self.log("INFO", f"Starting Gemini Flash Story Arc batch tagging [{mode_label}] (target: {target_publisher or 'All'})...")
+        f = filters or {}
+        self.log(
+            "INFO",
+            f"Starting Gemini Flash Story Arc enrichment (scope={f.get('scope', 'all')}, target={target_publisher or 'All'})...",
+        )
         try:
             gemini_tagger = get_gemini_tagger()
             if not gemini_tagger or not gemini_tagger.config.get("api_key"):
@@ -160,9 +163,6 @@ class ContinuityBatchTagger:
                 self.status = "error"
                 return {"error": err_msg}
 
-            def log_callback(level: str, msg: str) -> None:
-                self.log(level, msg)
-
             def progress_callback(cur: int, tot: int, current_arc: str, matches_cnt: int) -> None:
                 with self._lock:
                     self.progress["current"] = cur
@@ -170,30 +170,23 @@ class ContinuityBatchTagger:
                     self.progress["currentComic"] = current_arc
                     self.progress["updated"] = matches_cnt
 
-            def cancel_check() -> bool:
-                return self.is_cancelled
-
             results = gemini_tagger.tag_all_library(
-                dry_run=dry_run,
                 target_publisher=target_publisher,
-                log_fn=log_callback,
+                since_ms=f.get("since_ms"),
+                scraped_since_sec=f.get("scraped_since_sec"),
+                log_fn=self.log,
                 progress_fn=progress_callback,
-                is_cancelled_fn=cancel_check,
+                is_cancelled_fn=lambda: self.is_cancelled,
             )
 
             with self._lock:
-                self.dry_run_results = []
-                for arc_id, arc_data in results.get("matchedArcs", {}).items():
-                    for m in arc_data.get("matches", []):
-                        self.dry_run_results.append({
-                            "comic": m.get("comicName"),
-                            "arc": arc_data.get("title"),
-                            "position": m.get("position"),
-                            "confidence": m.get("confidence"),
-                            "action": m.get("action"),
-                        })
-                self.status = "complete" if not self.is_cancelled else "cancelled"
-                self.last_run_time = datetime.now(timezone.utc).isoformat()
+                if self.is_cancelled:
+                    self.status = "cancelled"
+                else:
+                    self.status = "complete"
+                    now_ms = int(time.time() * 1000)
+                    self.last_run_time = now_ms
+                    save_batch_watermark(self.ro_db_path, now_ms)
             return results
         except Exception as e:
             self.status = "error"
@@ -203,10 +196,10 @@ class ContinuityBatchTagger:
             with self._lock:
                 self.is_running = False
 
-    def _run_batch(self, target_publisher: Optional[str], dry_run: bool = False) -> Dict[str, Any]:
+    def _run_batch(self, target_publisher: Optional[str], filters: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """Iterate library comics, match against reading-orders.db, and update ComicInfo sidecars."""
-        mode_label = "DRY-RUN simulation" if dry_run else "live write"
-        self.log("INFO", f"Starting Story Arc batch tagging [{mode_label}] (target: {target_publisher or 'All'})...")
+        f = filters or {}
+        self.log("INFO", f"Starting Story Arc batch tagging (target: {target_publisher or 'All'})...")
         try:
             if not Path(self.cn_db_path).exists() or not Path(self.ro_db_path).exists():
                 raise FileNotFoundError("Required databases not found")
@@ -256,42 +249,23 @@ class ContinuityBatchTagger:
 
                 file_path = comic.get("path") or ""
 
-                if dry_run:
-                    self.dry_run_results.append({
-                        "comicId": comic["id"],
-                        "comicName": comic.get("name") or "",
-                        "series": series,
-                        "issueNumber": num,
-                        "year": year,
-                        "matchedArc": clean_arc,
-                        "storyArcNumber": pos_str,
-                        "seriesGroup": series_group,
-                        "coverDistance": match.get("coverDistance", 0),
-                        "filePath": file_path,
-                    })
-                    self.progress["updated"] += 1
-                    self.log("INFO", f"[DRY-RUN] Would tag {os.path.basename(file_path or comic.get('name', ''))} -> {clean_arc} #{pos_str} (dHash: {match.get('coverDistance', 0)})")
-                    continue
-
                 if file_path and os.path.exists(file_path):
                     try:
                         existing = read_comic_info_xml(file_path) or {}
-                        if (
-                            existing.get("StoryArc") == clean_arc
-                            and str(existing.get("StoryArcNumber") or "") == pos_str
-                        ):
-                            self.progress["skipped"] += 1
-                            continue
-
                         existing_group = existing.get("SeriesGroup")
                         group_to_use = existing_group if existing_group else series_group
 
-                        meta_to_write = {
-                            **existing,
-                            "StoryArc": clean_arc,
-                            "StoryArcNumber": pos_str,
-                            "SeriesGroup": group_to_use,
-                        }
+                        meta_to_write = merge_story_arcs_meta(
+                            {**existing, "SeriesGroup": group_to_use},
+                            [(clean_arc, pos_str)],
+                        )
+                        if (
+                            meta_to_write.get("StoryArc") == existing.get("story_arc")
+                            and str(meta_to_write.get("StoryArcNumber") or "") == str(existing.get("story_arc_number") or "")
+                            and meta_to_write.get("StoryArcs") == existing.get("story_arcs")
+                        ):
+                            self.progress["skipped"] += 1
+                            continue
                         xml_str = generate_comic_info_xml(meta_to_write)
                         # ALWAYS write external sidecar (storage_mode="sidecar"), leaving archives untouched!
                         write_comic_info(file_path, xml_str, storage_mode="sidecar")
@@ -299,10 +273,17 @@ class ContinuityBatchTagger:
                         # Update DB metadata
                         now_ms = int(time.time() * 1000)
                         cn_write = sqlite3.connect(self.cn_db_path, timeout=5.0)
-                        cn_write.execute(
-                            "UPDATE comics SET metadata = ?, updatedAt = ? WHERE id = ?",
-                            (json.dumps(meta_to_write), now_ms, comic["id"]),
-                        )
+                        cols = {r[1] for r in cn_write.execute("PRAGMA table_info(comics)").fetchall()}
+                        if "updatedAt" in cols:
+                            cn_write.execute(
+                                "UPDATE comics SET metadata = ?, updatedAt = ? WHERE id = ?",
+                                (json.dumps(meta_to_write), now_ms, comic["id"]),
+                            )
+                        else:
+                            cn_write.execute(
+                                "UPDATE comics SET metadata = ? WHERE id = ?",
+                                (json.dumps(meta_to_write), comic["id"]),
+                            )
                         cn_write.commit()
                         cn_write.close()
 
@@ -314,19 +295,20 @@ class ContinuityBatchTagger:
                 else:
                     self.progress["skipped"] += 1
 
-            self.status = "complete"
+            self.status = "complete" if not self.is_cancelled else "cancelled"
             self.is_running = False
-            self.last_run_time = int(datetime.now().timestamp())
+            if not self.is_cancelled:
+                now_ms = int(time.time() * 1000)
+                self.last_run_time = now_ms
+                save_batch_watermark(self.ro_db_path, now_ms)
             self.log(
                 "INFO",
-                f"Batch tagging completed [{mode_label}]: {self.progress['updated']} updated, {self.progress['skipped']} skipped, {self.progress['errors']} errors.",
+                f"Batch tagging completed: {self.progress['updated']} updated, {self.progress['skipped']} skipped, {self.progress['errors']} errors.",
             )
-            return {"completed": True, "dryRun": dry_run, "progress": dict(self.progress)}
+            return {"completed": True, "progress": dict(self.progress)}
         except Exception as e:
             self.status = "error"
             self.is_running = False
-            self.log("ERROR", f"Batch tagging error: {e}")
-            return {"error": str(e)}
             self.log("ERROR", f"Batch tagging error: {e}")
             return {"error": str(e)}
 

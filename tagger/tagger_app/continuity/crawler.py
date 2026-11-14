@@ -21,6 +21,8 @@ from tagger_app.continuity.db import (
     get_order_count,
     get_sitemap_etag,
     set_sitemap_etag,
+    get_last_sync_time,
+    set_last_sync_time,
 )
 from tagger_app.continuity.parser import (
     parse_sitemap_slugs,
@@ -54,6 +56,26 @@ class ContinuityCrawler:
         self._thread: Optional[threading.Thread] = None
         self._logs: List[Dict[str, Any]] = []
         self._log_subscribers = []
+        self._hydrate_persisted_state()
+
+    def _hydrate_persisted_state(self) -> None:
+        """Load persisted last_sync_time and sitemap ETag from reading-orders.db."""
+        conn = None
+        should_close = self.db_conn is None
+        try:
+            conn = self.db_conn or get_connection()
+            if self.last_sync_time is None:
+                self.last_sync_time = get_last_sync_time(conn)
+            if self.last_sitemap_etag is None:
+                self.last_sitemap_etag = get_sitemap_etag(conn)
+        except Exception:
+            pass
+        finally:
+            if should_close and conn is not None:
+                try:
+                    conn.close()
+                except Exception:
+                    pass
 
     def log(self, level: str, message: str) -> None:
         """Append log message and notify live SSE subscribers."""
@@ -88,6 +110,8 @@ class ContinuityCrawler:
 
     def get_status(self) -> Dict[str, Any]:
         """Return current crawler state."""
+        if self.last_sync_time is None:
+            self._hydrate_persisted_state()
         return {
             "status": self.status,
             "isSyncing": self.is_syncing,
@@ -154,6 +178,7 @@ class ContinuityCrawler:
                     self.status = "idle"
                     self.is_syncing = False
                     self.last_sync_time = int(time.time())
+                    set_last_sync_time(conn, self.last_sync_time)
                     self.log("INFO", "Sitemap ETag unchanged (304 Not Modified). All orders up to date.")
                     return {"skipped": True, "reason": "Sitemap not modified (304)", "scrapedCount": 0}
                 if meta.get("etag"):
@@ -174,6 +199,7 @@ class ContinuityCrawler:
                 self.status = "idle"
                 self.is_syncing = False
                 self.last_sync_time = int(time.time())
+                set_last_sync_time(conn, self.last_sync_time)
                 self.log("INFO", f"All {len(slugs)} reading orders already indexed in local database.")
                 return {"skipped": True, "reason": "All orders already indexed", "scrapedCount": 0}
 
@@ -217,6 +243,7 @@ class ContinuityCrawler:
             self.status = "idle"
             self.is_syncing = False
             self.last_sync_time = int(time.time())
+            set_last_sync_time(conn, self.last_sync_time)
             if scraped > 0:
                 try:
                     self.log("INFO", "Backfilling cover images and dHashes for newly indexed reading orders...")
@@ -235,7 +262,7 @@ class ContinuityCrawler:
                                 break
                             pct = int((s_idx / len(slugs_to_scrape)) * 100)
                             self.log("INFO", f"[Gemini Sync {s_idx}/{len(slugs_to_scrape)}] ({pct}%) Matching candidate comics for '{slug}'...")
-                            gem_res = gemini.tag_arc(slug, dry_run=False, log_fn=lambda lvl, msg: self.log(lvl, msg))
+                            gem_res = gemini.tag_arc(slug, log_fn=lambda lvl, msg: self.log(lvl, msg))
                             if gem_res.get("totalMatches", 0) > 0:
                                 self.log("SUCCESS", f"  ✓ Gemini matched {gem_res['totalMatches']} issues for '{slug}'")
                     else:

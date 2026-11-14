@@ -397,5 +397,58 @@ describe('Gemini Vision Cover Arbiter', () => {
 
       expect(result.bestIndex).toBe(0);
     });
+
+    test('evaluates all provided candidates without truncating at 5', async () => {
+      const sevenCandidates = Array.from({ length: 7 }, (_, i) => ({
+        title: `Candidate Issue #${i + 1}`,
+        coverUrl: `https://example.com/cover-${i + 1}.jpg`
+      }));
+
+      let capturedGeminiBody = null;
+      global.fetch = jest.fn().mockImplementation((url, init) => {
+        if (url.includes('generativelanguage.googleapis.com')) {
+          capturedGeminiBody = JSON.parse(init.body);
+          return Promise.resolve({
+            ok: true,
+            json: () => Promise.resolve({
+              candidates: [
+                {
+                  content: {
+                    parts: [
+                      {
+                        text: JSON.stringify({
+                          bestIndex: 6,
+                          confidence: 0.94,
+                          reason: 'Seventh candidate matched.'
+                        })
+                      }
+                    ]
+                  }
+                }
+              ]
+            })
+          });
+        }
+        return Promise.resolve({
+          ok: true,
+          headers: new Map([['content-type', 'image/jpeg']]),
+          arrayBuffer: () => Promise.resolve(new ArrayBuffer(8))
+        });
+      });
+
+      const result = await matchCoverToCandidates({
+        localCoverPath: mockLocalPath,
+        candidates: sevenCandidates,
+        apiKey: 'mock-api-key-test-001'
+      });
+
+      expect(result.bestIndex).toBe(6);
+      expect(result.confidence).toBe(0.94);
+      const textParts = capturedGeminiBody.contents[0].parts
+        .map(p => p.text || '')
+        .join('\n');
+      expect(textParts).toContain('Candidate [6]:');
+      expect(textParts).toContain('Candidate Issue #7');
+    });
   });
 });

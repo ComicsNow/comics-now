@@ -28,8 +28,12 @@ def extract_series_phrases_for_arc(checklist: List[Dict[str, Any]]) -> Set[str]:
     return phrases
 
 
-def load_all_publisher_comics(cn_db_path: Path | str, publisher: str) -> List[Dict[str, Any]]:
-    """Query all comics in library for given publisher with normalized series precomputed."""
+def load_all_publisher_comics(
+    cn_db_path: Path | str,
+    publisher: str,
+    since_ms: Optional[int] = None,
+) -> List[Dict[str, Any]]:
+    """Query comics in library for given publisher with optional incremental filters."""
     p = Path(cn_db_path)
     if not p.exists():
         return []
@@ -41,10 +45,14 @@ def load_all_publisher_comics(cn_db_path: Path | str, publisher: str) -> List[Di
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
 
-    cursor.execute(
-        f"SELECT id, name, series, publisher, path, metadata FROM comics WHERE publisher IN ({placeholders})",
-        aliases,
-    )
+    cols = {r[1] for r in cursor.execute("PRAGMA table_info(comics)").fetchall()}
+    params: List[Any] = list(aliases)
+    sql = f"SELECT id, name, series, publisher, path, metadata FROM comics WHERE publisher IN ({placeholders})"
+    if since_ms is not None and "updatedAt" in cols:
+        sql += " AND updatedAt >= ?"
+        params.append(int(since_ms))
+
+    cursor.execute(sql, params)
     rows = cursor.fetchall()
     conn.close()
 
@@ -103,8 +111,11 @@ def get_arc_candidate_comics(
     return candidates
 
 
-def load_all_reading_orders(ro_db_path: Path | str) -> List[Dict[str, Any]]:
-    """Load all reading orders and their checklists from reading-orders.db."""
+def load_all_reading_orders(
+    ro_db_path: Path | str,
+    scraped_since_sec: Optional[int] = None,
+) -> List[Dict[str, Any]]:
+    """Load reading orders and their checklists from reading-orders.db."""
     p = Path(ro_db_path)
     if not p.exists():
         return []
@@ -113,7 +124,17 @@ def load_all_reading_orders(ro_db_path: Path | str) -> List[Dict[str, Any]]:
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
 
-    cursor.execute("SELECT id, title, publisher, description FROM reading_orders ORDER BY publisher, title ASC")
+    cols = {r[1] for r in cursor.execute("PRAGMA table_info(reading_orders)").fetchall()}
+    sql = "SELECT id, title, publisher, description FROM reading_orders"
+    params: List[Any] = []
+    if scraped_since_sec is not None:
+        ts_col = "updated_at" if "updated_at" in cols else ("scraped_at" if "scraped_at" in cols else None)
+        if ts_col:
+            sql += f" WHERE {ts_col} >= ?"
+            params.append(int(scraped_since_sec))
+    sql += " ORDER BY publisher, title ASC"
+
+    cursor.execute(sql, params)
     order_rows = cursor.fetchall()
 
     arcs = []

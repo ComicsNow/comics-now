@@ -205,6 +205,41 @@ def set_sitemap_etag(conn: sqlite3.Connection, etag: str) -> None:
         )
 
 
+def get_last_sync_time(conn: sqlite3.Connection) -> Optional[int]:
+    """Retrieve persisted last sync timestamp (Unix seconds), recovering from order timestamps if unset."""
+    cursor = conn.cursor()
+    try:
+        cursor.execute("SELECT value FROM reading_order_meta WHERE key = 'last_sync_time'")
+        row = cursor.fetchone()
+        if row and row["value"]:
+            return int(row["value"])
+        cursor.execute("SELECT updated_at FROM reading_order_meta WHERE key = 'sitemap_etag'")
+        etag_row = cursor.fetchone()
+        if etag_row and etag_row["updated_at"]:
+            return int(etag_row["updated_at"])
+        cursor.execute("SELECT MAX(updated_at) as max_ts FROM reading_orders")
+        max_row = cursor.fetchone()
+        if max_row and max_row["max_ts"]:
+            return int(max_row["max_ts"])
+    except Exception:
+        pass
+    return None
+
+
+def set_last_sync_time(conn: sqlite3.Connection, ts: int) -> None:
+    """Persist last sync timestamp (Unix seconds) in reading_order_meta."""
+    ts_int = int(ts)
+    with conn:
+        conn.execute(
+            """
+            INSERT INTO reading_order_meta (key, value, updated_at)
+            VALUES ('last_sync_time', ?, ?)
+            ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at
+            """,
+            (str(ts_int), ts_int),
+        )
+
+
 def list_reading_orders(conn: sqlite3.Connection, publisher: Optional[str] = None, search: Optional[str] = None) -> List[Dict[str, Any]]:
     """Query reading orders with optional publisher and title search filters."""
     query = "SELECT * FROM reading_orders WHERE 1=1"

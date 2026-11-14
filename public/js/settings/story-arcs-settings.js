@@ -8,6 +8,19 @@ const global = typeof canonicalGlobal !== 'undefined' ? canonicalGlobal : new Pr
   set: (t, p, v) => { if (typeof state !== 'undefined') state[p] = v; try { t[p] = v; } catch {} return true; }
 });
 
+/**
+ * Formats a Unix timestamp (seconds or milliseconds) or date string for display.
+ * Python crawler reports lastSyncTime in Unix seconds; JS Date expects ms.
+ */
+export function formatLastSyncTimestamp(ts) {
+  if (!ts) return 'Never';
+  const numeric = typeof ts === 'number' ? ts : (typeof ts === 'string' && /^\d+(\.\d+)?$/.test(ts.trim()) ? Number(ts.trim()) : null);
+  const ms = numeric !== null ? (numeric < 1e12 ? numeric * 1000 : numeric) : ts;
+  const d = new Date(ms);
+  if (Number.isNaN(d.getTime())) return 'Never';
+  return `${d.toLocaleDateString()} ${d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+}
+
 export async function loadStoryArcsSettings() {
   try {
     const res = await fetch(`${global.API_BASE_URL}/api/v1/settings`);
@@ -52,12 +65,7 @@ export async function refreshStoryArcsSyncStatus() {
     }
 
     if (lastSyncText) {
-      if (data.lastSyncTime) {
-        const d = new Date(data.lastSyncTime);
-        lastSyncText.textContent = `Last Sync: ${d.toLocaleDateString()} ${d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
-      } else {
-        lastSyncText.textContent = 'Last Sync: Never';
-      }
+      lastSyncText.textContent = `Last Sync: ${formatLastSyncTimestamp(data.lastSyncTime)}`;
     }
 
     if (detailsText) {

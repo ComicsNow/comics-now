@@ -149,27 +149,19 @@ def test_batch_tagger_dry_run_mode_creates_zero_files_and_zero_db_writes(tmp_pat
         )
     cn_conn.close()
 
-    # 3. Run batch tagger in DRY RUN mode
+    # 3. Run batch tagger live write
     tagger = ContinuityBatchTagger(cn_db_path=str(cn_path), ro_db_path=mock_ro_db)
-    res = tagger.start_batch_tag(target_publisher="DC Comics", run_async=False, dry_run=True, engine="rules")
+    res = tagger.start_batch_tag(target_publisher="DC Comics", run_async=False, engine="rules")
     assert res.get("completed") is True
-    assert res.get("dryRun") is True
     assert res["progress"]["updated"] == 1
 
-    # 4. Verify dry-run results were recorded
-    results = tagger.get_dry_run_results()
-    assert len(results) == 1
-    assert results[0]["matchedArc"] == "Crisis on Infinite Earths"
-    assert results[0]["storyArcNumber"] == "1"
-
-    # 5. STRICT VERIFICATION: NO sidecar created, NO archive modified, NO DB updated!
+    # 4. Verify sidecar and DB metadata were updated
     sidecar_path = tmp_path / "Crisis on Infinite Earths #1 (1985).ComicInfo.xml"
-    assert not sidecar_path.exists(), "Dry run must NOT create sidecars!"
-    assert cbz_file.stat().st_mtime == initial_mtime
+    assert sidecar_path.exists()
 
     cn_check = sqlite3.connect(str(cn_path))
     row = cn_check.execute("SELECT metadata FROM comics WHERE id = 'c1'").fetchone()
-    assert "StoryArc" not in row[0], "Dry run must NOT update database metadata!"
+    assert "Crisis on Infinite Earths" in row[0]
     cn_check.close()
 
 
@@ -179,7 +171,6 @@ def test_batch_tagger_routes_to_gemini_engine(tmp_path, mock_ro_db):
     mock_gemini_inst.config = {"api_key": "mock-api-key-test-001"}
     mock_gemini_inst.tag_all_library.return_value = {
         "completed": True,
-        "dryRun": True,
         "engine": "gemini",
         "totalArcs": 1,
         "totalMatches": 1,
@@ -188,10 +179,9 @@ def test_batch_tagger_routes_to_gemini_engine(tmp_path, mock_ro_db):
     }
 
     with patch("tagger_app.continuity.batch_tagger.get_gemini_tagger", return_value=mock_gemini_inst):
-        res = tagger.start_batch_tag(target_publisher="DC Comics", run_async=False, dry_run=True, engine="gemini")
+        res = tagger.start_batch_tag(target_publisher="DC Comics", run_async=False, engine="gemini")
         assert res.get("completed") is True
         assert res.get("engine") == "gemini"
-        assert res.get("dryRun") is True
         mock_gemini_inst.tag_all_library.assert_called_once()
 
 

@@ -91,7 +91,7 @@ def test_gemini_batch_tagger_match_and_sidecar_write(tmp_path):
     })
 
     with patch.object(tagger, "_call_gemini_api", return_value=mock_gemini_resp):
-        res = tagger.tag_arc("absolute-universe", dry_run=False)
+        res = tagger.tag_arc("absolute-universe")
         assert res["totalMatches"] == 1
         assert res["appliedCount"] == 1
 
@@ -138,7 +138,7 @@ def test_gemini_batch_tagger_respects_storage_mode_db(tmp_path):
     })
 
     with patch.object(tagger, "_call_gemini_api", return_value=mock_gemini_resp):
-        res = tagger.tag_arc("absolute-universe", dry_run=False)
+        res = tagger.tag_arc("absolute-universe")
         assert res["appliedCount"] == 1
 
         # Sidecar should NOT be created when storage_mode is 'db'
@@ -165,12 +165,12 @@ def test_gemini_batch_tagger_low_confidence_filtered_out(tmp_path):
     })
 
     with patch.object(tagger, "_call_gemini_api", return_value=mock_gemini_resp):
-        res = tagger.tag_arc("absolute-universe", dry_run=False)
+        res = tagger.tag_arc("absolute-universe")
         assert res["rawMatchesCount"] == 1
         assert res["appliedCount"] == 0  # Filtered out!
 
 
-def test_gemini_batch_tagger_all_publishers_dry_run(tmp_path):
+def test_gemini_batch_tagger_all_publishers_live(tmp_path):
     ro_p, cn_p, config_p, cbz_file = _setup_test_env(tmp_path)
     from tagger_app.continuity.gemini_batch_tagger import GeminiStoryArcTagger
 
@@ -189,15 +189,13 @@ def test_gemini_batch_tagger_all_publishers_dry_run(tmp_path):
     })
 
     with patch.object(tagger, "_call_gemini_api", return_value=mock_gemini_resp):
-        res = tagger.tag_all_library(dry_run=True)
+        res = tagger.tag_all_library()
         assert res["totalArcs"] >= 1
         assert res["totalMatches"] == 1
         assert res["arcsWithMatches"] == 1
         assert "absolute-universe" in res["matchedArcs"]
-        assert res["dryRun"] is True
-        # Verify no sidecar written during dry-run
         sidecar_p = Path(cbz_file).with_suffix(".ComicInfo.xml")
-        assert not sidecar_p.exists()
+        assert sidecar_p.exists()
 
 
 def test_gemini_match_single_comic(tmp_path):
@@ -262,7 +260,7 @@ def test_gemini_tag_all_library_streaming_callbacks(tmp_path):
         progress_updates.append((current, total, current_arc, matches_count))
 
     with patch.object(tagger, "_call_gemini_api", return_value=mock_gemini_resp):
-        res = tagger.tag_all_library(dry_run=True, log_fn=on_log, progress_fn=on_progress)
+        res = tagger.tag_all_library(log_fn=on_log, progress_fn=on_progress)
         assert len(logs) > 0
         assert len(progress_updates) > 0
         assert res["totalMatches"] == 1

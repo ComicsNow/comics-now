@@ -245,8 +245,7 @@ describe('Story Arcs Sync API Endpoints Integration', () => {
     for (const endpoint of [
       '/api/v1/story-arcs/logs',
       '/api/v1/story-arcs/batch-tag/publishers',
-      '/api/v1/story-arcs/batch-tag/status',
-      '/api/v1/story-arcs/batch-tag/results'
+      '/api/v1/story-arcs/batch-tag/status'
     ]) {
       const r = await checkForbidden(endpoint);
       expect(r.status).toBe(403);

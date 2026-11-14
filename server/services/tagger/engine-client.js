@@ -123,9 +123,10 @@ async function getScanLogsList() {
 
 async function getScanLogDetail(logId) {
   const serviceUrl = getTaggerServiceUrl() || 'http://127.0.0.1:5000';
-  const res = await fetch(`${serviceUrl}/api/logs/${logId}`);
+  const res = await fetch(`${serviceUrl}/api/logs/${encodeURIComponent(logId)}`);
   if (!res.ok) throw new Error(`Status ${res.status}`);
-  return await res.json();
+  const data = await res.json();
+  return (data && data.log) ? data.log : data;
 }
 
 async function clearEnhancedTracking() {

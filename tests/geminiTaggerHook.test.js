@@ -138,4 +138,45 @@ describe('Tagger Hook', () => {
     fs.existsSync.mockRestore();
     fs.readFileSync.mockRestore();
   });
+
+  test('preserves caller lower_threshold instead of overriding to 0.30 when Gemini is enabled', async () => {
+    const fs = require('fs');
+    jest.spyOn(fs, 'existsSync').mockReturnValue(true);
+    jest.spyOn(fs, 'readFileSync').mockReturnValue(JSON.stringify({
+      geminiApiKey: 'test-key',
+      geminiCoverMatchEnabled: true,
+      geminiTermsAccepted: true
+    }));
+
+    ctx.config = {
+      geminiApiKey: 'test-key',
+      geminiCoverMatchEnabled: true,
+      geminiTermsAccepted: true
+    };
+    mockDb.dbGet.mockImplementation(async (sql) => {
+      if (sql.includes("key = 'geminiCoverMatchEnabled'")) return { value: 'true' };
+      if (sql.includes("key = 'geminiTermsAccepted'")) return { value: 'true' };
+      return { value: '0' };
+    });
+
+    const mockResponse = new Response(JSON.stringify({ candidates: [] }), { status: 200 });
+    const originalFetchMock = jest.fn().mockResolvedValue(mockResponse);
+    globalThis.fetch = originalFetchMock;
+
+    installTaggerHook(ctx);
+
+    const reqInit = {
+      method: 'POST',
+      body: JSON.stringify({ path: '/tmp/test.cbz', upper_threshold: 0.90, lower_threshold: 0.80 })
+    };
+    await globalThis.fetch('http://127.0.0.1:5000/api/tag-file', reqInit);
+
+    expect(originalFetchMock).toHaveBeenCalledTimes(1);
+    const forwardedBody = JSON.parse(originalFetchMock.mock.calls[0][1].body);
+    expect(forwardedBody.lower_threshold).toBe(0.80);
+    expect(forwardedBody.upper_threshold).toBe(1.01);
+
+    fs.existsSync.mockRestore();
+    fs.readFileSync.mockRestore();
+  });
 });

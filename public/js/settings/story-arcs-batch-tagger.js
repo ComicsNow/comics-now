@@ -5,6 +5,7 @@ import {
   state,
   global as canonicalGlobal
 } from '../globals.js';
+import { formatLastSyncTimestamp } from './story-arcs-settings.js';
 
 const global = typeof canonicalGlobal !== 'undefined' ? canonicalGlobal : new Proxy(typeof window !== 'undefined' ? window : globalThis, {
   get: (t, p) => (typeof state !== 'undefined' && p in state) ? state[p] : t[p],
@@ -47,16 +48,21 @@ export async function refreshBatchTagStatus() {
   const progressLabel = document.getElementById('story-arcs-batch-progress-label');
   const startBtn = document.getElementById('start-story-arcs-batch-btn');
   const cancelBtn = document.getElementById('cancel-story-arcs-batch-btn');
+  const lastRunText = document.getElementById('story-arcs-batch-last-run-text');
 
   try {
     const res = await fetch(`${global.API_BASE_URL}/api/v1/story-arcs/batch-tag/status`);
     if (!res.ok) return;
     const data = await res.json();
 
+    if (lastRunText) {
+      lastRunText.textContent = `Last Run: ${formatLastSyncTimestamp(data.lastRunTime)}`;
+    }
+
     if (badge) {
       if (data.isRunning) {
         badge.textContent = `Tagging (${data.progress?.current || 0}/${data.progress?.total || 0})`;
-        badge.className = 'text-xs px-2.5 py-1 rounded-full bg-amber-900/60 text-amber-300 border border-amber-500/50 font-semibold animate-pulse self-start sm:self-center';
+        badge.className = 'text-xs px-2.5 py-1 rounded-full bg-amber-900/60 text-amber-300 border border-amber-500/50 font-semibold animate-pulse';
         if (progressCard) progressCard.classList.remove('hidden');
         if (cancelBtn) cancelBtn.classList.remove('hidden');
         if (startBtn) {
@@ -101,19 +107,47 @@ export function initBatchTaggerListeners() {
   const startBtn = document.getElementById('start-story-arcs-batch-btn');
   const cancelBtn = document.getElementById('cancel-story-arcs-batch-btn');
   const publisherSelect = document.getElementById('story-arcs-batch-publisher-select');
+  const scopeSelect = document.getElementById('story-arcs-batch-scope-select');
+  const sinceDateWrap = document.getElementById('story-arcs-batch-since-date-wrap');
+  const sinceDateInput = document.getElementById('story-arcs-batch-since-date');
+
+  if (scopeSelect) {
+    scopeSelect.addEventListener('change', () => {
+      const val = scopeSelect.value;
+      if (sinceDateWrap) {
+        if (val === 'since_date') sinceDateWrap.classList.remove('hidden');
+        else sinceDateWrap.classList.add('hidden');
+      }
+    });
+  }
 
   if (startBtn) {
     startBtn.addEventListener('click', async () => {
       const engineSelect = document.getElementById('story-arcs-engine-select');
       const engine = engineSelect ? engineSelect.value : 'gemini';
       const publisher = publisherSelect ? publisherSelect.value : 'all';
+      const scope = scopeSelect ? scopeSelect.value : 'all';
+      let sinceTimestamp = null;
+
+      if (scope === 'since_date') {
+        const rawDate = sinceDateInput ? sinceDateInput.value : '';
+        const parsed = rawDate ? new Date(rawDate).getTime() : NaN;
+        if (!rawDate || Number.isNaN(parsed)) {
+          if (typeof global.showSettingsMessage === 'function') {
+            global.showSettingsMessage('Please choose a valid date/time for "Since Date" scope.', 'error');
+          }
+          return;
+        }
+        sinceTimestamp = parsed;
+      }
+
       startBtn.disabled = true;
 
       try {
         const res = await fetch(`${global.API_BASE_URL}/api/v1/story-arcs/batch-tag`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ publisher, dryRun: false, engine })
+          body: JSON.stringify({ publisher, engine, scope, sinceTimestamp })
         });
         const contentType = res.headers.get('content-type') || '';
         if (!contentType.includes('application/json')) {

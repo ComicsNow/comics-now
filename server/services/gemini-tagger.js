@@ -114,11 +114,11 @@ function installTaggerHook(ctx) {
       return originalFetch(input, init);
     }
 
-    // Adjust request to Python so it gathers candidates without auto-writing with pHash
+    // Adjust request to Python so it gathers candidates using its configured lower_threshold
+    // without prematurely auto-writing with pHash
     const pythonReqBody = {
       ...reqBody,
-      upper_threshold: 1.01,
-      lower_threshold: 0.30
+      upper_threshold: 1.01
     };
 
     const newInit = {
