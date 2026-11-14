@@ -42,8 +42,12 @@ function getConfig(ctx) {
   const model = (fileConfig.geminiModel || ctx.config?.geminiModel || process.env.GEMINI_MODEL || 'gemini-3.5-flash-lite').trim();
   const dailyCap = parseInt(process.env.GEMINI_COVER_DAILY_CAP || fileConfig.geminiCoverDailyCap || '450', 10);
   const taggerServiceUrl = fileConfig.taggerServiceUrl || ctx.config?.taggerServiceUrl || 'http://127.0.0.1:5000';
+  const rawThinking = fileConfig.geminiThinkingLevel || ctx.config?.geminiThinkingLevel || process.env.GEMINI_THINKING_LEVEL || 'high';
+  const thinkingLevel = ['minimal', 'low', 'medium', 'high'].includes(String(rawThinking).toLowerCase().trim())
+    ? String(rawThinking).toLowerCase().trim()
+    : 'high';
 
-  return { enabled, apiKey, model, dailyCap, taggerServiceUrl, termsAccepted };
+  return { enabled, apiKey, model, dailyCap, taggerServiceUrl, termsAccepted, thinkingLevel };
 }
 
 async function checkAndIncrementQuota(ctx, dailyCap) {

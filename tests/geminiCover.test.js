@@ -128,6 +128,17 @@ describe('Gemini Vision Cover Arbiter', () => {
       // Maximum thinking level for vision matching
       expect(payload.generationConfig.thinkingConfig).toEqual({ thinkingLevel: 'high' });
     });
+
+    test('accepts custom thinkingLevel parameter in payload', () => {
+      const payload = buildGeminiPayload({
+        localBase64: 'abc123base64',
+        localMime: 'image/jpeg',
+        candidatesWithImages: [],
+        thinkingLevel: 'low'
+      });
+
+      expect(payload.generationConfig.thinkingConfig).toEqual({ thinkingLevel: 'low' });
+    });
   });
 
   describe('matchCoverToCandidates with mocked fetch', () => {

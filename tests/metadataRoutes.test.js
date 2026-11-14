@@ -362,6 +362,31 @@ describe('User Metadata Routes - External Search', () => {
     expect(results[0].issueNumber).toBe('1');
     expect(results[0].name).not.toContain('[nn]');
   });
+
+  it('requires admin role on external metadata & ComicVine search routes while keeping /comics/info user-accessible', () => {
+    const registered = {};
+    const testRouter = {
+      get: jest.fn((p, ...handlers) => { registered[p] = handlers; }),
+      post: jest.fn()
+    };
+    const requireAdmin = jest.fn((req, res, next) => next());
+
+    attachMetadataRoutes(testRouter, { ...deps, requireAdmin });
+
+    for (const adminRoute of [
+      '/api/v1/search/external',
+      '/api/v1/search/comicvine',
+      '/api/v1/comicvine/volume/:volumeId/issues',
+      '/api/v1/comicvine/volume/:id',
+      '/api/v1/comicvine/issue/:id'
+    ]) {
+      expect(registered[adminRoute]).toBeDefined();
+      expect(registered[adminRoute]).toContain(requireAdmin);
+    }
+
+    expect(registered['/api/v1/comics/info']).toBeDefined();
+    expect(registered['/api/v1/comics/info']).not.toContain(requireAdmin);
+  });
 });
 
 

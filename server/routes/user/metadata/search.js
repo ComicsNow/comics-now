@@ -18,6 +18,8 @@ function attachSearchRoutes(router, deps) {
     cvFetchJson,
     COMICVINE_API_URL
   } = deps;
+  const adminGuard = deps?.requireAdminAuth || deps?.requireAdmin;
+  const adminMw = typeof adminGuard === 'function' ? [adminGuard] : [];
 
   router.get('/api/v1/comics/info', async (req, res) => {
     try {
@@ -59,7 +61,7 @@ function attachSearchRoutes(router, deps) {
     }
   });
 
-  router.get('/api/v1/search/comicvine', async (req, res) => {
+  router.get('/api/v1/search/comicvine', ...adminMw, async (req, res) => {
     try {
       const apiKey = getComicVineApiKey();
       if (!apiKey) {

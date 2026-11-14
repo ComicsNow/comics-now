@@ -31,7 +31,8 @@ async function synthesizeMetadataWithGemini({
   existingMeta = {},
   publisherCodex = [],
   apiKey,
-  model = STRICT_MODEL
+  model = STRICT_MODEL,
+  thinkingLevel = 'high'
 }) {
   if (!apiKey) {
     throw new Error('No Gemini API key provided for metadata synthesis');
@@ -42,7 +43,8 @@ async function synthesizeMetadataWithGemini({
     allCandidates,
     filename,
     existingMeta,
-    publisherCodex
+    publisherCodex,
+    thinkingLevel
   });
 
   const activeModel = (model || '').trim() || STRICT_MODEL;

@@ -86,10 +86,19 @@ export async function fetchCtSettings() {
         geminiState.hasApiKey = !!geminiData.hasApiKey;
         geminiState.enabled = geminiData.enabled !== false;
         geminiState.model = geminiData.model || 'gemini-3.5-flash-lite';
+        geminiState.thinkingLevel = geminiData.thinkingLevel || 'high';
 
         const geminiToggle = document.getElementById('ct-gemini-enabled-toggle');
         if (geminiToggle && geminiData.enabled !== undefined) {
           geminiToggle.checked = !!geminiData.enabled;
+        }
+        const thinkingSelect = document.getElementById('ct-gemini-thinking-select');
+        if (thinkingSelect && geminiData.thinkingLevel) {
+          thinkingSelect.value = geminiData.thinkingLevel;
+        }
+        const thinkingStatus = document.getElementById('ct-gemini-thinking-status');
+        if (thinkingStatus && geminiData.thinkingLevel) {
+          thinkingStatus.textContent = geminiData.thinkingLevel.charAt(0).toUpperCase() + geminiData.thinkingLevel.slice(1);
         }
         const geminiKeyInput = document.getElementById('ct-gemini-key-input');
         if (geminiKeyInput) {

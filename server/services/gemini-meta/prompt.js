@@ -6,7 +6,8 @@ function buildMetadataPrompt({
   allCandidates = [],
   filename,
   existingMeta = {},
-  publisherCodex = []
+  publisherCodex = [],
+  thinkingLevel = 'high'
 }) {
   const winner = winningCandidate || allCandidates[0] || {};
   const winnerMeta = winner.metadata || {};
@@ -157,7 +158,7 @@ Return a JSON object adhering exactly to the requested schema.
     generationConfig: {
       responseMimeType: 'application/json',
       thinkingConfig: {
-        thinkingLevel: 'high'
+        thinkingLevel: thinkingLevel || 'high'
       },
       responseSchema: {
         type: 'OBJECT',

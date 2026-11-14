@@ -35,10 +35,6 @@ const COHESIVE_EXEMPTIONS = new Map([
     'Modal cloud deployment single-entrypoint app specification'
   ],
   [
-    'scripts/colab/colab_bulk_guided_view.py',
-    'Standalone Google Colab GPU batch inference script for PaliGemma 2 panel & bubble detection'
-  ],
-  [
     'public/js/viewer/fullscreen/pan.js',
     'Integrated 2D gesture and viewport matrix transformation math'
   ],
@@ -49,10 +45,6 @@ const COHESIVE_EXEMPTIONS = new Map([
   [
     'public/js/viewer/guided/overlay.js',
     'Integrated SVG panel mask and Bézier path renderer'
-  ],
-  [
-    'scripts/colab/colab_speaker_attribution.py',
-    'Standalone Google Colab GPU/TPU notebook script for Gemini speaker attribution'
   ],
   [
     'tagger/tagger_app/core/comicinfo.py',
@@ -200,7 +192,7 @@ describe('Architectural Ratchet & Code Health Invariants', () => {
   });
 
   test('Cohesive architectural exemptions have documented rationales, valid file paths, and source headers', () => {
-    expect(COHESIVE_EXEMPTIONS.size).toBe(9);
+    expect(COHESIVE_EXEMPTIONS.size).toBe(7);
     for (const [relPath, rationale] of COHESIVE_EXEMPTIONS.entries()) {
       expect(typeof rationale).toBe('string');
       expect(rationale.trim().length).toBeGreaterThan(15);

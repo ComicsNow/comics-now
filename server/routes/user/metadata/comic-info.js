@@ -17,6 +17,8 @@ function attachComicInfoRoutes(router, deps) {
     dbAll,
     formatErrorMessage
   } = deps;
+  const adminGuard = deps?.requireAdminAuth || deps?.requireAdmin;
+  const adminMiddlewares = typeof adminGuard === 'function' ? [adminGuard] : [];
 
   if (typeof router.post !== 'function') return;
 
@@ -54,7 +56,7 @@ function attachComicInfoRoutes(router, deps) {
     return { enabled, geminiApiKey, geminiModel, dailyCap };
   }
 
-  router.post('/api/v1/metadata/synthesize', async (req, res) => {
+  router.post('/api/v1/metadata/synthesize', ...adminMiddlewares, async (req, res) => {
     try {
       const { sources, filename, existingMeta } = req.body || {};
 
@@ -183,7 +185,7 @@ function attachComicInfoRoutes(router, deps) {
     }
   });
 
-  router.post('/api/v1/metadata/extract-from-url', async (req, res) => {
+  router.post('/api/v1/metadata/extract-from-url', ...adminMiddlewares, async (req, res) => {
     try {
       const { url, filename, existingMeta } = req.body || {};
 

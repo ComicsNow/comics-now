@@ -35,7 +35,8 @@ async function evaluateWithGemini(ctx, originalFetch, logger, res, reqBody, conf
       localCoverPath,
       candidates,
       apiKey: config.apiKey,
-      model: config.model
+      model: config.model,
+      thinkingLevel: config.thinkingLevel
     });
   } catch (err) {
     if (controller && textEncoder) {
@@ -100,7 +101,8 @@ async function evaluateWithGemini(ctx, originalFetch, logger, res, reqBody, conf
           existingMeta,
           publisherCodex,
           apiKey: config.apiKey,
-          model: config.model
+          model: config.model,
+          thinkingLevel: config.thinkingLevel
         });
 
         if (synthesized && typeof synthesized === 'object') {

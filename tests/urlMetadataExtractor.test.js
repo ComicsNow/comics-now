@@ -34,6 +34,55 @@ describe('URL Metadata Extractor Service & Route (TDD)', () => {
         expect(isSafeWebUrl('http://169.254.169.254:80/computeMetadata/v1/')).toBe(false);
       });
 
+      test('rejects RFC1918 private LAN IPs, alternate loopback, CGNAT, and IPv4-mapped IPv6', () => {
+        expect(isSafeWebUrl('http://192.168.0.110:3000/api/v1/settings')).toBe(false);
+        expect(isSafeWebUrl('http://10.0.0.1/')).toBe(false);
+        expect(isSafeWebUrl('http://10.123.45.67:3200/')).toBe(false);
+        expect(isSafeWebUrl('http://172.16.0.1/')).toBe(false);
+        expect(isSafeWebUrl('http://172.31.255.255/')).toBe(false);
+        expect(isSafeWebUrl('http://127.0.0.2:5000/')).toBe(false);
+        expect(isSafeWebUrl('http://127.1/')).toBe(false);
+        expect(isSafeWebUrl('http://0177.0.0.1/')).toBe(false);
+        expect(isSafeWebUrl('http://[::ffff:127.0.0.1]:5000/')).toBe(false);
+        expect(isSafeWebUrl('http://[::ffff:192.168.0.1]/')).toBe(false);
+        expect(isSafeWebUrl('http://100.64.0.1/')).toBe(false);
+        expect(isSafeWebUrl('http://internal.service.internal/')).toBe(false);
+      });
+
+      test('fetchUrlAsMarkdown rejects direct fallback when DNS resolves to private/loopback IP', async () => {
+        const dns = require('dns').promises;
+        jest.spyOn(dns, 'lookup').mockResolvedValue([{ address: '127.0.0.1', family: 4 }]);
+        const fetchSpy = jest.fn()
+          .mockRejectedValueOnce(new Error('Jina unreachable'));
+        global.fetch = fetchSpy;
+
+        await expect(fetchUrlAsMarkdown('https://rebind.example.com/comic'))
+          .rejects.toThrow(/restricted|private|loopback/i);
+        // Should only have called Jina, never the fallback URL directly
+        expect(fetchSpy).toHaveBeenCalledTimes(1);
+      });
+
+      test('fetchUrlAsMarkdown direct fallback disables automatic redirects', async () => {
+        const dns = require('dns').promises;
+        jest.spyOn(dns, 'lookup').mockResolvedValue([{ address: '93.184.216.34', family: 4 }]);
+        global.fetch = jest.fn()
+          .mockRejectedValueOnce(new Error('Jina unreachable'))
+          .mockResolvedValueOnce({
+            ok: false,
+            status: 302,
+            headers: { get: () => 'http://127.0.0.1:5000/scheduler-info' },
+            text: async () => ''
+          });
+
+        await expect(fetchUrlAsMarkdown('https://example.com/redirect-to-internal'))
+          .rejects.toThrow(/redirect/i);
+        expect(global.fetch).toHaveBeenNthCalledWith(
+          2,
+          'https://example.com/redirect-to-internal',
+          expect.objectContaining({ redirect: 'manual' })
+        );
+      });
+
       test('rejects non-HTTP schemes and invalid URLs', () => {
         expect(isSafeWebUrl('file:///etc/passwd')).toBe(false);
         expect(isSafeWebUrl('ftp://ftp.example.com/dump')).toBe(false);
@@ -435,6 +484,45 @@ describe('URL Metadata Extractor Service & Route (TDD)', () => {
       const extractBtn = form.querySelector('#tag-url-btn');
       expect(extractBtn).not.toBeNull();
       expect(extractBtn.textContent).toContain('Extract & Apply');
+    });
+  });
+
+  describe('Route Authorization (requireAdmin)', () => {
+    test('POST /api/v1/metadata/extract-from-url and /synthesize attach deps.requireAdmin middleware', () => {
+      const postCalls = [];
+      const mockRouter = {
+        get: jest.fn(),
+        post: jest.fn((routePath, ...handlers) => {
+          postCalls.push({ routePath, handlers });
+        })
+      };
+      const requireAdmin = jest.fn((req, res, next) => next());
+
+      attachMetadataRoutes(mockRouter, {
+        dbGet: jest.fn(),
+        dbRun: jest.fn(),
+        dbAll: jest.fn(),
+        log: jest.fn(),
+        formatErrorMessage: (e) => e.message,
+        isPathSafe: () => true,
+        resolvePath: (p) => p,
+        checkComicAccess: () => true,
+        getComicsDirectories: () => [],
+        createId: () => 'id',
+        getComicVineApiKey: () => '',
+        cvFetchJson: jest.fn(),
+        COMICVINE_API_URL: 'https://comicvine.gamespot.com/api',
+        stripHtml: (s) => s,
+        normalizeCvId: (id) => id,
+        requireAdmin
+      });
+
+      const extractRoute = postCalls.find((c) => c.routePath === '/api/v1/metadata/extract-from-url');
+      const synthRoute = postCalls.find((c) => c.routePath === '/api/v1/metadata/synthesize');
+      expect(extractRoute).toBeDefined();
+      expect(synthRoute).toBeDefined();
+      expect(extractRoute.handlers).toContain(requireAdmin);
+      expect(synthRoute.handlers).toContain(requireAdmin);
     });
   });
 });

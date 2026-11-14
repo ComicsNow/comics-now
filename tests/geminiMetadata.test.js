@@ -33,6 +33,16 @@ describe('Gemini Metadata Synthesizer', () => {
     expect(payload.contents[0].parts[0].text).toContain('"Image"');
   });
 
+  test('buildMetadataPrompt respects custom thinkingLevel', () => {
+    const payload = buildMetadataPrompt({
+      winningCandidate: { title: 'Test' },
+      filename: 'test.cbz',
+      thinkingLevel: 'medium'
+    });
+
+    expect(payload.generationConfig.thinkingConfig).toEqual({ thinkingLevel: 'medium' });
+  });
+
   test('synthesizeMetadataWithGemini normalizes volume/title splitting, user publisher codex, and returns dual-cased keys', async () => {
     const originalFetch = global.fetch;
     const mockOutput = {

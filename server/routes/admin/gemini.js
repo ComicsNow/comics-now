@@ -18,7 +18,9 @@ const {
   setGeminiApiKey,
   setGeminiModel,
   setGeminiCoverMatchEnabled,
-  setGeminiCoverDailyCap
+  setGeminiCoverDailyCap,
+  getGeminiThinkingLevel,
+  setGeminiThinkingLevel
 } = require('../../config');
 
 module.exports = function attach(router, deps) {
@@ -76,6 +78,7 @@ module.exports = function attach(router, deps) {
 
       let dbApiKey = '';
       let dbModel = '';
+      let dbThinking = '';
       let dbEnabled = null;
       let dbCap = null;
       if (typeof dbGet === 'function') {
@@ -87,6 +90,10 @@ module.exports = function attach(router, deps) {
           const modelRow = await dbGet("SELECT value FROM settings WHERE key = 'geminiModel'");
           if (modelRow?.value) {
             try { dbModel = JSON.parse(modelRow.value); } catch { dbModel = modelRow.value; }
+          }
+          const thinkingRow = await dbGet("SELECT value FROM settings WHERE key = 'geminiThinkingLevel'");
+          if (thinkingRow?.value) {
+            try { dbThinking = JSON.parse(thinkingRow.value); } catch { dbThinking = thinkingRow.value; }
           }
           const enabledRow = await dbGet("SELECT value FROM settings WHERE key = 'geminiCoverMatchEnabled'");
           if (enabledRow?.value !== undefined) {
@@ -113,6 +120,10 @@ module.exports = function attach(router, deps) {
 
       const isEnabled = dbEnabled !== null ? !!dbEnabled : (cfg.geminiCoverMatchEnabled !== false);
       const activeModel = dbModel || cfg.geminiModel || config.geminiModel || 'gemini-3.5-flash-lite';
+      const rawThinking = dbThinking || cfg.geminiThinkingLevel || config.geminiThinkingLevel || 'high';
+      const activeThinking = ['minimal', 'low', 'medium', 'high'].includes(String(rawThinking).toLowerCase().trim())
+        ? String(rawThinking).toLowerCase().trim()
+        : 'high';
       const dailyCapVal = dbCap ? parseInt(dbCap, 10) : parseInt(cfg.geminiCoverDailyCap || '450', 10);
 
       res.json({
@@ -121,6 +132,7 @@ module.exports = function attach(router, deps) {
         apiKeyPreview: cryptoVault.mask(apiKey),
         termsAccepted: termsAccepted,
         model: activeModel,
+        thinkingLevel: activeThinking,
         dailyCap: dailyCapVal,
         dailyUsed: quotaCount
       });
@@ -132,7 +144,7 @@ module.exports = function attach(router, deps) {
   async function handleGetModels(req, res) {
     try {
       const cfg = await readConfig();
-      const rawKey = req.query.apiKey || cfg.geminiApiKey || config.geminiApiKey || (process.env.NODE_ENV === 'test' ? '' : process.env.GEMINI_API_KEY) || '';
+      const rawKey = req.headers?.['x-gemini-api-key'] || req.query?.apiKey || cfg.geminiApiKey || config.geminiApiKey || (process.env.NODE_ENV === 'test' ? '' : process.env.GEMINI_API_KEY) || '';
       const apiKey = (cryptoVault.decrypt(rawKey) || rawKey || '').trim();
 
       const fallbackModels = [
@@ -159,12 +171,16 @@ module.exports = function attach(router, deps) {
         if (resp.ok) {
           const data = await resp.json();
           const rawModels = Array.isArray(data.models) ? data.models : [];
-          // Filter ONLY models that have Flash-Lite in name or displayName
+          // Filter ONLY models that have Flash-Lite / Flashlite (case-agnostic)
+          // AND exclude any models with Nano or TTS (case-agnostic) in name or displayName
           const flashLiteModels = rawModels.filter(m => {
             const name = (m.name || '').toLowerCase();
             const disp = (m.displayName || '').toLowerCase();
-            return name.includes('flash-lite') || name.includes('flashlite') ||
-                   disp.includes('flash-lite') || disp.includes('flashlite');
+            const isFlashLite = name.includes('flash-lite') || name.includes('flashlite') ||
+                                disp.includes('flash-lite') || disp.includes('flashlite');
+            const hasNanoOrTts = name.includes('nano') || disp.includes('nano') ||
+                                 name.includes('tts') || disp.includes('tts');
+            return isFlashLite && !hasNanoOrTts;
           }).map(m => {
             const cleanId = (m.name || '').replace(/^models\//, '');
             return {
@@ -214,7 +230,8 @@ module.exports = function attach(router, deps) {
         geminiModel,
         geminiCoverMatchEnabled,
         geminiCoverDailyCap,
-        geminiTermsAccepted
+        geminiTermsAccepted,
+        geminiThinkingLevel
       } = req.body || {};
 
       const cfg = await readConfig();
@@ -299,6 +316,21 @@ module.exports = function attach(router, deps) {
           await dbRun("INSERT INTO settings (key, value) VALUES ('geminiCoverDailyCap', ?) ON CONFLICT(key) DO UPDATE SET value = ?", [JSON.stringify(cap), JSON.stringify(cap)]);
         }
       }
+      if (geminiThinkingLevel !== undefined) {
+        const cleanThinking = String(geminiThinkingLevel).toLowerCase().trim();
+        const VALID_THINKING = ['minimal', 'low', 'medium', 'high'];
+        if (!VALID_THINKING.includes(cleanThinking)) {
+          return res.status(400).json({ error: 'geminiThinkingLevel must be one of: minimal, low, medium, high' });
+        }
+        cfg.geminiThinkingLevel = cleanThinking;
+        config.geminiThinkingLevel = cleanThinking;
+        try {
+          setGeminiThinkingLevel(cleanThinking, true);
+        } catch (_) {}
+        if (typeof dbRun === 'function') {
+          await dbRun("INSERT INTO settings (key, value) VALUES ('geminiThinkingLevel', ?) ON CONFLICT(key) DO UPDATE SET value = ?", [JSON.stringify(cleanThinking), JSON.stringify(cleanThinking)]);
+        }
+      }
 
       await fs.promises.writeFile(configPath, JSON.stringify(cfg, null, 2), 'utf8');
       if (typeof saveConfigToDisk === 'function') {
@@ -309,7 +341,8 @@ module.exports = function attach(router, deps) {
         ok: true,
         message: 'Settings saved',
         termsAccepted: !!cfg.geminiTermsAccepted,
-        model: cfg.geminiModel || 'gemini-3.5-flash-lite'
+        model: cfg.geminiModel || 'gemini-3.5-flash-lite',
+        thinkingLevel: cfg.geminiThinkingLevel || 'high'
       });
     } catch (err) {
       res.status(500).json({ error: err.message });

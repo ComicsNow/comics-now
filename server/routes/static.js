@@ -9,6 +9,9 @@ const {
 } = require('../constants');
 const { log } = require('../logger');
 const { isAuthEnabled } = require('../config');
+const { dbGet, dbRun } = require('../db');
+const { checkComicAccess } = require('../access-control');
+const { generateThumbnail } = require('../services/library-pages');
 
 function createStaticRouter({ getConfig, getComicsDirectories, getPublicLibraries }) {
   const router = express.Router();
@@ -127,7 +130,6 @@ function createStaticRouter({ getConfig, getComicsDirectories, getPublicLibrarie
   if (STATIC_DIR !== PUBLIC_DIR) {
     router.use(express.static(PUBLIC_DIR, staticOptions));
   }
-  router.use('/thumbnails', express.static(THUMBNAILS_DIRECTORY, { maxAge: '1y', immutable: true }));
   router.get('/thumbnails/:filename', async (req, res, next) => {
     const rawFilename = req.params.filename;
     const safeFilename = path.basename(rawFilename);
@@ -136,19 +138,36 @@ function createStaticRouter({ getConfig, getComicsDirectories, getPublicLibrarie
     if (!full.startsWith(resolvedDir + path.sep)) {
       return res.status(403).send('Forbidden');
     }
-    if (fs.existsSync(full)) {
-      return res.sendFile(safeFilename, { root: resolvedDir });
-    }
     const id = path.basename(safeFilename, path.extname(safeFilename));
     try {
-      const { dbGet, dbRun } = require('../db');
-      const { generateThumbnail } = require('../services/library-pages');
-      const comic = await dbGet('SELECT id, path FROM comics WHERE id = ? OR thumbnailPath = ?', [id, safeFilename]);
+      const comic = await dbGet(
+        'SELECT id, path, publisher, series FROM comics WHERE id = ? OR thumbnailPath = ?',
+        [id, safeFilename]
+      );
+      if (isAuthEnabled() && comic && req.user && req.user.role !== 'admin') {
+        const hasAccess = await checkComicAccess({
+          userId: req.user.userId,
+          userRole: req.user.role,
+          comicPath: comic.path,
+          publisher: comic.publisher,
+          series: comic.series,
+          rootFolders: getComicsDirectories(),
+          comicId: comic.id
+        });
+        if (!hasAccess) {
+          return res.status(403).send('Forbidden');
+        }
+      }
+      if (fs.existsSync(full)) {
+        res.set('Cache-Control', 'private, max-age=31536000, immutable');
+        return res.sendFile(safeFilename, { root: resolvedDir });
+      }
       if (comic && fs.existsSync(comic.path)) {
         const gen = await generateThumbnail(comic.path);
         const safeGen = gen ? path.basename(gen) : null;
         if (safeGen && fs.existsSync(path.join(resolvedDir, safeGen))) {
           await dbRun('UPDATE comics SET thumbnailPath = ? WHERE id = ?', [safeGen, comic.id]);
+          res.set('Cache-Control', 'private, max-age=31536000, immutable');
           return res.sendFile(safeGen, { root: resolvedDir });
         }
       }

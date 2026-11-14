@@ -189,6 +189,17 @@ function createTaggerConfigAccessors(config, saveConfigToDisk) {
     if (!skipSave) saveConfigToDisk();
   }
 
+  function getGeminiThinkingLevel() {
+    const level = (config.geminiThinkingLevel || '').toLowerCase().trim();
+    return ['minimal', 'low', 'medium', 'high'].includes(level) ? level : 'high';
+  }
+
+  function setGeminiThinkingLevel(level, skipSave = false) {
+    const clean = (level || '').toLowerCase().trim();
+    config.geminiThinkingLevel = ['minimal', 'low', 'medium', 'high'].includes(clean) ? clean : 'high';
+    if (!skipSave) saveConfigToDisk();
+  }
+
   return {
     getComicVineApiKey,
     setComicVineApiKey,
@@ -228,7 +239,9 @@ function createTaggerConfigAccessors(config, saveConfigToDisk) {
     getGeminiCoverDailyCap,
     setGeminiCoverDailyCap,
     getGeminiTermsAccepted,
-    setGeminiTermsAccepted
+    setGeminiTermsAccepted,
+    getGeminiThinkingLevel,
+    setGeminiThinkingLevel
   };
 }
 

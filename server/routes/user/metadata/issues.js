@@ -9,16 +9,11 @@ const { getConfig, getGoogleBooksApiKey, getMetronPassword, getGcdPassword } = r
 const { sanitizeMetadata } = require('../../../services/metadata');
 
 function attachIssuesRoutes(router, deps) {
-  const {
-    formatErrorMessage,
-    getComicVineApiKey,
-    cvFetchJson,
-    COMICVINE_API_URL,
-    stripHtml,
-    normalizeCvId
-  } = deps;
+  const { formatErrorMessage, getComicVineApiKey, cvFetchJson, COMICVINE_API_URL, stripHtml, normalizeCvId } = deps;
+  const adminGuard = deps?.requireAdminAuth || deps?.requireAdmin;
+  const adminMw = typeof adminGuard === 'function' ? [adminGuard] : [];
 
-  router.get('/api/v1/search/external', async (req, res) => {
+  router.get('/api/v1/search/external', ...adminMw, async (req, res) => {
     try {
       const { source = 'all', query = '' } = req.query;
       if (!query) {
@@ -131,7 +126,7 @@ function attachIssuesRoutes(router, deps) {
     }
   });
 
-  router.get('/api/v1/comicvine/volume/:volumeId/issues', async (req, res) => {
+  router.get('/api/v1/comicvine/volume/:volumeId/issues', ...adminMw, async (req, res) => {
     try {
       const apiKey = getComicVineApiKey();
       if (!apiKey) {
@@ -207,7 +202,7 @@ function attachIssuesRoutes(router, deps) {
     }
   });
 
-  router.get('/api/v1/comicvine/volume/:id', async (req, res) => {
+  router.get('/api/v1/comicvine/volume/:id', ...adminMw, async (req, res) => {
     try {
       const apiKey = getComicVineApiKey();
       if (!apiKey) {
@@ -282,7 +277,7 @@ function attachIssuesRoutes(router, deps) {
     }
   });
 
-  router.get('/api/v1/comicvine/issue/:id', async (req, res) => {
+  router.get('/api/v1/comicvine/issue/:id', ...adminMw, async (req, res) => {
     try {
       const apiKey = getComicVineApiKey();
       if (!apiKey) {

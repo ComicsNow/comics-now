@@ -6,6 +6,8 @@
  */
 const http = require('http');
 
+const SAFE_PARAM_RE = /^[a-zA-Z0-9_-]+$/;
+
 function getTaggerBaseUrl(deps) {
   return (deps && typeof deps.getTaggerServiceUrl === 'function' && deps.getTaggerServiceUrl()) ||
          (deps && deps.config && deps.config.taggerServiceUrl) ||
@@ -68,10 +70,13 @@ function attachUserStoryArcsRoutes(router, deps) {
 
   // GET /api/v1/comics/:comicId/continuity
   router.get('/api/v1/comics/:comicId/continuity', async (req, res) => {
+    const comicId = req.params.comicId;
+    if (!comicId || !SAFE_PARAM_RE.test(comicId)) {
+      return res.status(400).json({ ok: false, error: 'Invalid comic ID' });
+    }
     try {
-      const comicId = req.params.comicId;
       const baseUrl = getTaggerBaseUrl(deps);
-      const upstream = await fetch(`${baseUrl}/api/story-arcs/continuity/next/${comicId}`, {
+      const upstream = await fetch(`${baseUrl}/api/story-arcs/continuity/next/${encodeURIComponent(comicId)}`, {
         signal: AbortSignal.timeout(5000)
       });
       const data = await upstream.json();
@@ -87,7 +92,7 @@ function attachUserStoryArcsRoutes(router, deps) {
   });
 
   // GET /api/v1/story-arcs/logs
-  router.get('/api/v1/story-arcs/logs', (req, res) => {
+  router.get('/api/v1/story-arcs/logs', ...syncMiddlewares, (req, res) => {
     return proxyJson(req, res, '/api/story-arcs/logs', 'GET');
   });
 
@@ -97,7 +102,7 @@ function attachUserStoryArcsRoutes(router, deps) {
   });
 
   // GET /api/v1/story-arcs/batch-tag/publishers
-  router.get('/api/v1/story-arcs/batch-tag/publishers', (req, res) => {
+  router.get('/api/v1/story-arcs/batch-tag/publishers', ...syncMiddlewares, (req, res) => {
     return proxyJson(req, res, '/api/story-arcs/batch-tag/publishers', 'GET');
   });
 
@@ -112,12 +117,12 @@ function attachUserStoryArcsRoutes(router, deps) {
   });
 
   // GET /api/v1/story-arcs/batch-tag/status
-  router.get('/api/v1/story-arcs/batch-tag/status', (req, res) => {
+  router.get('/api/v1/story-arcs/batch-tag/status', ...syncMiddlewares, (req, res) => {
     return proxyJson(req, res, '/api/story-arcs/batch-tag/status', 'GET');
   });
 
   // GET /api/v1/story-arcs/batch-tag/results
-  router.get('/api/v1/story-arcs/batch-tag/results', (req, res) => {
+  router.get('/api/v1/story-arcs/batch-tag/results', ...syncMiddlewares, (req, res) => {
     return proxyJson(req, res, '/api/story-arcs/batch-tag/results', 'GET');
   });
 
@@ -197,10 +202,13 @@ function attachUserStoryArcsRoutes(router, deps) {
 
   // GET /api/v1/story-arcs/:arcId
   router.get('/api/v1/story-arcs/:arcId', async (req, res) => {
+    const arcId = req.params.arcId;
+    if (!arcId || !SAFE_PARAM_RE.test(arcId)) {
+      return res.status(400).json({ ok: false, error: 'Invalid story arc ID' });
+    }
     try {
-      const arcId = req.params.arcId;
       const baseUrl = getTaggerBaseUrl(deps);
-      const upstream = await fetch(`${baseUrl}/api/story-arcs/${arcId}`, {
+      const upstream = await fetch(`${baseUrl}/api/story-arcs/${encodeURIComponent(arcId)}`, {
         signal: AbortSignal.timeout(5000)
       });
       const data = await upstream.json();

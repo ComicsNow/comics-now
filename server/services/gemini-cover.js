@@ -146,7 +146,7 @@ async function fetchImageAsBase64(url, timeoutMs = 8000) {
 /**
  * Builds the payload for Gemini generateContent with positive framing and instructions at end.
  */
-function buildGeminiPayload({ localBase64, localMime, candidatesWithImages }) {
+function buildGeminiPayload({ localBase64, localMime, candidatesWithImages, thinkingLevel = 'high' }) {
   const parts = [];
 
   // Positive framing intro
@@ -238,7 +238,7 @@ function buildGeminiPayload({ localBase64, localMime, candidatesWithImages }) {
     generationConfig: {
       responseMimeType: 'application/json',
       thinkingConfig: {
-        thinkingLevel: 'high'
+        thinkingLevel: thinkingLevel || 'high'
       },
       responseSchema: {
         type: 'OBJECT',
@@ -324,7 +324,8 @@ async function matchCoverToCandidates({
   candidates = [],
   apiKey,
   model = 'gemini-3.5-flash-lite',
-  throttleMs = DEFAULT_THROTTLE_MS
+  throttleMs = DEFAULT_THROTTLE_MS,
+  thinkingLevel = 'high'
 }) {
   const effectiveApiKey = (cryptoVault.decrypt(apiKey) || apiKey || '').trim();
   const activeModel = (model || '').trim() || 'gemini-3.5-flash-lite';
@@ -384,7 +385,8 @@ async function matchCoverToCandidates({
   const payload = buildGeminiPayload({
     localBase64,
     localMime,
-    candidatesWithImages
+    candidatesWithImages,
+    thinkingLevel
   });
 
   // 4. Rate-limit throttle spacing (~4s between calls)

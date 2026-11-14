@@ -207,4 +207,49 @@ describe('Story Arcs Sync API Endpoints Integration', () => {
     expect(res.body).toHaveProperty('hasArc');
     expect(Array.isArray(res.body.earlierUnread)).toBe(true);
   });
+
+  it('rejects path traversal sequences in :arcId and :comicId without calling fetch', async () => {
+    global.fetch.mockClear();
+    const arcRes = await executeRequest('GET', '/api/v1/story-arcs/..%2f..%2fbrowse-files%3fpath=%2fetc');
+    expect(arcRes.status).toBe(400);
+    expect(arcRes.body).toHaveProperty('ok', false);
+
+    const contRes = await executeRequest('GET', '/api/v1/comics/..%2f..%2fscheduler-info/continuity');
+    expect(contRes.status).toBe(400);
+    expect(contRes.body).toHaveProperty('ok', false);
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+
+  it('requires admin role on batch-tagger and story-arc logs endpoints', async () => {
+    const restrictedRouter = createApiRouter({
+      log: jest.fn(),
+      dbAll: () => [],
+      dbGet: () => null,
+      dbRun: () => ({ changes: 0 }),
+      requireAuth: (req, res, next) => next(),
+      requireAdmin: (req, res) => res.status(403).json({ error: 'Admin access required' }),
+      isAuthEnabled: () => true,
+      config: {}
+    });
+
+    const checkForbidden = (url) => new Promise((resolve, reject) => {
+      const req = { method: 'GET', url, path: url, query: {}, body: {}, headers: {} };
+      const res = {
+        statusCode: 200,
+        status: jest.fn((c) => { res.statusCode = c; return res; }),
+        json: jest.fn((data) => resolve({ status: res.statusCode, body: data }))
+      };
+      restrictedRouter.handle(req, res, (err) => reject(err || new Error('Unhandled')));
+    });
+
+    for (const endpoint of [
+      '/api/v1/story-arcs/logs',
+      '/api/v1/story-arcs/batch-tag/publishers',
+      '/api/v1/story-arcs/batch-tag/status',
+      '/api/v1/story-arcs/batch-tag/results'
+    ]) {
+      const r = await checkForbidden(endpoint);
+      expect(r.status).toBe(403);
+    }
+  });
 });

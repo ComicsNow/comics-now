@@ -334,4 +334,103 @@ describe('Compliance & Config Endpoints', () => {
       })
     );
   });
+
+  test('GET /api/v1/gemini/config returns thinkingLevel default high', async () => {
+    const handler = getRouteHandler('GET', '/api/v1/gemini/config');
+    const req = {};
+    const res = {
+      json: jest.fn(),
+      status: jest.fn().mockReturnThis(),
+      set: jest.fn()
+    };
+
+    await handler(req, res);
+
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
+      thinkingLevel: 'high'
+    }));
+  });
+
+  test('POST /api/v1/gemini/config saves valid geminiThinkingLevel and rejects invalid', async () => {
+    const handler = getRouteHandler('POST', '/api/v1/gemini/config');
+
+    // Valid: 'low'
+    let res = { status: jest.fn().mockReturnThis(), json: jest.fn() };
+    await handler({ body: { geminiTermsAccepted: true, geminiThinkingLevel: 'low' } }, res);
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
+      ok: true,
+      thinkingLevel: 'low'
+    }));
+    expect(mockDbRun).toHaveBeenCalledWith(
+      expect.stringContaining('geminiThinkingLevel'),
+      expect.arrayContaining([JSON.stringify('low'), JSON.stringify('low')])
+    );
+
+    // Invalid: 'ultra-high'
+    res = { status: jest.fn().mockReturnThis(), json: jest.fn() };
+    await handler({ body: { geminiTermsAccepted: true, geminiThinkingLevel: 'ultra-high' } }, res);
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
+      error: expect.stringContaining('geminiThinkingLevel')
+    }));
+  });
+
+  test('GET /api/v1/gemini/models filters case-agnostically for Flash-Lite and strictly excludes Nano and TTS models', async () => {
+    const originalFetch = global.fetch;
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        models: [
+          { name: 'models/gemini-2.0-flash-lite', displayName: 'Gemini 2.0 Flash-Lite' },
+          { name: 'models/GEMINI-2.5-FLASHLITE', displayName: 'GEMINI 2.5 FLASHLITE' },
+          { name: 'models/gemini-2.0-flash-lite-tts', displayName: 'Gemini 2.0 Flash-Lite TTS' },
+          { name: 'models/gemini-nano-flash-lite', displayName: 'Gemini Nano Flash-Lite' },
+          { name: 'models/gemini-2.5-flash-lite-preview-TTS', displayName: 'Gemini 2.5 Flash-Lite Preview TTS' },
+          { name: 'models/gemini-2.0-flash', displayName: 'Gemini 2.0 Flash' },
+          { name: 'models/gemini-1.5-pro', displayName: 'Gemini 1.5 Pro' }
+        ]
+      })
+    });
+
+    try {
+      const handler = getRouteHandler('GET', '/api/v1/gemini/models');
+      const req = { query: { apiKey: 'AIzaSyLiveTestKey' } };
+      const res = {
+        json: jest.fn(),
+        status: jest.fn().mockReturnThis()
+      };
+
+      await handler(req, res);
+
+      expect(res.json).toHaveBeenCalled();
+      const callData = res.json.mock.calls[0][0];
+      expect(callData.source).toBe('gemini-api');
+
+      // Verify returned IDs
+      const returnedIds = callData.models.map(m => m.id);
+      expect(returnedIds).toContain('gemini-2.0-flash-lite');
+      expect(returnedIds).toContain('GEMINI-2.5-FLASHLITE');
+
+      // Verify Nano and TTS are excluded (case-agnostic)
+      expect(returnedIds.some(id => id.toLowerCase().includes('tts'))).toBe(false);
+      expect(returnedIds.some(id => id.toLowerCase().includes('nano'))).toBe(false);
+      expect(returnedIds.some(id => id === 'gemini-2.0-flash')).toBe(false);
+      expect(returnedIds.some(id => id === 'gemini-1.5-pro')).toBe(false);
+
+      // Verify all models are flash-lite
+      callData.models.forEach(m => {
+        const idLower = m.id.toLowerCase();
+        const dispLower = m.displayName.toLowerCase();
+        const isFlashLite = idLower.includes('flash-lite') || idLower.includes('flashlite') ||
+                            dispLower.includes('flash-lite') || dispLower.includes('flashlite');
+        expect(isFlashLite).toBe(true);
+        expect(idLower.includes('tts')).toBe(false);
+        expect(dispLower.includes('tts')).toBe(false);
+        expect(idLower.includes('nano')).toBe(false);
+        expect(dispLower.includes('nano')).toBe(false);
+      });
+    } finally {
+      global.fetch = originalFetch;
+    }
+  });
 });

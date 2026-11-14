@@ -1,47 +1,50 @@
-# Comics Now! v4.1.0 Release Notes
+# Comics Now! v4.2.0 Release Notes
 
-Welcome to **Comics Now! v4.1.0** — feature release introducing smart panel-aware speech bubble zoom placement with intelligent panel collision avoidance, seamless reading flow preservation, and reverse proxy asset delivery hardening.
+Welcome to **Comics Now! v4.2.0** — feature and security release introducing configurable Gemini AI Thinking Levels, strict Flash-Lite model discovery filtering, comprehensive defense-in-depth origin security hardening (SSRF prevention, sidecar proxy path traversal mitigation, thumbnail IDOR authorization), and configuration storage protections.
 
 ---
 
-## ✨ What's New & Highlights in v4.1.0
+## ✨ What's New & Highlights in v4.2.0
 
-### 1. Smart Panel-Aware Speech Bubble Zoom Placement
-* **Dynamic Panel Collision Avoidance**: Guided view speech bubble zoom now intelligently avoids covering the active comic panel artwork. When inspecting dialogue bubbles in **Western Speech Zoom**, **Manga Speech Zoom**, or **Manga Panel Zoom**, the viewer calculates the containing panel's on-screen geometry and dynamically docks the magnifier callout in clear space:
-  - **Clean Vertical Docking**: Docks cleanly above or below the panel when vertical clearance is available.
-  - **Side-Escape for Tall Panels**: When viewing tall vertical panels spanning most of the page height, the overlay escapes horizontally to the left or right side, keeping the entire panel and its artwork in view.
-  - **Opposite-Corner Fallback for Splash Pages**: On giant full-page splash panels where panel overlap is unavoidable, the overlay positions itself in the corner opposite the bubble (e.g. bubble in top-left → overlay in bottom-right).
-* **Guaranteed Bubble Visibility**: The placement algorithm strictly penalizes bubble overlap to zero, ensuring the magnifier callout never obscures the original speech bubble being read.
-* **Intra-Panel Placement Stability**: Consecutive taps on dialogue bubbles within the same panel maintain positional stability, eliminating erratic jumping across the screen during conversations.
-* **100% Decoupled from Panel Zoom**: Panel zoom rendering remains completely untouched in its own isolated branch, maintaining standard centering, fit scaling, and navigation.
+### 1. Configurable Gemini Thinking Levels & Flash-Lite Model Filtering
+* **Thinking Level Configuration**: Added configurable `geminiThinkingLevel` (`minimal`, `low`, `medium`, `high`) across backend configs, SQLite `settings` table, API endpoints, and the Admin UI. Allows fine-tuning AI reasoning effort for cover matching, metadata synthesis, and tagger operations.
+* **Curated Flash-Lite Model Filtering**: Model discovery (`/api/v1/gemini/models`) now case-insensitively filters Google AI models to Flash-Lite while strictly excluding specialized non-chat variants (Nano and TTS models).
 
-### 2. Reverse Proxy & Tunnel Asset Delivery Hardening
-* **Vite Bundle Asset Delivery**: Whitelisted `/assets/` and `/logos/` in `publicPathPrefixes` in the JWT authentication middleware (`server/middleware/auth.js`). Eliminates `401 Unauthorized` responses on JavaScript/CSS asset bundles when accessing Comics Now! via Cloudflare Tunnels, reverse proxies, and subpath deployments with authentication enabled.
+### 2. Comprehensive Origin Security & Access Control Hardening
+* **SSRF & Private CIDR Mitigation**: Hardened URL metadata extraction (`isSafeWebUrl` and DNS pre-resolution) to reject RFC 1918 private LAN ranges, alternate loopback/CGNAT/link-local ranges, IPv6 ULA/mapped addresses, and `.internal` hostnames. Disabled automated HTTP redirects on direct fallback fetches.
+* **Sidecar Proxy Path Traversal Mitigation**: Added strict character and format validation on `:arcId` and `:comicId` parameters before dispatching upstream proxy requests to the Tag Comics Now service, preventing path traversal attacks.
+* **Access Control & Admin Route Alignment**: Enforced `requireAdmin` authentication across metadata synthesis, URL extraction, batch-tagger status/logs, and external search proxy endpoints.
+* **Thumbnail IDOR & Access Check Hardening**: Removed unguarded static thumbnail exposure and enforced per-user library access verification (`checkComicAccess`) across cached and on-demand thumbnail generation.
+* **Configuration Storage & Key Transport Hardening**: Enforced `0600` file permissions on `config.json` and `comics-now.db` upon creation and save; added support for passing Gemini API keys via `X-Gemini-Api-Key` HTTP header to prevent API key exposure in URL query parameters and proxy logs.
 
 ---
 
 ## ⬆️ Upgrade Notes
-* **No Database Migrations Required**: v4.1.0 is 100% backward-compatible with existing databases and sidecar files.
+* **No Database Migrations Required**: v4.2.0 is 100% backward-compatible with existing databases and sidecar files.
 * **Zero Disruption to User Data**: All user reading lists, reading progress, and custom sort orders remain completely untouched.
-* **Automatic Client Update**: Frontend assets are bundled via Vite (`public/dist/`); browsers will automatically load the new viewer scripts.
+* **Automatic Client Update**: Frontend assets are bundled via Vite (`public/dist/`); browsers will automatically load updated scripts.
 
 ---
 
-## 📦 v4.1.0 Changelog
-1. `feat(viewer)`: smart panel-aware speech bubble zoom placement (`0b82150`)
-2. `fix(auth)`: whitelist Vite /assets/ and /logos/ in JWT auth middleware for proxy and tunnel deployments (`14a26c9`)
+## 📦 v4.2.0 Changelog
+1. `feat(gemini)`: configurable thinking levels and strict Flash-Lite model filtering
+2. `security(api)`: harden URL metadata extraction against SSRF and private network targeting
+3. `security(proxy)`: sanitize route parameters to prevent sidecar path traversal
+4. `security(auth)`: enforce admin guard on metadata synthesis, external search, and batch-tagger endpoints
+5. `security(thumbnails)`: enforce per-user library access checks on thumbnail generation and serving
+6. `security(config)`: restrict configuration and database file permissions to 0600
 
 ---
 
 ## 🧪 Verification & Test Results
-- **Full Jest suite**: `197 suites passed, 1520 tests passed (100% pass rate)`.
-- **Dedicated TDD placement test suite**: `tests/guidedBubblePlacement.test.js` (14/14 tests passed).
-- **Interactive zoom integration**: `tests/guidedInteractiveZoom.test.js` and `tests/guidedZoomOverlay.test.js` verified (100% pass rate).
+- **Full Jest suite**: `197 suites passed, 1533 tests passed (100% pass rate)`.
+- **Architectural invariants**: `tests/architectureRatchet.test.js` verified (100% pass rate).
+- **Security & route integration suites**: `tests/urlMetadataExtractor.test.js`, `tests/storyArcsSyncRoute.test.js`, `tests/metadataRoutes.test.js`, `tests/server/routes/static.test.js` verified.
 - **Production build**: Tailwind CSS v4 and Vite client bundle compiled cleanly.
 
 ---
 
-# Previous Release: Comics Now! v4.0.0
+# Previous Release: Comics Now! v4.1.0
 
 ### Story Arcs, Narrative Timelines & Continuity Management
 - **Dedicated Story Arcs Smart Filter**: New `⚡ Story Arcs` filter pill in publisher view with Gold/Amber trade dress (`#F59E0B` / `#EF4444`) and real-time library completeness metrics.

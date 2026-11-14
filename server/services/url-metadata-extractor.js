@@ -6,13 +6,63 @@
  * ComicInfo metadata via Gemini 3.5 Flash-Lite.
  */
 
+const dns = require('dns').promises;
+const net = require('net');
 const { isTitleSameAsSeries } = require('./metadata');
 
 const DEFAULT_MODEL = 'gemini-3.5-flash-lite';
 
+function isPrivateOrReservedIPv4(ip) {
+  const parts = ip.split('.').map(Number);
+  if (parts.length !== 4 || parts.some(n => !Number.isInteger(n) || n < 0 || n > 255)) {
+    return true;
+  }
+  const [a, b] = parts;
+  if (a === 0) return true; // 0.0.0.0/8
+  if (a === 10) return true; // 10.0.0.0/8
+  if (a === 100 && b >= 64 && b <= 127) return true; // 100.64.0.0/10 CGNAT
+  if (a === 127) return true; // 127.0.0.0/8 loopback
+  if (a === 169 && b === 254) return true; // 169.254.0.0/16 link-local / cloud metadata
+  if (a === 172 && b >= 16 && b <= 31) return true; // 172.16.0.0/12
+  if (a === 192 && b === 168) return true; // 192.168.0.0/16
+  if (a >= 224) return true; // multicast & reserved
+  return false;
+}
+
+function isPrivateOrReservedIP(rawIp) {
+  if (!rawIp || typeof rawIp !== 'string') return true;
+  const ip = rawIp.replace(/^\[|\]$/g, '').split('%')[0].toLowerCase();
+  const version = net.isIP(ip);
+  if (version === 4) {
+    return isPrivateOrReservedIPv4(ip);
+  }
+  if (version === 6) {
+    if (ip === '::' || ip === '::1') return true;
+    if (ip.startsWith('fe80:') || ip.startsWith('fc') || ip.startsWith('fd')) return true;
+    if (ip.startsWith('::ffff:')) {
+      const mapped = ip.slice('::ffff:'.length);
+      if (net.isIPv4(mapped)) {
+        return isPrivateOrReservedIPv4(mapped);
+      }
+      const hexParts = mapped.split(':');
+      if (hexParts.length === 2) {
+        const hi = parseInt(hexParts[0], 16);
+        const lo = parseInt(hexParts[1], 16);
+        if (!Number.isNaN(hi) && !Number.isNaN(lo)) {
+          const v4 = `${(hi >> 8) & 0xff}.${hi & 0xff}.${(lo >> 8) & 0xff}.${lo & 0xff}`;
+          return isPrivateOrReservedIPv4(v4);
+        }
+      }
+      return true;
+    }
+    return false;
+  }
+  return false;
+}
+
 /**
- * Validates that candidate web URL does not target loopback or cloud metadata services.
- * Rejects SSRF vectors such as 127.0.0.1, localhost, 169.254.x.x, non-HTTP schemes.
+ * Validates that candidate web URL does not target loopback, private LAN, or cloud metadata services.
+ * Rejects SSRF vectors such as 127.0.0.0/8, 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 169.254.0.0/16, non-HTTP schemes.
  */
 function isSafeWebUrl(url) {
   if (!url || typeof url !== 'string') return false;
@@ -23,24 +73,44 @@ function isSafeWebUrl(url) {
     }
     const hostname = (parsed.hostname || '').toLowerCase();
     if (!hostname) return false;
+    const bareHost = hostname.replace(/^\[|\]$/g, '');
     if (
-      hostname === '127.0.0.1' ||
-      hostname === 'localhost' ||
-      hostname === '::1' ||
-      hostname === '[::1]' ||
-      hostname === '0.0.0.0' ||
-      hostname.endsWith('.localhost') ||
-      hostname.endsWith('.local')
+      bareHost === 'localhost' ||
+      bareHost.endsWith('.localhost') ||
+      bareHost.endsWith('.local') ||
+      bareHost.endsWith('.internal')
     ) {
       return false;
     }
-    // Reject link-local cloud metadata (AWS/GCP/Azure link-local: 169.254.0.0/16)
-    if (hostname.startsWith('169.254.') || hostname.startsWith('fe80:')) {
+    if (net.isIP(bareHost) !== 0 && isPrivateOrReservedIP(bareHost)) {
       return false;
     }
     return true;
   } catch {
     return false;
+  }
+}
+
+async function assertSafeResolvedHost(url) {
+  if (!isSafeWebUrl(url)) {
+    throw new Error(`Invalid or restricted URL target: ${url}`);
+  }
+  const parsed = new URL(url.trim());
+  const bareHost = (parsed.hostname || '').toLowerCase().replace(/^\[|\]$/g, '');
+  if (net.isIP(bareHost) !== 0) {
+    if (isPrivateOrReservedIP(bareHost)) {
+      throw new Error(`Restricted private or loopback IP target: ${bareHost}`);
+    }
+    return;
+  }
+  const records = await dns.lookup(bareHost, { all: true });
+  if (!Array.isArray(records) || records.length === 0) {
+    throw new Error(`Could not resolve host: ${bareHost}`);
+  }
+  for (const record of records) {
+    if (isPrivateOrReservedIP(record.address)) {
+      throw new Error(`Restricted private or loopback resolved IP (${record.address}) for ${bareHost}`);
+    }
   }
 }
 
@@ -81,9 +151,17 @@ async function fetchUrlAsMarkdown(url, options = {}) {
     console.warn(`[UrlMetadataExtractor] Jina fetch failed for ${url}: ${err.message}. Attempting direct fallback...`);
   }
 
-  // Fallback: Direct fetch with basic HTML stripping
+  // Fallback: Direct fetch with DNS rebinding check, disabled redirects, and HTML stripping
+  await assertSafeResolvedHost(url);
+
   try {
-    const fallbackRes = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' } });
+    const fallbackRes = await fetch(url, {
+      headers: { 'User-Agent': 'Mozilla/5.0' },
+      redirect: 'manual'
+    });
+    if (fallbackRes.status >= 300 && fallbackRes.status < 400) {
+      throw new Error(`Redirect responses (${fallbackRes.status}) are not permitted during direct fallback`);
+    }
     const html = await fallbackRes.text();
     return html
       .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
@@ -171,7 +249,8 @@ async function extractMetadataFromUrl({
   existingMeta = {},
   publisherCodex = [],
   apiKey,
-  model = DEFAULT_MODEL
+  model = DEFAULT_MODEL,
+  thinkingLevel = 'high'
 }) {
   if (!url) {
     throw new Error('URL is required for metadata extraction.');
@@ -202,7 +281,7 @@ async function extractMetadataFromUrl({
       generationConfig: {
         responseMimeType: 'application/json',
         thinkingConfig: {
-          thinkingLevel: 'high'
+          thinkingLevel: thinkingLevel || 'high'
         },
         temperature: 0.1
       }

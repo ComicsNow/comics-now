@@ -87,6 +87,21 @@ function installTaggerHook(ctx) {
       } catch (_) {}
     }
 
+    if (ctx.db && typeof ctx.db.dbGet === 'function') {
+      try {
+        const thinkingRow = await ctx.db.dbGet("SELECT value FROM settings WHERE key = 'geminiThinkingLevel'");
+        if (thinkingRow?.value) {
+          let rawThinking = thinkingRow.value;
+          try { rawThinking = JSON.parse(rawThinking); } catch { rawThinking = thinkingRow.value; }
+          const clean = String(rawThinking).toLowerCase().trim();
+          if (['minimal', 'low', 'medium', 'high'].includes(clean)) {
+            config.thinkingLevel = clean;
+            if (ctx.config) ctx.config.geminiThinkingLevel = clean;
+          }
+        }
+      } catch (_) {}
+    }
+
     // If Gemini is disabled, has no API key, or terms have not been accepted, pass through completely unaltered
     if (!config.enabled || !config.apiKey || !config.termsAccepted) {
       return originalFetch(input, init);

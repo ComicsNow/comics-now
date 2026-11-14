@@ -47,6 +47,7 @@ const DEFAULT_CONFIG = {
   geminiCoverMatchEnabled: true,
   geminiCoverDailyCap: 450,
   geminiTermsAccepted: false,
+  geminiThinkingLevel: 'high',
   readingOrdersIntervalDays: 7,
   readingOrdersMode: 'both'
 };
@@ -61,7 +62,7 @@ function ensureConfigFileExists() {
   }
   if (!fs.existsSync(CONFIG_FILE)) {
     const initialConfig = { ...DEFAULT_CONFIG, libraries: [{ path: '/comics', hierarchyMode: 'metadata' }] };
-    fs.writeFileSync(CONFIG_FILE, JSON.stringify(initialConfig, null, 2));
+    fs.writeFileSync(CONFIG_FILE, JSON.stringify(initialConfig, null, 2), { mode: 0o600 });
     log('INFO', 'SERVER', `Created default config at ${CONFIG_FILE}`);
   }
 }
@@ -80,7 +81,8 @@ function saveConfigToDisk() {
     } catch (_) {}
     const { comicsDirectories, ...safeConfig } = config;
     const merged = { ...diskConfig, ...safeConfig };
-    fs.writeFileSync(CONFIG_FILE, JSON.stringify(merged, null, 2));
+    fs.writeFileSync(CONFIG_FILE, JSON.stringify(merged, null, 2), { mode: 0o600 });
+    try { fs.chmodSync(CONFIG_FILE, 0o600); } catch (_) {}
     log('INFO', 'SERVER', `Saved config to ${CONFIG_FILE}`);
     return true;
   } catch (e) {

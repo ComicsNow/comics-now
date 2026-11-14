@@ -16,7 +16,8 @@ export const geminiState = {
   termsAccepted: false,
   hasApiKey: false,
   enabled: false,
-  model: 'gemini-3.5-flash-lite'
+  model: 'gemini-3.5-flash-lite',
+  thinkingLevel: 'high'
 };
 if (typeof window !== 'undefined') {
   window._geminiState = geminiState;
@@ -146,11 +147,14 @@ export function initGeminiComplianceModal() {
       const selectedModel = modelSelect ? modelSelect.value : 'gemini-3.5-flash-lite';
       const capInput = document.getElementById('ct-gemini-daily-cap');
       const dailyCap = capInput ? parseInt(capInput.value, 10) : 450;
+      const thinkingSelect = document.getElementById('ct-gemini-thinking-select');
+      const selectedThinking = thinkingSelect ? thinkingSelect.value : 'high';
 
       const payload = {
         geminiCoverMatchEnabled: true,
         geminiTermsAccepted: true,
         geminiModel: selectedModel,
+        geminiThinkingLevel: selectedThinking,
         geminiCoverDailyCap: dailyCap
       };
       if (keyVal) payload.geminiApiKey = keyVal;
@@ -167,6 +171,7 @@ export function initGeminiComplianceModal() {
         geminiState.hasApiKey = true;
         geminiState.enabled = true;
         geminiState.model = selectedModel;
+        geminiState.thinkingLevel = selectedThinking;
 
         const ctKeyInput = document.getElementById('ct-gemini-key-input');
         const ctEnabledToggle = document.getElementById('ct-gemini-enabled-toggle');
@@ -247,6 +252,18 @@ export function initGeminiComplianceModal() {
     });
   }
 
+  // Thinking level live status update
+  const ctThinkingSelect = document.getElementById('ct-gemini-thinking-select');
+  if (ctThinkingSelect && !ctThinkingSelect.dataset.bound) {
+    ctThinkingSelect.dataset.bound = 'true';
+    ctThinkingSelect.addEventListener('change', function() {
+      const statusSpan = document.getElementById('ct-gemini-thinking-status');
+      if (statusSpan && ctThinkingSelect.value) {
+        statusSpan.textContent = ctThinkingSelect.value.charAt(0).toUpperCase() + ctThinkingSelect.value.slice(1);
+      }
+    });
+  }
+
   // Dedicated Save Gemini Settings Button
   const geminiSaveBtn = document.getElementById('ct-gemini-save-btn');
   if (geminiSaveBtn && !geminiSaveBtn.dataset.bound) {
@@ -258,6 +275,8 @@ export function initGeminiComplianceModal() {
       const selectedModel = modelSelect ? modelSelect.value : 'gemini-3.5-flash-lite';
       const capInput = document.getElementById('ct-gemini-daily-cap');
       const dailyCap = capInput ? parseInt(capInput.value, 10) : 450;
+      const thinkingSelect = document.getElementById('ct-gemini-thinking-select');
+      const selectedThinking = thinkingSelect ? thinkingSelect.value : 'high';
       const state = geminiState;
 
       if (!state.termsAccepted && isEnabled && (keyVal || state.hasApiKey)) {
@@ -273,6 +292,7 @@ export function initGeminiComplianceModal() {
           geminiCoverMatchEnabled: isEnabled,
           geminiTermsAccepted: isEnabled ? true : !!state.termsAccepted,
           geminiModel: selectedModel,
+          geminiThinkingLevel: selectedThinking,
           geminiCoverDailyCap: dailyCap
         };
         if (keyVal) payload.geminiApiKey = keyVal;
@@ -289,6 +309,11 @@ export function initGeminiComplianceModal() {
           if (keyVal) state.hasApiKey = true;
           state.enabled = isEnabled;
           state.model = selectedModel;
+          state.thinkingLevel = selectedThinking;
+          const thinkingStatus = document.getElementById('ct-gemini-thinking-status');
+          if (thinkingStatus) {
+            thinkingStatus.textContent = selectedThinking.charAt(0).toUpperCase() + selectedThinking.slice(1);
+          }
 
           geminiSaveBtn.textContent = '✓ Saved';
           if (keyVal && ctKeyInput) {

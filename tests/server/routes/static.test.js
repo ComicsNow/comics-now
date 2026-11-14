@@ -41,6 +41,19 @@ jest.mock('../../../server/config', () => ({
   isAuthEnabled: jest.fn(() => true)
 }));
 
+jest.mock('../../../server/db', () => ({
+  dbGet: jest.fn(),
+  dbRun: jest.fn()
+}));
+
+jest.mock('../../../server/access-control', () => ({
+  checkComicAccess: jest.fn(() => true)
+}));
+
+jest.mock('../../../server/services/library-pages', () => ({
+  generateThumbnail: jest.fn()
+}));
+
 // We'll need to clear module cache for static.js to ensure mocks are applied
 const { createStaticRouter } = require('../../../server/routes/static');
 
@@ -193,6 +206,41 @@ describe('Static Router', () => {
 
         expect(res.set).toHaveBeenCalledWith('Cache-Control', 'public, max-age=86400');
         expect(res.sendFile).toHaveBeenCalledWith(path.join('/mock/icons', 'icon-192x192.png'));
+      });
+    });
+
+    describe('/thumbnails/:filename', () => {
+      it('does not mount unguarded express.static on /thumbnails and enforces checkComicAccess', async () => {
+        const { dbGet } = require('../../../server/db');
+        const { checkComicAccess } = require('../../../server/access-control');
+
+        const thumbUseCall = router.use.mock.calls.find(call => call[0] === '/thumbnails');
+        expect(thumbUseCall).toBeUndefined();
+
+        const handler = router.get.mock.calls.find(call => call[0] === '/thumbnails/:filename')[1];
+        expect(handler).toBeDefined();
+
+        fs.existsSync.mockReturnValue(true);
+        dbGet.mockResolvedValue({
+          id: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+          path: '/comics/Restricted/Issue1.cbz',
+          publisher: 'DC Comics',
+          series: 'Restricted'
+        });
+        checkComicAccess.mockResolvedValue(false);
+
+        req.params = { filename: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.jpg' };
+        req.user = { userId: 'restricted-user', role: 'user' };
+
+        await handler(req, res, next);
+
+        expect(checkComicAccess).toHaveBeenCalledWith(expect.objectContaining({
+          userId: 'restricted-user',
+          userRole: 'user',
+          comicId: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
+        }));
+        expect(res.status).toHaveBeenCalledWith(403);
+        expect(res.sendFile).not.toHaveBeenCalled();
       });
     });
   });
