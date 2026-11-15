@@ -298,5 +298,16 @@ describe('Static Router', () => {
       expect(sentHtml).toContain('\\u0026');
       expect(sentHtml).toContain('&quot;&gt;&lt;script&gt;');
     });
+
+    it('returns 404 for missing static assets instead of HTML SPA fallback', async () => {
+      const wildcardHandler = router.get.mock.calls.find(call => call[0] === '*')[1];
+      req.path = '/assets/missing-chunk.js';
+      req.url = '/assets/missing-chunk.js';
+
+      await wildcardHandler(req, res);
+
+      expect(res.status).toHaveBeenCalledWith(404);
+      expect(res.send).toHaveBeenCalledWith('Not Found');
+    });
   });
 });

@@ -108,13 +108,26 @@ class AppRouter {
           params[name] = match[index + 1];
         });
         
+        const navToken = (this._activeNavigationToken = (this._activeNavigationToken || 0) + 1);
+        const clearNavigatingFlag = () => {
+          if (this._activeNavigationToken === navToken) {
+            global._isNavigatingFromRouter = false;
+            if (typeof window !== 'undefined') window._isNavigatingFromRouter = false;
+          }
+        };
         global._isNavigatingFromRouter = true;
         if (typeof window !== 'undefined') window._isNavigatingFromRouter = true;
+        let callbackResult;
         try {
-          route.callback(params, url.searchParams);
-        } finally {
-          global._isNavigatingFromRouter = false;
-          if (typeof window !== 'undefined') window._isNavigatingFromRouter = false;
+          callbackResult = route.callback(params, url.searchParams);
+        } catch (err) {
+          clearNavigatingFlag();
+          throw err;
+        }
+        if (callbackResult && typeof callbackResult.then === 'function') {
+          Promise.resolve(callbackResult).then(clearNavigatingFlag, clearNavigatingFlag);
+        } else {
+          clearNavigatingFlag();
         }
         return;
       }

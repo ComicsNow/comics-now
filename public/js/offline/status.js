@@ -1,11 +1,15 @@
 import { state } from '../globals.js';
 import {
   PROGRESS_SYNC_DEBOUNCE_MS,
+  OFFLINE_SYNC_DIRTY_KEY,
   scheduleOfflineProgressSync,
   syncOfflineProgress,
   updateLibraryProgress,
   findComicInLibraryById,
-  enhancedBackgroundSync
+  enhancedBackgroundSync,
+  hasPendingOfflineSync,
+  markOfflineSyncDirty,
+  cancelOfflineSyncRetry
 } from './status/progress-sync.js';
 import {
   saveStatusToDB,
@@ -17,11 +21,15 @@ import {
 
 export {
   PROGRESS_SYNC_DEBOUNCE_MS,
+  OFFLINE_SYNC_DIRTY_KEY,
   scheduleOfflineProgressSync,
   syncOfflineProgress,
   updateLibraryProgress,
   findComicInLibraryById,
   enhancedBackgroundSync,
+  hasPendingOfflineSync,
+  markOfflineSyncDirty,
+  cancelOfflineSyncRetry,
   saveStatusToDB,
   updateOfflineReadStatus,
   updateOfflineSeriesStatus,
@@ -29,17 +37,49 @@ export {
   syncOfflineStatuses
 };
 
+const PROBE_BACKOFF_MS = [5000, 10000, 20000, 30000];
 let lastKnownOnlineState = typeof navigator !== 'undefined' ? navigator.onLine !== false : true;
 let activeProbePromise = null;
+let probeTimerId = null;
+let probeAttempt = 0;
 
 export function setLastKnownOnlineState(val) {
   lastKnownOnlineState = Boolean(val);
 }
 
+export function stopConnectivityProbe() {
+  if (probeTimerId && typeof clearTimeout === 'function') {
+    clearTimeout(probeTimerId);
+    probeTimerId = null;
+  }
+  probeAttempt = 0;
+}
+
 export function isAppOnline() {
+  if (lastKnownOnlineState === false) return false;
   if (lastKnownOnlineState === true) return true;
   if (typeof navigator !== 'undefined' && navigator.onLine) return true;
   return false;
+}
+
+export function scheduleConnectivityProbe() {
+  if (probeTimerId) return;
+  if (isAppOnline()) return;
+  if (typeof document !== 'undefined' && document.hidden) return;
+  if (typeof setTimeout !== 'function') return;
+
+  const delay = PROBE_BACKOFF_MS[Math.min(probeAttempt, PROBE_BACKOFF_MS.length - 1)];
+  probeAttempt = Math.min(probeAttempt + 1, PROBE_BACKOFF_MS.length - 1);
+  probeTimerId = setTimeout(() => {
+    probeTimerId = null;
+    checkServerConnectivity().catch(() => {});
+  }, delay);
+}
+
+export function markAppOffline() {
+  lastKnownOnlineState = false;
+  updateOfflineIndicator();
+  scheduleConnectivityProbe();
 }
 
 export async function checkServerConnectivity({ timeout = 3000, force = false } = {}) {
@@ -61,6 +101,7 @@ export async function checkServerConnectivity({ timeout = 3000, force = false } 
       if (res && (res.ok || res.status === 200)) {
         const wasOffline = lastKnownOnlineState === false;
         lastKnownOnlineState = true;
+        stopConnectivityProbe();
         updateOfflineIndicator();
         if (wasOffline && typeof window !== 'undefined' && typeof window.dispatchEvent === 'function') {
           window.dispatchEvent(new Event('online'));
@@ -74,10 +115,9 @@ export async function checkServerConnectivity({ timeout = 3000, force = false } 
       activeProbePromise = null;
     }
 
-    if (typeof navigator !== 'undefined' && navigator.onLine === false) {
-      lastKnownOnlineState = false;
-      updateOfflineIndicator();
-    }
+    lastKnownOnlineState = false;
+    updateOfflineIndicator();
+    scheduleConnectivityProbe();
     return false;
   })();
 
@@ -126,8 +166,15 @@ export const OfflineStatus = {
   updateOfflineIndicator,
   mergeOfflineStatusesIntoLibrary: (...args) => (typeof mergeOfflineStatusesIntoLibrary === 'function' ? mergeOfflineStatusesIntoLibrary(...args) : undefined),
   enhancedBackgroundSync: (...args) => (typeof enhancedBackgroundSync === 'function' ? enhancedBackgroundSync(...args) : undefined),
+  hasPendingOfflineSync: (...args) => (typeof hasPendingOfflineSync === 'function' ? hasPendingOfflineSync(...args) : false),
+  markOfflineSyncDirty: (...args) => (typeof markOfflineSyncDirty === 'function' ? markOfflineSyncDirty(...args) : undefined),
+  cancelOfflineSyncRetry: (...args) => (typeof cancelOfflineSyncRetry === 'function' ? cancelOfflineSyncRetry(...args) : undefined),
+  OFFLINE_SYNC_DIRTY_KEY: typeof OFFLINE_SYNC_DIRTY_KEY !== 'undefined' ? OFFLINE_SYNC_DIRTY_KEY : 'comicsNow_offlineSyncDirty',
   saveStatusToDB: (...args) => (typeof saveStatusToDB === 'function' ? saveStatusToDB(...args) : undefined),
   setLastKnownOnlineState,
+  markAppOffline,
+  scheduleConnectivityProbe,
+  stopConnectivityProbe,
   isAppOnline,
   checkServerConnectivity
 };

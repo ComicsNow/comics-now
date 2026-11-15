@@ -87,8 +87,11 @@ export async function deleteOfflineComic(comicId) {
   }
 
   return new Promise((resolve, reject) => {
-    const tx = activeDb.transaction(['comics', 'progress', 'statuses'], 'readwrite');
+    const hasMeta = activeDb.objectStoreNames?.contains('comicMeta');
+    const storeNames = hasMeta ? ['comics', 'comicMeta', 'progress', 'statuses'] : ['comics', 'progress', 'statuses'];
+    const tx = activeDb.transaction(storeNames, 'readwrite');
     const comicsStore = tx.objectStore('comics');
+    const metaStore = hasMeta ? tx.objectStore('comicMeta') : null;
     const progressStore = tx.objectStore('progress');
     const statusStore = tx.objectStore('statuses');
 
@@ -164,6 +167,14 @@ export async function deleteOfflineComic(comicId) {
         try { comicsStore.delete(idNum); } catch (_) { console.warn('[OFFLINE] Failed to delete idNum:', idNum, _); }
       }
       try { comicsStore.delete(idStr); } catch (_) { console.warn('[OFFLINE] Failed to delete idStr:', idStr, _); }
+
+      if (metaStore) {
+        try { metaStore.delete(originalId); } catch (_) {}
+        if (idNum !== null) {
+          try { metaStore.delete(idNum); } catch (_) {}
+        }
+        try { metaStore.delete(idStr); } catch (_) {}
+      }
 
       try { markProgressUnsynced(originalId); } catch (_) { console.warn('[OFFLINE] Failed to markProgressUnsynced originalId:', originalId, _); }
       try { markProgressUnsynced(idStr); } catch (_) { console.warn('[OFFLINE] Failed to markProgressUnsynced idStr:', idStr, _); }
@@ -249,51 +260,69 @@ export async function clearOfflineData() {
   const currentUserId = typeof getUserIdFn === 'function' ? getUserIdFn() : 'default-user';
 
   return new Promise((resolve, reject) => {
-    const tx = activeDb.transaction(['comics', 'progress', 'statuses'], 'readwrite');
+    const hasMeta = activeDb.objectStoreNames?.contains('comicMeta');
+    const storeNames = hasMeta ? ['comics', 'comicMeta', 'progress', 'statuses'] : ['comics', 'progress', 'statuses'];
+    const tx = activeDb.transaction(storeNames, 'readwrite');
     const comicsStore = tx.objectStore('comics');
+    const metaStore = hasMeta ? tx.objectStore('comicMeta') : null;
     const progressStore = tx.objectStore('progress');
     const statusStore = tx.objectStore('statuses');
 
-    const getAllRequest = comicsStore.getAll();
-    getAllRequest.onsuccess = async () => {
-      const allComics = getAllRequest.result || [];
-      const userComics = allComics.filter(comic => !comic.userId || comic.userId === currentUserId);
+    let clearedCount = 0;
 
+    const finalizeStores = () => {
       if (typeof debugLog === 'function') {
-        debugLog('OFFLINE', `Clearing ${userComics.length} comics for user ${currentUserId}`);
+        debugLog('OFFLINE', `Clearing ${clearedCount} comics for user ${currentUserId}`);
       }
-
-      userComics.forEach(comic => {
-        comicsStore.delete(comic.id);
-      });
-
       progressStore.clear();
       statusStore.clear();
+    };
 
-      if (typeof window !== 'undefined' && 'caches' in window) {
+    if (typeof comicsStore.openCursor === 'function') {
+      const cursorReq = comicsStore.openCursor();
+      cursorReq.onsuccess = (event) => {
+        const cursor = event.target.result;
+        if (!cursor) {
+          finalizeStores();
+          return;
+        }
+        const record = cursor.value;
+        if (!record?.userId || record.userId === currentUserId) {
+          comicsStore.delete(cursor.key);
+          if (metaStore) {
+            try { metaStore.delete(cursor.key); } catch (_) {}
+          }
+          clearedCount++;
+        }
+        cursor.continue();
+      };
+      cursorReq.onerror = (event) => {
+        reject(new Error(`Failed to clear comics: ${event.target.errorCode}`));
+      };
+    } else {
+      comicsStore.clear();
+      if (metaStore) metaStore.clear();
+      finalizeStores();
+    }
+
+    tx.oncomplete = async () => {
+      if (typeof caches !== 'undefined') {
         try {
           await caches.delete('comics-now-downloads');
         } catch (e) {
           console.error('[OFFLINE] Error clearing downloads cache:', e);
         }
       }
-
-      tx.oncomplete = () => {
-        if (state?.downloadedComicIds) {
-          state.downloadedComicIds.clear();
-        }
-        if (typeof window !== 'undefined' && window.downloadedComicIds) {
-          window.downloadedComicIds.clear();
-        }
-        resolve();
-      };
-
-      tx.onerror = (event) => reject(new Error(`Failed to clear data: ${event.target.errorCode}`));
+      if (state?.downloadedComicIds) {
+        state.downloadedComicIds.clear();
+      }
+      if (typeof window !== 'undefined' && window.downloadedComicIds) {
+        window.downloadedComicIds.clear();
+      }
+      resolve();
     };
 
-    getAllRequest.onerror = (event) => {
-      reject(new Error(`Failed to get comics: ${event.target.errorCode}`));
-    };
+    tx.onerror = (event) => reject(new Error(`Failed to clear data: ${event.target.errorCode}`));
   });
 }
 

@@ -1,5 +1,6 @@
 import { state, debugLog, applyDisplayInfoToComic } from '../../globals.js';
 import { openOfflineDB, getCurrentUserId } from '../db-core.js';
+import { getAllDownloadedComicIdsFromMeta } from './comic-meta.js';
 
 export function isIdInLibrary(targetId) {
   const currentLibrary = state?.library || (typeof window !== 'undefined' ? window.library : null);
@@ -120,6 +121,17 @@ export async function getAllDownloadedComics() {
   const getUserIdFn = typeof getCurrentUserId === 'function' ? getCurrentUserId : (state?.getCurrentUserId || (typeof window !== 'undefined' ? window.getCurrentUserId : null));
   const currentUserId = typeof getUserIdFn === 'function' ? getUserIdFn() : 'default-user';
 
+  if (typeof getAllDownloadedComicIdsFromMeta === 'function' && activeDb.objectStoreNames?.contains('comicMeta')) {
+    const metaIds = await getAllDownloadedComicIdsFromMeta();
+    if (metaIds) {
+      if (state) state.downloadedComicIds = metaIds;
+      if (typeof window !== 'undefined') {
+        window.downloadedComicIds = metaIds;
+      }
+      return metaIds;
+    }
+  }
+
   return new Promise((resolve, reject) => {
     const tx = activeDb.transaction(['comics', 'progress'], 'readonly');
     const comicsStore = tx.objectStore('comics');
@@ -214,6 +226,17 @@ export async function getAllDownloadedComicIds() {
 
   const getUserIdFn = typeof getCurrentUserId === 'function' ? getCurrentUserId : (state?.getCurrentUserId || (typeof window !== 'undefined' ? window.getCurrentUserId : null));
   const currentUserId = typeof getUserIdFn === 'function' ? getUserIdFn() : 'default-user';
+
+  if (typeof getAllDownloadedComicIdsFromMeta === 'function' && activeDb.objectStoreNames?.contains('comicMeta')) {
+    const metaIds = await getAllDownloadedComicIdsFromMeta();
+    if (metaIds) {
+      if (state) state.downloadedComicIds = metaIds;
+      if (typeof window !== 'undefined') {
+        window.downloadedComicIds = metaIds;
+      }
+      return metaIds;
+    }
+  }
 
   return new Promise((resolve, reject) => {
     try {

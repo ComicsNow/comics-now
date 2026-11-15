@@ -23,17 +23,30 @@ export async function saveComicToDB(comic, blob) {
   const getUserIdFn = typeof getCurrentUserId === 'function' ? getCurrentUserId : (state?.getCurrentUserId || (typeof window !== 'undefined' ? window.getCurrentUserId : null));
   const userId = typeof getUserIdFn === 'function' ? getUserIdFn() : 'default-user';
 
+  const downloadedAt = Date.now();
   const comicData = {
     id: comic.id,
     userId: userId,
     comicInfo: comic,
-    fileBlob: blob
+    fileBlob: blob,
+    downloadedAt
   };
 
   return new Promise((resolve, reject) => {
-    const tx = activeDb.transaction(['comics'], 'readwrite');
+    const hasMeta = activeDb.objectStoreNames?.contains('comicMeta');
+    const storeNames = hasMeta ? ['comics', 'comicMeta'] : ['comics'];
+    const tx = activeDb.transaction(storeNames, 'readwrite');
     const store = tx.objectStore('comics');
     const request = store.put(comicData);
+    if (hasMeta) {
+      tx.objectStore('comicMeta').put({
+        id: comic.id,
+        userId,
+        comicInfo: comic,
+        fileSize: blob?.size || 0,
+        downloadedAt
+      });
+    }
     request.onsuccess = () => resolve();
     request.onerror = (event) => reject(new Error(`Failed to save comic: ${event.target.errorCode}`));
   });
@@ -60,7 +73,9 @@ export async function updateDownloadedComicInfo(comicId, updates) {
 
   return new Promise((resolve, reject) => {
     try {
-      const tx = activeDb.transaction(['comics'], 'readwrite');
+      const hasMeta = activeDb.objectStoreNames?.contains('comicMeta');
+      const storeNames = hasMeta ? ['comics', 'comicMeta'] : ['comics'];
+      const tx = activeDb.transaction(storeNames, 'readwrite');
       const store = tx.objectStore('comics');
       const getRequest = store.get(comicId);
 
@@ -87,6 +102,15 @@ export async function updateDownloadedComicInfo(comicId, updates) {
         Object.assign(comic.comicInfo, updates);
 
         const putRequest = store.put(comic);
+        if (hasMeta) {
+          tx.objectStore('comicMeta').put({
+            id: comic.id,
+            userId: comic.userId || currentUserId,
+            comicInfo: comic.comicInfo,
+            fileSize: comic.fileSize ?? comic.fileBlob?.size ?? 0,
+            downloadedAt: comic.downloadedAt || Date.now()
+          });
+        }
 
         putRequest.onsuccess = () => {
           if (typeof debugLog === 'function') {

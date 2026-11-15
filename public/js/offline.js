@@ -24,53 +24,86 @@ async function initializeOfflineFeatures() {
   }
 
   if (typeof window !== 'undefined') {
+    const syncIfDirtyAndOnline = async () => {
+      const online = typeof OfflineStatus.isAppOnline === 'function'
+        ? OfflineStatus.isAppOnline()
+        : navigator.onLine !== false;
+      if (!online) return;
+      const dirty = typeof OfflineStatus.hasPendingOfflineSync === 'function'
+        ? await OfflineStatus.hasPendingOfflineSync()
+        : true;
+      if (dirty) {
+        OfflineStatus.enhancedBackgroundSync().catch(() => {});
+      }
+    };
+
     global.addEventListener('online', () => {
+      OfflineStatus.setLastKnownOnlineState?.(true);
+      OfflineStatus.stopConnectivityProbe?.();
       OfflineStatus.updateOfflineIndicator();
-      OfflineStatus.scheduleOfflineProgressSync(true);
-      OfflineStatus.syncOfflineStatuses().catch(error => {
-        
-      });
+      syncIfDirtyAndOnline();
 
       if (typeof global.fetchLibraryFromServer === 'function') {
-        global.fetchLibraryFromServer().catch(error => {
-          
-        });
+        global.fetchLibraryFromServer().catch(() => {});
       }
     });
 
     global.addEventListener('offline', () => {
+      OfflineStatus.markAppOffline?.();
       OfflineStatus.updateOfflineIndicator();
-      // On mobile network handover, verify if connectivity is actually lost
       if (typeof OfflineStatus.checkServerConnectivity === 'function') {
         OfflineStatus.checkServerConnectivity().catch(() => {});
       }
     });
 
-    // Proactively probe and self-heal connectivity when the user unlocks or resumes the PWA
+    const handleResume = () => {
+      if (typeof document !== 'undefined' && document.hidden) return;
+      if (typeof OfflineStatus.isAppOnline === 'function' && !OfflineStatus.isAppOnline()) {
+        OfflineStatus.checkServerConnectivity?.().catch(() => {});
+      } else {
+        syncIfDirtyAndOnline();
+      }
+    };
+
+    const handlePause = () => {
+      OfflineStatus.stopConnectivityProbe?.();
+      OfflineStatus.cancelOfflineSyncRetry?.();
+    };
+
     if (typeof document !== 'undefined') {
       document.addEventListener('visibilitychange', () => {
-        if (!document.hidden && typeof OfflineStatus.checkServerConnectivity === 'function') {
-          OfflineStatus.checkServerConnectivity().catch(() => {});
+        if (document.hidden) {
+          handlePause();
+        } else {
+          handleResume();
         }
       });
+      document.addEventListener('freeze', handlePause);
+      document.addEventListener('resume', handleResume);
     }
 
-    global.addEventListener('focus', () => {
-      if (typeof OfflineStatus.checkServerConnectivity === 'function') {
-        OfflineStatus.checkServerConnectivity().catch(() => {});
+    global.addEventListener('focus', handleResume);
+    global.addEventListener('pagehide', handlePause);
+    global.addEventListener('pageshow', (event) => {
+      if (event?.persisted) {
+        handleResume();
       }
     });
 
-    // Note: Since DOMContentLoaded might have already fired, we check document.readyState
+    global.addEventListener('storage', (event) => {
+      const dirtyKey = OfflineStatus.OFFLINE_SYNC_DIRTY_KEY || 'comicsNow_offlineSyncDirty';
+      if (event?.key === dirtyKey && event?.newValue === '1') {
+        syncIfDirtyAndOnline();
+      }
+    });
+
     const onDOMReady = () => {
       OfflineStatus.updateOfflineIndicator();
-      setInterval(() => {
-        OfflineStatus.updateOfflineIndicator();
-        // If the app is flagged as offline, probe server connectivity to break the Android Doze deadlock
-        if (typeof OfflineStatus.isAppOnline === 'function' && !OfflineStatus.isAppOnline()) {
-          OfflineStatus.checkServerConnectivity().catch(() => {});
-        }
-      }, 5000);
+      if (typeof OfflineStatus.isAppOnline === 'function' && !OfflineStatus.isAppOnline()) {
+        OfflineStatus.scheduleConnectivityProbe?.();
+      } else {
+        syncIfDirtyAndOnline();
+      }
     };
 
     if (document.readyState === 'loading') {
@@ -78,17 +111,6 @@ async function initializeOfflineFeatures() {
     } else {
       onDOMReady();
     }
-
-    setInterval(() => {
-      const isOnline = typeof OfflineStatus.isAppOnline === 'function'
-        ? OfflineStatus.isAppOnline()
-        : navigator.onLine !== false;
-      if (isOnline) {
-        OfflineStatus.enhancedBackgroundSync().catch(error => {
-          
-        });
-      }
-    }, 2 * 60 * 1000);
   }
 }
 

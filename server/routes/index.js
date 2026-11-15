@@ -34,6 +34,7 @@ const attachUserDevicesRoutes = require('./user/devices');
 const attachUserReadingListsRoutes = require('./user/reading-lists');
 const attachUserReadingRoutes = require('./user/reading');
 const attachUserProgressRoutes = require('./user/progress');
+const attachUserSyncStreamRoutes = require('./user/sync-stream');
 const attachUserLibraryRoutes = require('./user/library');
 const attachUserPagesRoutes = require('./user/pages');
 const attachUserMetadataRoutes = require('./user/metadata');
@@ -130,6 +131,7 @@ function setupUserRoutes(router, extendedDeps, requireUserAuth) {
   attachUserReadingListsRoutes(userRouter, extendedDeps);
   attachUserReadingRoutes(userRouter, extendedDeps);
   attachUserProgressRoutes(userRouter, extendedDeps);
+  attachUserSyncStreamRoutes(userRouter, extendedDeps);
   attachUserLibraryRoutes(userRouter, extendedDeps);
   attachUserPagesRoutes(userRouter, extendedDeps);
   attachUserMetadataRoutes(userRouter, extendedDeps);

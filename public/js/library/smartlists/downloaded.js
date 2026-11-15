@@ -104,12 +104,16 @@ export function syncDownloadedComicStatusFromLibrary(comic, normalizedStatus) {
 export async function rebuildDownloadedComics(options = {}) {
   const { skipRender = false, forceRender = false } = options || {};
 
-  const getAllDownloadedComics = state?.getAllDownloadedComics ||
+  const getDownloadedMeta = state?.getAllDownloadedComicMetadata ||
+    (typeof window !== 'undefined' ? window.getAllDownloadedComicMetadata : null) ||
+    state?.OfflineDB?.getAllDownloadedComicMetadata ||
+    (typeof window !== 'undefined' ? window.OfflineDB?.getAllDownloadedComicMetadata : null) ||
+    state?.getAllDownloadedComics ||
     (typeof window !== 'undefined' ? window.getAllDownloadedComics : null) ||
     state?.OfflineDB?.getAllDownloadedComics ||
     (typeof window !== 'undefined' ? window.OfflineDB?.getAllDownloadedComics : null);
 
-  if (typeof getAllDownloadedComics !== 'function') {
+  if (typeof getDownloadedMeta !== 'function') {
     downloadedSmartListComics = [];
     downloadedSmartListError = new Error('Offline downloads unavailable');
     triggerDownloadedButtonCount();
@@ -122,7 +126,7 @@ export async function rebuildDownloadedComics(options = {}) {
   }
 
   try {
-    const offlineRecords = await getAllDownloadedComics();
+    const offlineRecords = await getDownloadedMeta();
     const normalizedEntries = (Array.isArray(offlineRecords) ? offlineRecords : [])
       .map(record => {
         if (!record) return null;

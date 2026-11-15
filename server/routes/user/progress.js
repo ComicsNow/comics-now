@@ -1,4 +1,5 @@
 const path = require('path');
+const { notifySyncUpdate } = require('../../services/sync-stream');
 
 /**
  * User Progress Routes
@@ -128,7 +129,7 @@ module.exports = function attach(router, deps) {
       const userId = req.user?.userId || 'default-user';
 
       // Ownership check: Ensure deviceId belongs to userId
-      const device = await dbGet(`SELECT userId FROM devices WHERE deviceId = ?`, [deviceId]);
+      const device = await dbGet(`SELECT userId, deviceName FROM devices WHERE deviceId = ?`, [deviceId]);
       if (device && device.userId !== userId) {
         log('WARN', 'SYNC', `User ${userId} attempted to update device ${deviceId} owned by ${device.userId}`);
         return res.status(403).json({ ok: false, message: 'Unauthorized device' });
@@ -168,6 +169,15 @@ module.exports = function attach(router, deps) {
             totalPages = excluded.totalPages,
             updatedAt = excluded.updatedAt
         `, [userId, comicId, pageValidation.sanitized, totalPages, now]);
+
+        notifySyncUpdate(userId, deviceId, {
+          comicId,
+          lastReadPage: pageValidation.sanitized,
+          totalPages,
+          lastSyncTimestamp: now,
+          lastSyncDeviceId: deviceId,
+          lastSyncDeviceName: device?.deviceName || 'Another Device'
+        });
 
         log('INFO', 'SYNC', `Progress updated for comic ${comicId} by device ${deviceId} for user ${userId} (page ${pageValidation.sanitized})`);
       }

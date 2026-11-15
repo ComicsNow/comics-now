@@ -202,6 +202,19 @@ export async function downloadComicItem(manager, queueItem) {
     console.error('[DOWNLOAD MANAGER] Guided view fetch failed:', gvErr);
   }
 
+  if (comic.thumbnail && typeof window !== 'undefined' && 'caches' in window) {
+    try {
+      const thumbUrl = comic.thumbnail.startsWith('http') || comic.thumbnail.startsWith('/')
+        ? comic.thumbnail
+        : `${apiBaseUrl}/${comic.thumbnail.replace(/^\/+/, '')}`;
+      const thumbRes = await fetch(thumbUrl, { credentials: 'include' });
+      if (thumbRes.ok) {
+        const cache = await caches.open('comics-now-downloads');
+        await cache.put(thumbUrl, thumbRes);
+      }
+    } catch (_) {}
+  }
+
   await manager.saveComic(comic, blob);
   manager.partialData.delete(comic.id);
   manager.abortController = null;

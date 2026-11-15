@@ -2,6 +2,7 @@ import { state, debugLog } from '../globals.js';
 
 export const LIBRARY_CACHE_STORE = 'library';
 export const LIBRARY_CACHE_KEY = 'library-cache';
+let openDbPromise = null;
 
 // Helper function to get current userId synchronously
 export function getCurrentUserId() {
@@ -38,21 +39,28 @@ export async function openOfflineDB() {
     return activeDb;
   }
 
-  return new Promise((resolve, reject) => {
+  if (openDbPromise) {
+    return openDbPromise;
+  }
+
+  openDbPromise = new Promise((resolve, reject) => {
     debugLog('PROGRESS', 'Opening IndexedDB connection...');
-    const request = indexedDB.open('comics-now-offline', 13);
+    const request = indexedDB.open('comics-now-offline', 14);
 
     request.onerror = (event) => {
+      openDbPromise = null;
       reject(new Error(`Error opening IndexedDB: ${event.target.error}`));
     };
 
     request.onblocked = (event) => {
+      openDbPromise = null;
       console.warn('[IndexedDB] Database upgrade blocked by another connection. Please close other tabs.');
       reject(new Error('IndexedDB blocked by other connections'));
     };
 
     request.onsuccess = (event) => {
       const database = event.target.result;
+      openDbPromise = null;
       
       // Close database connection if an upgrade is requested by another tab/Service Worker
       database.onversionchange = () => {
@@ -60,6 +68,7 @@ export async function openOfflineDB() {
         console.log('[IndexedDB] Database connection closed due to version change request.');
         state.db = null;
         window.db = null;
+        openDbPromise = null;
       };
 
       state.db = database;
@@ -148,9 +157,18 @@ export async function openOfflineDB() {
         database.createObjectStore('deviceComics', { keyPath: 'id' });
       }
 
+      // Create lightweight comicMeta store (zero-blob metadata reads)
+      if (!database.objectStoreNames.contains('comicMeta')) {
+        debugLog('PROGRESS', "Creating 'comicMeta' object store with userId index");
+        const metaStore = database.createObjectStore('comicMeta', { keyPath: 'id' });
+        metaStore.createIndex('userId', 'userId', { unique: false });
+      }
+
       debugLog('PROGRESS', 'IndexedDB upgrade completed');
     };
   });
+
+  return openDbPromise;
 }
 
 export function formatBytes(bytes) {

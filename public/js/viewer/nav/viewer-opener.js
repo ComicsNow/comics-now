@@ -314,7 +314,12 @@ async function openComicViewer(comic, options = {}) {
   
   global.currentPageIndex = Math.max(0, Math.min(savedProgress, pages.length - 1));
 
-  if (typeof window !== 'undefined' && window.syncManager) {
+  const hasOfflinePages = Array.isArray(offlinePages) && offlinePages.length > 0;
+  const appOnline = typeof global.isAppOnline === 'function'
+    ? global.isAppOnline()
+    : (typeof navigator === 'undefined' || navigator.onLine !== false);
+
+  if (appOnline && !hasOfflinePages && typeof window !== 'undefined' && window.syncManager) {
     try {
       await window.syncManager.checkSyncStatus(comic.id, global.currentPageIndex);
     } catch (error) {}
@@ -324,17 +329,24 @@ async function openComicViewer(comic, options = {}) {
   global.preloadPages?.(global.currentPageIndex, pages);
 
   if (typeof global.refreshGuidedToggle === 'function') {
-    try { await global.refreshGuidedToggle(); } catch (_) {}
+    const togglePromise = Promise.resolve().then(() => global.refreshGuidedToggle()).catch(() => {});
+    if (appOnline && !hasOfflinePages) {
+      await togglePromise;
+    }
   }
 
   if (global.viewerContent) {
     global.viewerContent.scrollTop = 0;
   }
 
-  if (typeof global.loadComicSummary === 'function') {
-    try {
-      await global.loadComicSummary();
-    } catch (error) {}
+  if (appOnline && typeof global.loadComicSummary === 'function') {
+    if (hasOfflinePages) {
+      Promise.resolve().then(() => global.loadComicSummary()).catch(() => {});
+    } else {
+      try {
+        await global.loadComicSummary();
+      } catch (error) {}
+    }
   }
 
   if (!isLocal && typeof window !== 'undefined' && window.syncManager) {

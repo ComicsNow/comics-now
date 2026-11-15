@@ -7,6 +7,10 @@ import {
   getOfflineComicRecordById
 } from './db/comic-reader.js';
 import {
+  getAllDownloadedComicMetadata,
+  getOfflineComicMetaById
+} from './db/comic-meta.js';
+import {
   saveComicToDB,
   updateDownloadedComicInfo
 } from './db/comic-writer.js';
@@ -31,6 +35,8 @@ export {
   getStorageInfo,
   forceStorageCleanup,
   getOfflineComicRecordById,
+  getAllDownloadedComicMetadata,
+  getOfflineComicMetaById,
   updateDownloadedComicInfo,
   isIdInLibrary
 };
@@ -47,6 +53,8 @@ if (typeof state !== 'undefined') {
   state.getStorageInfo = getStorageInfo;
   state.forceStorageCleanup = forceStorageCleanup;
   state.getOfflineComicRecordById = getOfflineComicRecordById;
+  state.getAllDownloadedComicMetadata = getAllDownloadedComicMetadata;
+  state.getOfflineComicMetaById = getOfflineComicMetaById;
   state.updateDownloadedComicInfo = updateDownloadedComicInfo;
   state.isIdInLibrary = isIdInLibrary;
 }
@@ -63,6 +71,8 @@ if (typeof window !== 'undefined') {
   window.getStorageInfo = getStorageInfo;
   window.forceStorageCleanup = forceStorageCleanup;
   window.getOfflineComicRecordById = getOfflineComicRecordById;
+  window.getAllDownloadedComicMetadata = getAllDownloadedComicMetadata;
+  window.getOfflineComicMetaById = getOfflineComicMetaById;
   window.updateDownloadedComicInfo = updateDownloadedComicInfo;
   window.isIdInLibrary = isIdInLibrary;
 }

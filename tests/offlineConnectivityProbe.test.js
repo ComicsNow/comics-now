@@ -117,4 +117,23 @@ describe('PWA Offline False-Positive Resilience & Connectivity Probe', () => {
     expect(isOffline).toBe(false);
     expect(document.body.classList.contains('is-offline')).toBe(false);
   });
+
+  test('markAppOffline forces isAppOnline() to false even when navigator.onLine is true until probe succeeds', async () => {
+    const env = setupEnvironment(true); // navigator.onLine === true
+    expect(env.sandbox.isAppOnline()).toBe(true);
+
+    env.sandbox.markAppOffline();
+    expect(env.sandbox.isAppOnline()).toBe(false);
+    expect(document.body.classList.contains('is-offline')).toBe(true);
+
+    env.sandbox.fetch.mockResolvedValueOnce({ ok: true, status: 200 });
+    const recovered = await env.sandbox.checkServerConnectivity();
+    expect(recovered).toBe(true);
+    expect(env.sandbox.isAppOnline()).toBe(true);
+  });
+
+  test('offline.js does not register permanent 5s or 2m setInterval loops', () => {
+    const offlineCode = fs.readFileSync(path.resolve(__dirname, '../public/js/offline.js'), 'utf8');
+    expect(offlineCode).not.toMatch(/setInterval\s*\(/);
+  });
 });

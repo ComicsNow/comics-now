@@ -28,6 +28,8 @@ import {
   getStorageInfo,
   forceStorageCleanup,
   getOfflineComicRecordById,
+  getAllDownloadedComicMetadata,
+  getOfflineComicMetaById,
   updateDownloadedComicInfo
 } from './db-comics.js';
 import {
@@ -67,6 +69,8 @@ export const OfflineDB = {
   getStorageInfo,
   forceStorageCleanup,
   getOfflineComicRecordById,
+  getAllDownloadedComicMetadata,
+  getOfflineComicMetaById,
   updateDownloadedComicInfo,
   saveQueueItemToDB,
   getQueueFromDB,

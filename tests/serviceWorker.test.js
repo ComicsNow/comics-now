@@ -145,10 +145,88 @@ describe('public/service-worker.js', () => {
       'downloadQueue',
       'settings',
       'deviceLibraries',
-      'deviceComics'
+      'deviceComics',
+      'comicMeta'
     ];
     for (const storeName of expectedStores) {
       expect(existingStoreNames.has(storeName)).toBe(true);
     }
+  });
+
+  test('bypasses fetch interception for /api/v1/sync/stream and text/event-stream', () => {
+    const { listeners } = loadServiceWorkerSandbox();
+    const fetchListener = listeners.get('fetch');
+
+    let respondCalled = false;
+    fetchListener({
+      request: {
+        method: 'GET',
+        url: 'http://localhost:3000/api/v1/sync/stream?deviceId=dev-1',
+        mode: 'cors',
+        headers: { get: (k) => (k.toLowerCase() === 'accept' ? 'text/event-stream' : '') }
+      },
+      respondWith: () => { respondCalled = true; }
+    });
+    expect(respondCalled).toBe(false);
+  });
+
+  test('navigate falls back to cached index.html on 502 Bad Gateway', async () => {
+    const cachedShell = { ok: true, status: 200, cachedShell: true };
+    const { listeners, cacheMap } = loadServiceWorkerSandbox({
+      fetch: jest.fn(async () => ({
+        ok: false,
+        status: 502,
+        type: 'basic',
+        headers: { get: () => 'text/html' },
+        clone: () => ({ ok: false, status: 502 })
+      }))
+    });
+    cacheMap.set('http://localhost:3000/index.html', cachedShell);
+
+    const fetchListener = listeners.get('fetch');
+    let respondedPromise;
+    fetchListener({
+      request: {
+        method: 'GET',
+        mode: 'navigate',
+        url: 'http://localhost:3000/comic/123/page/4',
+        headers: { get: (k) => (k.toLowerCase() === 'accept' ? 'text/html' : '') }
+      },
+      respondWith: (p) => { respondedPromise = p; }
+    });
+
+    const result = await respondedPromise;
+    expect(result).toBe(cachedShell);
+  });
+
+  test('js/css fetch rejects HTML poisoning and falls back to cached asset on 502', async () => {
+    const cachedJs = { ok: true, status: 200, cachedAsset: true };
+    const { listeners, cacheMap, mockCache } = loadServiceWorkerSandbox({
+      fetch: jest.fn(async () => ({
+        ok: true,
+        status: 200,
+        type: 'basic',
+        headers: { get: (k) => (k.toLowerCase() === 'content-type' ? 'text/html; charset=utf-8' : '') },
+        clone: () => ({ ok: true, status: 200 })
+      }))
+    });
+    const assetUrl = 'http://localhost:3000/assets/index-abc.js';
+    cacheMap.set(assetUrl, cachedJs);
+
+    const fetchListener = listeners.get('fetch');
+    let respondedPromise;
+    fetchListener({
+      request: {
+        method: 'GET',
+        mode: 'cors',
+        url: assetUrl,
+        headers: { get: () => '' }
+      },
+      respondWith: (p) => { respondedPromise = p; }
+    });
+
+    const result = await respondedPromise;
+    expect(result).toBe(cachedJs);
+    expect(mockCache.put).not.toHaveBeenCalled();
   });
 });

@@ -21,7 +21,8 @@ async function callGetSeriesComics(rootFolder, publisher, series) {
 }
 
 // Save progress to IndexedDB (for downloaded comics)
-export async function saveProgressToDB(comicId, currentPage, totalPages, comicPath) {
+export async function saveProgressToDB(comicId, currentPage, totalPages, comicPath, options = {}) {
+  const { synced = false, skipSync = false } = options || {};
   const activeDb = state?.db || (typeof window !== 'undefined' ? window.db : null);
   if (!activeDb) {
     if (typeof debugLog === 'function') debugLog('PROGRESS', 'IndexedDB not initialized, opening connection...');
@@ -40,7 +41,7 @@ export async function saveProgressToDB(comicId, currentPage, totalPages, comicPa
     id: comicId,
     lastReadPage: normalizedPage,
     page: normalizedPage,
-    synced: false,
+    synced: Boolean(synced),
     updatedAt: new Date().toISOString()
   };
 
@@ -56,9 +57,11 @@ export async function saveProgressToDB(comicId, currentPage, totalPages, comicPa
 
   return new Promise((resolve, reject) => {
     try {
-      const transaction = dbToUse.transaction(['progress', 'comics'], 'readwrite');
+      const hasMeta = dbToUse.objectStoreNames?.contains?.('comicMeta');
+      const targetStoreName = hasMeta ? 'comicMeta' : 'comics';
+      const transaction = dbToUse.transaction(['progress', targetStoreName], 'readwrite');
       const progressStore = transaction.objectStore('progress');
-      const comicsStore = transaction.objectStore('comics');
+      const targetStore = transaction.objectStore(targetStoreName);
 
       const keysToUpdate = [];
       if (comicId !== undefined && comicId !== null) {
@@ -82,7 +85,7 @@ export async function saveProgressToDB(comicId, currentPage, totalPages, comicPa
 
         let request;
         try {
-          request = comicsStore.get(keysToUpdate[index]);
+          request = targetStore.get(keysToUpdate[index]);
         } catch (error) {
           updateNextComicRecord(index + 1);
           return;
@@ -102,7 +105,7 @@ export async function saveProgressToDB(comicId, currentPage, totalPages, comicPa
               comicData.comicInfo.path = comicPath;
             }
             try {
-              comicsStore.put(comicData);
+              targetStore.put(comicData);
             } catch (error) {
               // Ignore inner errors
             }
@@ -120,7 +123,18 @@ export async function saveProgressToDB(comicId, currentPage, totalPages, comicPa
 
       transaction.oncomplete = () => {
         if (typeof debugLog === 'function') debugLog('PROGRESS', `Successfully saved progress to IndexedDB for comic ${comicId}`);
-        callScheduleOfflineProgressSync(true);
+        if (!synced) {
+          try {
+            if (typeof state?.OfflineStatus?.markOfflineSyncDirty === 'function') {
+              state.OfflineStatus.markOfflineSyncDirty();
+            } else if (typeof localStorage !== 'undefined') {
+              localStorage.setItem('comicsNow_offlineSyncDirty', '1');
+            }
+          } catch {}
+        }
+        if (!skipSync && !synced) {
+          callScheduleOfflineProgressSync(true);
+        }
         resolve();
       };
 

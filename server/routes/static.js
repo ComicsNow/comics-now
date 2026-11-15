@@ -197,7 +197,16 @@ function createStaticRouter({ getConfig, getComicsDirectories, getPublicLibrarie
   router.use('/icons', express.static(ICONS_DIRECTORY, { maxAge: '1y', immutable: true }));
   router.use('/logos', express.static(LOGOS_DIRECTORY, { maxAge: '1y', immutable: true }));
 
-  router.get('*', sendAppShell);
+  router.get('*', (req, res) => {
+    const reqPath = req.path || req.url || '';
+    if (
+      reqPath.startsWith('/assets/') ||
+      /\.(js|css|map|wasm|png|ico|svg|json|woff2?|ttf)$/i.test(reqPath)
+    ) {
+      return res.status(404).send('Not Found');
+    }
+    return sendAppShell(req, res);
+  });
 
   return router;
 }

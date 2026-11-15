@@ -64,7 +64,8 @@ export async function fetchWithProgress(url, onProgress) {
 
 export async function refreshDownloadsInfo() {
   const db = state.OfflineDB || window.OfflineDB || {};
-  if (!db.getAllDownloadedComics) {
+  const readDownloaded = db.getAllDownloadedComicMetadata || db.getAllDownloadedComics;
+  if (!readDownloaded) {
     console.warn('[DOWNLOADS INFO] OfflineDB not ready');
     return;
   }
@@ -75,7 +76,7 @@ export async function refreshDownloadsInfo() {
   downloadsInfoDiv.textContent = 'Calculating...';
   let downloadedComics = [];
   try {
-    downloadedComics = await db.getAllDownloadedComics();
+    downloadedComics = await readDownloaded();
   } catch (err) {
     console.error('[DOWNLOADS INFO] Failed to calculate downloads:', err);
     renderContent(downloadsInfoDiv, safeHtml`<div class="text-red-400 text-sm">Error calculating downloads. Please refresh.</div>`);
@@ -90,7 +91,7 @@ export async function refreshDownloadsInfo() {
   const applyDisplayInfoToComic = state.applyDisplayInfoToComic || window.applyDisplayInfoToComic;
 
   downloadedComics.forEach(comic => {
-    totalSize += comic.fileBlob?.size || 0;
+    totalSize += comic.fileSize ?? comic.fileBlob?.size ?? 0;
     const comicInfo = comic.comicInfo || {};
     const info = typeof applyDisplayInfoToComic === 'function' ? applyDisplayInfoToComic(comicInfo) : comicInfo;
     const displayName = info.displayTitle || comicInfo.name || 'Unknown Comic';

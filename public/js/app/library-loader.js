@@ -88,7 +88,19 @@ export async function loadLibraryOfflineFirst() {
     const hasLibraryData = Boolean(cachedLibrary);
 
     if (!cachedLibrary && isOffline) {
-      showOfflineLibraryUnavailableMessage();
+      const offlineDb = appGlobal.OfflineDB || (typeof window !== 'undefined' ? window.OfflineDB : null);
+      let downloadedIds = appGlobal.downloadedComicIds;
+      if ((!downloadedIds || downloadedIds.size === 0) && typeof offlineDb?.getAllDownloadedComicIds === 'function') {
+        try {
+          downloadedIds = await offlineDb.getAllDownloadedComicIds();
+        } catch {}
+      }
+      const smartLists = appGlobal.LibrarySmartLists || (typeof window !== 'undefined' ? window.LibrarySmartLists : null);
+      if (downloadedIds && downloadedIds.size > 0 && typeof smartLists?.showDownloadedSmartList === 'function') {
+        smartLists.showDownloadedSmartList();
+      } else {
+        showOfflineLibraryUnavailableMessage();
+      }
     }
 
     // If we're online, refresh from the server

@@ -195,15 +195,25 @@ export function initUIControls() {
  * Phase 5: Initial data loading
  */
 export async function loadInitialData() {
-  // 4.5) Load manga mode preference early
-  try {
-    const response = await fetch(`${appGlobal.API_BASE_URL}/api/v1/manga-mode-preference`);
-    const data = await response.json();
-    if (response.ok && data.ok) {
-      appGlobal.mangaModePreference = data.mangaMode;
-    }
-  } catch (error) {
-    console.warn('[initializeApp:mangaModePreference]', error);
+  // 4.5) Load manga mode preference in background with short timeout (never block offline boot)
+  const isOnline = typeof appGlobal.isAppOnline === 'function'
+    ? appGlobal.isAppOnline()
+    : (typeof navigator === 'undefined' || navigator.onLine !== false);
+  if (isOnline) {
+    const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+    const timeoutId = controller ? setTimeout(() => controller.abort(), 2000) : null;
+    fetch(`${appGlobal.API_BASE_URL}/api/v1/manga-mode-preference`, controller ? { signal: controller.signal } : undefined)
+      .then(async (response) => {
+        if (timeoutId) clearTimeout(timeoutId);
+        const data = await response.json();
+        if (response.ok && data.ok) {
+          appGlobal.mangaModePreference = data.mangaMode;
+        }
+      })
+      .catch((error) => {
+        if (timeoutId) clearTimeout(timeoutId);
+        console.warn('[initializeApp:mangaModePreference]', error);
+      });
   }
 
   // 5) Load library from cache first, then sync with server

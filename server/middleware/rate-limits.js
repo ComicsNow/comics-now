@@ -70,6 +70,7 @@ function createOriginCsrfGuard(options = {}) {
 
 const generalLimiterExclusions = new Set([
   '/api/v1/public/auth',
+  '/api/v1/sync/stream',
   '/api/v1/comics/pages/image',
   '/thumbnails',
   '/icons',

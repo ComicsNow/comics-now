@@ -1,6 +1,7 @@
 const { log } = require('./logger');
 const { closeDb } = require('./db');
 const { stopTaggerWorker } = require('./services/tagger-process');
+const { closeAllSyncClients } = require('./services/sync-stream');
 
 /**
  * Attaches graceful shutdown handlers to SIGINT and SIGTERM.
@@ -14,6 +15,9 @@ function setupGracefulShutdown(server) {
     if (shuttingDown) return;
     shuttingDown = true;
     log('INFO', 'SERVER', `Received ${signal}, shutting down…`);
+
+    closeAllSyncClients();
+    server.closeIdleConnections?.();
 
     server.close(async () => {
       log('INFO', 'SERVER', 'HTTP server closed.');

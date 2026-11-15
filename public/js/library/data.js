@@ -175,6 +175,11 @@ export async function ensureSeriesLoaded(rootFolder, publisher, series) {
       comicIdMap.set(comic.id, comic);
     }
 
+    const saveCache = state.saveLibraryCacheToDB || (typeof window !== 'undefined' ? window.saveLibraryCacheToDB : null);
+    if (typeof saveCache === 'function') {
+      saveCache(library).catch(() => {});
+    }
+
     debugLog('LAZY', `Successfully loaded ${comics.length} comics for series ${series}`);
     return true;
   } catch (error) {
@@ -184,7 +189,7 @@ export async function ensureSeriesLoaded(rootFolder, publisher, series) {
 }
 
 export async function getSeriesComics(rootFolder, publisher, series) {
-  await ensureSeriesLoaded(rootFolder, publisher, series);
+  const loaded = await ensureSeriesLoaded(rootFolder, publisher, series);
 
   const library = state.library || window.library;
   if (!library) return [];
@@ -209,6 +214,19 @@ export async function getSeriesComics(rootFolder, publisher, series) {
   if (Array.isArray(seriesData)) {
     return seriesData;
   } else if (seriesData && seriesData._hasDetails === false) {
+    if (!loaded) {
+      const offlineDb = state.OfflineDB || (typeof window !== 'undefined' ? window.OfflineDB : null);
+      const readMeta = offlineDb?.getAllDownloadedComicMetadata;
+      if (typeof readMeta === 'function') {
+        try {
+          const allMeta = await readMeta();
+          const matched = (allMeta || [])
+            .map(r => r?.comicInfo)
+            .filter(c => c && c.series === series && (!publisher || !c.publisher || c.publisher === publisher));
+          if (matched.length > 0) return matched;
+        } catch {}
+      }
+    }
     console.warn(`Series data for ${series} exists but has no details`);
     return [];
   }

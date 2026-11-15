@@ -222,56 +222,68 @@ function registerRoutes() {
       }
     });
 
-    global.router.addRoute('/comic/:id', (params, query) => {
+    const resolveComicOrOffline = async (comicId) => {
       const getComic = global.getComicById || (typeof window !== 'undefined' ? window.getComicById : null) || state.getComicById;
+      const found = typeof getComic === 'function' ? getComic(comicId, true) : null;
+      if (found) return found;
+
+      const offlineDb = global.OfflineDB || (typeof window !== 'undefined' ? window.OfflineDB : null) || state.OfflineDB;
+      const metaReader = offlineDb?.getOfflineComicMetaById || offlineDb?.getOfflineComicRecordById ||
+        global.getOfflineComicMetaById || global.getOfflineComicRecordById;
+      if (typeof metaReader === 'function') {
+        const record = await metaReader(comicId);
+        if (record && (record.comicInfo || record.id != null)) {
+          const comic = {
+            ...(record.comicInfo || {}),
+            id: record.comicInfo?.id ?? record.id,
+            progress: record.progress || record.comicInfo?.progress || { lastReadPage: 0, totalPages: 0 }
+          };
+          return {
+            comic,
+            rootFolder: comic.rootFolder || null,
+            publisher: comic.publisher || null,
+            series: comic.series || null
+          };
+        }
+      }
+      return null;
+    };
+
+    const openResolvedComicRoute = async (params, query, pageNum = null) => {
       const openViewer = global.openComicViewer || (typeof window !== 'undefined' ? window.openComicViewer : null) || state.openComicViewer;
       if (typeof openViewer !== 'function') return;
 
-      const result = typeof getComic === 'function' ? getComic(params.id, true) : null;
+      const result = await resolveComicOrOffline(params.id);
+      if (!result) return;
+
       const folderPath = query.get('folderPath');
       const readingListId = query.get('readingListId');
       const readingListName = query.get('readingListName');
-      if (result) {
-        // Recover context if missing (e.g. on refresh)
-        if (result.rootFolder) global.currentRootFolder = result.rootFolder;
-        if (result.publisher) global.currentPublisher = result.publisher;
-        if (result.series) global.currentSeries = result.series;
-        if (folderPath) global.currentFolderPath = decodeURIComponent(folderPath);
-        
-        const options = {};
-        if (readingListId) options.readingListId = readingListId;
-        if (readingListName) options.readingListName = decodeURIComponent(readingListName);
 
-        openViewer(result.comic, options);
+      if (result.rootFolder) global.currentRootFolder = result.rootFolder;
+      if (result.publisher) global.currentPublisher = result.publisher;
+      if (result.series) global.currentSeries = result.series;
+      if (folderPath) global.currentFolderPath = decodeURIComponent(folderPath);
+
+      const options = {};
+      if (readingListId) options.readingListId = readingListId;
+      if (readingListName) options.readingListName = decodeURIComponent(readingListName);
+
+      await openViewer(result.comic, options);
+      if (pageNum !== null && !Number.isNaN(pageNum)) {
+        setTimeout(() => {
+          if (typeof global.turnToPage === 'function') global.turnToPage(pageNum - 1);
+        }, 300);
       }
+    };
+
+    global.router.addRoute('/comic/:id', (params, query) => {
+      return openResolvedComicRoute(params, query, null);
     });
 
     global.router.addRoute('/comic/:id/page/:pageNumber', (params, query) => {
-      const getComic = global.getComicById || (typeof window !== 'undefined' ? window.getComicById : null) || state.getComicById;
-      const openViewer = global.openComicViewer || (typeof window !== 'undefined' ? window.openComicViewer : null) || state.openComicViewer;
-      if (typeof openViewer !== 'function') return;
-
-      const result = typeof getComic === 'function' ? getComic(params.id, true) : null;
-      const folderPath = query.get('folderPath');
-      const readingListId = query.get('readingListId');
-      const readingListName = query.get('readingListName');
-      if (result) {
-        // Recover context if missing
-        if (result.rootFolder) global.currentRootFolder = result.rootFolder;
-        if (result.publisher) global.currentPublisher = result.publisher;
-        if (result.series) global.currentSeries = result.series;
-        if (folderPath) global.currentFolderPath = decodeURIComponent(folderPath);
-
-        const options = {};
-        if (readingListId) options.readingListId = readingListId;
-        if (readingListName) options.readingListName = decodeURIComponent(readingListName);
-
-        openViewer(result.comic, options);
-        const pageNum = parseInt(params.pageNumber, 10);
-        setTimeout(() => {
-          if (typeof global.turnToPage === 'function') global.turnToPage(pageNum - 1); 
-        }, 300);
-      }
+      const pageNum = parseInt(params.pageNumber, 10);
+      return openResolvedComicRoute(params, query, pageNum);
     });
   }
 }

@@ -61,10 +61,28 @@ self.addEventListener('install', event => {
   );
 });
 
-// ACTIVATE: clean old caches for other base paths/versions
+// ACTIVATE: clean old caches for other base paths/versions while preserving shell if needed
 self.addEventListener('activate', event => {
   event.waitUntil((async () => {
     const names = await caches.keys();
+    const currentCache = await caches.open(CACHE_NAME);
+    const shellUrl = new URL('index.html', self.registration.scope).toString();
+    let hasShell = Boolean(await currentCache.match(shellUrl));
+
+    if (!hasShell) {
+      for (const oldName of names) {
+        if (oldName.startsWith('comics-now-') && oldName !== CACHE_NAME && oldName !== DOWNLOADS_CACHE_NAME) {
+          const oldCache = await caches.open(oldName);
+          const oldShell = await oldCache.match(shellUrl);
+          if (oldShell) {
+            await currentCache.put(shellUrl, oldShell.clone());
+            hasShell = true;
+            break;
+          }
+        }
+      }
+    }
+
     await Promise.all(
       names
         .filter(n => n.startsWith('comics-now-') && n !== CACHE_NAME && n !== DOWNLOADS_CACHE_NAME)
@@ -88,8 +106,12 @@ self.addEventListener('fetch', event => {
     return;
   }
 
-  // HEALTH CHECK BYPASS: Let browser handle connectivity health probes directly
-  if (url.pathname.includes('/api/v1/health')) {
+  // HEALTH CHECK & SSE STREAM BYPASS: Let browser handle probes and EventSource directly
+  if (
+    url.pathname.includes('/api/v1/health') ||
+    url.pathname.includes('/api/v1/sync/stream') ||
+    (req.headers.get('accept') || '').includes('text/event-stream')
+  ) {
     return;
   }
 
@@ -187,17 +209,33 @@ self.addEventListener('fetch', event => {
     return;
   }
 
-  // Navigations (HTML): network-first, fallback to cached app shell
+  // Navigations (HTML): network-first with timeout + non-OK fallback to cached app shell
   if (req.mode === 'navigate' || (req.headers.get('accept') || '').includes('text/html')) {
     event.respondWith((async () => {
       const cache = await caches.open(CACHE_NAME);
+      const shellUrl = new URL('index.html', self.registration.scope);
+      const findCachedShell = async () => {
+        return (await cache.match(shellUrl.toString())) ||
+          (await cache.match(new URL('./index.html', self.registration.scope).toString())) ||
+          (await cache.match(req)) ||
+          (await caches.match?.(shellUrl.toString()));
+      };
+
+      const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+      const timeoutId = controller ? setTimeout(() => controller.abort(), 2500) : null;
+
       try {
-        const net = await fetch(req, { cache: 'no-store' });
-        // Only the app's own entry document may refresh the cached shell.
-        // Other in-scope HTML navigations (embedded UI pages, foreign
-        // documents) are served but never cached, so they cannot replace
-        // the app shell with foreign HTML.
-        const shellUrl = new URL('index.html', self.registration.scope);
+        const fetchOpts = { cache: 'no-store' };
+        if (controller) fetchOpts.signal = controller.signal;
+        const net = await fetch(req, fetchOpts);
+        if (timeoutId) clearTimeout(timeoutId);
+
+        if (!net || !net.ok || net.type === 'opaqueredirect') {
+          const fallbackShell = await findCachedShell();
+          if (fallbackShell) return fallbackShell;
+          return net;
+        }
+
         const shellPath = shellUrl.pathname;
         const rootPath = BASE_PATH.replace(/\/+$/, '');
         const reqPath = url.pathname;
@@ -205,14 +243,13 @@ self.addEventListener('fetch', event => {
           reqPath === rootPath ||
           reqPath === `${rootPath}/` ||
           reqPath === `${rootPath}/index.html`;
-        if (net.ok && url.origin === self.location.origin && isShellNavigation) {
+        if (url.origin === self.location.origin && isShellNavigation) {
           cache.put(shellUrl.toString(), net.clone());
         }
         return net;
       } catch (err) {
-        const shell = await cache.match(new URL('index.html', self.registration.scope).toString()) ||
-                      await cache.match(new URL('./index.html', self.registration.scope).toString()) ||
-                      await cache.match(req);
+        if (timeoutId) clearTimeout(timeoutId);
+        const shell = await findCachedShell();
         if (shell) return shell;
         return new Response('Offline - No cached app available', { status: 503, statusText: 'Offline' });
       }
@@ -220,32 +257,23 @@ self.addEventListener('fetch', event => {
     return;
   }
 
-  // Static assets inside scope: network-first for JS & CSS (to get updates), cache-first for other assets
+  // Static assets inside scope: hashed Vite bundles cache-first; unhashed JS/CSS network-first with timeout & HTML guard
   event.respondWith((async () => {
     const cache = await caches.open(CACHE_NAME);
 
-    // For JavaScript & CSS files, try network first to get updates, then cache
     if (url.pathname.endsWith('.js') || url.pathname.endsWith('.css')) {
       const isJs = url.pathname.endsWith('.js');
       const isCss = url.pathname.endsWith('.css');
-      try {
-        const net = await fetch(req, { cache: 'no-store' });
-        if (net.ok && url.origin === self.location.origin) {
-          cache.put(req, net.clone());
-        }
-        return net;
-      } catch (err) {
-        // Fallback to cache when offline
+      const isHashedBundle = /\/assets\/[^/]+-[a-zA-Z0-9_-]{6,}\.(js|css)$/.test(url.pathname);
+
+      const findCachedAsset = async () => {
         const hit = await cache.match(req);
         if (hit) return hit;
 
-        // Scope-relative URL fallback (e.g. /comics/assets/index.js -> ./assets/index.js)
         const relUrl = new URL(url.pathname.replace(BASE_PATH, ''), self.registration.scope).toString();
         const relHit = await cache.match(relUrl);
         if (relHit) return relHit;
 
-        // Offline resilience fallback:
-        // If a hashed asset or index bundle was requested, search for any matching cached asset
         const cacheKeys = await cache.keys();
         for (const key of cacheKeys) {
           const keyUrl = new URL(key.url);
@@ -268,6 +296,39 @@ self.addEventListener('fetch', event => {
             }
           }
         }
+        return null;
+      };
+
+      if (isHashedBundle) {
+        const cachedHashed = await cache.match(req);
+        if (cachedHashed) return cachedHashed;
+      }
+
+      const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+      const timeoutId = controller ? setTimeout(() => controller.abort(), 3000) : null;
+
+      try {
+        const fetchOpts = { cache: 'no-store' };
+        if (controller) fetchOpts.signal = controller.signal;
+        const net = await fetch(req, fetchOpts);
+        if (timeoutId) clearTimeout(timeoutId);
+
+        const contentType = (net?.headers?.get?.('content-type') || '').toLowerCase();
+        const isHtmlPoison = contentType.includes('text/html');
+        if (!net || !net.ok || net.type === 'opaqueredirect' || isHtmlPoison) {
+          const fallback = await findCachedAsset();
+          if (fallback) return fallback;
+          return net;
+        }
+
+        if (url.origin === self.location.origin) {
+          cache.put(req, net.clone());
+        }
+        return net;
+      } catch (err) {
+        if (timeoutId) clearTimeout(timeoutId);
+        const fallback = await findCachedAsset();
+        if (fallback) return fallback;
 
         return new Response(`Offline - Asset not cached (${url.pathname})`, {
           status: 503,
@@ -324,8 +385,8 @@ function encodePath(str) {
  */
 async function openDownloadDB() {
   return new Promise((resolve, reject) => {
-    // MUST match version in db-core.js (currently 13)
-    const request = indexedDB.open('comics-now-offline', 13);
+    // MUST match version in db-core.js (currently 14)
+    const request = indexedDB.open('comics-now-offline', 14);
 
     request.onsuccess = () => {
       const database = request.result;
@@ -375,6 +436,10 @@ async function openDownloadDB() {
       }
       if (!database.objectStoreNames.contains('deviceComics')) {
         database.createObjectStore('deviceComics', { keyPath: 'id' });
+      }
+      if (!database.objectStoreNames.contains('comicMeta')) {
+        const metaStore = database.createObjectStore('comicMeta', { keyPath: 'id' });
+        metaStore.createIndex('userId', 'userId', { unique: false });
       }
     };
   });
@@ -513,21 +578,33 @@ async function removeQueueItem(db, id) {
 async function saveComicBlob(db, comic, blob) {
   return new Promise((resolve, reject) => {
     try {
-      const tx = db.transaction(['comics'], 'readwrite');
+      const hasMeta = db.objectStoreNames?.contains('comicMeta');
+      const storeNames = hasMeta ? ['comics', 'comicMeta'] : ['comics'];
+      const tx = db.transaction(storeNames, 'readwrite');
       const store = tx.objectStore('comics');
 
       // Get userId from comic or use default
       const userId = comic.userId || 'default-user';
+      const downloadedAt = Date.now();
 
       const comicData = {
         id: comic.id,
         userId: userId,
         comicInfo: comic,
         fileBlob: blob,
-        downloadedAt: Date.now()
+        downloadedAt
       };
 
       const request = store.put(comicData);
+      if (hasMeta) {
+        tx.objectStore('comicMeta').put({
+          id: comic.id,
+          userId: userId,
+          comicInfo: comic,
+          fileSize: blob?.size || 0,
+          downloadedAt
+        });
+      }
 
       request.onsuccess = () => {
         resolve();

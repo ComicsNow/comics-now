@@ -808,6 +808,7 @@ The background crawler incorporates adaptive rate-limiting and conditional cachi
 ### Cross-Device Reading Progress
 - As you read, the reader sends progress heartbeats (`page`, `totalPages`, `completed`) to `/api/v1/comics/:id/progress`.
 - Progress is stored in the database per-user.
+- **Real-Time SSE Progress Sync (`/api/v1/user/progress/stream`)**: Active tabs subscribe to Server-Sent Events for live `progress` and `sync-needed` updates across devices, pausing cleanly when backgrounded and reconnecting with eager offline sync when visible again.
 - When you open the same comic on another device, Comics Now! prompts you to resume from where you left off.
 
 ### The Downloads Queue
@@ -821,6 +822,7 @@ Comics Now! is a full Progressive Web App:
 - **On Android**: In Chrome, tap the menu and select **Install App** or **Add to Home screen**.
 - **On Desktop (Chrome/Edge)**: Click the **Install** icon in the URL address bar.
 - Once installed, downloaded comics can be read completely offline with zero internet access.
+- **Offline Refresh & Deep-Link Recovery**: Refreshing or opening `/comic/:id` (or `/comic/:id/page/:pageNumber`) while offline serves the cached app shell, loads downloaded metadata cleanly from the lightweight `comicMeta` IndexedDB store, and opens downloaded comics directly without requiring network access.
 
 ### Active Connectivity Probing & Doze Self-Healing
 On mobile devices (especially Android PWAs/WebAPKs), the operating system's battery optimization (Doze Mode) suspends network sockets when the screen locks. In standard PWAs, this causes browsers to get stuck reporting `navigator.onLine === false` even after reconnecting to Wi-Fi.

@@ -1,5 +1,9 @@
 import { state } from '../../globals.js';
-import { updateLibraryProgress } from './progress-sync.js';
+import {
+  updateLibraryProgress,
+  markOfflineSyncDirty,
+  enhancedBackgroundSync
+} from './progress-sync.js';
 
 export async function saveStatusToDB(item) {
   const db = state.OfflineDB || (typeof window !== 'undefined' ? window.OfflineDB : null) || {};
@@ -13,7 +17,15 @@ export async function saveStatusToDB(item) {
     const tx = activeDb.transaction(['statuses'], 'readwrite');
     const store = tx.objectStore('statuses');
     store.put({ ...item, synced: false });
-    tx.oncomplete = () => resolve();
+    tx.oncomplete = () => {
+      markOfflineSyncDirty();
+      const onlineCheck = state.OfflineStatus?.isAppOnline || (typeof window !== 'undefined' ? window.OfflineStatus?.isAppOnline : null);
+      const isOnline = typeof onlineCheck === 'function' ? onlineCheck() : (typeof navigator === 'undefined' || navigator.onLine !== false);
+      if (isOnline && typeof enhancedBackgroundSync === 'function') {
+        enhancedBackgroundSync().catch(() => {});
+      }
+      resolve();
+    };
     tx.onerror = (event) => reject(event.target.error);
   });
 }
@@ -28,9 +40,11 @@ export async function updateOfflineReadStatus(comicId, status) {
 
   const idNum = typeof comicId === 'number' ? comicId : Number(comicId);
   const idStr = String(comicId);
+  const hasMeta = activeDb.objectStoreNames?.contains?.('comicMeta');
+  const targetStoreName = hasMeta ? 'comicMeta' : 'comics';
   return new Promise(resolve => {
-    const tx = activeDb.transaction(['comics', 'progress'], 'readwrite');
-    const comicsStore = tx.objectStore('comics');
+    const tx = activeDb.transaction([targetStoreName, 'progress'], 'readwrite');
+    const targetStore = tx.objectStore(targetStoreName);
     const progressStore = tx.objectStore('progress');
 
     function applyUpdate(data) {
@@ -48,7 +62,7 @@ export async function updateOfflineReadStatus(comicId, status) {
       } else {
         prog.lastReadPage = 0;
       }
-      comicsStore.put(data);
+      targetStore.put(data);
 
       const normalizedLastRead = typeof prog.lastReadPage === 'number' && !Number.isNaN(prog.lastReadPage)
         ? prog.lastReadPage
@@ -74,13 +88,13 @@ export async function updateOfflineReadStatus(comicId, status) {
       updateLibraryProgress(data.id, { lastReadPage: normalizedLastRead, totalPages: prog.totalPages });
     }
 
-    const req = comicsStore.get(idNum);
+    const req = targetStore.get(idNum);
     req.onsuccess = () => {
       const data = req.result;
       if (data) {
         applyUpdate(data);
       } else {
-        const req2 = comicsStore.get(idStr);
+        const req2 = targetStore.get(idStr);
         req2.onsuccess = () => applyUpdate(req2.result);
       }
     };
@@ -217,13 +231,16 @@ export async function mergeOfflineStatusesIntoLibrary() {
 }
 
 export async function syncOfflineStatuses() {
-  if (typeof navigator !== 'undefined' && !navigator.onLine) return;
+  const onlineCheck = state.OfflineStatus?.isAppOnline || (typeof window !== 'undefined' ? window.OfflineStatus?.isAppOnline : null);
+  const isOnline = typeof onlineCheck === 'function' ? onlineCheck() : (typeof navigator === 'undefined' || navigator.onLine !== false);
+  if (!isOnline) return 0;
+
   const db = state.OfflineDB || (typeof window !== 'undefined' ? window.OfflineDB : null) || {};
   if (db.openOfflineDB) {
     await db.openOfflineDB();
   }
   const activeDb = state.db || (typeof window !== 'undefined' ? window.db : null);
-  if (!activeDb) return;
+  if (!activeDb) return 0;
 
   await new Promise(resolve => setTimeout(resolve, 0));
 
@@ -237,7 +254,10 @@ export async function syncOfflineStatuses() {
     req.onerror = () => reject(req.error || new Error('getAll failed'));
   });
 
+  if (unsynced.length === 0) return 0;
+
   const apiBaseUrl = state.API_BASE_URL || (typeof window !== 'undefined' ? window.API_BASE_URL : '') || '';
+  let remainingUnsynced = 0;
 
   const CONCURRENCY_LIMIT = 5;
   for (let i = 0; i < unsynced.length; i += CONCURRENCY_LIMIT) {
@@ -248,8 +268,9 @@ export async function syncOfflineStatuses() {
         const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
         const timeoutId = controller && typeof setTimeout === 'function' ? setTimeout(() => controller.abort(), timeoutMs) : null;
 
+        let res;
         if (item.type === 'series') {
-          await fetch(`${apiBaseUrl}/api/v1/series/status`, {
+          res = await fetch(`${apiBaseUrl}/api/v1/series/status`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -261,7 +282,7 @@ export async function syncOfflineStatuses() {
             signal: controller?.signal,
           });
         } else {
-          await fetch(`${apiBaseUrl}/api/v1/comics/status`, {
+          res = await fetch(`${apiBaseUrl}/api/v1/comics/status`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ comicId: item.comicId, status: item.status }),
@@ -271,6 +292,11 @@ export async function syncOfflineStatuses() {
 
         if (timeoutId && typeof clearTimeout === 'function') clearTimeout(timeoutId);
 
+        if (!res || !res.ok) {
+          remainingUnsynced++;
+          return;
+        }
+
         item.synced = true;
         await new Promise((resolve, reject) => {
           const tx2 = activeDb.transaction(['statuses'], 'readwrite');
@@ -279,8 +305,11 @@ export async function syncOfflineStatuses() {
           tx2.onerror = () => reject(tx2.error || new Error('put failed'));
         });
       } catch (error) {
+        remainingUnsynced++;
         console.error('[OFFLINE] Failed to sync status for item:', item, error);
       }
     }));
   }
+
+  return remainingUnsynced;
 }

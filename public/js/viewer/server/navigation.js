@@ -16,12 +16,14 @@ export async function saveProgress(page) {
     global.currentComic.progress.lastReadPage = page;
 
     // Server comics always sync via syncManager
+    let onlineSynced = false;
     const syncManager = global.syncManager || global.window?.syncManager || (typeof window !== 'undefined' && window.syncManager);
     if (syncManager) {
       try {
-        await syncManager.updateProgress(global.currentComic.id, page);
+        const syncRes = await syncManager.updateProgress(global.currentComic.id, page);
+        onlineSynced = Boolean(syncRes && syncRes.ok);
       } catch (error) {
-        // Silent catch
+        onlineSynced = false;
       }
     }
 
@@ -32,7 +34,8 @@ export async function saveProgress(page) {
           global.currentComic.id,
           page,
           global.currentComic.progress?.totalPages,
-          global.currentComic.path
+          global.currentComic.path,
+          { synced: onlineSynced, skipSync: onlineSynced }
         );
       } catch (error) {
         // Silent catch

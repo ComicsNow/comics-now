@@ -18,6 +18,7 @@ import {
 } from './device.js';
 import { updateLocalProgressAndCounts } from './library-counts.js';
 import { createSyncModal, createDeviceSelectionModal, showSyncNotification } from './modals.js';
+import { SyncStream } from './stream.js';
 
 export class SyncManager {
   constructor() {
@@ -28,11 +29,13 @@ export class SyncManager {
     this.lastKnownPage = 0;
     this.lastKnownTimestamp = 0;
     this.isPolling = false;
+    this.isImpersonating = false;
     this.ignoredSyncPoints = loadIgnoredSyncPoints();
     this.userId = null;
     this.userEmail = null;
     this.userRole = null;
     this.authEnabled = false;
+    this.syncStream = new SyncStream(this);
   }
 
   loadIgnoredSyncPoints() {
@@ -85,6 +88,7 @@ export class SyncManager {
         this.userEmail = userData.email;
         this.userRole = userData.role;
         this.authEnabled = userData.authEnabled;
+        this.isImpersonating = Boolean(userData.impersonating || userData.isImpersonating);
         debugLog('SYNC', 'User context loaded:', { userId: this.userId, email: this.userEmail, role: this.userRole, authEnabled: this.authEnabled });
       }
     } catch (_) {}
@@ -93,6 +97,9 @@ export class SyncManager {
   }
 
   async initializeDevice() {
+    if (this.isImpersonating) {
+      return null;
+    }
     const apiBaseUrl = (state && state.API_BASE_URL) || '';
     const savedDeviceId = localStorage.getItem('comicsNow_deviceId');
     const savedDeviceName = localStorage.getItem('comicsNow_deviceName');
@@ -144,6 +151,9 @@ export class SyncManager {
     localStorage.setItem('comicsNow_deviceName', this.deviceName);
 
     debugLog('SYNC', `Device auto-registered: ${this.deviceName} (${this.deviceId})`);
+    if (this.currentComicId && !this.isImpersonating) {
+      this.startPolling(this.currentComicId);
+    }
     return data;
   }
 
@@ -164,7 +174,10 @@ export class SyncManager {
 
       this.currentComicId = comicId;
       this.lastKnownPage = currentPage;
-      this.lastKnownTimestamp = data.lastSyncTimestamp || 0;
+      this.lastKnownTimestamp = Math.max(
+        Number(data.lastSyncTimestamp) || 0,
+        Number(data.currentDeviceProgress?.lastSyncTimestamp) || 0
+      );
 
       if (data.hasNewerSync && data.isFromDifferentDevice) {
         const isIgnored = isSyncPointIgnored(
@@ -229,22 +242,34 @@ export class SyncManager {
 
   async showSyncDialog(syncData) {
     return new Promise((resolve) => {
-      const modal = createSyncModal(syncData, resolve, async (serverProgress) => {
-        if (typeof state !== 'undefined' && state.currentComic) {
-          state.currentPageIndex = serverProgress.lastReadPage;
-          if (!state.currentComic.progress) state.currentComic.progress = {};
-          state.currentComic.progress.lastReadPage = serverProgress.lastReadPage;
-          if (typeof state.renderPage === 'function') await state.renderPage();
-          const updateLib = state.updateLibraryProgress || (typeof window !== 'undefined' ? window.updateLibraryProgress : null);
-          if (typeof updateLib === 'function') updateLib(state.currentComic.id, serverProgress.lastReadPage, serverProgress.totalPages);
+      const modal = createSyncModal(
+        syncData,
+        resolve,
+        async (serverProgress) => {
+          this.lastKnownPage = serverProgress.lastReadPage;
+          if (serverProgress.lastSyncTimestamp) {
+            this.lastKnownTimestamp = serverProgress.lastSyncTimestamp;
+          }
+          if (typeof state !== 'undefined' && state.currentComic) {
+            state.currentPageIndex = serverProgress.lastReadPage;
+            if (!state.currentComic.progress) state.currentComic.progress = {};
+            state.currentComic.progress.lastReadPage = serverProgress.lastReadPage;
+            if (typeof state.renderPage === 'function') await state.renderPage();
+            const updateLib = state.updateLibraryProgress || (typeof window !== 'undefined' ? window.updateLibraryProgress : null);
+            if (typeof updateLib === 'function') updateLib(state.currentComic.id, serverProgress.lastReadPage, serverProgress.totalPages);
+            try { await this.updateProgress(state.currentComic.id, serverProgress.lastReadPage); } catch (_) {}
+          }
+        },
+        (cId, sData) => {
+          if (sData) this.markSyncPointAsIgnored(cId, sData.lastSyncTimestamp, sData.lastReadPage, sData.lastSyncDeviceId);
         }
-      });
+      );
       document.body.appendChild(modal);
     });
   }
 
   async updateProgress(comicId, page) {
-    if (!this.deviceId) return;
+    if (!this.deviceId) return { ok: false, reason: 'no-device' };
     const apiBaseUrl = (state && state.API_BASE_URL) || '';
 
     try {
@@ -259,10 +284,12 @@ export class SyncManager {
         })
       });
 
-      const data = await response.json();
+      const data = await response.json().catch(() => ({}));
       if (response.ok) {
         this.lastKnownPage = page;
-        this.lastKnownTimestamp = data.lastSyncTimestamp;
+        if (data.lastSyncTimestamp) {
+          this.lastKnownTimestamp = data.lastSyncTimestamp;
+        }
         this.clearIgnoredSyncPoint(comicId);
         updateLocalProgressAndCounts(comicId, page);
 
@@ -275,26 +302,23 @@ export class SyncManager {
         if (typeof saveLibCache === 'function' && typeof state.library !== 'undefined') {
           saveLibCache(state.library).catch(() => {});
         }
+        return { ok: true, data };
       }
-    } catch (_) {}
+      return { ok: false, status: response.status, data };
+    } catch (error) {
+      return { ok: false, error: error.message };
+    }
   }
 
   startPolling(comic) {
-    if (this.isPolling || !this.deviceId) return;
     const comicId = typeof comic === 'object' ? comic.id : comic;
     if (!comicId) return;
 
-    this.isPolling = true;
     this.currentComicId = comicId;
+    if (!this.deviceId || this.isImpersonating) return;
 
-    this.pollInterval = setInterval(async () => {
-      try {
-        const result = await this.checkSyncStatus(comicId, this.lastKnownPage);
-        if (result.shouldSync) {
-          this.showSyncNotification(result.data);
-        }
-      } catch (_) {}
-    }, 5 * 60 * 1000);
+    this.isPolling = true;
+    this.syncStream.start();
   }
 
   stopPolling() {
@@ -302,6 +326,7 @@ export class SyncManager {
       clearInterval(this.pollInterval);
       this.pollInterval = null;
     }
+    this.syncStream.stop();
     this.isPolling = false;
     this.currentComicId = null;
   }

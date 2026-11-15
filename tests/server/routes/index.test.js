@@ -45,6 +45,7 @@ jest.mock('../../../server/routes/user/devices', () => jest.fn());
 jest.mock('../../../server/routes/user/reading-lists', () => jest.fn());
 jest.mock('../../../server/routes/user/reading', () => jest.fn());
 jest.mock('../../../server/routes/user/progress', () => jest.fn());
+jest.mock('../../../server/routes/user/sync-stream', () => jest.fn());
 jest.mock('../../../server/routes/user/library', () => jest.fn());
 jest.mock('../../../server/routes/user/pages', () => jest.fn());
 jest.mock('../../../server/routes/user/metadata', () => jest.fn());
@@ -62,7 +63,7 @@ jest.mock('../../../server/routes/admin/impersonate', () => jest.fn());
 
 const mockSubRouters = [
   './public/auth', './public/health',
-  './user/settings', './user/devices', './user/reading-lists', './user/reading', './user/progress', './user/library', './user/pages', './user/metadata',
+  './user/settings', './user/devices', './user/reading-lists', './user/reading', './user/progress', './user/sync-stream', './user/library', './user/pages', './user/metadata',
   './admin/users', './admin/comictagger', './admin/guided', './admin/settings', './admin/library-mgmt', './admin/rename', './admin/mcp-tools', './admin/user-stats', './admin/gemini',
   './admin/impersonate'
 ];

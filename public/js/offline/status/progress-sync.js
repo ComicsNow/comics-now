@@ -1,10 +1,106 @@
 import { state, debugLog } from '../../globals.js';
 
 export const PROGRESS_SYNC_DEBOUNCE_MS = 400;
+export const OFFLINE_SYNC_DIRTY_KEY = 'comicsNow_offlineSyncDirty';
+const RETRY_BACKOFF_MS = [15000, 30000, 60000, 120000, 300000];
+
 let progressSyncTimerId = null;
 let progressSyncInProgress = false;
 let progressSyncNeedsRun = false;
 let progressSyncPromise = null;
+let activeSyncPromise = null;
+let resyncRequested = false;
+let retryTimerId = null;
+let retryAttempt = 0;
+
+function readDirtyFlag() {
+  try {
+    if (typeof localStorage !== 'undefined') {
+      return localStorage.getItem(OFFLINE_SYNC_DIRTY_KEY);
+    }
+  } catch {}
+  return null;
+}
+
+export function markOfflineSyncDirty() {
+  try {
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem(OFFLINE_SYNC_DIRTY_KEY, '1');
+    }
+  } catch {}
+}
+
+export function clearOfflineSyncDirty() {
+  try {
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem(OFFLINE_SYNC_DIRTY_KEY, '0');
+    }
+  } catch {}
+}
+
+export function cancelOfflineSyncRetry() {
+  if (retryTimerId) {
+    clearTimeout(retryTimerId);
+    retryTimerId = null;
+  }
+}
+
+export function scheduleOfflineSyncRetry() {
+  cancelOfflineSyncRetry();
+  if (typeof document !== 'undefined' && document.hidden) return;
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) return;
+
+  const delay = RETRY_BACKOFF_MS[Math.min(retryAttempt, RETRY_BACKOFF_MS.length - 1)];
+  retryAttempt = Math.min(retryAttempt + 1, RETRY_BACKOFF_MS.length - 1);
+  retryTimerId = setTimeout(() => {
+    retryTimerId = null;
+    enhancedBackgroundSync().catch(() => {});
+  }, delay);
+}
+
+export async function hasPendingOfflineSync() {
+  const flag = readDirtyFlag();
+  if (flag === '1') return true;
+  if (flag === '0') return false;
+
+  const db = state.OfflineDB || (typeof window !== 'undefined' ? window.OfflineDB : null) || {};
+  if (db.openOfflineDB) {
+    await db.openOfflineDB();
+  }
+  const activeDb = state.db || (typeof window !== 'undefined' ? window.db : null);
+  if (!activeDb) return false;
+
+  const hasUnsynced = await new Promise((resolve) => {
+    try {
+      const storeNames = activeDb.objectStoreNames?.contains?.('statuses')
+        ? ['progress', 'statuses']
+        : ['progress'];
+      const tx = activeDb.transaction(storeNames, 'readonly');
+      let found = false;
+      const pReq = tx.objectStore('progress').getAll();
+      pReq.onsuccess = () => {
+        if ((pReq.result || []).some((i) => !i.synced)) found = true;
+      };
+      if (storeNames.includes('statuses')) {
+        const sReq = tx.objectStore('statuses').getAll();
+        sReq.onsuccess = () => {
+          if ((sReq.result || []).some((i) => !i.synced)) found = true;
+        };
+      }
+      tx.oncomplete = () => resolve(found);
+      tx.onerror = () => resolve(false);
+    } catch {
+      resolve(false);
+    }
+  });
+
+  if (hasUnsynced) {
+    markOfflineSyncDirty();
+  } else {
+    clearOfflineSyncDirty();
+  }
+  return hasUnsynced;
+}
 
 export function updateLibraryProgress(comicId, page, totalPages) {
   const library = state.library || (typeof window !== 'undefined' ? window.library : null);
@@ -130,6 +226,8 @@ export async function syncOfflineProgress() {
 
     const syncManager = state.syncManager || (typeof window !== 'undefined' ? window.syncManager : null);
 
+    let remainingUnsynced = 0;
+
     for (const item of unsynced) {
       await new Promise(resolve => setTimeout(resolve, 0));
 
@@ -156,8 +254,9 @@ export async function syncOfflineProgress() {
           comicPath = libraryComic.path;
         }
 
-        if (!comicPath && db.getOfflineComicRecordById) {
-          const offlineRecord = await db.getOfflineComicRecordById(item.id);
+        const metaReader = db.getOfflineComicMetaById || db.getOfflineComicRecordById;
+        if (!comicPath && metaReader) {
+          const offlineRecord = await metaReader(item.id);
           if (offlineRecord && offlineRecord.comicInfo) {
             comicPath = offlineRecord.comicInfo.path || offlineRecord.comicInfo.filePath || offlineRecord.path || null;
           }
@@ -166,6 +265,7 @@ export async function syncOfflineProgress() {
         if (!comicPath) {
           debugLog('OFFLINE', `Comic with ID ${item.id} path not yet resolved, retaining unsynced progress for next sync attempt`);
           item.syncAttempts = (item.syncAttempts || 0) + 1;
+          remainingUnsynced++;
           await new Promise((resolve, reject) => {
             const tx2 = activeDb.transaction(['progress'], 'readwrite');
             tx2.objectStore('progress').put(item);
@@ -177,11 +277,17 @@ export async function syncOfflineProgress() {
 
         if (syncManager && syncManager.deviceId) {
           try {
-            await syncManager.updateProgress(item.id, pageValue);
+            const updateResult = await syncManager.updateProgress(item.id, pageValue);
+            if (!updateResult || updateResult.ok === false) {
+              remainingUnsynced++;
+              continue;
+            }
           } catch (syncError) {
+            remainingUnsynced++;
             continue;
           }
         } else {
+          remainingUnsynced++;
           continue;
         }
 
@@ -203,13 +309,14 @@ export async function syncOfflineProgress() {
           tx2.onerror = () => reject(tx2.error || new Error('put failed'));
         });
       } catch (error) {
-        // Handle error silently
+        remainingUnsynced++;
       }
     }
+    return remainingUnsynced;
   })();
 
   try {
-    await progressSyncPromise;
+    return await progressSyncPromise;
   } finally {
     progressSyncInProgress = false;
     progressSyncPromise = null;
@@ -221,17 +328,40 @@ export async function syncOfflineProgress() {
 }
 
 export async function enhancedBackgroundSync() {
-  try {
-    if (typeof navigator !== 'undefined' && navigator.onLine === false) {
-      return;
-    }
-
-    await scheduleOfflineProgressSync(true);
-    const syncStatuses = state.syncOfflineStatuses || (typeof window !== 'undefined' ? window.syncOfflineStatuses : null);
-    if (typeof syncStatuses === 'function') {
-      await syncStatuses();
-    }
-  } catch (error) {
-    // Handle error silently
+  if (activeSyncPromise) {
+    resyncRequested = true;
+    return activeSyncPromise;
   }
+
+  activeSyncPromise = (async () => {
+    try {
+      if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+        return;
+      }
+
+      const remainingProgress = (await syncOfflineProgress()) || 0;
+      const syncStatuses = state.syncOfflineStatuses || (typeof window !== 'undefined' ? window.syncOfflineStatuses : null);
+      const remainingStatuses = typeof syncStatuses === 'function' ? ((await syncStatuses()) || 0) : 0;
+
+      if (remainingProgress === 0 && remainingStatuses === 0 && !resyncRequested) {
+        clearOfflineSyncDirty();
+        retryAttempt = 0;
+        cancelOfflineSyncRetry();
+      } else {
+        markOfflineSyncDirty();
+        scheduleOfflineSyncRetry();
+      }
+    } catch (error) {
+      markOfflineSyncDirty();
+      scheduleOfflineSyncRetry();
+    } finally {
+      activeSyncPromise = null;
+      if (resyncRequested) {
+        resyncRequested = false;
+        enhancedBackgroundSync().catch(() => {});
+      }
+    }
+  })();
+
+  return activeSyncPromise;
 }
