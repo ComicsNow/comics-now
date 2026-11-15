@@ -45,7 +45,11 @@ function readZipEntryBuffer(zipfile, entry) {
 
 function resolveZipRelative(baseDir, href) {
   if (!href) return '';
-  const clean = decodeURIComponent(String(href).split('#')[0].split('?')[0]);
+  const raw = String(href).split('#')[0].split('?')[0];
+  let clean = raw;
+  try {
+    clean = decodeURIComponent(raw);
+  } catch (_) {}
   const joined = baseDir ? path.posix.join(baseDir, clean) : clean;
   return joined.replace(/^\/+/, '');
 }
