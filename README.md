@@ -21,21 +21,20 @@
 
 Most digital comic servers were built a decade ago as basic file browsers. **Comics Now!** re-imagines your comic library as a modern, intelligent web application designed for desktops, tablets, and phones:
 
-* 🧠 **Interactive Panel & Bubble Zoom (Guided View)**: Powered by deep learning neural networks (`manga.onnx` and speech bubble detectors) with instant cloud GPU acceleration via **Modal** (~1–2s per batch on NVIDIA T4s), incremental scoping, and visual authoring via **[GVE Now!](https://github.com/ComicsNow/gve-now-editor)**. *(Note: Automated guided view sequence buttons have been removed as automated stepping is not reliable enough across diverse comic layouts; interactive **Panel Zoom** and **Bubble Zoom** with adaptive touch tolerance remain fully active for precision on-demand zoom.)*
-* 🔀 **Interactive Continuity DAG View**: Visualize complex multi-series crossover timelines as interactive Directed Acyclic Graphs with curved Bézier flow lines, fluid pinch-to-zoom/pan navigation, 1-click node reading, and a 3-way view switcher (**Grid `⊞`**, **List `☰`**, and **DAG `🔀`**).
-* 🖼️ **Fullscreen Page Preview Grid, Filmstrip & Scrubber**: Navigate issues visually with a dynamic, lazy-loaded page preview grid, a bottom precision page scrubber, and a horizontal touch-scrollable thumbnail filmstrip. Full-resolution WebP on-the-fly transcoding backed by an LRU disk cache cuts bandwidth while keeping 1:1 pixel coordinates for panel zoom.
-* 🔄 **True Cross-Device Sync**: Pick up right where you left off. Reading progress syncs in real-time between your phone, tablet, and PC.
-* 📱 **Resumable Offline PWA & Self-Healing Connectivity**: Install Comics Now! to your iOS, iPadOS, Android, or desktop home screen. Queue comics with HTTP `Range` resumable transfers, native Android Background Fetch, and active health probing that self-heals when waking from mobile sleep mode.
-* 🤖 **Google Gemini AI Vision & Multi-Source Tagging**: Built-in enrichment engine querying ComicVine, Metron, GCD, Goodreads, Amazon, Google Books, and web URLs with perceptual cover hashing. Powered by Google Gemini AI Vision to visually identify issue numbers, series, publishers, and release years directly from cover art when standard scraping fails, plus one-step **Web URL Tagging** with daily quota tracking and manual metadata staging.
-* ⚡ **High-Throughput SQLite Architecture**: Native zero-scan covering and composite indexes for reading lists and DAG views, backed by 256MB memory-mapped I/O (`mmap`), in-memory temporary tables/sorts, and an expanded 64MB RAM cache. Instantaneous server boots with guarded startup migrations and potential database storage savings of up to 50%+.
-* 🎨 **DC All In Typography & Clean 2-Line Hierarchy**: Punchier Anton display typography with electric blue selection halos. Strict 2-line layout displaying **Series & Issue Number on Line 1** and **Story Title on Line 2** — eliminating raw filename leakage across cards and viewer headers.
-* 📁 **Configurable File & Folder Organization**: Flexible 4-tab management panel with customizable token naming rules and folder hierarchy templates, with live preview and safe, type-to-confirm batch execution for entire libraries.
-* 🔌 **AI Model Context Protocol (MCP)**: Native Python MCP server exposing 60+ tools allowing Claude, Cursor, and Gemini to curate reading lists, tag comics directly from web URLs (`tag_comic_from_url`), inspect cover art, trigger guided view detection, reorganize directories, and query your collection with natural language.
-* 🛡️ **Cloudflare Zero Trust Ready**: Zero open ports needed. Full integration with Cloudflare Access JWT authentication, granular user permissions (down to publisher and series), and admin impersonation.
-* 🔐 **Enterprise-Grade Secrets Vault (AES-256-GCM)**: All third-party API keys (ComicVine, Gemini, Google Books), scraper logins (Metron, GCD), and cloud GPU tokens (Modal) are automatically encrypted at rest using envelope encryption with an auto-generated 256-bit key (`data/.app_secret`) or container secrets (`COMICS_SECRET_KEY` / `COMICS_SECRET_KEY_FILE`). Sensitive values are masked in the UI to prevent shoulder-surfing and log leakage.
-* 📂 **Metadata Mode & Folder Mode**: Organize your library by metadata tags (Publisher → Series → Issue) or mirror your physical directory tree directly.
-* 💻 **Client-Side Local Reader**: Drag and drop local CBZ/CBR files directly into the browser to read instantly with WebAssembly—no file upload required.
-* 📖 **E-Ink & Color E-Reader Modes**: Purpose-built anti-ghosting display modes for e-paper devices. **Monochrome** applies grayscale + contrast for black-and-white screens; **Color** boosts saturation for color e-paper. Kindle, Kobo, Onyx Boox, and PocketBook are auto-detected, and the choice persists per device.
+* 🧠 **Interactive Panel & Bubble Zoom (Guided View)**: Deep-learning panel and speech-bubble detection with optional **Modal** cloud GPU acceleration and visual authoring via **[GVE Now!](https://github.com/ComicsNow/gve-now-editor)**.
+* 🖼️ **Fullscreen Page Preview Grid, Filmstrip & Scrubber**: Navigate issues with a lazy-loaded page grid, precision scrubber, and touch-scrollable thumbnail filmstrip backed by cached WebP transcoding.
+* 🔄 **True Cross-Device Sync**: Pick up right where you left off with real-time reading progress sync across phone, tablet, and desktop.
+* 📱 **Resumable Offline PWA**: Install to iOS, iPadOS, Android, or desktop home screens with resumable downloads, Background Fetch, and automatic reconnect recovery.
+* 🤖 **Google Gemini AI Vision & Multi-Source Tagging**: Enrich metadata from ComicVine, Metron, GCD, Goodreads, Amazon, Google Books, and web URLs with perceptual cover hashing and Gemini Vision cover matching.
+* ⚡ **High-Throughput SQLite Architecture**: Instantaneous server boots with indexed reading lists and guarded startup migrations.
+* 🎨 **DC All In Typography & Clean 2-Line Hierarchy**: Bold Anton display typography with electric blue selection halos and a 2-line layout (**Series & Issue Number** on Line 1, **Story Title** on Line 2) free of raw filename clutter.
+* 📁 **Configurable File & Folder Organization**: 4-tab management panel with customizable token naming rules, folder hierarchy templates, live previews, and safe batch execution.
+* 🔌 **AI Model Context Protocol (MCP)**: Built-in Python MCP server exposing 60+ tools for Claude, Cursor, and Gemini to curate reading lists, tag comics from URLs, inspect covers, trigger guided view, and query your collection.
+* 🛡️ **Cloudflare Zero Trust Ready**: Zero open ports needed with Cloudflare Access JWT authentication, granular publisher/series permissions, and admin impersonation.
+* 🔐 **AES-256-GCM Secrets Vault**: All third-party API keys, scraper logins, and cloud GPU tokens are automatically encrypted at rest and masked in the UI.
+* 📂 **Metadata Mode & Folder Mode**: Browse by metadata tags (Publisher → Series → Issue) or mirror your physical directory tree.
+* 💻 **Client-Side Local Reader**: Drag and drop local CBZ/CBR files directly into the browser to read instantly—no upload required.
+* 📖 **E-Ink & Color E-Reader Modes**: Anti-ghosting display modes for monochrome and color e-paper with automatic Kindle, Kobo, Onyx Boox, and PocketBook detection.
 
 ---
 
@@ -94,7 +93,7 @@ Open [http://localhost:3000](http://localhost:3000) in your browser!
 
 ---
 
-### Option 2: Docker Compose
+### Option 3: Docker Compose
 
 Save as `docker-compose.yml`:
 
@@ -122,35 +121,18 @@ docker compose up -d
 
 ---
 
-### Option 3: Configuration Quick Start (`config.json`)
+### Option 4: Configuration Quick Start (`config.json`)
 
-Comics Now! reads its persistent server and library settings from `data/config.json`. A complete, valid template organized into **`[BOOT]`** and **`[UI]`** sections is provided in [`config.example.json`](config.example.json):
+Comics Now! reads its persistent settings from `data/config.json`, using [`config.example.json`](config.example.json) as a template organized into **`[BOOT]`** (port, `baseUrl`, proxy/auth) and **`[UI]`** (libraries, API keys, tagger, scan settings):
 
 ```bash
-# 1. Ensure the data directory exists
 mkdir -p data
-
-# 2. Copy the template into place
 cp config.example.json data/config.json
 ```
 
-The template clearly indicates which settings are required before startup versus which can be configured via the web interface:
-- **`[BOOT]` Settings** (`port`, `baseUrl`, `trustProxy`, `authentication`): Required before the server starts because routing, ports, and security initialize at boot.
-- **`[UI]` Settings** (`libraries`, API keys, Gemini settings, tagger thresholds, scan intervals): Can be left with defaults or blank and configured anytime directly in the web UI. Changes made in the UI are automatically saved back to `data/config.json`. All API keys, passwords, and external tokens are automatically encrypted at rest using AES-256-GCM.
+`[UI]` settings can be configured anytime in the web interface and are saved back to `data/config.json` with all API keys, passwords, and tokens automatically encrypted at rest using AES-256-GCM.
 
-#### Key Settings at a Glance:
-| Category | Setting | Recommended Value | Description |
-|---|---|---|---|
-| `[BOOT]` | `baseUrl` | `"/"` | Root domain path (`"/"`), or subpath prefix (e.g. `"/comics"`) if behind a reverse proxy. |
-| `[BOOT]` | `trustProxy` | `1` | Enable when running behind Cloudflare Tunnel, Nginx, Traefik, or Caddy. |
-| `[BOOT]` | `authentication` | `{ "enabled": false, ... }` | Set to `true` with `adminEmail` if using Cloudflare Zero Trust. |
-| `[UI]` | `comicsLocation` | `"/path/to/inbox"` | Ingestion directory where Tag Comics Now! scans for untagged CBZ files. |
-| `[UI]` | `libraries` | `[{"path": "...", "hierarchyMode": "metadata"}]` | Organized collections. Choose `"metadata"` or `"folder"`. |
-| `[UI]` | `delete_cbr_after_conversion` | `false` | Whether to delete (`true`) or keep (`false`, default) source `.cbr` files after converting them to `.cbz`. |
-| `[UI]` | `delete_pdf_after_conversion` | `false` | Whether to delete (`true`) or keep (`false`, default) source `.pdf` files after converting them to `.cbz`. |
-| `[UI]` | `geminiApiKey` | `"AIzaSy..."` | Optional Google Gemini API key for AI visual cover matching (encrypted at rest). |
-
-*(For full schema tables, Cloudflare Zero Trust setup, and in-depth UI vs. file configuration guides, see the [Wiki Configuration Reference](docs/WIKI.md#configuration-reference-configjson).)*
+*(For the full schema table, Cloudflare Zero Trust setup, and UI vs. file configuration rules, see the [Wiki Configuration Reference](docs/WIKI.md#configuration-reference-configjson).)*
 
 ---
 
@@ -172,7 +154,7 @@ Looking for detailed setup guides, configuration tables, or workflow deep dives?
 - [Modal Serverless GPU Acceleration & $30 Free Tier Cap](docs/WIKI.md#modal-serverless-gpu-acceleration-cloud-gpu-speedup)
 - [Fullscreen Thumbnail Filmstrip & Scrubber](docs/WIKI.md#fullscreen-thumbnail-filmstrip--scrubber)
 - [Authoring & Editing Guided View with GVE Now!](docs/WIKI.md#authoring--editing-guided-view-with-gve-now)
-- [Interactive Reading List DAG & Continuity Views](docs/WIKI.md#interactive-continuity-dag-view-directed-acyclic-graph)
+- [Story Arcs & Continuity Engine](docs/WIKI.md#story-arcs--continuity-engine-readingorderscom)
 - [Curating & Syncing Reading Lists to All Users](docs/WIKI.md#9-reading-lists)
 - [Progressive Web App (PWA) Offline Installation & Doze Recovery](docs/WIKI.md#10-devices-progress-syncing--offline-pwa)
 - [UI Long-Press Context Menus & Actions](docs/WIKI.md#11-ui-navigation-views--long-press-menus)
@@ -182,50 +164,23 @@ Looking for detailed setup guides, configuration tables, or workflow deep dives?
 
 ## ⚡ Serverless GPU Acceleration (Modal)
 
-Analyzing comic pages with deep learning neural networks can be computationally heavy for low-power home servers or Raspberry Pis. Comics Now! natively integrates with [Modal](https://modal.com) to offload panel and speech bubble detection to cloud **NVIDIA T4 GPUs** in ~1–2 seconds per batch.
-
-### $30/Month Free Tier & Setting a Spending Limit
-Modal provides **$30.00 of free recurring compute credits every calendar month** to every user account (enough to process 30,000+ comic pages for free).
-
-To guarantee you are never billed beyond the free tier:
-1. Go to your [Modal Dashboard](https://modal.com) → **Settings → Billing / Usage** (or **Workspace Settings → Usage Limits**).
-2. Set the **Monthly Spending Limit** to **`$30.00`**.
-3. Enable email alert thresholds (e.g. at 50%, 80%, 100%) and save changes.
+Offload Guided View panel and speech-bubble detection from low-power home servers to [Modal](https://modal.com) cloud **NVIDIA T4 GPUs** (~1–2s per batch). Modal includes **$30.00/month in free compute credits** (30,000+ pages/month).
 
 > [!WARNING]
-> **User Responsibility & Billing Safeguards**: It is strictly your responsibility to configure your spending limits in your Modal account dashboard and monitor your usage. Comics Now! provides automated budget monitoring and safe fallbacks to local CPU, but cannot control third-party billing accounts or guarantee that third-party services will not bill you if you choose not to set a spend limit or configure a higher limit.
+> **User Responsibility & Billing Safeguards**: Configure a `$30.00` monthly spending limit in your Modal account dashboard. Comics Now! includes budget monitoring and safe CPU fallback, but cannot control third-party billing accounts.
 
-### Quick Setup (30 Seconds)
-1. In your Modal dashboard, generate an API token under **Settings → API Tokens**.
-2. In Comics Now!, open **Settings → Guided View**, check **Use Modal GPU Acceleration**, and paste your **Token ID** and **Token Secret**.
-3. Click **Test Connection**, then click **⚡ Initialize Modal GPU Environment** to deploy models to cloud storage.
-
-*(Read the [Complete Modal Setup & Telemetry Guide](docs/WIKI.md#modal-serverless-gpu-acceleration-cloud-gpu-speedup) in the Wiki.)*
+*(See the [Complete Modal Setup & Telemetry Guide](docs/WIKI.md#modal-serverless-gpu-acceleration-cloud-gpu-speedup) in the Wiki.)*
 
 ---
 
-## 🔀 Interactive Reading List DAG (Continuity Timelines)
+## ⚡ Story Arcs & Continuity Engine
 
-For massive multi-title crossover events (*Crisis on Infinite Earths*, *Absolute Universe*, *Infinity Gauntlet*), Comics Now! features an interactive **Continuity DAG (Directed Acyclic Graph)** view:
-- **Parallel Series Lanes & Bézier Curves**: See chronological issue order flow across publishers and titles.
-- **Pinch-to-Zoom & Pan**: Full touch and mouse navigation with fluid SVG canvas scaling.
-- **Click-to-Read Graph Nodes**: Tap any issue node directly on the graph to view summary or start reading.
-- **Segmented View Switcher**: Toggle seamlessly between **Grid (`⊞`)**, **List (`☰`)** (with live % progress badges and action buttons), and **DAG (`🔀`)** modes.
+For massive multi-title crossover events (*Crisis on Infinite Earths*, *Civil War*, *Absolute Universe*), Comics Now! integrates the **ReadingOrders.com Story Arcs Engine**:
+- **Gemini Flash AI Matching**: High-confidence semantic matching across tie-ins, one-shots, and collected editions—leaving uncertain matches untouched.
+- **Multi-Arc ComicInfo Standard**: Enriches files with ComicInfo v2.0/v2.1 `<StoryArc>`, `<StoryArcNumber>`, `<StoryArcs>`, and `<SeriesGroup>` tags, plus *"Up Next in Arc"* in-reader prompts.
+- **Polite Live Sync**: Real-time SSE sync console with conditional ETag caching.
 
-*(Read the [Reading List DAG Guide](docs/WIKI.md#interactive-continuity-dag-view-directed-acyclic-graph) in the Wiki.)*
-
----
-
-## ⚡ Story Arcs & Continuity Engine (ReadingOrders.com Integration)
-
-Never lose track of where to read next in complex multi-series crossover events (*Civil War*, *Crisis on Infinite Earths*, *Blackest Night*, *Absolute Universe*):
-- 🏆 **Dedicated Story Arcs View (Gold Box-Set Design)**: Instant Smart Filter separating canonical multi-series crossovers (`#F59E0B`/`#EF4444`) from personal reading lists.
-- 🤖 **Gemini Flash AI Matching (Exclusive Engine — Zero Fallback)**: Continuity matching is powered exclusively by Gemini Flash AI. Comic book crossover events span dozens of separate series, one-shots, variant titles, collected edition trades, and tie-ins. Heuristic regex and string rule matchers are notoriously brittle and generate false positives. **Gemini Flash semantic understanding is the only reliable way to achieve accurate, high-confidence continuity matching**. If Gemini is unavailable or finds no confident match, the comic is left untouched—guaranteeing zero metadata corruption.
-- ⏱️ **Narrative Timeline DAG Visualizer**: Visual timeline displaying chronological reading flow, issue importance tags (Core, Essential, Companion), and local library collection gaps.
-- 📖 **In-Reader Continuity Prompts**: Automatically alerts you upon finishing an issue with an *"Up Next in Arc"* prompt leading directly to the next chronological issue.
-- 🏷️ **Tag Comics Now! ComicInfo Standard**: Selectable metadata source enriching files with ComicInfo v2.0/v2.1 `<StoryArc>`, `<StoryArcNumber>`, and `<SeriesGroup>` tags.
-- 📡 **Unified Live Sync & Crawler Logs**: Live SSE streaming console displaying real-time turn-by-turn progress (`[idx/total] (X%)`), AI token estimation, and matched issues. When the crawler indexes new reading orders, candidate comics are automatically evaluated with Gemini.
-- 🛡️ **Polite Scraping & 3-Tier Rescrape Prevention**: High-performance periodic runner with rate limiting (1.2s delay + anti-bot jitter) and Sitemap ETag conditional validation (`HTTP 304`), skipping unmodified pages in < 150ms.
+*(Read the [Story Arcs Engine Docs](docs/WIKI.md#story-arcs--continuity-engine-readingorderscom) in the Wiki.)*
 
 ---
 
