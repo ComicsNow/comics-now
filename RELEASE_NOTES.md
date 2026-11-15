@@ -18,11 +18,11 @@ Welcome to **Comics Now! v5.0.0** — a major release introducing native PDF and
 ### 3. Guided View Hardening (PDF/EPUB, Isolated ONNX Worker & Fallbacks)
 * **PDF & Comic EPUB Support**: Extended both Modal GPU and local CPU Guided View pipelines to detect panels and bubbles on `.pdf` and `.epub` comics.
 * **Isolated Local ONNX Worker**: Moved `onnxruntime-node` inference into a dedicated `child_process.fork` worker (`onnx-worker.js`) serialized by `localCpuMutex` with immediate `SIGKILL` cancellation support.
-* **Detection Accuracy Fixes**: Added EXIF orientation normalization (`sharp().rotate()` locally and `ImageOps.exif_transpose` on Modal) and a `0.5 → 0.15` confidence retry fallback when western comics return zero panels.
+* **Detection & Coordinate Alignment Fixes**: Added EXIF orientation normalization (`sharp().rotate()` locally and `ImageOps.exif_transpose` on Modal), a `0.5 → 0.15` confidence retry fallback when western comics return only full-page fallback boxes, shared `doc_worker.py` PDF page extraction for Modal so detected panel/bubble coordinates match the reader 1:1, and resilient trailing-JSON parsing in `modal-detector.js`.
 
 ### 4. Cover Extraction & Sidecar Tagging for PDF & Comic EPUB
 * **Cover Extraction**: Added `.pdf` first-page rendering and OPF-ordered `.epub` cover extraction in the Python tagger service and Node tagger bridges.
-* **Non-Destructive `.ComicInfo.xml` Sidecars**: `.epub`, `.pdf`, and `.cbr` files always write metadata to adjacent `.ComicInfo.xml` sidecars so source archives remain untouched.
+* **Non-Destructive `.ComicInfo.xml` Sidecars**: `.epub`, `.pdf`, and `.cbr` files always write metadata to adjacent `.ComicInfo.xml` sidecars so source archives remain untouched, and staging folder tagger scans strictly filter to supported, allowed comic extensions (ignoring `.xml` sidecars, `.aria2` partial downloads, and hidden files).
 
 ---
 
@@ -45,5 +45,5 @@ Welcome to **Comics Now! v5.0.0** — a major release introducing native PDF and
 ## 📦 v5.0.0 Changelog
 1. `feat(formats)`: add multi-format visibility (`cbz`/`cbr`/`pdf`/`epub`), explicit `auto_convert_enabled`, per-format `EPUB → CBZ` conversion, Keep/Delete original selectors, and safe first-install defaults
 2. `feat(reader,offline)`: add native PDF and fixed-layout comic EPUB streaming, offline PWA playback, Local Device Library support, and self-hosted `pdfjs-dist` SW precaching
-3. `feat(guided)`: add `.pdf`/`.epub` Guided View support, isolated `SIGKILL`-cancellable local ONNX worker with `localCpuMutex`, EXIF orientation fixes, and `0.5 → 0.15` western zero-panel fallback
-4. `feat(tagger)`: add `.pdf`/`.epub` cover extraction, OPF/PDF metadata fallbacks, and forced `.ComicInfo.xml` sidecar writes for `.cbr`/`.pdf`/`.epub`
+3. `feat(guided)`: add `.pdf`/`.epub` Guided View support, isolated `SIGKILL`-cancellable local ONNX worker with `localCpuMutex`, EXIF orientation fixes, `0.5 → 0.15` western fallback-box retry, and 1:1 Modal/viewer PDF coordinate parity
+4. `feat(tagger)`: add `.pdf`/`.epub` cover extraction, OPF/PDF metadata fallbacks, forced `.ComicInfo.xml` sidecar writes for `.cbr`/`.pdf`/`.epub`, and strict comic-extension filtering in staging scans
