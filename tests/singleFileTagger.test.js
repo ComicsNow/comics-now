@@ -228,8 +228,8 @@ describe('per-comic tag search service', () => {
   });
 
   test('rejects unsupported formats and missing comics with typed errors', async () => {
-    db.dbGet.mockResolvedValueOnce({ ...CBZ_ROW, path: 'fixtures/mock-comic.pdf' });
-    await expect(runSingleFileTagger({ comicId: 'mock-pdf-id' })).rejects.toMatchObject({
+    db.dbGet.mockResolvedValueOnce({ ...CBZ_ROW, path: 'fixtures/mock-comic.txt' });
+    await expect(runSingleFileTagger({ comicId: 'mock-txt-id' })).rejects.toMatchObject({
       code: 'unsupported_format',
       statusCode: 400
     });

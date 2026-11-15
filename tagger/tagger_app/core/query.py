@@ -1,7 +1,7 @@
 """Filename -> search query normalization, shared by every source resolver."""
 import re
 
-COMIC_EXTENSIONS = ('.cbz', '.cbr', '.rar', '.pdf')
+COMIC_EXTENSIONS = ('.cbz', '.cbr', '.rar', '.pdf', '.epub')
 
 
 def strip_comic_extension(filename):

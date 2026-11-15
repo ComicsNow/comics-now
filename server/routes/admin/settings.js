@@ -174,10 +174,13 @@ module.exports = function attach(router, deps) {
         interval = 5,
         apiKey = '',
         allowedFormats = 'cbz',
-        metadataStorage = 'archive',
+        autoConvertEnabled,
+        autoConvertFormats,
+        metadataStorage = 'sidecar',
         pageCacheMaxMb,
         deleteCbrAfterConversion,
         deletePdfAfterConversion,
+        deleteEpubAfterConversion,
         readingOrdersIntervalDays,
         readingOrdersMode
       } = req.body || {};
@@ -210,15 +213,32 @@ module.exports = function attach(router, deps) {
       const minutes = intervalValidation.sanitized;
       const sanitizedApiKey = apiKeyValidation.sanitized;
 
-      const effectiveStorage = metadataStorage === 'sidecar' ? 'sidecar' : 'archive';
+      const effectiveStorage = ['sidecar', 'db', 'archive'].includes(metadataStorage)
+        ? metadataStorage
+        : 'sidecar';
 
       deps.setScanIntervalMinutes(minutes);
-      deps.setAllowedFormats(allowedFormats);
+      const savedFormats = deps.setAllowedFormats(allowedFormats) || allowedFormats;
       deps.setMetadataStorage(effectiveStorage);
 
       await saveSetting('scanInterval', minutes);
-      await saveSetting('allowed_formats', allowedFormats);
+      await saveSetting('allowed_formats', savedFormats);
       await saveSetting('metadata_storage', effectiveStorage);
+
+      if (autoConvertEnabled !== undefined) {
+        const isEnabled = autoConvertEnabled === true || autoConvertEnabled === 'true' || autoConvertEnabled === 1 || autoConvertEnabled === '1';
+        if (typeof deps.setAutoConvertEnabled === 'function') {
+          deps.setAutoConvertEnabled(isEnabled);
+        }
+        await saveSetting('auto_convert_enabled', isEnabled);
+      }
+
+      if (autoConvertFormats !== undefined) {
+        const savedAutoFormats = typeof deps.setAutoConvertFormats === 'function'
+          ? deps.setAutoConvertFormats(autoConvertFormats)
+          : (Array.isArray(autoConvertFormats) ? autoConvertFormats : []);
+        await saveSetting('auto_convert_formats', savedAutoFormats);
+      }
 
       if (deleteCbrAfterConversion !== undefined) {
         const shouldDeleteCbr =
@@ -240,6 +260,17 @@ module.exports = function attach(router, deps) {
           deps.setDeletePdfAfterConversion(shouldDeletePdf);
         }
         await saveSetting('delete_pdf_after_conversion', shouldDeletePdf);
+      }
+
+      if (deleteEpubAfterConversion !== undefined) {
+        const shouldDeleteEpub =
+          deleteEpubAfterConversion === true ||
+          deleteEpubAfterConversion === 'true' ||
+          deleteEpubAfterConversion === 'delete';
+        if (typeof deps.setDeleteEpubAfterConversion === 'function') {
+          deps.setDeleteEpubAfterConversion(shouldDeleteEpub);
+        }
+        await saveSetting('delete_epub_after_conversion', shouldDeleteEpub);
       }
 
       if (sanitizedPageCacheMaxMb !== undefined) {

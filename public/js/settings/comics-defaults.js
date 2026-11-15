@@ -3,6 +3,11 @@ import { html, raw, render } from '../ui/template.js';
 import { showSettingsMessage } from './shared.js';
 import { buildLibraryPrefRow } from './library-pref-row.js';
 import { initStoryArcReaderSettings } from './story-arc-reader-settings.js';
+import {
+  applyFormatControlsToDom,
+  readFormatControlsFromDom,
+  wireFormatControlListeners
+} from './format-controls.js';
 
 const clear = typeof clearElement === 'function' ? clearElement : (el) => { if (el) { if (typeof el.replaceChildren === 'function') el.replaceChildren(); else el.innerHTML = ''; } };
 const renderContent = (typeof render === 'function' && render.length >= 2) ? render : (el, content) => {
@@ -52,9 +57,12 @@ let wired = false;
 const baseline = {
   masterManga: false,
   masterContinuous: false,
-  allowedFormats: 'cbz',
+  allowedFormats: ['cbz'],
+  autoConvertEnabled: false,
+  autoConvertFormats: [],
   deleteCbrAfterConversion: false,
   deletePdfAfterConversion: false,
+  deleteEpubAfterConversion: false,
   libraryPrefs: {}, // path -> { mangaMode, continuousMode }
 };
 
@@ -73,20 +81,11 @@ function currentState() {
       continuousMode: !!row.querySelector('.lib-toggle-scroll')?.checked,
     };
   });
-  const cbrSelect = $('cbr-conversion-originals-select');
-  const pdfSelect = $('pdf-conversion-originals-select');
-  const deleteCbrAfterConversion = cbrSelect
-    ? cbrSelect.value === 'delete'
-    : baseline.deleteCbrAfterConversion;
-  const deletePdfAfterConversion = pdfSelect
-    ? pdfSelect.value === 'delete'
-    : baseline.deletePdfAfterConversion;
+  const fmtState = readFormatControlsFromDom(baseline);
   return {
     masterManga: !!$('master-manga-toggle')?.checked,
     masterContinuous: !!$('master-continuous-toggle')?.checked,
-    allowedFormats: $('allowed-formats-select')?.value || 'cbz',
-    deleteCbrAfterConversion,
-    deletePdfAfterConversion,
+    ...fmtState,
     libraryPrefs,
   };
 }
@@ -95,6 +94,12 @@ function isDirty() {
   const cur = currentState();
   if (cur.masterManga !== baseline.masterManga) return true;
   if (cur.masterContinuous !== baseline.masterContinuous) return true;
+  if (JSON.stringify(cur.allowedFormats) !== JSON.stringify(baseline.allowedFormats)) return true;
+  if (cur.autoConvertEnabled !== baseline.autoConvertEnabled) return true;
+  if (JSON.stringify(cur.autoConvertFormats) !== JSON.stringify(baseline.autoConvertFormats)) return true;
+  if (cur.deleteCbrAfterConversion !== baseline.deleteCbrAfterConversion) return true;
+  if (cur.deletePdfAfterConversion !== baseline.deletePdfAfterConversion) return true;
+  if (cur.deleteEpubAfterConversion !== baseline.deleteEpubAfterConversion) return true;
   const paths = new Set([
     ...Object.keys(cur.libraryPrefs),
     ...Object.keys(baseline.libraryPrefs),
@@ -158,20 +163,23 @@ async function saveAll() {
   if (status) status.textContent = 'Saving…';
 
   try {
-    // 1. Library format & conversion settings (allowedFormats, deleteCbrAfterConversion, deletePdfAfterConversion).
+    // 1. Library format & conversion settings.
     if (
-      cur.allowedFormats !== baseline.allowedFormats ||
+      JSON.stringify(cur.allowedFormats) !== JSON.stringify(baseline.allowedFormats) ||
+      cur.autoConvertEnabled !== baseline.autoConvertEnabled ||
+      JSON.stringify(cur.autoConvertFormats) !== JSON.stringify(baseline.autoConvertFormats) ||
       cur.deleteCbrAfterConversion !== baseline.deleteCbrAfterConversion ||
-      cur.deletePdfAfterConversion !== baseline.deletePdfAfterConversion
+      cur.deletePdfAfterConversion !== baseline.deletePdfAfterConversion ||
+      cur.deleteEpubAfterConversion !== baseline.deleteEpubAfterConversion
     ) {
       let interval = 5;
       let apiKey = '';
-      let metadataStorage = 'archive';
+      let metadataStorage = 'sidecar';
       try {
         const existing = await (await fetch(`${apiBase()}/api/v1/settings`)).json();
         interval = existing.scanInterval ?? 5;
         apiKey = existing.comicVineApiKey ?? '';
-        metadataStorage = existing.metadataStorage ?? 'archive';
+        metadataStorage = existing.metadataStorage ?? 'sidecar';
       } catch (e) {
         console.error('[DEFAULTS] Failed to read existing settings before save:', e);
       }
@@ -182,8 +190,11 @@ async function saveAll() {
           interval,
           apiKey,
           allowedFormats: cur.allowedFormats,
+          autoConvertEnabled: cur.autoConvertEnabled,
+          autoConvertFormats: cur.autoConvertFormats,
           deleteCbrAfterConversion: cur.deleteCbrAfterConversion,
           deletePdfAfterConversion: cur.deletePdfAfterConversion,
+          deleteEpubAfterConversion: cur.deleteEpubAfterConversion,
           metadataStorage,
         }),
       });
@@ -233,20 +244,17 @@ async function loadSettingsValues() {
   try {
     const res = await fetch(`${apiBase()}/api/v1/settings`);
     const data = await res.json();
-    const af = $('allowed-formats-select');
-    if (af && data.allowedFormats) af.value = data.allowedFormats;
-    const cbrSelect = $('cbr-conversion-originals-select');
-    const pdfSelect = $('pdf-conversion-originals-select');
-    const delCbr = data.deleteCbrAfterConversion === true;
-    const delPdf = data.deletePdfAfterConversion === true;
-    if (cbrSelect) cbrSelect.value = delCbr ? 'delete' : 'keep';
-    if (pdfSelect) pdfSelect.value = delPdf ? 'delete' : 'keep';
-    baseline.deleteCbrAfterConversion = delCbr;
-    baseline.deletePdfAfterConversion = delPdf;
+    applyFormatControlsToDom(data);
+    const synced = readFormatControlsFromDom();
+    baseline.allowedFormats = synced.allowedFormats;
+    baseline.autoConvertEnabled = synced.autoConvertEnabled;
+    baseline.autoConvertFormats = synced.autoConvertFormats;
+    baseline.deleteCbrAfterConversion = synced.deleteCbrAfterConversion;
+    baseline.deletePdfAfterConversion = synced.deletePdfAfterConversion;
+    baseline.deleteEpubAfterConversion = synced.deleteEpubAfterConversion;
   } catch (e) {
     console.error('[DEFAULTS] Failed to load settings:', e);
   }
-  baseline.allowedFormats = $('allowed-formats-select')?.value || 'cbz';
 }
 
 async function loadMasterDefaults() {
@@ -342,9 +350,9 @@ export function initComicsDefaults() {
   if (wired) return;
   wired = true;
 
-  $('allowed-formats-select')?.addEventListener('change', refreshDirtyUI);
-  $('cbr-conversion-originals-select')?.addEventListener('change', refreshDirtyUI);
-  $('pdf-conversion-originals-select')?.addEventListener('change', refreshDirtyUI);
+  if (typeof wireFormatControlListeners === 'function') {
+    wireFormatControlListeners(refreshDirtyUI);
+  }
   $('master-manga-toggle')?.addEventListener('change', onMasterMangaChange);
   $('master-continuous-toggle')?.addEventListener('change', onMasterContinuousChange);
   $('comics-defaults-save-btn')?.addEventListener('click', saveAll);

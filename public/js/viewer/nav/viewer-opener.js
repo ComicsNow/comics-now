@@ -145,6 +145,9 @@ async function openComicViewer(comic, options = {}) {
       }
     }
   }
+  try {
+    global.currentComicArchiveCache?.archive?.close?.();
+  } catch (_) {}
   global.currentComic = comic;
   global.currentMetadata = null;
   global.currentComicArchiveCache = null;

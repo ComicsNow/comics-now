@@ -240,8 +240,8 @@ def _include_below_text(boxes: list, gray, orig_h: int, orig_w: int, cur_h: int 
 def _preprocess(img_bytes: bytes, fit: str, orig_w: int = None, orig_h: int = None):
     """Return (tensor, sx, sy, px, py, orig_w, orig_h, gray_np)."""
     import numpy as np
-    from PIL import Image
-    img = Image.open(io.BytesIO(img_bytes)).convert("RGB")
+    from PIL import Image, ImageOps
+    img = ImageOps.exif_transpose(Image.open(io.BytesIO(img_bytes))).convert("RGB")
     cur_w, cur_h = img.size
     if orig_w is None:
         orig_w = cur_w
@@ -275,8 +275,8 @@ def _preprocess(img_bytes: bytes, fit: str, orig_w: int = None, orig_h: int = No
 def _prepare_page_tensors(img_bytes: bytes, comic_type: str = "manga", orig_w: int = None, orig_h: int = None) -> dict:
     """Decode image once and generate required tensors for panels and bubbles."""
     import numpy as np
-    from PIL import Image
-    img = Image.open(io.BytesIO(img_bytes)).convert("RGB")
+    from PIL import Image, ImageOps
+    img = ImageOps.exif_transpose(Image.open(io.BytesIO(img_bytes))).convert("RGB")
     cur_w, cur_h = img.size
     if orig_w is None:
         orig_w = cur_w
@@ -613,11 +613,16 @@ def detect_pages_batch(pages: list, comic_type: str) -> dict:
         try:
             # Mirror processComic in panel-detector.js exactly
             prepared = _prepare_page_tensors(img_bytes, comic_type, orig_w=orig_w, orig_h=orig_h)
-            raw_panels = (
-                _detect_panels(comic_type="manga", conf_threshold=0.1, filter_cls=0, prepared=prepared)
-                if comic_type == "manga"
-                else _detect_panels(comic_type="western", conf_threshold=0.5, filter_cls=0, prepared=prepared)
-            )
+            if comic_type == "manga":
+                raw_panels = _detect_panels(comic_type="manga", conf_threshold=0.1, filter_cls=0, prepared=prepared)
+            else:
+                raw_panels = _detect_panels(comic_type="western", conf_threshold=0.5, filter_cls=0, prepared=prepared)
+                is_full_page_fallback = (
+                    len(raw_panels) == 1
+                    and raw_panels[0] == [0, 0, prepared["orig_w"], prepared["orig_h"]]
+                )
+                if not raw_panels or is_full_page_fallback:
+                    raw_panels = _detect_panels(comic_type="western", conf_threshold=0.15, filter_cls=0, prepared=prepared)
             panels  = _sort_boxes(raw_panels, comic_type)
             bubbles = _detect_bubbles(comic_type=comic_type, prepared=prepared)
             sequence = (

@@ -51,6 +51,7 @@ async function loadOfflineComicPages(comic) {
       : (typeof window !== 'undefined' && typeof window.openClientArchive === 'function' ? window.openClientArchive : null);
 
     let entryNames = [];
+    let archiveType = null;
     if (openArchiveFn) {
       let archive = null;
       if (global.currentComicArchiveCache && global.currentComicArchiveCache.id === comic.id && !global.currentComicArchiveCache.failed) {
@@ -62,6 +63,7 @@ async function loadOfflineComicPages(comic) {
           global.currentComicZipCache = { id: comic.id, zip: archive.zip };
         }
       }
+      archiveType = archive.type;
       entryNames = archive.listEntries();
     } else {
       const JSZipCtor = global.JSZip;
@@ -76,12 +78,13 @@ async function loadOfflineComicPages(comic) {
       });
     }
 
-    const pageNames = entryNames
-      .filter((name) => {
-        if (!name || name.startsWith(MAC_OS_RESOURCE_PREFIX)) return false;
-        return IMAGE_FILE_REGEX.test(name);
-      })
-      .sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }));
+    const filteredEntries = entryNames.filter((name) => {
+      if (!name || name.startsWith(MAC_OS_RESOURCE_PREFIX)) return false;
+      return IMAGE_FILE_REGEX.test(name);
+    });
+    const pageNames = (archiveType === 'epub' || archiveType === 'pdf')
+      ? filteredEntries
+      : filteredEntries.sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }));
 
     // If we're loading from a local handle, we might not have a downloadedComicIds set yet
     if (!global.downloadedComicIds) {

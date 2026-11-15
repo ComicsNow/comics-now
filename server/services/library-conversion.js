@@ -2,11 +2,14 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { spawn } = require('child_process');
+const archiver = require('archiver');
 const { log } = require('../logger');
 const { t0, ms } = require('../utils');
+const { openEpubSession, parseEpubOpfMetadata } = require('./document-pages/epub-reader');
 const {
   getDeleteCbrAfterConversion,
-  getDeletePdfAfterConversion
+  getDeletePdfAfterConversion,
+  getDeleteEpubAfterConversion
 } = require('../config');
 
 const CONVERSION_TIMEOUT_MS = 30 * 60 * 1000;
@@ -85,8 +88,55 @@ function createProgressReporter(label) {
   };
 }
 
+function escapeXml(str) {
+  return String(str || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
+}
+
+function buildComicInfoXml(meta) {
+  if (!meta) return null;
+  const tags = [];
+  if (meta.title) tags.push(`  <Title>${escapeXml(meta.title)}</Title>`);
+  if (meta.series) tags.push(`  <Series>${escapeXml(meta.series)}</Series>`);
+  if (meta.number) tags.push(`  <Number>${escapeXml(meta.number)}</Number>`);
+  if (meta.writer) tags.push(`  <Writer>${escapeXml(meta.writer)}</Writer>`);
+  if (meta.publisher) tags.push(`  <Publisher>${escapeXml(meta.publisher)}</Publisher>`);
+  if (meta.genre) tags.push(`  <Genre>${escapeXml(meta.genre)}</Genre>`);
+  if (meta.summary) tags.push(`  <Summary>${escapeXml(meta.summary)}</Summary>`);
+  if (meta.year) tags.push(`  <Year>${escapeXml(meta.year)}</Year>`);
+  if (meta.month) tags.push(`  <Month>${escapeXml(meta.month)}</Month>`);
+  if (tags.length === 0) return null;
+  return `<?xml version="1.0" encoding="utf-8"?>\n<ComicInfo>\n${tags.join('\n')}\n</ComicInfo>\n`;
+}
+
+async function packFilesToCbz(destCbzPath, populateArchive) {
+  const tmpCbzPath = `${destCbzPath}.${process.pid}.${Date.now()}.tmp`;
+  await fs.promises.mkdir(path.dirname(destCbzPath), { recursive: true });
+  try {
+    await new Promise((resolve, reject) => {
+      const output = fs.createWriteStream(tmpCbzPath);
+      const archive = archiver('zip', { zlib: { level: 0 } });
+      output.on('close', resolve);
+      output.on('error', reject);
+      archive.on('error', reject);
+      archive.pipe(output);
+      Promise.resolve(populateArchive(archive))
+        .then(() => archive.finalize())
+        .catch(reject);
+    });
+    await fs.promises.rename(tmpCbzPath, destCbzPath);
+  } catch (err) {
+    await fs.promises.rm(tmpCbzPath, { force: true }).catch(() => {});
+    throw err;
+  }
+}
+
 /**
- * Converts a .cbr archive to a store-only .cbz archive using unrar and zip directly.
+ * Converts a .cbr archive to a store-only .cbz archive using unrar and archiver.
  */
 async function convertCbrToCbz(cbrPath, options = {}) {
   const start = t0();
@@ -112,12 +162,9 @@ async function convertCbrToCbz(cbrPath, options = {}) {
 
     await stripSymlinks(tempDir);
 
-    await runBinary(
-      'zip',
-      ['-0', '-r', '-q', '-y', safeCbzPath, '--', '.'],
-      tempDir,
-      reportProgress
-    );
+    await packFilesToCbz(safeCbzPath, (archive) => {
+      archive.directory(tempDir, false);
+    });
 
     if (!fs.existsSync(safeCbzPath)) {
       log('ERROR', 'CONVERT', `❌ Failed ${baseName}: CBZ file not created after ${ms(start)} ms`);
@@ -141,7 +188,7 @@ async function convertCbrToCbz(cbrPath, options = {}) {
 }
 
 /**
- * Converts a .pdf file to a .cbz archive using pdftoppm and zip directly.
+ * Converts a .pdf file to a .cbz archive using pdftoppm and archiver.
  */
 async function convertPdfToCbz(pdfPath, options = {}) {
   const start = t0();
@@ -176,12 +223,11 @@ async function convertPdfToCbz(pdfPath, options = {}) {
       return null;
     }
 
-    await runBinary(
-      'zip',
-      ['-j', '-y', safeCbzPath, '--', ...pageFiles],
-      tempDir,
-      reportProgress
-    );
+    await packFilesToCbz(safeCbzPath, (archive) => {
+      for (const file of pageFiles) {
+        archive.file(path.join(tempDir, file), { name: file });
+      }
+    });
 
     if (!fs.existsSync(safeCbzPath)) {
       log('ERROR', 'CONVERT', `❌ Failed ${baseName}: CBZ file not created after ${ms(start)} ms`);
@@ -204,7 +250,65 @@ async function convertPdfToCbz(pdfPath, options = {}) {
   }
 }
 
+/**
+ * Converts an image/fixed-layout comic .epub file to a .cbz archive using archiver.
+ */
+async function convertEpubToCbz(epubPath, options = {}) {
+  const start = t0();
+  const baseName = path.basename(epubPath);
+  log('INFO', 'CONVERT', `Converting EPUB: ${baseName}`);
+
+  const safeEpubPath = path.resolve(epubPath);
+  const safeCbzPath = path.resolve(epubPath.replace(/\.epub$/i, '.cbz'));
+  const shouldDelete = resolveDeleteFlag(options.deleteOriginals, getDeleteEpubAfterConversion);
+
+  let session = null;
+  try {
+    session = await openEpubSession(safeEpubPath);
+    if (!session.pages || session.pages.length === 0) {
+      log('ERROR', 'CONVERT', `❌ Failed ${baseName}: No comic images found in EPUB`);
+      return null;
+    }
+
+    const opfMeta = await parseEpubOpfMetadata(safeEpubPath).catch(() => null);
+    const comicInfoXml = buildComicInfoXml(opfMeta);
+
+    await packFilesToCbz(safeCbzPath, async (archive) => {
+      for (let i = 0; i < session.pages.length; i++) {
+        const entryName = session.pages[i];
+        const ext = path.extname(entryName).toLowerCase() || '.jpg';
+        const outName = `page-${String(i + 1).padStart(4, '0')}${ext}`;
+        const buf = await session.readBuffer(entryName);
+        archive.append(buf, { name: outName });
+      }
+      if (comicInfoXml) {
+        archive.append(Buffer.from(comicInfoXml, 'utf8'), { name: 'ComicInfo.xml' });
+      }
+    });
+
+    if (!fs.existsSync(safeCbzPath)) {
+      log('ERROR', 'CONVERT', `❌ Failed ${baseName}: CBZ file not created after ${ms(start)} ms`);
+      return null;
+    }
+
+    if (shouldDelete) {
+      await fs.promises.unlink(safeEpubPath);
+    }
+
+    log('INFO', 'CONVERT', `✅ Created: ${path.basename(safeCbzPath)} in ${ms(start)} ms`);
+    return safeCbzPath;
+  } catch (err) {
+    log('ERROR', 'CONVERT', `❌ Failed ${baseName}: ${err.message} after ${ms(start)} ms`);
+    return null;
+  } finally {
+    if (session) {
+      await session.close().catch(() => {});
+    }
+  }
+}
+
 module.exports = {
   convertCbrToCbz,
-  convertPdfToCbz
+  convertPdfToCbz,
+  convertEpubToCbz
 };

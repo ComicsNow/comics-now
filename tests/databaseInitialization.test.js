@@ -89,6 +89,34 @@ describe('Database Initialization & Schema Integrity', () => {
     const allowedFormats = await dbGet("SELECT value FROM settings WHERE key = 'allowed_formats'");
     expect(allowedFormats).toBeDefined();
     expect(JSON.parse(allowedFormats.value)).toBe('cbz');
+
+    const metadataStorage = await dbGet("SELECT value FROM settings WHERE key = 'metadata_storage'");
+    expect(metadataStorage).toBeDefined();
+    expect(JSON.parse(metadataStorage.value)).toBe('sidecar');
+
+    const autoConvertEnabled = await dbGet("SELECT value FROM settings WHERE key = 'auto_convert_enabled'");
+    expect(autoConvertEnabled).toBeDefined();
+    expect(JSON.parse(autoConvertEnabled.value)).toBe(false);
+
+    const autoConvertFormats = await dbGet("SELECT value FROM settings WHERE key = 'auto_convert_formats'");
+    expect(autoConvertFormats).toBeDefined();
+    expect(JSON.parse(autoConvertFormats.value)).toEqual([]);
+
+    const deleteEpub = await dbGet("SELECT value FROM settings WHERE key = 'delete_epub_after_conversion'");
+    expect(deleteEpub).toBeDefined();
+    expect(JSON.parse(deleteEpub.value)).toBe(false);
+
+    const guidedAuto = await dbGet("SELECT value FROM settings WHERE key = 'guided.autoOnAdd'");
+    expect(guidedAuto).toBeDefined();
+    expect(JSON.parse(guidedAuto.value)).toBe(false);
+
+    const guidedSchedule = await dbGet("SELECT value FROM settings WHERE key = 'guided.scheduleEnabled'");
+    expect(guidedSchedule).toBeDefined();
+    expect(JSON.parse(guidedSchedule.value)).toBe(false);
+
+    const guidedModal = await dbGet("SELECT value FROM settings WHERE key = 'guided.useModal'");
+    expect(guidedModal).toBeDefined();
+    expect(JSON.parse(guidedModal.value)).toBe(false);
   });
 
   test('all performance and lookup indexes exist', async () => {

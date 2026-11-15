@@ -6,6 +6,7 @@ const path = require('path');
 const { Readable } = require('stream');
 const { spawn } = require('child_process');
 const { isImage } = require('../utils');
+const { isDocumentExtension, openDocumentArchive } = require('./archive-dispatch');
 
 function isSafeEntry(name) {
     if (typeof name !== 'string') return false;
@@ -257,19 +258,12 @@ async function createRarReader(filePath) {
 
 async function openArchive(filePath) {
     const ext = path.extname(filePath).toLowerCase();
-    if (ext === '.cbz' || ext === '.zip') {
-        return createZipReader(filePath);
-    } else if (ext === '.cbr' || ext === '.rar') {
-        return createRarReader(filePath);
-    } else {
-        throw new Error('Unsupported archive format: ' + ext);
-    }
+    if (ext === '.cbz' || ext === '.zip') return createZipReader(filePath);
+    if (ext === '.cbr' || ext === '.rar') return createRarReader(filePath);
+    if (isDocumentExtension(ext)) return openDocumentArchive(ext, filePath);
+    throw new Error('Unsupported archive format: ' + ext);
 }
 
-/**
- * Filters archive entries down to visible image pages in reading order.
- * RAR entry names may use backslashes, so path parts are split on both separators.
- */
 function selectImagePages(entries) {
     return (entries || [])
         .filter(e => typeof e === 'string' && isImage(e))
@@ -278,7 +272,9 @@ function selectImagePages(entries) {
 }
 
 function createArchiveSession(archive) {
-    const pages = selectImagePages(archive.listEntries());
+    const pages = Array.isArray(archive.orderedPages)
+        ? [...archive.orderedPages]
+        : selectImagePages(archive.listEntries());
     let closed = false;
     let inFlight = 0;
     let idleResolve = null;

@@ -9,35 +9,58 @@ describe('Separate CBR and PDF Delete Originals After Conversion Settings', () =
     jest.clearAllMocks();
   });
 
-  test('DEFAULT_CONFIG defaults both delete_cbr_after_conversion and delete_pdf_after_conversion to false (Keep)', () => {
+  test('DEFAULT_CONFIG defaults auto-convert OFF, delete flags false (Keep), and metadata_storage to sidecar', () => {
+    expect(config.DEFAULT_CONFIG.auto_convert_enabled).toBe(false);
+    expect(config.DEFAULT_CONFIG.auto_convert_formats).toEqual([]);
     expect(config.DEFAULT_CONFIG.delete_cbr_after_conversion).toBe(false);
     expect(config.DEFAULT_CONFIG.delete_pdf_after_conversion).toBe(false);
+    expect(config.DEFAULT_CONFIG.delete_epub_after_conversion).toBe(false);
+    expect(config.DEFAULT_CONFIG.metadata_storage).toBe('sidecar');
     expect(config.DEFAULT_CONFIG.delete_originals_after_conversion).toBeUndefined();
   });
 
-  test('config.example.json includes delete_cbr_after_conversion and delete_pdf_after_conversion set to false by default', () => {
+  test('config.example.json includes first-install defaults for auto-convert, epub delete flag, and sidecar metadata', () => {
     const examplePath = path.join(__dirname, '..', 'config.example.json');
     const parsed = JSON.parse(fs.readFileSync(examplePath, 'utf8'));
+    expect(parsed.auto_convert_enabled).toBe(false);
+    expect(parsed.auto_convert_formats).toEqual([]);
     expect(parsed.delete_cbr_after_conversion).toBe(false);
     expect(parsed.delete_pdf_after_conversion).toBe(false);
+    expect(parsed.delete_epub_after_conversion).toBe(false);
+    expect(parsed.metadata_storage).toBe('sidecar');
     expect(parsed.delete_originals_after_conversion).toBeUndefined();
   });
 
-  test('CBR and PDF config accessors toggle independently', () => {
+  test('CBR, PDF, EPUB, and auto-convert config accessors toggle independently', () => {
     expect(typeof config.getDeleteCbrAfterConversion).toBe('function');
     expect(typeof config.setDeleteCbrAfterConversion).toBe('function');
     expect(typeof config.getDeletePdfAfterConversion).toBe('function');
     expect(typeof config.setDeletePdfAfterConversion).toBe('function');
+    expect(typeof config.getDeleteEpubAfterConversion).toBe('function');
+    expect(typeof config.setDeleteEpubAfterConversion).toBe('function');
+    expect(typeof config.getAutoConvertEnabled).toBe('function');
+    expect(typeof config.setAutoConvertEnabled).toBe('function');
+    expect(typeof config.getAutoConvertFormats).toBe('function');
+    expect(typeof config.setAutoConvertFormats).toBe('function');
 
     config.setDeleteCbrAfterConversion(true, true);
     config.setDeletePdfAfterConversion(false, true);
+    config.setDeleteEpubAfterConversion(true, true);
     expect(config.getDeleteCbrAfterConversion()).toBe(true);
     expect(config.getDeletePdfAfterConversion()).toBe(false);
+    expect(config.getDeleteEpubAfterConversion()).toBe(true);
 
     config.setDeleteCbrAfterConversion('keep', true);
     config.setDeletePdfAfterConversion('delete', true);
+    config.setDeleteEpubAfterConversion('keep', true);
     expect(config.getDeleteCbrAfterConversion()).toBe(false);
     expect(config.getDeletePdfAfterConversion()).toBe(true);
+    expect(config.getDeleteEpubAfterConversion()).toBe(false);
+
+    config.setAutoConvertEnabled(true, true);
+    config.setAutoConvertFormats(['pdf', 'epub', 'cbz'], true);
+    expect(config.getAutoConvertEnabled()).toBe(true);
+    expect(config.getAutoConvertFormats()).toEqual(['pdf', 'epub']);
   });
 
   test('GET /api/v1/settings returns deleteCbrAfterConversion and deletePdfAfterConversion', async () => {

@@ -4,7 +4,7 @@
 
 const SCOPE_URL = new URL(self.registration.scope);
 const BASE_PATH = SCOPE_URL.pathname;
-const CACHE_VERSION = 'v9.2';
+const CACHE_VERSION = 'v9.3';
 const CACHE_NAME = `comics-now-${CACHE_VERSION}-${BASE_PATH}`;
 const DOWNLOADS_CACHE_NAME = 'comics-now-downloads';
 
@@ -19,6 +19,8 @@ const ASSET_PATHS = [
   'tailwind.css',
   'jszip.min.js',
   'unrar.wasm',
+  'vendor/pdfjs/pdf.mjs',
+  'vendor/pdfjs/pdf.worker.mjs',
   'manifest.json',
   'icons/icon-192x192.png',
   'icons/icon-512x512.png',

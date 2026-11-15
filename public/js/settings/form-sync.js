@@ -11,6 +11,7 @@ import {
 } from '../globals.js';
 import { html, render } from '../ui/template.js';
 import { triggerScan } from '../events.js';
+import { applyFormatControlsToDom, readFormatControlsFromDom } from './format-controls.js';
 
 const global = typeof canonicalGlobal !== 'undefined' ? canonicalGlobal : new Proxy(typeof window !== 'undefined' ? window : globalThis, {
   get: (t, p) => (typeof state !== 'undefined' && p in state) ? state[p] : t[p],
@@ -68,20 +69,7 @@ export async function fetchSettings() {
       }
     }
 
-    const allowedFormatsSelect = document.getElementById('allowed-formats-select');
-    if (allowedFormatsSelect && data.allowedFormats) {
-      allowedFormatsSelect.value = data.allowedFormats;
-    }
-
-    const cbrConversionSelect = document.getElementById('cbr-conversion-originals-select');
-    if (cbrConversionSelect && data.deleteCbrAfterConversion !== undefined) {
-      cbrConversionSelect.value = data.deleteCbrAfterConversion ? 'delete' : 'keep';
-    }
-
-    const pdfConversionSelect = document.getElementById('pdf-conversion-originals-select');
-    if (pdfConversionSelect && data.deletePdfAfterConversion !== undefined) {
-      pdfConversionSelect.value = data.deletePdfAfterConversion ? 'delete' : 'keep';
-    }
+    applyFormatControlsToDom(data);
 
     const readingOrdersIntervalInput = document.getElementById('reading-orders-interval-input');
     if (readingOrdersIntervalInput && data.readingOrdersIntervalDays !== undefined) {
@@ -138,16 +126,23 @@ export function initSettingsFormEvents() {
       const readingOrdersMode = readingOrdersModeSelect ? readingOrdersModeSelect.value : undefined;
       let apiKey = '';
       let allowedFormats = 'cbz';
-      let metadataStorage = 'archive';
+      let autoConvertEnabled = false;
+      let autoConvertFormats = [];
+      let metadataStorage = 'sidecar';
       let deleteCbrAfterConversion = false;
       let deletePdfAfterConversion = false;
+      let deleteEpubAfterConversion = false;
       try {
         const existing = await (await fetch(`${global.API_BASE_URL}/api/v1/settings`)).json();
         apiKey = existing.comicVineApiKey || '';
-        allowedFormats = existing.allowedFormats || 'cbz';
-        metadataStorage = existing.metadataStorage || 'archive';
-        deleteCbrAfterConversion = existing.deleteCbrAfterConversion === true;
-        deletePdfAfterConversion = existing.deletePdfAfterConversion === true;
+        metadataStorage = existing.metadataStorage || 'sidecar';
+        const uiFormats = readFormatControlsFromDom(existing);
+        allowedFormats = uiFormats.allowedFormats;
+        autoConvertEnabled = uiFormats.autoConvertEnabled;
+        autoConvertFormats = uiFormats.autoConvertFormats;
+        deleteCbrAfterConversion = uiFormats.deleteCbrAfterConversion;
+        deletePdfAfterConversion = uiFormats.deletePdfAfterConversion;
+        deleteEpubAfterConversion = uiFormats.deleteEpubAfterConversion;
       } catch (err) {
         console.error('Failed to read existing settings before save:', err);
       }
@@ -160,10 +155,13 @@ export function initSettingsFormEvents() {
             interval,
             apiKey,
             allowedFormats,
+            autoConvertEnabled,
+            autoConvertFormats,
             metadataStorage,
             pageCacheMaxMb,
             deleteCbrAfterConversion,
             deletePdfAfterConversion,
+            deleteEpubAfterConversion,
             readingOrdersIntervalDays,
             readingOrdersMode
           })

@@ -6,8 +6,11 @@ const {
   setComicVineApiKey,
   setCtScheduleMinutes,
   setAllowedFormats,
+  setAutoConvertEnabled,
+  setAutoConvertFormats,
   setDeleteCbrAfterConversion,
   setDeletePdfAfterConversion,
+  setDeleteEpubAfterConversion,
   setMetadataStorage,
   setTaggerMode,
   setTaggerServiceUrl,
@@ -78,6 +81,16 @@ async function loadSettings() {
           setAllowedFormats(row.value, true);
         }
       }
+      if (row.key === 'auto_convert_enabled') {
+        let val;
+        try { val = JSON.parse(row.value); } catch { val = row.value; }
+        setAutoConvertEnabled(val, true);
+      }
+      if (row.key === 'auto_convert_formats') {
+        let val;
+        try { val = JSON.parse(row.value); } catch { val = row.value; }
+        setAutoConvertFormats(val, true);
+      }
       if (row.key === 'delete_cbr_after_conversion') {
         let val;
         try { val = JSON.parse(row.value); } catch { val = row.value; }
@@ -87,6 +100,11 @@ async function loadSettings() {
         let val;
         try { val = JSON.parse(row.value); } catch { val = row.value; }
         setDeletePdfAfterConversion(val, true);
+      }
+      if (row.key === 'delete_epub_after_conversion') {
+        let val;
+        try { val = JSON.parse(row.value); } catch { val = row.value; }
+        setDeleteEpubAfterConversion(val, true);
       }
       if (row.key === 'metadata_storage') {
         try {

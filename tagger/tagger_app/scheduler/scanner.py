@@ -9,6 +9,7 @@ import queue
 from concurrent.futures import ThreadPoolExecutor
 
 from tagger_app.config import UPLOAD_FOLDER, STATIC_TEMP_DIR
+from tagger_app.core.comic_files import is_supported_comic_file
 from tagger_app.core.tagger import process_single_cbz_file
 from tagger_app.core.enhancer import enhance_single_cbz_file
 from tagger_app.persistence.scan_logs import write_scan_log
@@ -41,7 +42,7 @@ def run_scheduled_scan():
     try:
         cbz_files = sorted([
             os.path.join(folder_path, f) for f in os.listdir(folder_path)
-            if f.lower().endswith('.cbz')
+            if is_supported_comic_file(f)
         ])
 
         results = []

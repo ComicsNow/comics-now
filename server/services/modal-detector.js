@@ -44,6 +44,24 @@ function buildEnv(credentials = {}) {
 
 let _readyWorkspaceCache = new Set();
 
+function parseJsonStdout(stdout) {
+  const trimmed = String(stdout || '').trim();
+  if (!trimmed) return null;
+  try {
+    return JSON.parse(trimmed);
+  } catch (_) {}
+
+  const lines = trimmed.split(/\r?\n/);
+  for (let i = lines.length - 1; i >= 0; i--) {
+    const line = lines[i].trim();
+    if (!line.startsWith('{')) continue;
+    try {
+      return JSON.parse(line);
+    } catch (_) {}
+  }
+  return null;
+}
+
 function runScriptJson(args, credentials = {}) {
   const pythonBin = getPythonBin();
   const useNice = fs.existsSync('/usr/bin/nice');
@@ -65,14 +83,11 @@ function runScriptJson(args, credentials = {}) {
     });
 
     child.on('close', (code) => {
-      try {
-        const trimmed = stdout.trim();
-        if (trimmed) {
-          const parsed = JSON.parse(trimmed);
-          resolve(parsed);
-          return;
-        }
-      } catch (_) {}
+      const parsed = parseJsonStdout(stdout);
+      if (parsed) {
+        resolve(parsed);
+        return;
+      }
 
       if (code !== 0) {
         resolve({
@@ -188,24 +203,20 @@ async function processComic(id, comicPath, type, opts = {}) {
         return;
       }
 
-      try {
-        const trimmed = stdout.trim();
-        if (trimmed) {
-          const parsed = JSON.parse(trimmed);
-          if (parsed.ok) {
-            resolve({
-              panels: parsed.panels,
-              pagesProcessed: parsed.pagesProcessed,
-              pageCount: parsed.pageCount,
-              outputPath: parsed.outputPath
-            });
-            return;
-          } else {
-            reject(new Error(parsed.error || 'Modal detection failed'));
-            return;
-          }
+      const parsed = parseJsonStdout(stdout);
+      if (parsed) {
+        if (parsed.ok) {
+          resolve({
+            panels: parsed.panels,
+            pagesProcessed: parsed.pagesProcessed,
+            pageCount: parsed.pageCount,
+            outputPath: parsed.outputPath
+          });
+          return;
         }
-      } catch (_) {}
+        reject(new Error(parsed.error || 'Modal detection failed'));
+        return;
+      }
 
       const errMsg = stderr.trim() || `Modal process exited with code ${code}`;
       reject(new Error(errMsg));

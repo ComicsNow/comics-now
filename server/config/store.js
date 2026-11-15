@@ -17,6 +17,7 @@ const {
 const { applyEnvOverrides } = require('./env');
 const { createTaggerConfigAccessors, encryptConfigSecretsInPlace } = require('./tagger-config');
 const { createStoryArcsConfigAccessors } = require('./story-arcs-config');
+const { createFormatConfigAccessors } = require('./formats');
 
 const DEFAULT_CONFIG = {
   port: 3000,
@@ -28,9 +29,12 @@ const DEFAULT_CONFIG = {
   comicVineApiKey: '',
   ctScheduleMinutes: 60,
   allowed_formats: 'cbz',
+  auto_convert_enabled: false,
+  auto_convert_formats: [],
   delete_cbr_after_conversion: false,
   delete_pdf_after_conversion: false,
-  metadata_storage: 'archive',
+  delete_epub_after_conversion: false,
+  metadata_storage: 'sidecar',
   trustProxy: false,
   taggerMode: 'new',
   taggerServiceUrl: 'http://127.0.0.1:5000',
@@ -231,60 +235,6 @@ function setPageCacheMaxMb(value, skipSave = false) {
   return sanitized;
 }
 
-function getAllowedFormats() {
-  return config.allowed_formats || 'cbz';
-}
-
-function setAllowedFormats(value, skipSave = false) {
-  const allowed = ['cbz', 'cbr', 'both'];
-  const sanitized = allowed.includes(value) ? value : 'cbz';
-  config.allowed_formats = sanitized;
-  if (!skipSave) {
-    saveConfigToDisk();
-  }
-  return sanitized;
-}
-
-function getDeleteCbrAfterConversion() {
-  return config.delete_cbr_after_conversion === true;
-}
-
-function setDeleteCbrAfterConversion(value, skipSave = false) {
-  const sanitized = value === true || value === 'true' || value === 'delete';
-  config.delete_cbr_after_conversion = sanitized;
-  if (!skipSave) {
-    saveConfigToDisk();
-  }
-  return sanitized;
-}
-
-function getDeletePdfAfterConversion() {
-  return config.delete_pdf_after_conversion === true;
-}
-
-function setDeletePdfAfterConversion(value, skipSave = false) {
-  const sanitized = value === true || value === 'true' || value === 'delete';
-  config.delete_pdf_after_conversion = sanitized;
-  if (!skipSave) {
-    saveConfigToDisk();
-  }
-  return sanitized;
-}
-
-function getMetadataStorage() {
-  return config.metadata_storage || 'archive';
-}
-
-function setMetadataStorage(value, skipSave = false) {
-  const allowed = ['archive', 'db', 'sidecar'];
-  const sanitized = allowed.includes(value) ? value : 'archive';
-  config.metadata_storage = sanitized;
-  if (!skipSave) {
-    saveConfigToDisk();
-  }
-  return sanitized;
-}
-
 function getCorsConfig() {
   if (!config.cors) {
     return { enabled: false, allowedOrigins: [] };
@@ -333,6 +283,7 @@ function setComicsLocation(location, skipSave = false) {
 
 const taggerAccessors = createTaggerConfigAccessors(config, saveConfigToDisk);
 const storyArcsAccessors = createStoryArcsConfigAccessors(config, saveConfigToDisk);
+const formatAccessors = createFormatConfigAccessors(config, saveConfigToDisk);
 
 module.exports = {
   DEFAULT_CONFIG,
@@ -354,20 +305,13 @@ module.exports = {
   setPageCacheMaxMb,
   getComicsLocation,
   setComicsLocation,
-  getAllowedFormats,
-  setAllowedFormats,
-  getDeleteCbrAfterConversion,
-  setDeleteCbrAfterConversion,
-  getDeletePdfAfterConversion,
-  setDeletePdfAfterConversion,
-  getMetadataStorage,
-  setMetadataStorage,
   getCorsConfig,
   getAuthConfig,
   isAuthEnabled,
   getAdminEmail,
   getCloudflareConfig,
   getTrustedIPs,
+  ...formatAccessors,
   ...taggerAccessors,
   ...storyArcsAccessors
 };

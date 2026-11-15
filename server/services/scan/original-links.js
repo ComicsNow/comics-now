@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 
-const ORIGINAL_EXTENSIONS = ['.cbr', '.pdf'];
+const ORIGINAL_EXTENSIONS = ['.cbr', '.pdf', '.epub'];
 
 /**
  * Builds a Map of resolved original path -> converted CBZ path.

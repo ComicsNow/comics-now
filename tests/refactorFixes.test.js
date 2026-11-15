@@ -81,6 +81,9 @@ describe('Phase 1A Bug Fixes & safeHtml XSS Fallback Hardening', () => {
         return { ok: true, json: async () => ({}) };
       });
 
+      const formatControlsCode = stripEsmSyntax(
+        fs.readFileSync(path.join(ROOT_DIR, 'public/js/settings/format-controls.js'), 'utf8')
+      );
       const prefRowCode = stripEsmSyntax(
         fs.readFileSync(path.join(ROOT_DIR, 'public/js/settings/library-pref-row.js'), 'utf8')
       );
@@ -107,7 +110,7 @@ describe('Phase 1A Bug Fixes & safeHtml XSS Fallback Hardening', () => {
         Promise
       };
       vm.createContext(sandbox);
-      vm.runInContext(prefRowCode + '\n' + defaultsCode, sandbox);
+      vm.runInContext(formatControlsCode + '\n' + prefRowCode + '\n' + defaultsCode, sandbox);
 
       await sandbox.reloadAll();
 
@@ -134,6 +137,7 @@ describe('Phase 1A Bug Fixes & safeHtml XSS Fallback Hardening', () => {
         showSettingsMessage: jest.fn(),
         buildLibraryPrefRow: jest.fn(),
         initStoryArcReaderSettings: jest.fn(),
+        wireFormatControlListeners: jest.fn(),
         console: { log: jest.fn(), warn: jest.fn(), error: jest.fn() },
         Set,
         Object,

@@ -95,7 +95,7 @@ def is_safe_cbz_path(file_path):
     real_path = os.path.realpath(abs_path)
     if _is_forbidden_system_path(abs_path) or _is_forbidden_system_path(real_path):
         return False
-    if not abs_path.lower().endswith((".cbz", ".cbr")):
+    if not abs_path.lower().endswith((".cbz", ".cbr", ".pdf", ".epub")):
         return False
     return os.path.isfile(abs_path)
 

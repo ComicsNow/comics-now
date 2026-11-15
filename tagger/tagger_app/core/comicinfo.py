@@ -383,14 +383,14 @@ def write_comic_info_sidecar(file_path, xml_str):
     print("[+] External ComicInfo.xml sidecar written successfully!")
 
 
-def write_comic_info(file_path, xml_str, storage_mode="archive"):
+def write_comic_info(file_path, xml_str, storage_mode="sidecar"):
     """
     Dispatch ComicInfo.xml writing based on the shared storage mode.
     'sidecar' -> external adjacent file only (archive untouched).
     anything else ('archive', etc.) -> embedded inside the CBZ.
-    Non-ZIP archives (CBR/RAR) always fall back to the sidecar.
+    Non-CBZ formats (CBR/RAR/PDF/EPUB) always fall back to the sidecar.
     """
-    if storage_mode == "sidecar" or not zipfile.is_zipfile(file_path):
+    if storage_mode == "sidecar" or file_path.lower().endswith((".cbr", ".pdf", ".epub")) or not zipfile.is_zipfile(file_path):
         write_comic_info_sidecar(file_path, xml_str)
     else:
         write_comic_info_to_cbz(file_path, xml_str)

@@ -3,6 +3,7 @@ const path = require('path');
 const { THUMBNAILS_DIRECTORY, GUIDED_VIEW_DIR } = require('../../../constants');
 const { formatFolderPath, updateComicIdentity, planOriginalMove } = require('../../../services/organization');
 const { getFolderRules } = require('../../../config');
+const { SUPPORTED_COMIC_EXTENSIONS, isComicFormatAllowed } = require('../../../services/comic-formats');
 
 module.exports = function attachMoveRoutes(router, deps) {
   const {
@@ -72,10 +73,8 @@ module.exports = function attachMoveRoutes(router, deps) {
 
       const files = comics.filter(c => {
         if (!fs.existsSync(c.path)) return false;
-        const ext = c.name.toLowerCase();
-        if (ext.endsWith('.cbz')) return allowedFormats === 'cbz' || allowedFormats === 'both';
-        if (ext.endsWith('.cbr')) return allowedFormats === 'cbr' || allowedFormats === 'both';
-        return false;
+        const ext = path.extname(c.name).toLowerCase();
+        return SUPPORTED_COMIC_EXTENSIONS.includes(ext) && isComicFormatAllowed(c.name, allowedFormats);
       });
 
       if (files.length === 0) {

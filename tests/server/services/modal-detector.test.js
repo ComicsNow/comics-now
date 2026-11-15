@@ -221,5 +221,26 @@ describe('modal-detector', () => {
       });
       await expect(promise).rejects.toThrow('Cancelled');
     });
+
+    it('parses trailing JSON when stdout contains leading warning lines', async () => {
+      const promise = modalDetector.processComic('comic-123', '/path/to/comic.pdf', 'western');
+
+      mockProcess.stdout.emit('data', 'warning: The `fitz` API is deprecated and will be removed in future.\n' + JSON.stringify({
+        ok: true,
+        panels: 112,
+        pagesProcessed: 30,
+        pageCount: 30,
+        outputPath: '/tmp/out.json'
+      }) + '\n');
+      mockProcess.emit('close', 0);
+
+      const res = await promise;
+      expect(res).toEqual({
+        panels: 112,
+        pagesProcessed: 30,
+        pageCount: 30,
+        outputPath: '/tmp/out.json'
+      });
+    });
   });
 });

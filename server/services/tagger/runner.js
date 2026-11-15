@@ -14,6 +14,15 @@ const review = require('./review');
 const companionSync = require('./companion-sync');
 const fileRunState = require('./file-run-state');
 const { resolveCoverPath, buildTaggerRequest } = require('./single-file');
+const { SUPPORTED_COMIC_EXTENSIONS, isComicFormatAllowed } = require('../comic-formats');
+
+function filterTaggerComicEntries(entries, allowedFormats = ['cbz']) {
+  return (entries || []).filter(e => {
+    if (!e || !e.isFile() || !e.name || e.name.startsWith('.')) return false;
+    const ext = path.extname(e.name).toLowerCase();
+    return SUPPORTED_COMIC_EXTENSIONS.includes(ext) && isComicFormatAllowed(e.name, allowedFormats);
+  });
+}
 
 let ctInterval = null;
 let ctRunning = false;
@@ -100,14 +109,8 @@ async function runComicTagger(options = {}) {
     }
 
     const entries = await fs.promises.readdir(dir, { withFileTypes: true });
-    const allowedFormats = appConfig.allowed_formats || 'cbz';
-    const comicFiles = entries.filter(e => {
-      if (!e.isFile()) return false;
-      const ext = path.extname(e.name).toLowerCase();
-      if (ext === '.cbz') return allowedFormats === 'cbz' || allowedFormats === 'both';
-      if (ext === '.cbr') return allowedFormats === 'cbr' || allowedFormats === 'both';
-      return false;
-    });
+    const allowedFormats = appConfig.allowed_formats || ['cbz'];
+    const comicFiles = filterTaggerComicEntries(entries, allowedFormats);
 
     if (comicFiles.length === 0) {
       ctLog(`ⓘ No supported comic files found to process (Allowed: ${allowedFormats})`);
@@ -142,7 +145,8 @@ async function runComicTagger(options = {}) {
       fileIndex++;
       const itemStart = Date.now();
       const filePath = path.join(dir, entry.name);
-      const isCbr = path.extname(entry.name).toLowerCase() === '.cbr';
+      const ext = path.extname(entry.name).toLowerCase();
+      const isCbr = ext === '.cbr' || ext === '.pdf' || ext === '.epub';
       const id = createId(filePath);
 
       let stats;
@@ -353,5 +357,6 @@ module.exports = {
   isTaggerRunning,
   cancelComicTagger,
   scheduleCtRun,
-  runComicTagger
+  runComicTagger,
+  filterTaggerComicEntries
 };

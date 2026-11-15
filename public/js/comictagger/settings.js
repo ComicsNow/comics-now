@@ -26,7 +26,7 @@ export async function fetchCtSettings() {
     if (scanFolderInput) scanFolderInput.value = data.comicsLocation || '';
 
     const storageInput = document.getElementById('ct-storage-input');
-    if (storageInput) storageInput.value = data.metadataStorage || 'archive';
+    if (storageInput) storageInput.value = data.metadataStorage || 'sidecar';
     
     const upperInput = document.getElementById('ct-upper-threshold-input');
     if (upperInput) upperInput.value = Math.round((data.upperThreshold || 0.90) * 100);

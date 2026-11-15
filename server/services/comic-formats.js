@@ -1,18 +1,50 @@
 const path = require('path');
 
+const ALL_COMIC_FORMATS = Object.freeze(['cbz', 'cbr', 'pdf', 'epub']);
+const SUPPORTED_COMIC_EXTENSIONS = Object.freeze(['.cbz', '.cbr', '.pdf', '.epub']);
+const CONVERTIBLE_COMIC_FORMATS = Object.freeze(['cbr', 'pdf', 'epub']);
+
 /**
- * Read-side visibility check for the Allowed Library Formats setting.
- * Only .cbz/.cbr are in scope; unknown or extensionless names stay visible.
+ * Normalize an allowedFormats setting (legacy string, CSV, or array) into a
+ * deduplicated list of supported comic format identifiers.
  */
-function isComicFormatAllowed(fileNameOrPath, allowedFormats = 'cbz') {
-    const ext = path.extname(String(fileNameOrPath || '')).toLowerCase();
-    if (ext !== '.cbz' && ext !== '.cbr') return true;
+function normalizeAllowedFormats(allowedFormats = 'cbz') {
+  if (Array.isArray(allowedFormats)) {
+    const valid = [];
+    for (const item of allowedFormats) {
+      const norm = String(item || '').trim().toLowerCase();
+      if (ALL_COMIC_FORMATS.includes(norm) && !valid.includes(norm)) {
+        valid.push(norm);
+      }
+    }
+    return valid.length > 0 ? valid : ['cbz'];
+  }
 
-    const mode = String(allowedFormats || 'cbz').trim().toLowerCase();
-    const effective = (mode === 'cbr' || mode === 'both') ? mode : 'cbz';
-
-    if (ext === '.cbz') return effective === 'cbz' || effective === 'both';
-    return effective === 'cbr' || effective === 'both';
+  const raw = String(allowedFormats || 'cbz').trim().toLowerCase();
+  if (raw === 'both') return ['cbz', 'cbr'];
+  if (raw === 'all') return [...ALL_COMIC_FORMATS];
+  if (raw.includes(',')) {
+    return normalizeAllowedFormats(raw.split(','));
+  }
+  return ALL_COMIC_FORMATS.includes(raw) ? [raw] : ['cbz'];
 }
 
-module.exports = { isComicFormatAllowed };
+/**
+ * Read-side visibility check for the Allowed Library Formats setting.
+ * Unknown or extensionless names stay visible.
+ */
+function isComicFormatAllowed(fileNameOrPath, allowedFormats = 'cbz') {
+  const ext = path.extname(String(fileNameOrPath || '')).toLowerCase();
+  if (!SUPPORTED_COMIC_EXTENSIONS.includes(ext)) return true;
+
+  const allowed = normalizeAllowedFormats(allowedFormats);
+  return allowed.includes(ext.slice(1));
+}
+
+module.exports = {
+  ALL_COMIC_FORMATS,
+  SUPPORTED_COMIC_EXTENSIONS,
+  CONVERTIBLE_COMIC_FORMATS,
+  normalizeAllowedFormats,
+  isComicFormatAllowed
+};

@@ -57,7 +57,8 @@ async function detectPanels(buffer, typeOrIsManga, confThreshold = null, filterC
   try {
     const type = typeof typeOrIsManga === 'boolean' ? (typeOrIsManga ? 'manga' : 'western') : typeOrIsManga;
     const session = await getSession(type);
-    const image = sharp(buffer).removeAlpha();
+    const base = sharp(buffer);
+    const image = (typeof base.rotate === 'function' ? base.rotate() : base).removeAlpha();
     const meta = await image.metadata();
 
     const fit = type === 'manga' ? 'contain' : 'fill';
@@ -157,7 +158,8 @@ async function detectBubbles(buffer, type = 'western', confThreshold = null) {
     }
 
     const session = await getSession('bubble');
-    const image = sharp(buffer).removeAlpha();
+    const base = sharp(buffer);
+    const image = (typeof base.rotate === 'function' ? base.rotate() : base).removeAlpha();
     const meta = await image.metadata();
     const inputImg = await image.resize(INPUT_SIZE, INPUT_SIZE, { fit: 'contain', background: { r: 0, g: 0, b: 0 } }).raw().toBuffer();
 

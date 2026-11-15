@@ -112,4 +112,31 @@ describe('panel-detector processor sidecar handling', () => {
       code: 'EXTRACTION_TIMEOUT'
     });
   });
+
+  test('retries western detection at 0.15 confidence when 0.5 returns zero panels', async () => {
+    mockSession(['page-0001.jpg'], async () => Buffer.from('page'));
+    detectPanels
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([[10, 20, 200, 300]]);
+    detectBubbles.mockResolvedValue([]);
+
+    const result = await processComic('synthetic-fallback', '/lib/synthetic.pdf', 'western');
+
+    expect(detectPanels).toHaveBeenNthCalledWith(1, expect.any(Buffer), 'western', 0.5, 0);
+    expect(detectPanels).toHaveBeenNthCalledWith(2, expect.any(Buffer), 'western', 0.15, 0);
+    expect(result.panels).toBe(1);
+    expect(fs.existsSync(result.outputPath)).toBe(true);
+  });
+
+  test('processes comic EPUB pages via openArchiveSession preserving page keys', async () => {
+    mockSession(['OEBPS/images/cover.jpg', 'OEBPS/images/p02.jpg'], async () => Buffer.from('page'));
+    detectPanels.mockResolvedValue([[0, 0, 400, 600]]);
+    detectBubbles.mockResolvedValue([]);
+
+    const result = await processComic('synthetic-epub', '/lib/synthetic.epub', 'western');
+    const saved = JSON.parse(fs.readFileSync(result.outputPath, 'utf8'));
+
+    expect(result.pageCount).toBe(2);
+    expect(Object.keys(saved.pages)).toEqual(['OEBPS/images/cover.jpg', 'OEBPS/images/p02.jpg']);
+  });
 });

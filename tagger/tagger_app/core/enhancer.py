@@ -5,7 +5,7 @@ import uuid
 import shutil
 
 from tagger_app.config import UPLOAD_FOLDER
-from tagger_app.core.covers import extract_cover_from_cbz
+from tagger_app.core.comic_files import extract_cover_from_comic as extract_cover_from_cbz
 from tagger_app.core.comicinfo import read_comic_info_xml, generate_comic_info_xml, write_comic_info
 from tagger_app.core.enrichment import (
     enrich_metadata_from_other_sources,

@@ -142,7 +142,7 @@ async function evaluateWithGemini(ctx, originalFetch, logger, res, reqBody, conf
           body: JSON.stringify({
             path: filePath,
             metadata: finalMetadata,
-            metadata_storage: reqBody.metadata_storage || 'archive'
+            metadata_storage: reqBody.metadata_storage || 'sidecar'
           })
         });
       } catch (applyErr) {

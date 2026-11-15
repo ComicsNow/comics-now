@@ -43,8 +43,11 @@
   "scanIntervalMinutes": 5,
   "pageCacheMaxMb": 200,
   "allowed_formats": "cbz",
+  "auto_convert_enabled": false,
+  "auto_convert_formats": [],
   "delete_cbr_after_conversion": false,
   "delete_pdf_after_conversion": false,
+  "delete_epub_after_conversion": false,
   "metadata_storage": "sidecar",
 
   "// [UI] 3. Scrapers & Credentials": "Can be entered in Web UI -> Tag Comics Now! -> Settings (Encrypted at rest)",

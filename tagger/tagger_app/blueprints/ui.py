@@ -9,7 +9,7 @@ from tagger_app.config import UPLOAD_FOLDER, STATIC_TEMP_DIR, is_safe_cbz_path, 
 from tagger_app.scheduler.state import scheduler_config
 from tagger_app.scheduler.scanner import sessions
 from tagger_app.core.enrichment import check_comic_info_completeness
-from tagger_app.core.covers import extract_cover_from_cbz
+from tagger_app.core.comic_files import extract_cover_from_comic as extract_cover_from_cbz, is_supported_comic_file
 from tagger_app.core.comicinfo import read_comic_info_xml
 
 ui_bp = Blueprint('ui', __name__)
@@ -32,7 +32,7 @@ def get_local_files():
     for root, dirs, files in os.walk(workspace_dir):
         dirs[:] = [d for d in dirs if not d.startswith('.') and d not in ('uploads', 'static', 'temp_covers')]
         for file in files:
-            if file.lower().endswith('.cbz'):
+            if is_supported_comic_file(file):
                 abs_path = os.path.join(root, file)
                 rel_path = os.path.relpath(abs_path, workspace_dir)
                 cbz_files.append({
@@ -82,7 +82,7 @@ def browse_files():
                         "name": item,
                         "path": item_path
                     })
-            elif os.path.isfile(item_path) and item.lower().endswith('.cbz'):
+            elif os.path.isfile(item_path) and is_supported_comic_file(item):
                 is_incomplete, reason = check_comic_info_completeness(item_path)
                 cbz_files.append({
                     "name": item,

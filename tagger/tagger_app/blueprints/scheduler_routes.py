@@ -22,6 +22,8 @@ from tagger_app.scheduler.scanner import (
     active_scans_lock,
 )
 
+from tagger_app.core.comic_files import is_supported_comic_file
+
 scheduler_bp = Blueprint('scheduler', __name__)
 
 
@@ -110,7 +112,7 @@ def library_enhance_folder():
         cbz_files = []
         for root_dir, dirs, files in os.walk(folder_path):
             for file in files:
-                if file.lower().endswith('.cbz'):
+                if is_supported_comic_file(file):
                     cbz_files.append(os.path.join(root_dir, file))
         cbz_files.sort()
 

@@ -12,6 +12,8 @@ const { getMetadataStorage } = require('../../config');
 const { trimObjectStrings } = require('../../utils');
 const { cleanGenreAndTags, isTitleSameAsSeries } = require('./sanitizer');
 const { buildComicInfoXml } = require('./enricher');
+const { parseEpubOpfMetadata } = require('../document-pages/epub-reader');
+const { readPdfMetadata } = require('../document-pages/pdf-reader');
 
 const MAX_XML_BYTES = 2 * 1024 * 1024;
 const UNSAFE_XML_DTD_RE = /<!(?:DOCTYPE|ENTITY)\b/i;
@@ -62,7 +64,43 @@ async function getComicInfoFromArchive(comicPath) {
     }
   }
 
-  // 2. Fallback to reading from Zip archive
+  // 2. For PDF/EPUB without a ComicInfo.xml sidecar, extract embedded document metadata
+  const docExt = path.extname(comicPath).toLowerCase();
+  if (docExt === '.epub') {
+    try {
+      const opf = await parseEpubOpfMetadata(comicPath);
+      if (opf) {
+        const info = {};
+        if (opf.title) info.Title = opf.title;
+        if (opf.series) info.Series = opf.series;
+        if (opf.number) info.Number = opf.number;
+        if (opf.writer) info.Writer = opf.writer;
+        if (opf.publisher) info.Publisher = opf.publisher;
+        if (opf.genre) info.Genre = opf.genre;
+        if (opf.summary) info.Summary = opf.summary;
+        if (opf.year) info.Year = String(opf.year);
+        if (opf.month) info.Month = String(opf.month);
+        return trimObjectStrings(info);
+      }
+    } catch {}
+    return {};
+  }
+  if (docExt === '.pdf') {
+    try {
+      const pdfMeta = await readPdfMetadata(comicPath);
+      if (pdfMeta) {
+        const info = {};
+        if (pdfMeta.title) info.Title = pdfMeta.title;
+        if (pdfMeta.writer) info.Writer = pdfMeta.writer;
+        if (pdfMeta.genre) info.Genre = pdfMeta.genre;
+        if (pdfMeta.summary) info.Summary = pdfMeta.summary;
+        return trimObjectStrings(info);
+      }
+    } catch {}
+    return {};
+  }
+
+  // 3. Fallback to reading from Zip archive
   let archive;
   try {
     archive = await openArchive(comicPath);
@@ -251,7 +289,7 @@ function createSaveMetadataToComic(getWriter) {
         return;
       }
 
-      if (storageMode === 'sidecar') {
+      if (storageMode === 'sidecar' || ext === '.pdf' || ext === '.epub') {
         const sidecarPath = path.join(path.dirname(comicPath), path.basename(comicPath, ext) + '.ComicInfo.xml');
         await fs.promises.writeFile(sidecarPath, metadataXml, 'utf-8');
         log('INFO', 'META', `✅ Saved ComicInfo.xml sidecar for ${path.basename(comicPath)}`);

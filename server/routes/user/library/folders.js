@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const { isPathSafe: _isPathSafe } = require('../../../utils');
-const { isComicFormatAllowed } = require('../../../services/comic-formats');
+const { SUPPORTED_COMIC_EXTENSIONS, isComicFormatAllowed } = require('../../../services/comic-formats');
 
 /**
  * Security: Check if a user has access to a specific file or folder path.
@@ -134,7 +134,7 @@ module.exports = function attachFoldersRoutes(router, deps) {
           rawFolders.push({ name: entry.name, path: fullPath });
         } else if (entry.isFile()) {
           const ext = path.extname(entry.name).toLowerCase();
-          if (['.cbz', '.cbr'].includes(ext) && isComicFormatAllowed(entry.name, allowedFormats)) {
+          if (SUPPORTED_COMIC_EXTENSIONS.includes(ext) && isComicFormatAllowed(entry.name, allowedFormats)) {
             comicFiles.push({ name: entry.name, path: fullPath });
           }
         }

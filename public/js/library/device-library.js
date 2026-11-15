@@ -74,12 +74,12 @@ export async function requestDeviceLibrary() {
     input.webkitdirectory = true; // For desktop Firefox/Safari
     
     input.onchange = async (e) => {
-      const files = Array.from(e.target.files).filter(f => 
-        f.name.toLowerCase().endsWith('.cbz') || f.name.toLowerCase().endsWith('.cbr')
+      const files = Array.from(e.target.files).filter(f =>
+        /\.(cbz|cbr|pdf|epub)$/i.test(f.name || '')
       );
-      
+
       if (files.length === 0) {
-        alert('No .cbz or .cbr files found in the selection.');
+        alert('No .cbz, .cbr, .pdf, or .epub files found in the selection.');
         return;
       }
 

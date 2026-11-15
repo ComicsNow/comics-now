@@ -292,12 +292,22 @@ module.exports = function attach(router, deps) {
       const stat = await fs.promises.stat(p);
       const fileSize = stat.size;
       const range = req.headers.range;
+      const ext = path.extname(p).toLowerCase();
+      const contentType = ext === '.pdf'
+        ? 'application/pdf'
+        : ext === '.epub'
+          ? 'application/epub+zip'
+          : ext === '.cbr'
+            ? 'application/vnd.comicbook-rar'
+            : ext === '.cbz'
+              ? 'application/vnd.comicbook+zip'
+              : 'application/octet-stream';
 
       // HEAD: return size only (used to seed Background Fetch's downloadTotal so
       // the progress bar can compute a percentage) — never stream the body.
       if (req.method === 'HEAD') {
         res.setHeader('Accept-Ranges', 'bytes');
-        res.setHeader('Content-Type', 'application/zip');
+        res.setHeader('Content-Type', contentType);
         res.setHeader('Content-Length', fileSize);
         return res.end();
       }
@@ -314,12 +324,12 @@ module.exports = function attach(router, deps) {
         res.setHeader('Content-Range', `bytes ${start}-${end}/${fileSize}`);
         res.setHeader('Accept-Ranges', 'bytes');
         res.setHeader('Content-Length', end - start + 1);
-        res.setHeader('Content-Type', 'application/zip');
+        res.setHeader('Content-Type', contentType);
         res.setHeader('Content-Disposition', `attachment; filename="${path.basename(p)}"`);
         fs.createReadStream(p, { start, end }).pipe(res);
       } else {
         res.setHeader('Accept-Ranges', 'bytes');
-        res.setHeader('Content-Type', 'application/zip');
+        res.setHeader('Content-Type', contentType);
         res.setHeader('Content-Disposition', `attachment; filename="${path.basename(p)}"`);
         res.setHeader('Content-Length', fileSize);
         fs.createReadStream(p).pipe(res);

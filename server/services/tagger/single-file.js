@@ -13,7 +13,8 @@ const review = require('./review');
 const companionSync = require('./companion-sync');
 const fileRunState = require('./file-run-state');
 
-const SUPPORTED_EXTENSIONS = new Set(['.cbz', '.cbr']);
+const SUPPORTED_EXTENSIONS = new Set(['.cbz', '.cbr', '.pdf', '.epub']);
+const SIDECAR_ONLY_EXTENSIONS = new Set(['.cbr', '.pdf', '.epub']);
 
 class TaggerRunError extends Error {
   constructor(message, code, statusCode) {
@@ -165,9 +166,10 @@ async function runSingleFileTagger({ comicId, force = false } = {}) {
     throw new TaggerRunError('Comic not found.', 'comic_not_found', 404);
   }
 
-  const isCbr = path.extname(comic.path).toLowerCase() === '.cbr';
-  if (!SUPPORTED_EXTENSIONS.has(path.extname(comic.path).toLowerCase())) {
-    throw new TaggerRunError('Only CBZ and CBR files support tag search.', 'unsupported_format', 400);
+  const ext = path.extname(comic.path).toLowerCase();
+  const isSidecarOnly = SIDECAR_ONLY_EXTENSIONS.has(ext);
+  if (!SUPPORTED_EXTENSIONS.has(ext)) {
+    throw new TaggerRunError('Only CBZ, CBR, PDF, and EPUB files support tag search.', 'unsupported_format', 400);
   }
 
   if (!fs.existsSync(comic.path)) {
@@ -181,16 +183,16 @@ async function runSingleFileTagger({ comicId, force = false } = {}) {
     await ensureWorker(serviceUrl);
 
     const publisherCodex = await loadPublisherCodex();
-    const coverPath = isCbr ? await resolveCoverPath({ comic, filePath: comic.path }) : null;
+    const coverPath = isSidecarOnly ? await resolveCoverPath({ comic, filePath: comic.path }) : null;
     const request = buildTaggerRequest({
       filePath: comic.path,
-      isCbr,
+      isCbr: isSidecarOnly,
       forceReprocess: Boolean(force),
       publisherCodex,
       coverPath
     });
 
-    ctLog(`Starting per-comic tag search: ${comic.name}${isCbr ? ' (CBR → sidecar)' : ''}`);
+    ctLog(`Starting per-comic tag search: ${comic.name}${isSidecarOnly ? ` (${ext.slice(1).toUpperCase()} → sidecar)` : ''}`);
 
     let res;
     try {

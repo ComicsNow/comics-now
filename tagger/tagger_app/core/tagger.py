@@ -8,7 +8,8 @@ import sqlite3
 
 from tagger_app.config import UPLOAD_FOLDER
 from tagger_app.core.metadata import normalize_metadata
-from tagger_app.core.covers import extract_cover_from_cbz, get_comics_now_cover
+from tagger_app.core.covers import get_comics_now_cover
+from tagger_app.core.comic_files import extract_cover_from_comic as extract_cover_from_cbz
 from tagger_app.core.limiter import domain_limiter
 from tagger_app.core.comicinfo import read_comic_info_xml, generate_comic_info_xml, write_comic_info
 from tagger_app.core.enrichment import check_comic_info_completeness, enrich_metadata_from_other_sources, query_all_sources_sequentially
@@ -31,7 +32,7 @@ def _is_readable_cover(file_path):
         return False
 
 
-def process_single_cbz_file(file_path, comicvine_api_key, google_books_api_key=None, metron_user=None, metron_pass=None, lower_threshold=0.80, upper_threshold=0.90, on_progress=None, enabled_fields=None, enabled_sources=None, force_reprocess=False, metadata_storage="archive", publisher_codex=None, cover_path=None):
+def process_single_cbz_file(file_path, comicvine_api_key, google_books_api_key=None, metron_user=None, metron_pass=None, lower_threshold=0.80, upper_threshold=0.90, on_progress=None, enabled_fields=None, enabled_sources=None, force_reprocess=False, metadata_storage="sidecar", publisher_codex=None, cover_path=None):
     filename = os.path.basename(file_path)
     print(f"[*] Processing comic file: {filename}")
 

@@ -5,12 +5,15 @@ const path = require('path');
 const mockConfig = { comicsLocation: '/tmp/inbox', metadata_storage: 'archive' };
 
 jest.mock('../server/config', () => ({
-  getConfig: () => mockConfig
+  getConfig: () => mockConfig,
+  getAutoConvertEnabled: () => true,
+  getAutoConvertFormats: () => ['cbr', 'pdf']
 }));
 
 jest.mock('../server/services/library-conversion', () => ({
   convertCbrToCbz: jest.fn(),
-  convertPdfToCbz: jest.fn()
+  convertPdfToCbz: jest.fn(),
+  convertEpubToCbz: jest.fn()
 }));
 
 jest.mock('../server/services/library-pages', () => ({
@@ -230,6 +233,7 @@ describe('scanner conversion with linked originals', () => {
 
     const ctx = makeCtx({
       allowedFormats: 'cbr',
+      autoConvertEnabled: false,
       originalLinks: buildOriginalLinkMap([{ path: linkedCbz, originalPath: cbrPath }])
     });
 

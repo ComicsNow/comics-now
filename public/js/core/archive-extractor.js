@@ -7,6 +7,8 @@
 
 import { createExtractorFromData } from 'node-unrar-js';
 import { state, global as canonicalGlobal } from '../globals.js';
+import { openPdfClientArchive } from './pdf-client-extractor.js';
+import { openEpubClientArchive } from './epub-client-extractor.js';
 
 const global = typeof canonicalGlobal !== 'undefined' ? canonicalGlobal : state;
 
@@ -54,18 +56,22 @@ async function toArrayBuffer(data) {
  * falling back to filename extension.
  */
 export function detectArchiveType(arrayBuffer, filename = '') {
+  const name = String(filename || '');
   if (arrayBuffer && arrayBuffer.byteLength >= 4) {
     const bytes = new Uint8Array(arrayBuffer.slice(0, 4));
+    if (bytes[0] === 0x25 && bytes[1] === 0x50 && bytes[2] === 0x44 && bytes[3] === 0x46) {
+      return 'pdf';
+    }
     if (bytes[0] === 0x52 && bytes[1] === 0x61 && bytes[2] === 0x72 && bytes[3] === 0x21) {
       return 'cbr';
     }
     if (bytes[0] === 0x50 && bytes[1] === 0x4b) {
-      return 'cbz';
+      return /\.epub$/i.test(name) ? 'epub' : 'cbz';
     }
   }
-  if (/\.cbr$/i.test(String(filename || ''))) {
-    return 'cbr';
-  }
+  if (/\.pdf$/i.test(name)) return 'pdf';
+  if (/\.epub$/i.test(name)) return 'epub';
+  if (/\.cbr$/i.test(name)) return 'cbr';
   return 'cbz';
 }
 
@@ -76,6 +82,15 @@ export function detectArchiveType(arrayBuffer, filename = '') {
 export async function openClientArchive(data, filename = '') {
   const arrayBuffer = await toArrayBuffer(data);
   const type = detectArchiveType(arrayBuffer, filename);
+
+  if (type === 'pdf') {
+    return openPdfClientArchive(arrayBuffer);
+  }
+
+  const JSZipCtor = (global && global.JSZip) || (typeof window !== 'undefined' ? window.JSZip : null);
+  if (type === 'epub') {
+    return openEpubClientArchive(arrayBuffer, JSZipCtor);
+  }
 
   if (type === 'cbr') {
     const createExtractor = typeof createExtractorFromData === 'function'
@@ -95,40 +110,45 @@ export async function openClientArchive(data, filename = '') {
       }
     }
 
+    const extractRarBlob = async (entryName) => {
+      const extracted = extractor.extract({ files: [entryName] });
+      const files = extracted && extracted.files ? Array.from(extracted.files) : [];
+      const file = files.find((f) => f && f.fileHeader && f.fileHeader.name === entryName) || files[0];
+      if (!file || !file.extraction) {
+        throw new Error(`Entry not found in CBR: ${entryName}`);
+      }
+      return new Blob([file.extraction], { type: getImageMimeType(entryName) });
+    };
+
     return {
       type: 'cbr',
       extractor,
       listEntries: () => entryNames.slice(),
-      extractEntryBlob: async (entryName) => {
-        const extracted = extractor.extract({ files: [entryName] });
-        const files = extracted && extracted.files ? Array.from(extracted.files) : [];
-        const file = files.find((f) => f && f.fileHeader && f.fileHeader.name === entryName) || files[0];
-        if (!file || !file.extraction) {
-          throw new Error(`Entry not found in CBR: ${entryName}`);
-        }
-        return new Blob([file.extraction], { type: getImageMimeType(entryName) });
-      },
+      extractEntryBlob: extractRarBlob,
+      getPageBlob: extractRarBlob,
       close: () => {}
     };
   }
 
-  const JSZipCtor = (global && global.JSZip) || (typeof window !== 'undefined' ? window.JSZip : null);
   if (!JSZipCtor) {
     throw new Error('JSZip not found');
   }
 
   const zip = await new JSZipCtor().loadAsync(arrayBuffer);
+  const extractZipBlob = async (entryName) => {
+    const pageFile = zip.file(entryName);
+    if (!pageFile) {
+      throw new Error(`Entry not found in CBZ: ${entryName}`);
+    }
+    return await pageFile.async('blob');
+  };
+
   return {
     type: 'cbz',
     zip,
     listEntries: () => Object.keys(zip.files).filter((name) => zip.files[name] && !zip.files[name].dir),
-    extractEntryBlob: async (entryName) => {
-      const pageFile = zip.file(entryName);
-      if (!pageFile) {
-        throw new Error(`Entry not found in CBZ: ${entryName}`);
-      }
-      return await pageFile.async('blob');
-    },
+    extractEntryBlob: extractZipBlob,
+    getPageBlob: extractZipBlob,
     close: () => {}
   };
 }

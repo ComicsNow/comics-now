@@ -144,7 +144,7 @@ export async function scanDeviceLibrary(libraryId, directoryHandle, onProgress) 
       if (entry.kind === 'directory') {
         await walk(entry, path);
       } else if (entry.kind === 'file') {
-        if (entry.name.toLowerCase().endsWith('.cbz') || entry.name.toLowerCase().endsWith('.cbr')) {
+        if (/\.(cbz|cbr|pdf|epub)$/i.test(entry.name || '')) {
           foundEntries.push({ entry, path });
         }
       }

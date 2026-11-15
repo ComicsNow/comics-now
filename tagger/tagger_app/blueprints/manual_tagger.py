@@ -16,8 +16,10 @@ from tagger_app.core.enrichment import (
     query_all_sources_sequentially,
     enrich_metadata_from_other_sources,
 )
+from tagger_app.core.comic_files import is_supported_comic_file
 from tagger_app.core.comicinfo import (
     generate_comic_info_xml,
+    write_comic_info,
     write_comic_info_to_cbz,
 )
 from tagger_app.persistence.tracking_db import mark_as_enhanced
@@ -159,7 +161,7 @@ def tag_comic():
         if not edited_metadata.get("story_arc"):
             enrich_with_continuity(edited_metadata, cbz_path)
         xml_str = generate_comic_info_xml(edited_metadata, enabled_fields=scheduler_config.get("selected_fields"))
-        write_comic_info_to_cbz(cbz_path, xml_str)
+        write_comic_info(cbz_path, xml_str, storage_mode=scheduler_config.get("metadata_storage", "sidecar"))
         mark_as_enhanced(cbz_path, [edited_metadata.get("source_url") or "Unknown"])
 
         write_scan_log(
@@ -214,7 +216,7 @@ def batch_tag_folder():
     try:
         cbz_files = sorted([
             os.path.join(folder_path, f) for f in os.listdir(folder_path)
-            if f.lower().endswith('.cbz')
+            if is_supported_comic_file(f)
         ])
 
         if not cbz_files:

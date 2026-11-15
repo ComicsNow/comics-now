@@ -3,12 +3,11 @@ const path = require('path');
 const { openArchiveSession, getEntryBuffer } = require('../archive-utils');
 const { GUIDED_VIEW_DIR } = require('../../constants');
 const { guidedLog, guidedLogUpdate } = require('../../logger');
-const { detectPanels, detectBubbles } = require('./inference');
 const {
-  sortReadingOrder,
-  buildMangaSequence,
-  buildHybridWesternSequence
-} = require('./ordering');
+  detectPageInProcess,
+  detectPageInWorker,
+  abortActiveWorker
+} = require('./worker-client');
 
 const PAGE_TIMEOUT_MS = 30000;
 
@@ -53,7 +52,10 @@ async function processComic(id, comicPath, type, opts = {}) {
     let totalPanels = 0, pagesProcessed = 0;
 
     for (const pageName of pages) {
-      if (isCancelled()) throw new Error('Cancelled');
+      if (isCancelled()) {
+        abortActiveWorker('Cancelled');
+        throw new Error('Cancelled');
+      }
       try {
         if (pagesProcessed % 10 === 0) guidedLogUpdate('processing-pages:' + id, 'INFO', '   ... processing page ' + pagesProcessed + '/' + pages.length);
         const buffer = await withTimeout(
@@ -61,16 +63,20 @@ async function processComic(id, comicPath, type, opts = {}) {
           PAGE_TIMEOUT_MS,
           `Page extraction timed out for ${pageName}`
         );
-        const rawPanels = (type === 'manga') ? await detectPanels(buffer, 'manga', 0.1, 0) : await detectPanels(buffer, 'western', 0.5, 0);
-        const panels = sortReadingOrder(rawPanels, type);
-        const bubbles = await detectBubbles(buffer, type);
-        let sequence = (type === 'manga') ? buildMangaSequence(rawPanels, bubbles) : buildHybridWesternSequence(panels, bubbles);
-        result.pages[pageName] = { panels, bubbles, sequence: sequence.length > 0 ? sequence : panels };
-        totalPanels += panels.length;
+        const useWorker = opts.useWorker !== undefined ? Boolean(opts.useWorker) : !process.env.JEST_WORKER_ID;
+        const detected = useWorker
+          ? await detectPageInWorker(buffer, type, { isCancelled })
+          : await detectPageInProcess(buffer, type);
+        result.pages[pageName] = {
+          panels: detected.panels,
+          bubbles: detected.bubbles,
+          sequence: detected.sequence
+        };
+        totalPanels += detected.panels.length;
         pagesProcessed++;
       } catch (err) {
-        // A timed-out shared extractor is unsafe to keep using: abort the comic.
-        if (err && err.code === 'EXTRACTION_TIMEOUT') throw err;
+        // A timed-out shared extractor or cancelled run must abort the comic immediately.
+        if (isCancelled() || (err && err.code === 'EXTRACTION_TIMEOUT')) throw err;
         result.pages[pageName] = { panels: [], bubbles: [], sequence: [] };
         guidedLog('WARN', '   page failed: ' + pageName + ' — ' + err.message);
       }

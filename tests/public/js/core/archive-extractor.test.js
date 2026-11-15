@@ -69,20 +69,25 @@ function createArchiveExtractorSandbox(overrides = {}) {
 }
 
 describe('public/js/core/archive-extractor.js', () => {
-  test('detectArchiveType identifies RAR and ZIP magic bytes and falls back to filename', () => {
+  test('detectArchiveType identifies RAR, ZIP, PDF, and EPUB magic bytes and falls back to filename', () => {
     const { sandbox } = createArchiveExtractorSandbox();
 
     const rarBuf = new Uint8Array([0x52, 0x61, 0x72, 0x21, 0x1a, 0x07]).buffer;
     const zipBuf = new Uint8Array([0x50, 0x4b, 0x03, 0x04]).buffer;
+    const pdfBuf = new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2d]).buffer;
     const unknownBuf = new Uint8Array([0x00, 0x00, 0x00, 0x00]).buffer;
 
     expect(sandbox.detectArchiveType(rarBuf, 'comic.cbz')).toBe('cbr');
     expect(sandbox.detectArchiveType(zipBuf, 'comic.cbr')).toBe('cbz');
+    expect(sandbox.detectArchiveType(zipBuf, 'comic.epub')).toBe('epub');
+    expect(sandbox.detectArchiveType(pdfBuf, 'comic.bin')).toBe('pdf');
     expect(sandbox.detectArchiveType(unknownBuf, 'issue.CBR')).toBe('cbr');
+    expect(sandbox.detectArchiveType(unknownBuf, 'issue.PDF')).toBe('pdf');
+    expect(sandbox.detectArchiveType(unknownBuf, 'issue.EPUB')).toBe('epub');
     expect(sandbox.detectArchiveType(unknownBuf, 'issue.cbz')).toBe('cbz');
   });
 
-  test('openClientArchive extracts entries from CBZ using JSZip', async () => {
+  test('openClientArchive extracts entries from CBZ using JSZip and exposes getPageBlob alias', async () => {
     const { sandbox } = createArchiveExtractorSandbox();
     const zipBuf = new Uint8Array([0x50, 0x4b, 0x03, 0x04]).buffer;
 
@@ -92,6 +97,8 @@ describe('public/js/core/archive-extractor.js', () => {
 
     const blob = await archive.extractEntryBlob('page01.jpg');
     expect(blob).toBeInstanceOf(Blob);
+    const pageBlob = await archive.getPageBlob('page01.jpg');
+    expect(pageBlob).toBeInstanceOf(Blob);
     await expect(archive.extractEntryBlob('missing.jpg')).rejects.toThrow('Entry not found in CBZ');
   });
 

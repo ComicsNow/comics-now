@@ -19,8 +19,10 @@ try:
 except ImportError:
     rarfile = None
 
-from PIL import Image, ImageFile
+from PIL import Image, ImageFile, ImageOps
 ImageFile.LOAD_TRUNCATED_IMAGES = True
+
+from doc_pages import list_epub_pages, list_pdf_pages, read_epub_pages, read_pdf_pages
 
 try:
     from tqdm import tqdm
@@ -73,6 +75,11 @@ def open_archive(comic_path: str):
 
 
 def list_pages(comic_path: str) -> list[str]:
+    ext = pathlib.Path(comic_path).suffix.lower()
+    if ext == ".pdf":
+        return list_pdf_pages(comic_path)
+    if ext == ".epub":
+        return list_epub_pages(comic_path)
     with open_archive(comic_path) as arch:
         names = arch.namelist()
     pages = [
@@ -100,6 +107,11 @@ def _read_entry_safe(arch, name: str) -> bytes:
 
 
 def read_pages(comic_path: str, page_names: list[str]) -> dict[str, bytes]:
+    ext = pathlib.Path(comic_path).suffix.lower()
+    if ext == ".pdf":
+        return read_pdf_pages(comic_path, page_names)
+    if ext == ".epub":
+        return read_epub_pages(comic_path, page_names)
     with open_archive(comic_path) as arch:
         return {name: _read_entry_safe(arch, name) for name in page_names}
 
@@ -110,7 +122,7 @@ def prepare_page_webp(raw_bytes: bytes, max_side: int = 1280, quality: int = 80)
     Always returns the exact original (orig_w, orig_h) so bounding box coordinates
     can be projected back into original image space with zero shift.
     """
-    img = Image.open(io.BytesIO(raw_bytes))
+    img = ImageOps.exif_transpose(Image.open(io.BytesIO(raw_bytes)))
     orig_w, orig_h = img.size
     max_dim = max(orig_w, orig_h)
 

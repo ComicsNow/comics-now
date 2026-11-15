@@ -132,7 +132,7 @@ async function applyUserSelection(selections, onScanComplete) {
   const filePath = pendingMatchState.filePath;
   const fileName = pendingMatchState.fileName;
   const reviewComicId = pendingMatchState.comicId || createId(filePath);
-  const isCbr = path.extname(filePath).toLowerCase() === '.cbr';
+  const isCbr = ['.cbr', '.pdf', '.epub'].includes(path.extname(filePath).toLowerCase());
   const effectiveStorage = isCbr ? 'sidecar' : config.getMetadataStorage();
 
   try {

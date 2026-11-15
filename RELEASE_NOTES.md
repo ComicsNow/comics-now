@@ -2,6 +2,13 @@
 
 Welcome to **Comics Now! v4.2.0** — feature, performance, and security release introducing configurable Gemini AI Thinking Levels, native client-side offline CBR/CBZ extraction with Cache-First Service Worker image delivery and deduplicated preloading, comprehensive defense-in-depth origin security hardening, and configuration storage protections.
 
+### 6. Native PDF & Comic EPUB Support, Format Controls & Guided View Hardening
+* **Native PDF & Fixed-Layout Comic EPUB Reading**: Added server-side PDF rendering (`PyMuPDF`) and OPF-ordered comic EPUB extraction (`yauzl`) alongside client-side offline and Local Device Library playback via self-hosted `pdfjs-dist` (pre-cached in the Service Worker) and `JSZip`.
+* **Granular Format Visibility & Auto-Conversion Controls**: Added multi-format visibility checkboxes (`CBZ`, `CBR`, `PDF`, `EPUB`), an explicit auto-conversion toggle (`auto_convert_enabled`) with per-format conversion checkboxes (`CBR`, `PDF`, `EPUB` → `CBZ`), and per-format Keep/Delete original selectors.
+* **Safe First-Install Defaults**: Configured fresh installs with auto-conversion off, Keep Originals enabled for all formats, Guided View processing off by default, and metadata storage defaulted to XML sidecar + DB (`sidecar`).
+* **Guided View PDF/EPUB & Local ONNX Isolation**: Extended both Modal GPU and local CPU Guided View pipelines to support `.pdf` and `.epub` comics with EXIF orientation normalization and `0.5 → 0.15` western zero-panel fallback, and isolated local `onnxruntime-node` inference into a cancellable `SIGKILL` child worker serialized by `localCpuMutex`.
+* **Cover Extraction & Sidecar Tagging**: Added `.pdf` and OPF-ordered `.epub` cover extraction and metadata tagging across the Python tagger service and Node tagger bridges, writing external `.ComicInfo.xml` sidecars without modifying `.epub` or `.pdf` files.
+
 ---
 
 ## ✨ What's New & Highlights in v4.2.0
@@ -39,12 +46,26 @@ Welcome to **Comics Now! v4.2.0** — feature, performance, and security release
 * **Navigation, Breadcrumb & Search Enhancements**: Moved underlined ancestor-only breadcrumbs between the app title and action buttons, positioned view titles directly below the search bar, removed the redundant series continuity strip, and added Reading Lists and Story Arcs to library search and the search field dropdown.
 * **Direct CBR/PDF Conversion & Zip Argument Ordering**: Fixed Info-ZIP `--` argument ordering across `ComicInfo.xml` archive updates and conversion scripts, and refactored `library-conversion.js` to invoke `unrar`, `pdftoppm`, and `zip` directly from Node.js with temporary directory cleanup.
 
+### 6. Native PDF & Comic EPUB Support, Format Controls & Guided View Hardening
+* **Native PDF & Fixed-Layout Comic EPUB Reading**: Added server-side PDF rendering (`PyMuPDF`) and OPF-ordered comic EPUB extraction (`yauzl`) alongside client-side offline and Local Device Library playback via self-hosted `pdfjs-dist` (pre-cached in the Service Worker) and `JSZip`.
+* **Granular Format Visibility & Auto-Conversion Controls**: Added multi-format visibility checkboxes (`CBZ`, `CBR`, `PDF`, `EPUB`), an explicit auto-conversion toggle (`auto_convert_enabled`) with per-format conversion checkboxes (`CBR`, `PDF`, `EPUB` → `CBZ`), and per-format Keep/Delete original selectors.
+* **Safe First-Install Defaults**: Configured fresh installs with auto-conversion off, Keep Originals enabled for all formats, Guided View processing off by default, and metadata storage defaulted to XML sidecar + DB (`sidecar`).
+* **Guided View PDF/EPUB & Local ONNX Isolation**: Extended both Modal GPU and local CPU Guided View pipelines to support `.pdf` and `.epub` comics with EXIF orientation normalization and `0.5 → 0.15` western zero-panel fallback, and isolated local `onnxruntime-node` inference into a cancellable `SIGKILL` child worker serialized by `localCpuMutex`.
+* **Cover Extraction & Sidecar Tagging**: Added `.pdf` and OPF-ordered `.epub` cover extraction and metadata tagging across the Python tagger service and Node tagger bridges, writing external `.ComicInfo.xml` sidecars without modifying `.epub` or `.pdf` files.
+
 ---
 
 ## ⬆️ Upgrade Notes
 * **No Database Migrations Required**: v4.2.0 is 100% backward-compatible with existing databases and sidecar files.
 * **Zero Disruption to User Data**: All user reading lists, reading progress, and custom sort orders remain completely untouched.
 * **Automatic Client Update**: Frontend assets are bundled via Vite (`public/dist/`); browsers will automatically load updated scripts.
+
+### 6. Native PDF & Comic EPUB Support, Format Controls & Guided View Hardening
+* **Native PDF & Fixed-Layout Comic EPUB Reading**: Added server-side PDF rendering (`PyMuPDF`) and OPF-ordered comic EPUB extraction (`yauzl`) alongside client-side offline and Local Device Library playback via self-hosted `pdfjs-dist` (pre-cached in the Service Worker) and `JSZip`.
+* **Granular Format Visibility & Auto-Conversion Controls**: Added multi-format visibility checkboxes (`CBZ`, `CBR`, `PDF`, `EPUB`), an explicit auto-conversion toggle (`auto_convert_enabled`) with per-format conversion checkboxes (`CBR`, `PDF`, `EPUB` → `CBZ`), and per-format Keep/Delete original selectors.
+* **Safe First-Install Defaults**: Configured fresh installs with auto-conversion off, Keep Originals enabled for all formats, Guided View processing off by default, and metadata storage defaulted to XML sidecar + DB (`sidecar`).
+* **Guided View PDF/EPUB & Local ONNX Isolation**: Extended both Modal GPU and local CPU Guided View pipelines to support `.pdf` and `.epub` comics with EXIF orientation normalization and `0.5 → 0.15` western zero-panel fallback, and isolated local `onnxruntime-node` inference into a cancellable `SIGKILL` child worker serialized by `localCpuMutex`.
+* **Cover Extraction & Sidecar Tagging**: Added `.pdf` and OPF-ordered `.epub` cover extraction and metadata tagging across the Python tagger service and Node tagger bridges, writing external `.ComicInfo.xml` sidecars without modifying `.epub` or `.pdf` files.
 
 ---
 
@@ -68,6 +89,14 @@ Welcome to **Comics Now! v4.2.0** — feature, performance, and security release
 17. `fix(ui,settings)`: normalize array library preferences, persist per-comic continuous mode toggles, fix stale reading-list modal filters, and harden `safeHtml`/image attribute escaping
 18. `refactor(core,tagger,mcp)`: replace global `fetch` monkey-patching with explicit `taggerFetch`, fix Story Arcs publishers DB connection handling, eliminate circular/inline imports, and prune orphaned modules and `/_ext/*` aliases
 19. `feat(offline,sync)`: add `comicMeta` v14 metadata store, PWA offline route recovery, SSE progress sync stream, and async router navigation guard
+20. `feat(formats,guided,tagger)`: add native PDF and comic EPUB streaming/offline reading, multi-format visibility & auto-conversion controls, isolated ONNX worker, and PDF/EPUB cover extraction & sidecar tagging
+
+### 6. Native PDF & Comic EPUB Support, Format Controls & Guided View Hardening
+* **Native PDF & Fixed-Layout Comic EPUB Reading**: Added server-side PDF rendering (`PyMuPDF`) and OPF-ordered comic EPUB extraction (`yauzl`) alongside client-side offline and Local Device Library playback via self-hosted `pdfjs-dist` (pre-cached in the Service Worker) and `JSZip`.
+* **Granular Format Visibility & Auto-Conversion Controls**: Added multi-format visibility checkboxes (`CBZ`, `CBR`, `PDF`, `EPUB`), an explicit auto-conversion toggle (`auto_convert_enabled`) with per-format conversion checkboxes (`CBR`, `PDF`, `EPUB` → `CBZ`), and per-format Keep/Delete original selectors.
+* **Safe First-Install Defaults**: Configured fresh installs with auto-conversion off, Keep Originals enabled for all formats, Guided View processing off by default, and metadata storage defaulted to XML sidecar + DB (`sidecar`).
+* **Guided View PDF/EPUB & Local ONNX Isolation**: Extended both Modal GPU and local CPU Guided View pipelines to support `.pdf` and `.epub` comics with EXIF orientation normalization and `0.5 → 0.15` western zero-panel fallback, and isolated local `onnxruntime-node` inference into a cancellable `SIGKILL` child worker serialized by `localCpuMutex`.
+* **Cover Extraction & Sidecar Tagging**: Added `.pdf` and OPF-ordered `.epub` cover extraction and metadata tagging across the Python tagger service and Node tagger bridges, writing external `.ComicInfo.xml` sidecars without modifying `.epub` or `.pdf` files.
 
 ---
 

@@ -62,7 +62,15 @@ async function initializeDatabase() {
 
     // Seed default settings
     await dbRun(`INSERT OR IGNORE INTO settings (key, value) VALUES ('allowed_formats', '"cbz"')`);
-    await dbRun(`INSERT OR IGNORE INTO settings (key, value) VALUES ('metadata_storage', '"archive"')`);
+    await dbRun(`INSERT OR IGNORE INTO settings (key, value) VALUES ('auto_convert_enabled', 'false')`);
+    await dbRun(`INSERT OR IGNORE INTO settings (key, value) VALUES ('auto_convert_formats', '[]')`);
+    await dbRun(`INSERT OR IGNORE INTO settings (key, value) VALUES ('delete_cbr_after_conversion', 'false')`);
+    await dbRun(`INSERT OR IGNORE INTO settings (key, value) VALUES ('delete_pdf_after_conversion', 'false')`);
+    await dbRun(`INSERT OR IGNORE INTO settings (key, value) VALUES ('delete_epub_after_conversion', 'false')`);
+    await dbRun(`INSERT OR IGNORE INTO settings (key, value) VALUES ('metadata_storage', '"sidecar"')`);
+    await dbRun(`INSERT OR IGNORE INTO settings (key, value) VALUES ('guided.autoOnAdd', 'false')`);
+    await dbRun(`INSERT OR IGNORE INTO settings (key, value) VALUES ('guided.scheduleEnabled', 'false')`);
+    await dbRun(`INSERT OR IGNORE INTO settings (key, value) VALUES ('guided.useModal', 'false')`);
 
     await dbRun(`CREATE TABLE IF NOT EXISTS devices (
       deviceId TEXT PRIMARY KEY,
