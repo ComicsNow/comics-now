@@ -22,7 +22,7 @@ def test_read_pdf_pages_matches_viewer_180_dpi():
 
 
 def test_read_pdf_pages_matches_doc_worker_dimensions_on_embedded_jpeg(tmp_path):
-    # Create a 200x300 JPEG embedded into a 768x1152 pt PDF page (simulating Justice Buster #04)
+    # Create a 200x300 JPEG embedded into a 768x1152 pt PDF page
     img = Image.new("RGB", (200, 300), color=(40, 80, 120))
     img_buf = io.BytesIO()
     img.save(img_buf, format="JPEG")
