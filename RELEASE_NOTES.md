@@ -1,14 +1,13 @@
 # Comics Now! v4.2.0 Release Notes
 
-Welcome to **Comics Now! v4.2.0** — feature, performance, and security release introducing configurable Gemini AI Thinking Levels, strict Flash-Lite model discovery filtering, native client-side offline CBR/CBZ extraction with Cache-First Service Worker image delivery and deduplicated preloading, comprehensive defense-in-depth origin security hardening, and configuration storage protections.
+Welcome to **Comics Now! v4.2.0** — feature, performance, and security release introducing configurable Gemini AI Thinking Levels, native client-side offline CBR/CBZ extraction with Cache-First Service Worker image delivery and deduplicated preloading, comprehensive defense-in-depth origin security hardening, and configuration storage protections.
 
 ---
 
 ## ✨ What's New & Highlights in v4.2.0
 
-### 1. Configurable Gemini Thinking Levels & Flash-Lite Model Filtering
+### 1. Configurable Gemini Thinking Levels
 * **Thinking Level Configuration**: Added configurable `geminiThinkingLevel` (`minimal`, `low`, `medium`, `high`) across backend configs, SQLite `settings` table, API endpoints, and the Admin UI. Allows fine-tuning AI reasoning effort for cover matching, metadata synthesis, and tagger operations.
-* **Curated Flash-Lite Model Filtering**: Model discovery (`/api/v1/gemini/models`) now case-insensitively filters Google AI models to Flash-Lite while strictly excluding specialized non-chat variants (Nano and TTS models).
 
 ### 2. Comprehensive Origin Security & Access Control Hardening
 * **SSRF & Private CIDR Mitigation**: Hardened URL metadata extraction (`isSafeWebUrl` and DNS pre-resolution) to reject RFC 1918 private LAN ranges, alternate loopback/CGNAT/link-local ranges, IPv6 ULA/mapped addresses, and `.internal` hostnames. Disabled automated HTTP redirects on direct fallback fetches.
@@ -49,7 +48,7 @@ Welcome to **Comics Now! v4.2.0** — feature, performance, and security release
 ---
 
 ## 📦 v4.2.0 Changelog
-1. `feat(gemini)`: configurable thinking levels and strict Flash-Lite model filtering
+1. `feat(gemini)`: configurable thinking levels
 2. `security(api)`: harden URL metadata extraction against SSRF and private network targeting
 3. `security(proxy)`: sanitize route parameters to prevent sidecar path traversal
 4. `security(auth)`: enforce admin guard on metadata synthesis, external search, and batch-tagger endpoints
@@ -67,16 +66,6 @@ Welcome to **Comics Now! v4.2.0** — feature, performance, and security release
 16. `security(authz,cache,xss,xml)`: scope story-arc/reading-list access bounds, mark page caches private, clear SW caches on impersonation, escape story-arc UI templates, and reject DTD/ENTITY or >2MB `ComicInfo.xml` payloads
 17. `fix(ui,settings)`: normalize array library preferences, persist per-comic continuous mode toggles, fix stale reading-list modal filters, and harden `safeHtml`/image attribute escaping
 18. `refactor(core,tagger,mcp)`: replace global `fetch` monkey-patching with explicit `taggerFetch`, fix Story Arcs publishers DB connection handling, eliminate circular/inline imports, and prune orphaned modules and `/_ext/*` aliases
-
----
-
-## 🧪 Verification & Test Results
-- **Full Jest suite**: `213 suites passed, 1602 tests passed, 1 snapshot passed (100% pass rate)`.
-- **Python tagger suite**: `266 passed (100% pass rate)`.
-- **MCP server suite**: `50 passed (100% pass rate)`.
-- **Architectural invariants**: `tests/architectureRatchet.test.js` (`5/5` passed, 100% pass rate).
-- **Security & route integration suites**: `tests/scripts/archiveConversionSecurity.test.js`, `tests/server/routes/coverProxySecurity.test.js`, `tests/server/routes/userAccessBounds.test.js`, `tests/server/middleware/securityGuards.test.js`, `tests/server/services/xmlAndConfigSecurity.test.js`, `tests/public/js/viewer/endStoryArcXss.test.js`, `tests/refactorFixes.test.js`, `tests/geminiTaggerHook.test.js`, `tagger/tests/test_tagger_security.py`, `tests/urlMetadataExtractor.test.js`, `tests/storyArcsSyncRoute.test.js`, `tests/metadataRoutes.test.js`, `tests/server/routes/static.test.js` verified.
-- **Production build**: Tailwind CSS v4 and Vite client bundle compiled cleanly.
 
 ---
 
