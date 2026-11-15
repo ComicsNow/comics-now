@@ -249,12 +249,8 @@ function registerRoutes() {
       return null;
     };
 
-    const openResolvedComicRoute = async (params, query, pageNum = null) => {
-      const openViewer = global.openComicViewer || (typeof window !== 'undefined' ? window.openComicViewer : null) || state.openComicViewer;
-      if (typeof openViewer !== 'function') return;
-
-      const result = await resolveComicOrOffline(params.id);
-      if (!result) return;
+    const applyResolvedComicRoute = (result, query, pageNum, openViewer) => {
+      if (!result) return null;
 
       const folderPath = query.get('folderPath');
       const readingListId = query.get('readingListId');
@@ -269,12 +265,34 @@ function registerRoutes() {
       if (readingListId) options.readingListId = readingListId;
       if (readingListName) options.readingListName = decodeURIComponent(readingListName);
 
-      await openViewer(result.comic, options);
-      if (pageNum !== null && !Number.isNaN(pageNum)) {
-        setTimeout(() => {
-          if (typeof global.turnToPage === 'function') global.turnToPage(pageNum - 1);
-        }, 300);
+      const viewerPromise = openViewer(result.comic, options);
+      const schedulePageTurn = () => {
+        if (pageNum !== null && !Number.isNaN(pageNum)) {
+          setTimeout(() => {
+            if (typeof global.turnToPage === 'function') global.turnToPage(pageNum - 1);
+          }, 300);
+        }
+      };
+      if (viewerPromise && typeof viewerPromise.then === 'function') {
+        return Promise.resolve(viewerPromise).then(schedulePageTurn);
       }
+      schedulePageTurn();
+      return null;
+    };
+
+    const openResolvedComicRoute = (params, query, pageNum = null) => {
+      const openViewer = global.openComicViewer || (typeof window !== 'undefined' ? window.openComicViewer : null) || state.openComicViewer;
+      if (typeof openViewer !== 'function') return;
+
+      const getComic = global.getComicById || (typeof window !== 'undefined' ? window.getComicById : null) || state.getComicById;
+      const syncResult = typeof getComic === 'function' ? getComic(params.id, true) : null;
+      if (syncResult) {
+        return applyResolvedComicRoute(syncResult, query, pageNum, openViewer);
+      }
+
+      return resolveComicOrOffline(params.id).then((asyncResult) =>
+        applyResolvedComicRoute(asyncResult, query, pageNum, openViewer)
+      );
     };
 
     global.router.addRoute('/comic/:id', (params, query) => {

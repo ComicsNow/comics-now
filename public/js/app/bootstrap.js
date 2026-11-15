@@ -202,9 +202,12 @@ export async function loadInitialData() {
   if (isOnline) {
     const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
     const timeoutId = controller ? setTimeout(() => controller.abort(), 2000) : null;
-    fetch(`${appGlobal.API_BASE_URL}/api/v1/manga-mode-preference`, controller ? { signal: controller.signal } : undefined)
+    Promise.resolve(
+      fetch(`${appGlobal.API_BASE_URL}/api/v1/manga-mode-preference`, controller ? { signal: controller.signal } : undefined)
+    )
       .then(async (response) => {
         if (timeoutId) clearTimeout(timeoutId);
+        if (!response || typeof response.json !== 'function') return;
         const data = await response.json();
         if (response.ok && data.ok) {
           appGlobal.mangaModePreference = data.mangaMode;
