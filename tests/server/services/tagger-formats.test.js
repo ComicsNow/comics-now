@@ -100,7 +100,7 @@ describe('tagger format support for PDF and comic EPUB', () => {
     );
   });
 
-  test('filterTaggerComicEntries skips .xml, .aria2, non-comic files, and disallowed comic formats', () => {
+  test('filterTaggerComicEntries skips .xml, non-comic files, and disallowed comic formats', () => {
     const mockEntry = (name, isFile = true) => ({ name, isFile: () => isFile });
     const entries = [
       mockEntry('issue.cbz'),
@@ -108,7 +108,7 @@ describe('tagger format support for PDF and comic EPUB', () => {
       mockEntry('issue.epub'),
       mockEntry('disallowed.cbr'),
       mockEntry('issue.ComicInfo.xml'),
-      mockEntry('download.pdf.aria2'),
+      mockEntry('issue.pdf.part'),
       mockEntry('notes.txt'),
       mockEntry('.hidden.cbz'),
       mockEntry('subfolder', false)

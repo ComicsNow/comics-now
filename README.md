@@ -21,7 +21,7 @@
 
 Most digital comic servers were built a decade ago as basic file browsers. **Comics Now!** re-imagines your comic library as a modern, intelligent web application designed for desktops, tablets, and phones:
 
-* 🧠 **Interactive Panel & Bubble Zoom (Guided View)**: Deep-learning panel and speech-bubble detection with optional **Modal** cloud GPU acceleration and visual authoring via **[GVE Now!](https://github.com/ComicsNow/gve-now-editor)**.
+* 🧠 **Interactive Panel & Bubble Zoom (Guided View)**: Deep-learning panel and speech-bubble detection across CBZ, CBR, PDF, and EPUB with optional **Modal** cloud GPU acceleration and visual authoring via **[GVE Now!](https://github.com/ComicsNow/gve-now-editor)**.
 * 🖼️ **Fullscreen Page Preview Grid, Filmstrip & Scrubber**: Navigate issues with a lazy-loaded page grid, precision scrubber, and touch-scrollable thumbnail filmstrip backed by cached WebP transcoding.
 * 🔄 **True Cross-Device Sync**: Pick up right where you left off with real-time reading progress sync across phone, tablet, and desktop.
 * 📱 **Resumable Offline PWA**: Install to iOS, iPadOS, Android, or desktop home screens with resumable downloads, Background Fetch, and automatic reconnect recovery.
@@ -33,7 +33,7 @@ Most digital comic servers were built a decade ago as basic file browsers. **Com
 * 🛡️ **Cloudflare Zero Trust Ready**: Zero open ports needed with Cloudflare Access JWT authentication, granular publisher/series permissions, and admin impersonation.
 * 🔐 **AES-256-GCM Secrets Vault**: All third-party API keys, scraper logins, and cloud GPU tokens are automatically encrypted at rest and masked in the UI.
 * 📂 **Metadata Mode & Folder Mode**: Browse by metadata tags (Publisher → Series → Issue) or mirror your physical directory tree.
-* 💻 **Client-Side Local Reader**: Drag and drop local CBZ/CBR files directly into the browser to read instantly—no upload required.
+* 💻 **Client-Side Local Reader**: Drag and drop local CBZ/CBR/PDF/EPUB files directly into the browser to read instantly—no upload required.
 * 📖 **E-Ink & Color E-Reader Modes**: Anti-ghosting display modes for monochrome and color e-paper with automatic Kindle, Kobo, Onyx Boox, and PocketBook detection.
 
 ---

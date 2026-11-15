@@ -221,9 +221,11 @@ Settings are resolved in the following order:
 | `comicsLocation` | `string` | `"/comics"` | Ingestion/inbox workspace where Tag Comics Now! scans for untagged or newly downloaded CBZ files. |
 | `scanIntervalMinutes` | `number` | `5` | Frequency (in minutes) of background filesystem scans to discover new comics. |
 | `pageCacheMaxMb` | `number` | `200` | Maximum disk space (MB) for cached rendered pages. Allowed range: `50`–`10240`. Lowering the limit immediately evicts the oldest cached pages down to 85% of the new cap; no server restart is required. |
-| `allowed_formats` | `string` | `"cbz"` | Permitted archive formats (`"cbz"`, `"cbr"`, or `"both"`). Automatic conversion converts PDF and CBR to CBZ in `comicsLocation`. |
+| `allowed_formats` | `array \| string` | `["cbz"]` | Permitted archive formats (`cbz`, `cbr`, `pdf`, `epub`, or legacy `"both"` / `"all"`). |
+| `auto_convert_enabled` | `boolean` | `false` | Master toggle for automatic format conversion to `.cbz` during scans. |
 | `delete_cbr_after_conversion` | `boolean` | `false` | Whether to delete (`true`) or keep (`false`, default) original `.cbr` files after converting them to `.cbz`. |
 | `delete_pdf_after_conversion` | `boolean` | `false` | Whether to delete (`true`) or keep (`false`, default) original `.pdf` files after converting them to `.cbz`. |
+| `delete_epub_after_conversion` | `boolean` | `false` | Whether to delete (`true`) or keep (`false`, default) original `.epub` files after converting them to `.cbz`. |
 | `metadata_storage` | `string` | `"archive"` | Where comic metadata is stored: `"sidecar"` (writes external `.ComicInfo.xml` files alongside the comic), `"archive"` (embeds `ComicInfo.xml` directly inside the `.cbz` zip archive), or `"database"` (stored in SQLite only). |
 
 ##### 3. Tag Comics Now! & Metadata Services
@@ -506,14 +508,16 @@ In **Settings → General Settings**:
 - **CBZ (`.cbz`)**: Standard ZIP archive containing image files (`JPG`, `PNG`, `WEBP`, `GIF`).
 - **CBR (`.cbr`)**: RAR archive containing image files.
 - **PDF (`.pdf`)**: Adobe Portable Document Format.
+- **EPUB (`.epub`)**: Fixed-layout / image-based comic EPUB archives (OPF cover and spine-ordered).
 
-### Automatic PDF & CBR Conversion to CBZ
+### Automatic CBR, PDF & EPUB Conversion to CBZ
 In **Settings → Comics Defaults → Allowed Library Formats**:
-- **Convert PDF to CBZ**: When a `.pdf` is placed in `comicsLocation`, the scanner invokes `pdftoppm` to extract PDF pages at native resolution and packages them into a `.cbz` archive.
-- **Convert CBR to CBZ**: When `allowed_formats` is set to `"cbz"`, the scanner uses `unrar` to extract `.cbr` RAR archives in `comicsLocation` and repacks them into store-only `.cbz` archives for faster extraction and lower memory usage.
+- **Auto-Convert Toggle & Per-Format Rules**: Enable automatic conversion (`auto_convert_enabled`) and select which formats (`CBR → CBZ`, `PDF → CBZ`, `EPUB → CBZ`) should be converted during library scans.
+- **Convert PDF / EPUB / CBR to CBZ**: PDF pages are extracted via `PyMuPDF` (`pdftoppm` fallback), EPUB images follow OPF spine order, and CBR archives are extracted via `unrar`, then packaged into store-only `.cbz` archives.
 - **Independent Source Retention (`Keep` by Default)**:
-  - **Original CBR Files After Conversion** (`delete_cbr_after_conversion`): Defaults to **Keep CBR Originals (`false`)**. Can be switched to **Delete CBR After Conversion (`true`)** to automatically remove the source `.cbr` once the `.cbz` is verified.
-  - **Original PDF Files After Conversion** (`delete_pdf_after_conversion`): Defaults to **Keep PDF Originals (`false`)**. Can be switched to **Delete PDF After Conversion (`true`)** to automatically remove the source `.pdf` once the `.cbz` is verified.
+  - **Original CBR Files After Conversion** (`delete_cbr_after_conversion`): Defaults to **Keep CBR Originals (`false`)**.
+  - **Original PDF Files After Conversion** (`delete_pdf_after_conversion`): Defaults to **Keep PDF Originals (`false`)**.
+  - **Original EPUB Files After Conversion** (`delete_epub_after_conversion`): Defaults to **Keep EPUB Originals (`false`)**.
   - When originals are kept on disk, the scanner automatically detects existing sibling `.cbz` files and skips redundant re-conversion on subsequent library scans.
 
 ### The 3 Metadata Storage Options
@@ -604,7 +608,7 @@ Comics Now! features an AI-driven panel detection pipeline:
 ### Modal Serverless GPU Acceleration (Cloud GPU Speedup)
 While local CPU detection runs smoothly on modern desktop processors, analyzing hundreds of pages with deep learning neural networks can take 30–60 seconds per issue on low-power servers, NAS hardware, or a Raspberry Pi.
 
-Comics Now! supports offloading panel and dialogue bubble detection to cloud **NVIDIA T4 GPUs** via [Modal](https://modal.com):
+Comics Now! supports offloading panel and dialogue bubble detection (across CBZ, CBR, PDF, and EPUB) to cloud **NVIDIA T4 GPUs** via [Modal](https://modal.com):
 
 | Feature | Local CPU Inference (ONNX) | Modal Serverless GPU (T4) |
 | :--- | :--- | :--- |

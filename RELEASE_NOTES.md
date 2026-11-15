@@ -22,7 +22,7 @@ Welcome to **Comics Now! v5.0.0** — a major release introducing native PDF and
 
 ### 4. Cover Extraction & Sidecar Tagging for PDF & Comic EPUB
 * **Cover Extraction**: Added `.pdf` first-page rendering and OPF-ordered `.epub` cover extraction in the Python tagger service and Node tagger bridges.
-* **Non-Destructive `.ComicInfo.xml` Sidecars**: `.epub`, `.pdf`, and `.cbr` files always write metadata to adjacent `.ComicInfo.xml` sidecars so source archives remain untouched, and staging folder tagger scans strictly filter to supported, allowed comic extensions (ignoring `.xml` sidecars, `.aria2` partial downloads, and hidden files).
+* **Non-Destructive `.ComicInfo.xml` Sidecars**: `.epub`, `.pdf`, and `.cbr` files always write metadata to adjacent `.ComicInfo.xml` sidecars so source archives remain untouched, and staging folder tagger scans strictly filter to supported, allowed comic extensions (ignoring `.xml` sidecars, non-comic files, and hidden files).
 
 ---
 
