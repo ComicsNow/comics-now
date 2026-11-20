@@ -69,7 +69,7 @@ export const WesternSpeechZoomMode = {
     }
   },
 
-  handleImageClick(nx, ny) {
+  handleImageClick(nx, ny, options = {}) {
     if (!active) return false;
 
     // Western speech zoom only zooms speech bubbles (with expanded hit area)
@@ -77,7 +77,7 @@ export const WesternSpeechZoomMode = {
       ? state.GuidedView.currentPageBubbles()
       : [];
     const findBubble = state.GuidedView.findBubbleAtPoint || (typeof window !== 'undefined' && window.GuidedView?.findBubbleAtPoint);
-    let bestIndex = (typeof findBubble === 'function') ? findBubble(bubbles, nx, ny) : -1;
+    let bestIndex = (typeof findBubble === 'function') ? findBubble(bubbles, nx, ny, options) : -1;
     if (bestIndex === -1 && typeof findBubble !== 'function') {
       let minArea = Infinity;
       for (let i = 0; i < bubbles.length; i++) {

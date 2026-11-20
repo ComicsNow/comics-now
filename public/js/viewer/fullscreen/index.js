@@ -68,6 +68,8 @@ import {
   onFullscreenReset
 } from './zoom-pan.js';
 
+import { clearHotspotBubbleCursor } from './long-press.js';
+
 import {
   openFullscreen,
   closeFullscreen,
@@ -129,6 +131,7 @@ export {
   bindFullscreenZoomToggle,
   bindFullscreenLongPress,
   cancelPendingSideNav,
+  clearHotspotBubbleCursor,
   animateFullscreenPan
 };
 
@@ -166,7 +169,8 @@ export const ViewerFullscreen = {
   checkSpreadCinemaStatus,
   applyLandscapeTransform,
   resetLandscapePan,
-  initFullscreenNavigation
+  initFullscreenNavigation,
+  clearHotspotBubbleCursor
 };
 
 if (state) {

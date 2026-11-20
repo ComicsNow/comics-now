@@ -386,6 +386,7 @@ exports[`Tailwind class inventory (public/**/*.{html,js}) snapshots the sorted u
   "fullscreen-image",
   "fullscreen-info-bar",
   "fullscreen-nav",
+  "fullscreen-nav--bubble-target",
   "fullscreen-nav-button",
   "fullscreen-page-counter-button",
   "fullscreen-page-counter-wrapper",

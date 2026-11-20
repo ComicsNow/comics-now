@@ -1,20 +1,21 @@
-# Comics Now! v5.0.1 Release Notes
+# Comics Now! v5.0.2 Release Notes
 
-**Comics Now! v5.0.1** is a patch release fixing a settings persistence regression introduced in v5.0.0 where Auto-Conversion and EPUB original-retention settings reverted in the UI immediately after saving.
+**Comics Now! v5.0.2** is a patch release fixing fullscreen edge speech-bubble interaction so speech bubbles under the left and right page-turn hotspots zoom properly instead of triggering accidental page turns.
 
 ---
 
-## 🐛 Bug Fixes in v5.0.1
+## 🐛 Bug Fixes in v5.0.2
 
-* **Persist Auto-Conversion & EPUB Retention Settings (`server/bootstrap/api-router.js`)**:
-  * Wired `getAutoConvertEnabled`, `setAutoConvertEnabled`, `getAutoConvertFormats`, `setAutoConvertFormats`, `getDeleteEpubAfterConversion`, and `setDeleteEpubAfterConversion` into `createConfiguredApiRouter()`.
-  * Previously, saving settings via `POST /api/v1/settings` wrote those values to SQLite without updating the in-memory config accessors, causing the subsequent `GET /api/v1/settings` refresh to return `false` / `[]` and reset the UI controls.
-* **Lockfile Sync**:
-  * Synced `package-lock.json` with `pdfjs-dist` and `@napi-rs/canvas` dependencies so `npm ci` builds succeed in Docker and npm CI workflows.
+* **Prioritize Edge Speech Bubbles Over Fullscreen Page-Turn Hotspots**:
+  * In Western Speech Zoom, Manga Speech Zoom, and Manga Panel Zoom, tapping or pressing a speech bubble positioned inside the outer 10% left/right fullscreen edge strips now zooms the speech bubble instead of triggering a page turn or 250ms long-press navigation.
+* **Preserve Edge Navigation & Panels**:
+  * Tapping empty edge margins, letterbox/pillarbox bars, standard fullscreen edges, or non-bubble manga panels continues to turn pages normally, with tighter edge hit-target padding (`6px` in Speech Zoom, exact bounds in Manga Panel Zoom) so inward bubbles do not block page turns.
+* **Desktop Hover Cursor Cue**:
+  * Hovering over an edge speech bubble with a mouse now displays a `zoom-in` cursor and resets automatically when leaving the edge, turning pages via keyboard, switching modes, or closing fullscreen.
 
 ---
 
 ## 🧪 Verification
 
-* Added regression test `tests/apiRouterAutoConvert.test.js` verifying `POST /api/v1/settings` → `GET /api/v1/settings` round-trip persistence for `autoConvertEnabled`, `autoConvertFormats`, and `delete*AfterConversion`.
-* Verified full Jest test suite (`223/223` suites, `1671` tests, `1` snapshot passing).
+* Added regression suite `tests/guidedEdgeHotspotArbitration.test.js` (`23` tests) covering Western/Manga Speech Zoom, bubbles-only Manga Panel Zoom, tight edge padding, long-press suppression, mouse-only hover cursor lifecycle, and open controls/overlay guards.
+* Verified full test suite (`224/224` Jest suites, `1,694` tests, `1` snapshot; `273/273` Python tagger tests), CSS/Vite production builds, and Playwright Firefox smoke check (`0` uncaught console errors).

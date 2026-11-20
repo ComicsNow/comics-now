@@ -68,7 +68,7 @@ export const MangaSpeechZoomMode = {
     }
   },
 
-  handleImageClick(nx, ny) {
+  handleImageClick(nx, ny, options = {}) {
     if (!active) return false;
 
     // Manga speech zoom only zooms speech bubbles (with expanded hit area)
@@ -76,7 +76,7 @@ export const MangaSpeechZoomMode = {
       ? state.GuidedView.mangaPageBubbles()
       : [];
     const findBubble = state.GuidedView.findBubbleAtPoint || (typeof window !== 'undefined' && window.GuidedView?.findBubbleAtPoint);
-    let bestIdx = (typeof findBubble === 'function') ? findBubble(bubbles, nx, ny) : -1;
+    let bestIdx = (typeof findBubble === 'function') ? findBubble(bubbles, nx, ny, options) : -1;
     if (bestIdx === -1 && typeof findBubble !== 'function') {
       let minArea = Infinity;
       for (let i = 0; i < bubbles.length; i++) {

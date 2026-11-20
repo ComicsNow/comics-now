@@ -544,6 +544,9 @@ body.is-offline .comic-context-menu-item.hide-offline {
 }
 .fullscreen-nav.left { left: 0; }
 .fullscreen-nav.right { right: 0; }
+.fullscreen-nav.fullscreen-nav--bubble-target {
+    cursor: zoom-in;
+}
 
 /* When zoomed or in continuous mode, let touch/pan/scroll events reach the viewer underneath
    instead of being captured by the side-nav hotspots */

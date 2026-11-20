@@ -76,6 +76,7 @@ export async function closeFullscreen() {
   }
   
   hideFullscreenControls();
+  global.clearHotspotBubbleCursor?.();
   if (typeof stopCinemaPan === 'function') stopCinemaPan();
   try {
     global.closeFilmstrip?.();

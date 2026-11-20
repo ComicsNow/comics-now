@@ -95,6 +95,7 @@ import './js/viewer/guided/modes/western-speech-zoom.js';
 import './js/viewer/guided/modes/manga-panel-zoom.js';
 import './js/viewer/guided/modes/manga-speech-zoom.js';
 import './js/viewer/guided/pan.js';
+import './js/viewer/guided/hotspot-arbitration.js';
 import './js/viewer/guided/input.js';
 import './js/viewer/guided/lifecycle.js';
 import './js/viewer/guided/buttons.js';

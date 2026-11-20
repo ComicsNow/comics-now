@@ -35,7 +35,14 @@ export function getRenderState() {
  * Orchestrates the rendering by calling the refactored pure functions 
  * in state.GuidedView (from overlay.js).
  */
+// Barrel wrappers for edge-hotspot arbitration (implemented in hotspot-arbitration.js).
+// Intentionally NOT merged into state.GuidedView, which already holds the implementations.
+export const hasEdgeBubbleAtClient = (...args) => state.GuidedView.hasEdgeBubbleAtClient?.(...args) ?? false;
+export const findEdgeBubbleAtClient = (...args) => state.GuidedView.findEdgeBubbleAtClient?.(...args) ?? null;
+
 export function refreshRender() {
+  // A re-render invalidates any hover-driven edge cursor state.
+  (state.clearHotspotBubbleCursor || (typeof window !== 'undefined' ? window.clearHotspotBubbleCursor : null))?.();
   const { targetBox, isPanelZoom } = getRenderState();
   const registry = state.GuidedView.ModeRegistry;
   const activeModeName = registry.getActiveModeName();

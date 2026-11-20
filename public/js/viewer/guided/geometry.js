@@ -110,7 +110,7 @@ export function findBubbleAtPoint(bubbles, nx, ny, options = {}) {
     // 2. Check expanded margin hit
     const dx = Math.max(0, bx - nx, nx - (bx + bw));
     const dy = Math.max(0, by - ny, ny - (by + bh));
-    if (dx <= hitPadX && dy <= hitPadY) {
+    if (hitPadX > 0 && hitPadY > 0 && dx <= hitPadX && dy <= hitPadY) {
       const dist = Math.hypot(dx / hitPadX, dy / hitPadY);
       if (dist < minPaddedDist) {
         minPaddedDist = dist;

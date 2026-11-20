@@ -8,6 +8,24 @@ let lastTapAt = 0, lastTapX = 0, lastTapY = 0;
 function getImg() { return document.getElementById('fullscreen-image'); }
 function getStage() { return document.getElementById('fullscreen-viewer'); }
 
+// Inline `object-fit: contain` math, used when hotspot-arbitration.js is not loaded.
+function fallbackRenderedImageRect(img) {
+  const rect = img.getBoundingClientRect();
+  let left = rect.left, top = rect.top, width = rect.width, height = rect.height;
+  if (img.naturalWidth > 0 && img.naturalHeight > 0 && rect.width > 0 && rect.height > 0) {
+    const imgRatio = img.naturalWidth / img.naturalHeight;
+    const boxRatio = rect.width / rect.height;
+    if (boxRatio > imgRatio + 0.01) {
+      width = rect.height * imgRatio;
+      left = rect.left + (rect.width - width) / 2;
+    } else if (boxRatio < imgRatio - 0.01) {
+      height = rect.width / imgRatio;
+      top = rect.top + (rect.height - height) / 2;
+    }
+  }
+  return { left, top, width, height };
+}
+
 /**
  * Delegates clicks to the active mode if applicable.
  */
@@ -83,28 +101,25 @@ export function handleImageClick(e) {
   const img = getImg();
   if (!img || !img.naturalWidth) return;
 
-  const rect = img.getBoundingClientRect();
-  let renderedLeft = rect.left;
-  let renderedTop = rect.top;
-  let renderedW = rect.width;
-  let renderedH = rect.height;
-  if (img.naturalWidth > 0 && img.naturalHeight > 0 && rect.width > 0 && rect.height > 0) {
-    const imgRatio = img.naturalWidth / img.naturalHeight;
-    const boxRatio = rect.width / rect.height;
-    if (boxRatio > imgRatio + 0.01) {
-      renderedH = rect.height;
-      renderedW = rect.height * imgRatio;
-      renderedLeft = rect.left + (rect.width - renderedW) / 2;
-    } else if (boxRatio < imgRatio - 0.01) {
-      renderedW = rect.width;
-      renderedH = rect.width / imgRatio;
-      renderedTop = rect.top + (rect.height - renderedH) / 2;
-    }
-  }
+  const rendered = (state.GuidedView?.getRenderedImageRect || fallbackRenderedImageRect)(img);
+  const renderedLeft = rendered.left;
+  const renderedTop = rendered.top;
+  const renderedW = rendered.width;
+  const renderedH = rendered.height;
 
   const isAboveOrBelow = e.clientY < renderedTop || e.clientY > (renderedTop + renderedH);
   const isSideHotspot = !!(e.target && typeof e.target.closest === 'function' && e.target.closest('#fullscreen-nav-left, #fullscreen-nav-right'));
   if (isSideHotspot && !isAboveOrBelow) {
+    // Speech bubbles under the edge hotspot win over the page turn; otherwise
+    // fall through (no stopPropagation) so the hotspot turns the page.
+    const edgeHit = state.GuidedView?.findEdgeBubbleAtClient?.(e.clientX, e.clientY);
+    if (edgeHit && activeMode?.handleImageClick?.(edgeHit.nx, edgeHit.ny, edgeHit.hitOptions)) {
+      const cancelSideNav = state.cancelPendingSideNav || window.cancelPendingSideNav;
+      cancelSideNav?.();
+      e.preventDefault?.();
+      e.stopPropagation?.();
+      state.triggerEinkFlash?.();
+    }
     return;
   }
 

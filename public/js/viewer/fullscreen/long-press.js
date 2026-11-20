@@ -39,6 +39,26 @@ export function cancelLocalPendingSideNav() {
   }
 }
 
+export function clearHotspotBubbleCursor() {
+  ['fullscreen-nav-left', 'fullscreen-nav-right'].forEach((id) => {
+    document.getElementById(id)?.classList.remove('fullscreen-nav--bubble-target');
+  });
+}
+
+// Desktop-only hover affordance: zoom-in cursor while the mouse is over an edge speech bubble.
+function bindBubbleHoverCursor(nav) {
+  nav.addEventListener('pointermove', (event) => {
+    if (event.pointerType !== 'mouse') return;
+    const hasBubble = !!global.GuidedView?.hasEdgeBubbleAtClient?.(event.clientX, event.clientY);
+    if (hasBubble) nav.classList.add('fullscreen-nav--bubble-target');
+    else nav.classList.remove('fullscreen-nav--bubble-target');
+  });
+  nav.addEventListener('pointerleave', (event) => {
+    if (event.pointerType !== 'mouse') return;
+    nav.classList.remove('fullscreen-nav--bubble-target');
+  });
+}
+
 export function makeLongPressHandlers(dir) {
   function down(event) {
     if (event.pointerType === 'touch' && global.fullscreenTouchPointers?.size > 1) {
@@ -48,6 +68,11 @@ export function makeLongPressHandlers(dir) {
     if (global.isFullscreenZoomed) return;
     if (global.isFullImageMode) return;
     if (global.GuidedView?.isPanning) return;
+    // An edge speech bubble owns the tap: never start the page-turn long press.
+    if (global.GuidedView?.hasEdgeBubbleAtClient?.(event.clientX, event.clientY)) {
+      clearLongPress();
+      return;
+    }
     longPressPointerId = event.pointerId;
     longPressStartX = event.clientX;
     longPressStartY = event.clientY;
@@ -142,6 +167,7 @@ export function bindFullscreenLongPress() {
     left.addEventListener('click', h.click);
     left.addEventListener('dblclick', onHotspotDblClick);
     left.addEventListener('contextmenu', (e) => e.preventDefault());
+    bindBubbleHoverCursor(left);
   }
   if (right && !right._longPressBound) {
     right._longPressBound = true;
@@ -154,9 +180,11 @@ export function bindFullscreenLongPress() {
     right.addEventListener('click', h.click);
     right.addEventListener('dblclick', onHotspotDblClick);
     right.addEventListener('contextmenu', (e) => e.preventDefault());
+    bindBubbleHoverCursor(right);
   }
 }
 
 global.consumeLongPressJustFired = consumeLongPressJustFired;
 global.cancelLocalPendingSideNav = cancelLocalPendingSideNav;
 global.bindFullscreenLongPress = bindFullscreenLongPress;
+global.clearHotspotBubbleCursor = clearHotspotBubbleCursor;
