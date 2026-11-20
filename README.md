@@ -7,8 +7,9 @@
 <p align="center">
   <a href="https://comicsnow.github.io/"><img src="https://img.shields.io/badge/Website-Live%20Interactive%20Demo-blue?style=flat&logo=googlechrome&logoColor=white" alt="Live Demo & Website"></a>
   <a href="https://www.npmjs.com/package/comics-now"><img src="https://img.shields.io/npm/v/comics-now.svg?color=cb3837&logo=npm" alt="npm version"></a>
-  <a href="#quick-start-60-seconds"><img src="https://img.shields.io/badge/docker-ready-blue.svg?logo=docker" alt="Docker Ready"></a>
-  <a href="https://github.com/ComicsNow/comics-now/pkgs/container/comics-now"><img src="https://img.shields.io/badge/ghcr.io-comics--now-2496ED.svg?logo=github" alt="GHCR Image"></a>
+  <a href="https://www.npmjs.com/package/comics-now"><img src="https://img.shields.io/npm/d18m/comics-now?color=cb3837&logo=npm&label=npm%20downloads" alt="npm Downloads"></a>
+  <a href="https://hub.docker.com/r/comicsnowdev/comics-now"><img src="https://img.shields.io/docker/pulls/comicsnowdev/comics-now?color=2496ED&logo=docker&logoColor=white&label=docker%20hub%20pulls" alt="Docker Hub Pulls"></a>
+  <a href="https://github.com/ComicsNow/comics-now/pkgs/container/comics-now"><img src="https://img.shields.io/badge/dynamic/regex?url=https%3A%2F%2Fgithub.com%2FComicsNow%2Fcomics-now%2Fpkgs%2Fcontainer%2Fcomics-now&search=Total%20downloads%3C%2Fspan%3E%5Cs*%3Ch3%5B%5E%3E%5D*%3E(%5B%5E%3C%5D%2B)&replace=%241&label=ghcr.io%20downloads&logo=github&color=2496ED" alt="GHCR Downloads"></a>
   <a href="https://github.com/ComicsNow/comics-now/actions/workflows/docker-publish.yml"><img src="https://github.com/ComicsNow/comics-now/actions/workflows/docker-publish.yml/badge.svg" alt="Build Status"></a>
   <a href="https://ko-fi.com/comicsnow"><img src="https://img.shields.io/badge/Ko--fi-Support-FF5E5B?logo=ko-fi&logoColor=white" alt="Support on Ko-fi"></a>
   <a href="docs/WIKI.md"><img src="https://img.shields.io/badge/docs-WIKI%20Manual-green.svg" alt="Documentation"></a>
