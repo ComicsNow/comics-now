@@ -15,20 +15,17 @@ import {
   publisherAlphaFilter,
   publisherListContainer
 } from '../../globals.js';
-
 import {
   updateFilterButtonCounts,
   filterPublishersByActiveFilter,
   getPublisherStatusCounts,
   statusCountsMatchFilter
 } from '../status.js';
-
 import { updateBreadcrumb, makeCountChips } from '../breadcrumb.js';
 import * as Data from '../data.js';
 import { renderAlphaFilter, applyFilterAndRender } from '../alpha-list.js';
 import { syncSmartFilterButtons, mountSmartFilterHostInto } from '../smart-filters.js';
 import { showSeriesList, renderPublisherStoryArcs, renderPublisherReadingLists } from './series.js';
-
 const actionsRef = (typeof actions !== 'undefined' && actions?.navigation) ? actions : (typeof globalThis !== 'undefined' ? globalThis.__COMICS_STORE__?.actions : null);
 const clear = typeof clearElement === 'function' ? clearElement : (el) => { if (el) { if (typeof el.replaceChildren === 'function') el.replaceChildren(); else el.innerHTML = ''; } };
 const renderContent = (typeof render === 'function' && render.length >= 2) ? render : (el, content) => {
@@ -41,7 +38,6 @@ const renderContent = (typeof render === 'function' && render.length >= 2) ? ren
     el.innerHTML = String(content ?? '');
   }
 };
-
 const safeHtml = (typeof html === 'function' && html.length > 0) ? html : (strings, ...values) => {
   let out = '';
   for (let i = 0; i < strings.length; i++) {
@@ -55,17 +51,13 @@ const safeHtml = (typeof html === 'function' && html.length > 0) ? html : (strin
   }
   return { toHTML: () => out, html: out, __isRawHtml: true };
 };
-
 const safeRaw = (typeof raw === 'function' && raw.length > 0) ? raw : (v) => ({
   __isRawHtml: true,
   html: String(v ?? '')
 });
-
 const API_BASE_URL = state.API_BASE_URL || (typeof window !== 'undefined' && window.API_BASE_URL) || '';
-
 export function showPublisherList(rootFolder, options = {}) {
   const force = Boolean(options.force);
-  
   if (!state._isNavigatingFromRouter && state.router && !state._isAppInitializing) {
      const navPath = `/library?rootFolder=${encodeURIComponent(rootFolder)}`;
      if ((getRelativePath() + window.location.search) !== navPath) {
@@ -73,16 +65,13 @@ export function showPublisherList(rootFolder, options = {}) {
        return;
      }
   }
-
   const normalizedPath = rootFolder ? rootFolder.replace(/[\\\/]+$/, '') : '';
   const actualKey = state.library?.[rootFolder] ? rootFolder : (state.library?.[normalizedPath] ? normalizedPath : (state.library?.[normalizedPath + '/'] ? normalizedPath + '/' : null));
   const rootData = actualKey ? state.library[actualKey] : null;
-
   if (!state.library || !rootData) {
     (state.showRootFolderList || (typeof window !== 'undefined' && window.showRootFolderList))?.({ force: true });
     return;
   }
-
   if (state.currentView !== 'publishers') {
     state.activeAlphaFilter = 'All';
   }
@@ -102,54 +91,44 @@ export function showPublisherList(rootFolder, options = {}) {
   }
   syncSmartFilterButtons();
   if (typeof updateFilterButtonCounts === 'function') updateFilterButtonCounts();
-
   const publishers = rootData ? rootData.publishers : {};
   const publishersToRender = filterPublishersByActiveFilter(publishers);
   const publisherNames = Object.keys(publishersToRender);
-
   if (publisherNames.length === 1 && !force && state.activeSmartFilter !== 'story-arc' && state.activeSmartFilter !== 'reading-list') {
     state.currentPublisher = publisherNames[0];
     if (typeof window !== 'undefined') window.currentPublisher = state.currentPublisher;
     showSeriesList(publisherNames[0]);
     return;
   }
-
   showView(publisherListDiv);
   mountSmartFilterHostInto(publisherListDiv);
-
   const folderLabel = (typeof window !== 'undefined' && window.LIBRARY_NAMES && (window.LIBRARY_NAMES[state.currentRootFolder] || window.LIBRARY_NAMES[normalizedPath])) || normalizedPath.split(/[\\\/]/).pop() || state.currentRootFolder;
   if (publisherTitleH2) {
     publisherTitleH2.textContent = folderLabel;
   }
-
   updateBreadcrumb([
     { label: 'Libraries', action: () => (state.showRootFolderList || (typeof window !== 'undefined' && window.showRootFolderList))?.({ force: true }) },
     { label: folderLabel }
   ]);
-
   const existingStoryArcFilter = document.getElementById('story-arcs-status-filter');
   if (existingStoryArcFilter && state.activeSmartFilter !== 'story-arc') existingStoryArcFilter.remove();
   const existingReadingListFilter = document.getElementById('reading-lists-status-filter');
   if (existingReadingListFilter && state.activeSmartFilter !== 'reading-list') existingReadingListFilter.remove();
-
   if (state.activeSmartFilter === 'reading-list') {
     if (publisherAlphaFilter) clear(publisherAlphaFilter);
     renderPublisherReadingLists(null, publisherListContainer);
     return;
   }
-
   if (state.activeSmartFilter === 'story-arc') {
     if (publisherAlphaFilter) clear(publisherAlphaFilter);
     renderPublisherStoryArcs(null, publisherListContainer);
     return;
   }
-
   if (publisherListContainer) {
     publisherListContainer.className = 'grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6';
   }
   renderAlphaFilter(publisherAlphaFilter, publishersToRender, renderPublisherCards, 'publishers');
 }
-
 export function renderPublisherCards(publishersToShow) {
   if (publisherListContainer) {
     publisherListContainer.className = 'grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6';
@@ -182,16 +161,13 @@ export function renderPublisherCards(publishersToShow) {
     if (!statusCountsMatchFilter(counts)) {
       continue;
     }
-
     const SmartLists = state.LibrarySmartLists || (typeof window !== 'undefined' && window.LibrarySmartLists) || {};
     const getReadingLists = state.getReadingListsForPublisher || (typeof window !== 'undefined' && window.getReadingListsForPublisher) || SmartLists.getReadingListsForPublisher;
     const pubReadingLists = typeof getReadingLists === 'function' ? getReadingLists(publisher) : [];
     const readingListCount = pubReadingLists.length;
-
     const getStoryArcs = state.getStoryArcsForPublisher || (typeof window !== 'undefined' && window.getStoryArcsForPublisher) || SmartLists.getStoryArcsForPublisher;
     const pubStoryArcs = typeof getStoryArcs === 'function' ? getStoryArcs(publisher) : [];
     const storyArcCount = pubStoryArcs.length;
-
     let countsChips = makeCountChips(counts);
     let extraChips = '';
     if (readingListCount > 0) {
@@ -207,7 +183,6 @@ export function renderPublisherCards(publishersToShow) {
         countsChips = `<div class="card-counts">${extraChips}</div>`;
       }
     }
-
     let allComics = [];
     if (publisherData.series) {
       for (const seriesName in publisherData.series) {
@@ -217,13 +192,11 @@ export function renderPublisherCards(publishersToShow) {
         }
       }
     }
-
     let allComicsAreManga = false;
     if (allComics.length > 0) {
       allComicsAreManga = allComics.every(comic => comic.mangaMode === true);
     }
     const mangaBannerHtml = allComicsAreManga ? `<div class="status-banner status-manga">Manga</div>` : '';
-
     let publisherStatusBannerHtml = '';
     if (counts && counts.total > 0 && counts.read === counts.total) {
       publisherStatusBannerHtml = `<div class="status-banner status-read">Read</div>`;
@@ -239,25 +212,22 @@ export function renderPublisherCards(publishersToShow) {
               title="Bulk Read/Unread">
         ${publisherStatusIcon}
       </button>`;
-
     let isPublisherDownloaded = false;
     if (allComics.length > 0) {
       isPublisherDownloaded = allComics.every(comic => state.downloadedComicIds?.has?.(comic.id));
     }
-
     const downloadIcon = isPublisherDownloaded
       ? ICONS.READ
       : ICONS.DOWNLOAD;
-
     const downloadButtonHtml = `<button class="download-btn absolute top-2 right-2 ${isPublisherDownloaded ? 'text-green-400' : 'text-gray-400 hover:text-white'}"
           title="${isPublisherDownloaded ? 'Delete from device' : 'Download publisher'}"
           data-publisher-name="${escapeHtml(publisher)}"
           data-root-folder="${escapeHtml(state.currentRootFolder)}"
           data-is-downloaded="${isPublisherDownloaded}"
         >${downloadIcon}</button>`;
-
     const card = document.createElement('div');
     card.className = 'series-card bg-gray-800 rounded-lg shadow-lg cursor-pointer p-4 border border-gray-700/50 hover:border-purple-500/50 transition-all duration-300 group';
+    card.setAttribute('data-publisher', publisher);
     const hasLogo = Boolean(publisherData.logoUrl);
     const needsLightBackground = Boolean(publisherData.logoNeedsBackground);
     const needsDarkBackground = Boolean(publisherData.logoNeedsDarkBackground);
@@ -283,13 +253,11 @@ export function renderPublisherCards(publishersToShow) {
       ${safeRaw(countsChips)}
     `);
     card.addEventListener('click', () => showSeriesList(publisher));
-
     const downloadBtn = card.querySelector('.download-btn');
     if (downloadBtn) {
       downloadBtn.addEventListener('click', async (e) => {
         e.stopPropagation();
         const isDownloaded = downloadBtn.dataset.isDownloaded === 'true';
-
         if (isDownloaded) {
           if (confirm(`Delete these ${allComics.length} downloaded comics from your device?`)) {
             downloadBtn.disabled = true;
@@ -305,7 +273,6 @@ export function renderPublisherCards(publishersToShow) {
         }
       });
     }
-
     const pubStatusBtn = card.querySelector('.status-toggle-btn');
     if (pubStatusBtn) {
       pubStatusBtn.addEventListener('click', async (e) => {
@@ -326,7 +293,6 @@ export function renderPublisherCards(publishersToShow) {
         }
       });
     }
-
     let longPressTimer = null;
     let contextMenuShown = false;
     const publisherContextData = {
@@ -334,13 +300,11 @@ export function renderPublisherCards(publishersToShow) {
       publisherInfo: publisherData,
       rootFolder: state.currentRootFolder
     };
-
     card.addEventListener('contextmenu', (e) => {
       if (typeof window !== 'undefined' && typeof window.showPublisherContextMenu === 'function') {
         window.showPublisherContextMenu(e, publisherContextData);
       }
     });
-
     card.addEventListener('touchstart', (e) => {
       contextMenuShown = false;
       longPressTimer = setTimeout(() => {
@@ -350,7 +314,6 @@ export function renderPublisherCards(publishersToShow) {
         }
       }, 500);
     });
-
     card.addEventListener('touchend', (e) => {
       if (longPressTimer) {
         clearTimeout(longPressTimer);
@@ -362,14 +325,37 @@ export function renderPublisherCards(publishersToShow) {
         contextMenuShown = false;
       }
     });
-
     card.addEventListener('touchmove', () => {
       if (longPressTimer) {
         clearTimeout(longPressTimer);
         longPressTimer = null;
       }
     });
-
     publisherListContainer.appendChild(card);
   }
+}
+if (typeof window !== 'undefined' && !window._publisherLogoListenerBound) {
+  window._publisherLogoListenerBound = true;
+  window.addEventListener('PUBLISHER_LOGO_UPDATED', (event) => {
+    const { publisher, logoUrl } = event.detail || {};
+    if (!publisher || !logoUrl) return;
+    const escaped = typeof CSS !== 'undefined' && CSS.escape ? CSS.escape(publisher) : publisher.replace(/"/g, '\\"');
+    const cards = document.querySelectorAll(`[data-publisher="${escaped}"]`);
+    cards.forEach((card) => {
+      let img = card.querySelector('img');
+      if (img) {
+        img.src = logoUrl;
+      } else {
+        const logoWrapper = card.querySelector('.flex.items-center.justify-center');
+        if (logoWrapper) {
+          logoWrapper.innerHTML = '';
+          const newImg = document.createElement('img');
+          newImg.src = logoUrl;
+          newImg.alt = publisher;
+          newImg.className = 'max-h-16 max-w-full object-contain';
+          logoWrapper.appendChild(newImg);
+        }
+      }
+    });
+  });
 }

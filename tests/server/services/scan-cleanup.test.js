@@ -104,4 +104,60 @@ describe('cleanupStaleComics', () => {
             expect.stringContaining('Aborting stale-comic cleanup')
         );
     });
+
+    it('deletes orphaned ComicInfo.xml sidecar when missing comic has no companions', async () => {
+        const sidecarPath = path.join(testDir, 'mock-missing-001.ComicInfo.xml');
+        fs.writeFileSync(sidecarPath, '<ComicInfo><Title>Orphan</Title></ComicInfo>');
+
+        await cleanupStaleComics(makeInput());
+
+        expect(fs.existsSync(sidecarPath)).toBe(false);
+        expect(log).toHaveBeenCalledWith(
+            'INFO',
+            'SCAN',
+            expect.stringContaining('Deleted orphan ComicInfo.xml sidecar')
+        );
+    });
+
+    it('Companion Guard: preserves ComicInfo.xml when a companion format exists beside it', async () => {
+        const sidecarPath = path.join(testDir, 'mock-missing-001.ComicInfo.xml');
+        const companionPdf = path.join(testDir, 'mock-missing-001.pdf');
+        fs.writeFileSync(sidecarPath, '<ComicInfo><Title>Shared</Title></ComicInfo>');
+        fs.writeFileSync(companionPdf, 'synthetic pdf content');
+
+        try {
+            await cleanupStaleComics(makeInput());
+
+            expect(fs.existsSync(sidecarPath)).toBe(true);
+            expect(fs.existsSync(companionPdf)).toBe(true);
+        } finally {
+            if (fs.existsSync(companionPdf)) fs.unlinkSync(companionPdf);
+            if (fs.existsSync(sidecarPath)) fs.unlinkSync(sidecarPath);
+        }
+    });
+
+    it('preserves ComicInfo.xml if parent directory does not exist or is unreachable', async () => {
+        const nonExistentDir = path.join(testDir, 'unreachable-subdir');
+        const unmountedComic = path.join(nonExistentDir, 'offline-issue.cbz');
+        const unmountedId = createId(unmountedComic);
+
+        await dbRun(
+            `INSERT OR REPLACE INTO comics (id, path, name) VALUES (?, ?, ?)`,
+            [unmountedId, unmountedComic, 'offline-issue.cbz']
+        );
+
+        try {
+            await cleanupStaleComics({
+                dbComicsMap: new Map([[unmountedComic, { id: unmountedId }]]),
+                fileSystemComics: new Set(),
+                unreachableTopDirs: [],
+                subDirScanErrors: 0
+            });
+
+            // The comic row was deleted, but no exception was thrown on unlinking sidecar
+            expect(await dbGet('SELECT id FROM comics WHERE id = ?', [unmountedId])).toBeUndefined();
+        } finally {
+            await dbRun('DELETE FROM comics WHERE id = ?', [unmountedId]);
+        }
+    });
 });

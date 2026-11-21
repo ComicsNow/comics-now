@@ -29,7 +29,8 @@ async function createZipFile(destPath, entries) {
 }
 
 function createMinimalPdf(destPath) {
-  const py = path.join('/opt/comics-now/.venv/bin/python3');
+  const rootVenvPy = path.resolve(__dirname, '../../../.venv/bin/python3');
+  const py = fs.existsSync(rootVenvPy) ? rootVenvPy : 'python3';
   const script = `
 import fitz, sys
 doc = fitz.open()

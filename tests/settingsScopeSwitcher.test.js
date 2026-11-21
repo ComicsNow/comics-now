@@ -65,7 +65,7 @@ describe('Settings Scope Switcher (Approach A)', () => {
 
   test('defines correct scope hierarchy and mappings', () => {
     expect(switcher.SCOPES.reader.tabs).toEqual(['comics-defaults', 'downloads', 'devices']);
-    expect(switcher.SCOPES.server.tabs).toEqual(['general', 'users', 'logs']);
+    expect(switcher.SCOPES.server.tabs).toEqual(['general', 'publisher-logos', 'users', 'logs']);
     expect(switcher.SCOPES.engines.tabs).toEqual(['guided-reader']);
 
     expect(switcher.TAB_TO_SCOPE['comics-defaults']).toBe('reader');

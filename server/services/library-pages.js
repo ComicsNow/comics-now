@@ -29,8 +29,15 @@ async function generateThumbnail(comicPath) {
   const filename = `${id}.jpg`;
   const full = path.join(THUMBNAILS_DIRECTORY, filename);
   if (fs.existsSync(full)) {
-    log('INFO', 'THUMBNAIL', `Skip (exists): ${filename}`);
-    return filename;
+    try {
+      const st = fs.statSync(full);
+      if (st && st.size > 0) {
+        log('INFO', 'THUMBNAIL', `Skip (exists): ${filename}`);
+        return filename;
+      }
+      log('WARN', 'THUMBNAIL', `Found 0-byte thumbnail ${filename}, regenerating...`);
+      fs.unlinkSync(full);
+    } catch (_) {}
   }
 
   const start = t0();
@@ -56,7 +63,7 @@ async function generateThumbnail(comicPath) {
 
   try {
     log('INFO', 'THUMBNAIL', `Create → ${filename} (first page: ${firstPage})`);
-    await sharp(buffer)
+    await sharp(buffer, { failOn: 'none' })
       .resize({ height: 300, withoutEnlargement: true })
       .jpeg({ quality: 80, progressive: true })
       .toFile(full);

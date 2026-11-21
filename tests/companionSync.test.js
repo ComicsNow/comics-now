@@ -107,6 +107,82 @@ describe('companion metadata sync', () => {
     );
   });
 
+  test('PDF primary mirrors its metadata into the converted CBZ companion', async () => {
+    const primaryPdf = {
+      id: 'mock-pdf-id',
+      path: path.join('fixtures', 'mock-comic.pdf'),
+      originalPath: null
+    };
+    db.dbGet.mockResolvedValue(primaryPdf);
+    db.dbAll.mockResolvedValue([COMPANION_CBZ]);
+
+    const result = await syncCompanionTag(primaryPdf.id);
+
+    expect(result).toMatchObject({ synced: true, companionId: COMPANION_CBZ.id });
+    expect(metadata.writeComicInfoToCbz).toHaveBeenCalledWith(
+      COMPANION_CBZ.path,
+      expect.stringContaining('Mock Series')
+    );
+  });
+
+  test('EPUB primary mirrors its metadata into the converted CBZ companion', async () => {
+    const primaryEpub = {
+      id: 'mock-epub-id',
+      path: path.join('fixtures', 'mock-comic.epub'),
+      originalPath: null
+    };
+    db.dbGet.mockResolvedValue(primaryEpub);
+    db.dbAll.mockResolvedValue([COMPANION_CBZ]);
+
+    const result = await syncCompanionTag(primaryEpub.id);
+
+    expect(result).toMatchObject({ synced: true, companionId: COMPANION_CBZ.id });
+    expect(metadata.writeComicInfoToCbz).toHaveBeenCalledWith(
+      COMPANION_CBZ.path,
+      expect.stringContaining('Mock Series')
+    );
+  });
+
+  test('reverse sync from a converted CBZ back to its PDF original uses a sidecar', async () => {
+    const originalPdfPath = path.join('fixtures', 'mock-comic.pdf');
+    db.dbGet.mockResolvedValue({
+      id: 'mock-cbz-id',
+      path: COMPANION_CBZ.path,
+      originalPath: originalPdfPath
+    });
+    db.dbAll.mockResolvedValue([{ id: 'mock-pdf-id', path: originalPdfPath }]);
+
+    const result = await syncCompanionTag('mock-cbz-id');
+
+    expect(result.synced).toBe(true);
+    expect(metadata.writeComicInfoToCbz).not.toHaveBeenCalled();
+    expect(fs.promises.writeFile).toHaveBeenCalledWith(
+      path.join('fixtures', 'mock-comic.ComicInfo.xml'),
+      expect.any(String),
+      'utf-8'
+    );
+  });
+
+  test('reverse sync from a converted CBZ back to its EPUB original uses a sidecar', async () => {
+    const originalEpubPath = path.join('fixtures', 'mock-comic.epub');
+    db.dbGet.mockResolvedValue({
+      id: 'mock-cbz-id',
+      path: COMPANION_CBZ.path,
+      originalPath: originalEpubPath
+    });
+    db.dbAll.mockResolvedValue([{ id: 'mock-epub-id', path: originalEpubPath }]);
+
+    const result = await syncCompanionTag('mock-cbz-id');
+
+    expect(result.synced).toBe(true);
+    expect(metadata.writeComicInfoToCbz).not.toHaveBeenCalled();
+    expect(fs.promises.writeFile).toHaveBeenCalledWith(
+      path.join('fixtures', 'mock-comic.ComicInfo.xml'),
+      expect.any(String),
+      'utf-8'
+    );
+  });
+
   test('does nothing when the primary has no linked companion', async () => {
     db.dbAll.mockResolvedValue([]);
 

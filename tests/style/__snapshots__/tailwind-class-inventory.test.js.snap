@@ -602,6 +602,7 @@ exports[`Tailwind class inventory (public/**/*.{html,js}) snapshots the sorted u
   "lowercase",
   "manga-mode-btn",
   "mark-read-btn",
+  "max-h-16",
   "max-h-48",
   "max-h-64",
   "max-h-96",

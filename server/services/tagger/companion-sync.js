@@ -6,10 +6,11 @@ const metadata = require('../metadata');
 const { log } = require('../../logger');
 const { buildTaggedDbMeta } = require('./persist');
 
-const CBR_LOOKUP_SQL =
+const COMPANION_CBZ_LOOKUP_SQL =
   "SELECT id, path FROM comics WHERE originalPath = ? COLLATE NOCASE AND LOWER(path) LIKE '%.cbz' ORDER BY id ASC LIMIT 1";
 const CBZ_ORIGINAL_LOOKUP_SQL =
-  "SELECT id, path FROM comics WHERE path = ? COLLATE NOCASE AND LOWER(path) LIKE '%.cbr' ORDER BY id ASC LIMIT 1";
+  "SELECT id, path FROM comics WHERE path = ? COLLATE NOCASE AND (LOWER(path) LIKE '%.cbr' OR LOWER(path) LIKE '%.pdf' OR LOWER(path) LIKE '%.epub') ORDER BY id ASC LIMIT 1";
+const ORIGINAL_EXTENSIONS = ['.cbr', '.pdf', '.epub'];
 
 function isUsableMetadata(info) {
   return Boolean(info && (info.Series || info.Title));
@@ -31,8 +32,8 @@ function sidecarPathFor(comicPath) {
 async function findCompanion(primary) {
   const primaryExt = path.extname(primary.path || '').toLowerCase();
 
-  if (primaryExt === '.cbr') {
-    const rows = await db.dbAll(CBR_LOOKUP_SQL, [primary.path]);
+  if (ORIGINAL_EXTENSIONS.includes(primaryExt)) {
+    const rows = await db.dbAll(COMPANION_CBZ_LOOKUP_SQL, [primary.path]);
     return rows && rows.length > 0 ? rows[0] : null;
   }
 
@@ -52,8 +53,8 @@ async function writeCompanionFile(companionPath, info) {
   if (!metadataXml) return;
 
   const companionExt = path.extname(companionPath).toLowerCase();
-  // RAR archives are read-only in place — the companion CBR always gets a sidecar.
-  if (companionExt === '.cbr' || storage === 'sidecar') {
+  // Non-ZIP archives and documents (CBR, PDF, EPUB) always receive a sidecar.
+  if (ORIGINAL_EXTENSIONS.includes(companionExt) || storage === 'sidecar') {
     await fs.promises.writeFile(sidecarPathFor(companionPath), metadataXml, 'utf-8');
     return;
   }

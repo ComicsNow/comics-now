@@ -8,7 +8,9 @@ const { THUMBNAILS_DIRECTORY } = require('../../../server/constants');
 const { extractPageBuffer, getComicPages, generateThumbnail } = require('../../../server/services/library-pages');
 
 jest.mock('fs', () => ({
-  existsSync: jest.fn()
+  existsSync: jest.fn(),
+  statSync: jest.fn(),
+  unlinkSync: jest.fn()
 }));
 
 jest.mock('sharp', () => {
@@ -94,11 +96,28 @@ describe('library-pages service', () => {
 
     it('returns filename without generating if thumbnail already exists', async () => {
       fs.existsSync.mockReturnValue(true);
+      fs.statSync.mockReturnValue({ size: 1234 });
       const result = await generateThumbnail(mockComicPath);
       expect(result).toBe(`${mockId}.jpg`);
       expect(fs.existsSync).toHaveBeenCalledWith(path.join('/mock/thumbnails', `${mockId}.jpg`));
       expect(log).toHaveBeenCalledWith('INFO', 'THUMBNAIL', `Skip (exists): ${mockId}.jpg`);
       expect(listPages).not.toHaveBeenCalled();
+    });
+
+    it('evicts 0-byte thumbnail and regenerates if existing thumbnail has size 0', async () => {
+      fs.existsSync.mockReturnValue(true);
+      fs.statSync.mockReturnValue({ size: 0 });
+      listPages.mockResolvedValue(['page1.jpg']);
+      const mockBuffer = Buffer.from('image');
+      getEntryBuffer.mockResolvedValue(mockBuffer);
+      sharp.sharpInstance.toFile.mockResolvedValue();
+
+      const result = await generateThumbnail(mockComicPath);
+
+      expect(fs.unlinkSync).toHaveBeenCalledWith(path.join('/mock/thumbnails', `${mockId}.jpg`));
+      expect(log).toHaveBeenCalledWith('WARN', 'THUMBNAIL', `Found 0-byte thumbnail ${mockId}.jpg, regenerating...`);
+      expect(result).toBe(`${mockId}.jpg`);
+      expect(sharp).toHaveBeenCalledWith(mockBuffer, { failOn: 'none' });
     });
 
     it('returns null and logs error if it fails to read pages (catch in getComicPages returning empty array)', async () => {
@@ -153,7 +172,7 @@ describe('library-pages service', () => {
       const result = await generateThumbnail(mockComicPath);
 
       expect(result).toBe(`${mockId}.jpg`);
-      expect(sharp).toHaveBeenCalledWith(mockBuffer);
+      expect(sharp).toHaveBeenCalledWith(mockBuffer, { failOn: 'none' });
       expect(sharp.sharpInstance.resize).toHaveBeenCalledWith({ height: 300, withoutEnlargement: true });
       expect(sharp.sharpInstance.jpeg).toHaveBeenCalledWith({ quality: 80, progressive: true });
       expect(sharp.sharpInstance.toFile).toHaveBeenCalledWith(path.join('/mock/thumbnails', `${mockId}.jpg`));

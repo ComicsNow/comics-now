@@ -195,7 +195,14 @@ function createStaticRouter({ getConfig, getComicsDirectories, getPublicLibrarie
     next();
   });
   router.use('/icons', express.static(ICONS_DIRECTORY, { maxAge: '1y', immutable: true }));
-  router.use('/logos', express.static(LOGOS_DIRECTORY, { maxAge: '1y', immutable: true }));
+  router.use('/logos', express.static(LOGOS_DIRECTORY, {
+    maxAge: 0,
+    etag: true,
+    lastModified: true,
+    setHeaders: (res) => {
+      res.setHeader('Cache-Control', 'no-cache, must-revalidate');
+    }
+  }));
 
   router.get('*', (req, res) => {
     const reqPath = req.path || req.url || '';

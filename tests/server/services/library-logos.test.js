@@ -1,6 +1,6 @@
 const fs = require('fs');
 const path = require('path');
-const { resolveLogo } = require('../../../server/services/library-logos');
+const { resolveLogo, invalidateLogo, invalidatePublisher } = require('../../../server/services/library-logos');
 
 // Mock dependencies
 jest.mock('fs', () => ({
@@ -219,6 +219,44 @@ describe('library-logos', () => {
 
       // Restore Date.now
       Date.now = OriginalDateNow;
+    });
+
+    it('invalidateLogo forces fresh disk read on next call', async () => {
+      const dir = getUniqueDir();
+      fs.promises.readdir.mockResolvedValue([{ name: 'logo.png', isFile: () => true }]);
+      sharp.mockImplementation(() => ({
+        metadata: jest.fn().mockResolvedValue({ format: 'png', hasAlpha: true }),
+        raw: () => ({ toBuffer: jest.fn().mockResolvedValue({ data: Buffer.from([10, 10, 10, 255]) }) })
+      }));
+
+      await resolveLogo(dir);
+      expect(fs.promises.readdir).toHaveBeenCalledTimes(1);
+
+      invalidateLogo(dir);
+
+      await resolveLogo(dir);
+      expect(fs.promises.readdir).toHaveBeenCalledTimes(2);
+    });
+
+    it('invalidatePublisher calculates safe directory and purges cache', async () => {
+      const { LOGOS_DIRECTORY } = require('../../../server/constants');
+      const { safeDirName } = require('../../../server/utils');
+      const publisher = 'DC Comics';
+      const pubDir = path.join(LOGOS_DIRECTORY, safeDirName(publisher));
+
+      fs.promises.readdir.mockResolvedValue([{ name: 'logo.svg', isFile: () => true }]);
+      sharp.mockImplementation(() => ({
+        metadata: jest.fn().mockResolvedValue({ format: 'svg', hasAlpha: false }),
+        raw: () => ({ toBuffer: jest.fn().mockResolvedValue({ data: Buffer.from([200, 200, 200, 255]) }) })
+      }));
+
+      await resolveLogo(pubDir);
+      expect(fs.promises.readdir).toHaveBeenCalledTimes(1);
+
+      invalidatePublisher(publisher);
+
+      await resolveLogo(pubDir);
+      expect(fs.promises.readdir).toHaveBeenCalledTimes(2);
     });
   });
 });

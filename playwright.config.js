@@ -1,9 +1,8 @@
 const { defineConfig, devices } = require('@playwright/test');
 
-// Local override: this dev machine already hosts another service (comics-mcp)
-// on 3009, so the e2e port is env-configurable. Defaults match CI.
-const E2E_PORT = process.env.E2E_PORT || '3009';
-const E2E_URL = `http://localhost:${E2E_PORT}`;
+// Isolated test port default (3035) to avoid colliding with host service (comics-mcp / ucl-agent on 3009)
+const E2E_PORT = process.env.E2E_PORT || '3035';
+const E2E_URL = process.env.E2E_URL || `http://localhost:${E2E_PORT}`;
 
 module.exports = defineConfig({
   testDir: './tests/e2e',
@@ -17,7 +16,6 @@ module.exports = defineConfig({
     screenshot: 'only-on-failure',
     headless: true,
   },
-  // Automatically start and stop your server before running tests
   webServer: {
     command: `NODE_ENV=test DATA_DIR=tests/fixtures/data PORT=${E2E_PORT} node server.js`,
     url: E2E_URL,
@@ -28,8 +26,15 @@ module.exports = defineConfig({
   },
   projects: [
     {
-      name: 'chromium',
-      use: { ...devices['Desktop Chrome'] },
-    }
-  ]
+      name: 'firefox',
+      use: {
+        ...devices['Desktop Firefox'],
+        launchOptions: {
+          executablePath:
+            process.env.PLAYWRIGHT_FIREFOX_BIN ||
+            '/opt/ms-playwright/firefox-1578/firefox/firefox',
+        },
+      },
+    },
+  ],
 });

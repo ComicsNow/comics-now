@@ -50,6 +50,7 @@ const attachAdminMcpToolsRoutes = require('./admin/mcp-tools');
 const attachAdminUserStatsRoutes = require('./admin/user-stats');
 const attachAdminGeminiRoutes = require('./admin/gemini');
 const attachAdminImpersonateRoutes = require('./admin/impersonate');
+const publisherLogosRouter = require('./admin/publisher-logos');
 
 function createExtendedDeps(deps) {
   const { log, getComicsDirectories, getPathFromLibraryId } = deps;
@@ -151,6 +152,8 @@ function setupAdminRoutes(router, extendedDeps, requireAdminAuth) {
   attachAdminMcpToolsRoutes(adminRouter, extendedDeps);
   attachAdminUserStatsRoutes(adminRouter, extendedDeps);
   attachAdminGeminiRoutes(adminRouter, extendedDeps);
+  adminRouter.use('/api/admin/publishers/logos', publisherLogosRouter);
+  adminRouter.use('/publishers/logos', publisherLogosRouter);
   router.use(adminRouter);
 }
 

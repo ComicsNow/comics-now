@@ -31,6 +31,7 @@ For the complete REST endpoint reference — every route under `/api/v1` with pa
    - [Adding a Library](#adding-a-library)
    - [Metadata Mode vs. Folder Mode](#metadata-mode-vs-folder-mode)
    - [Scan Pipeline & Error Safeguards](#scan-pipeline--error-safeguards)
+   - [Deletions of Orphaned Files & The Companion Guard](#deletions-of-orphaned-files--the-companion-guard)
    - [Scan Intervals & Scheduling](#scan-intervals--scheduling)
 6. [Supported Formats, Auto-Conversion & Metadata Storage](#6-supported-formats-auto-conversion--metadata-storage)
    - [Supported Formats](#supported-formats)
@@ -495,6 +496,30 @@ When a scan is triggered (manually or via schedule):
 5. **Database Sync**: Adds new records and updates modified files.
 6. **I/O Error Safeguard**: If any directory fails to read during traversal (e.g. an unmounted NAS share), the server **aborts missing file cleanup immediately**. This prevents accidental deletion of reading progress or lists due to temporary disk disconnects.
 
+### Deletions of Orphaned Files & The Companion Guard
+
+When a comic archive is removed, moved, or deleted outside of Comics Now, the library scanner automatically cleans up stale references and artifacts during the library scan maintenance phase:
+
+1. **What Gets Cleaned Up**:
+   - **Database Records**: The stale comic entry is removed from the `comics` table, along with its associated reading progress, bookmarks, and list references.
+   - **Cover Thumbnails**: The generated JPEG thumbnail in `data/thumbnails/<comicId>.jpg` is unlinked.
+   - **Guided View Sidecars**: The AI-generated panel and speech-bubble bounding box sidecar in `data/metadata/guided_view/<comicId>.json` is unlinked.
+   - **Adjacent `ComicInfo.xml` Sidecars**: Any companion XML metadata file (`<stem>.ComicInfo.xml`) sitting beside the deleted archive on disk is unlinked.
+
+2. **The Companion Guard (Multi-Format Protection)**:
+   - When comics are converted (e.g., CBR, PDF, or EPUB converted to CBZ) and the setting to delete the original is disabled (`delete_cbr_after_conversion`, `delete_pdf_after_conversion`, `delete_epub_after_conversion` set to `false`), multiple comic formats share the same base stem and sidecar.
+   - Before deleting any `.ComicInfo.xml` sidecar on disk, Comics Now checks whether **any** supported companion format (`.cbz`, `.cbr`, `.pdf`, `.epub`) sharing that file stem still exists in the directory.
+   - If a companion file still exists on disk, the sidecar is **strictly preserved**.
+   - The sidecar is only unlinked when **all** comic formats for that stem are absent from disk.
+
+3. **Storage Reachability Safeguard**:
+   - Stale comic and artifact cleanup requires verified storage accessibility. If any top-level library root or subfolder is unreachable or reports read errors (such as an unmounted network share, sleeping NAS, or detached USB storage), the entire cleanup process is immediately aborted.
+   - No database records, thumbnails, or sidecar files are touched when storage is unreachable.
+
+4. **Self-Healing Thumbnail Generation**:
+   - Cover thumbnails generated with Sharp use permissive image decoding (`failOn: 'none'`), ensuring that vintage scans with non-standard EXIF headers or trailing pre-marker bytes decode cleanly rather than failing.
+   - If an interrupted or corrupted 0-byte thumbnail file is ever detected on disk, Comics Now evicts the 0-byte file and regenerates a fresh cover thumbnail during the scan.
+
 ### Scan Intervals & Scheduling
 In **Settings → General Settings**:
 - Configure **Scan Interval**: Set how frequently the server checks for new comics (e.g., every 6 hours, 24 hours, or a custom cron expression).
@@ -909,23 +934,53 @@ Located in the bottom-left corner of the interface:
 - **Publisher Filters**: Filter reading lists or library views by specific publishers.
 - **Sorting Options**: Sort by Alphabetical (A-Z / Z-A), Issue Number, Publication Date, or Date Added to Library.
 
-### Custom Publisher Logos
-Publisher logos appear on publisher cards throughout the interface.
-- Logos are stored on disk in the `logos/` directory:
+### Custom Publisher Logos & Publisher Logos Manager
+
+Publisher logos appear prominently on publisher cards, headers, and series listings throughout Comics Now!
+
+#### 1. Publisher Logos Management Interface
+Comics Now! provides a dedicated, full-featured **Publisher Logos Manager** for administrators:
+- **Navigation**:
+  - Open **Settings** $\rightarrow$ **Publisher Logos** tab in the main settings modal.
+  - Or right-click / long-press any publisher card in the library and select **🎨 Change Publisher Logo** to jump directly to the logo editor.
+- **Staged Non-Destructive Workflow**:
+  - All operations (**Upload**, **ComicVine Fetch**, and **Delete**) are staged in client memory with status badges (`● Pending Save` or `● Pending Delete`).
+  - No files on disk are touched, overwritten, or deleted until the administrator clicks the floating **💾 Save Changes** button.
+  - To discard all pending edits without modifying disk state, click **Discard All** in the sticky bottom action bar.
+- **Filter & Search Controls**:
+  - **Filter Buttons**: Instantly switch between **All**, **With Logo**, or **Missing**. Publishers with missing logos remain visible in the `Missing` view while staging changes until saved.
+  - **Live Search**: Type into the search input to filter publishers in real time across large libraries.
+
+#### 2. Managing Logos (Upload, Fetch & Delete)
+Each publisher card provides compact action buttons:
+- `[📤]` **Upload Custom Logo**: Upload a local logo image from your device.
+  - **Supported Formats**: `.svg`, `.png`, `.webp`, `.jpg`, `.jpeg`, `.gif` (up to 10 MB).
+  - Automatically sanitized and verified via binary magic byte sniffing to prevent malicious or mislabeled uploads.
+- `[🔍]` **Fetch from ComicVine**: Automatically queries the ComicVine API for official publisher artwork.
+  - Displays an animated spinner while fetching.
+  - Sniffs actual image payloads directly from buffer magic bytes (correcting mislabeled formats such as PNGs served behind `.jpg` extensions).
+  - Automatically identifies and rejects ComicVine's blank placeholder files (`blank.png`), notifying the user if no real logo exists on ComicVine.
+- `[🗑]` / `[↺]` **Delete / Revert**:
+  - If a publisher already has a logo, clicking the delete button stages it for deletion (`● Pending Delete`).
+  - If an action has been staged (Upload, Fetch, or Delete), the button transforms into an amber **Revert** button to reset that publisher's state.
+
+#### 3. Contrast Adaptation & High-Res Zoom Lightbox
+- **Automated Contrast Adaptation**: Transparent logos (`.png`, `.svg`, `.webp`, `.gif`) are automatically analyzed for average luminance and opacity. Dark logos are automatically given a translucent white backdrop, while light/white logos receive a dark container to guarantee high contrast.
+- **Interactive Zoom Lightbox**: Clicking any logo preview card opens a full-screen Zoom Lightbox displaying the image in high resolution alongside its format, width, and height.
+
+#### 4. Filesystem Storage & Cache Architecture
+- **Directory Structure**: Logos are organized on disk under the `logos/` root directory using safe publisher folder names:
   ```text
   logos/
-  ├── Marvel/
-  │   └── logo.png
   ├── DC Comics/
   │   └── logo.svg
+  ├── Marvel/
+  │   └── logo.png
   └── Image Comics/
       └── logo.jpg
   ```
-- **Supported Formats**: `.png`, `.jpg`, `.jpeg`, `.svg`, `.webp`.
-- **How to Add**:
-  - **Method 1 (UI)**: Long-press any publisher card and click **Change Logo** to upload.
-  - **Method 2 (Filesystem)**: Create a folder inside `logos/` matching the publisher name and place your image inside.
-- If no custom logo is uploaded, Comics Now! automatically generates a colored brand badge using the publisher's initial letter.
+- **Canonical Naming**: Stored logos are standardized to `logo.<ext>` (`logo.png`, `logo.svg`, etc.).
+- **HTTP Caching**: Logos are served with `Cache-Control: public, max-age=0, must-revalidate` and strong ETags matching the filesystem inode and timestamp, ensuring instant visual updates across devices when a logo is modified.
 
 ---
 

@@ -138,13 +138,16 @@
           <!-- 2. Server Admin Scope Tabs -->
           <div id="settings-scope-server-tabs" class="scope-tabs-group hidden flex items-center gap-1 sm:gap-2" style="display: none;">
             <button id="settings-tab-general" data-text="Storage" class="tab-button py-2 px-2.5 sm:px-3 text-xs font-semibold whitespace-nowrap">
-              <span>Storage & Formats</span>
+              <span>Storage</span>
+            </button>
+            <button id="settings-tab-publisher-logos" data-text="Logos" class="tab-button py-2 px-2.5 sm:px-3 text-xs font-semibold whitespace-nowrap">
+              <span>Publisher Logos</span>
             </button>
             <button id="settings-tab-users" data-text="Users" class="tab-button py-2 px-2.5 sm:px-3 text-xs font-semibold whitespace-nowrap">
               <span>Users</span>
             </button>
             <button id="settings-tab-logs" data-text="Logs" class="tab-button py-2 px-2.5 sm:px-3 text-xs font-semibold whitespace-nowrap">
-              <span>Diagnostics Logs</span>
+              <span>Logs</span>
             </button>
           </div>
 
@@ -305,6 +308,17 @@
           </form>
         </div>
         
+        <!-- Publisher Logos Tab -->
+        <div id="settings-content-publisher-logos" class="hidden space-y-4">
+          <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-2 border-b border-gray-700/60">
+            <div>
+              <h3 class="text-lg font-bold text-white flex items-center gap-2">Publisher Logos</h3>
+              <p class="text-xs text-gray-400 mt-0.5">Manage official vector and high-resolution publisher master assets.</p>
+            </div>
+          </div>
+          <div id="publisher-logos-container"></div>
+        </div>
+
         <!-- Logs Tab -->
         <div id="settings-content-logs" class="hidden">
           <div class="flex flex-col sm:flex-row gap-2 mb-4">

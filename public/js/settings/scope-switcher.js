@@ -22,7 +22,7 @@ export const SCOPES = {
     icon: '⚙️',
     adminOnly: true,
     defaultTab: 'general',
-    tabs: ['general', 'users', 'logs']
+    tabs: ['general', 'publisher-logos', 'users', 'logs']
   },
   engines: {
     id: 'engines',
@@ -41,6 +41,7 @@ export const TAB_TO_SCOPE = {
   'general': 'server',
   'users': 'server',
   'logs': 'server',
+  'publisher-logos': 'server',
   'guided-reader': 'engines'
 };
 

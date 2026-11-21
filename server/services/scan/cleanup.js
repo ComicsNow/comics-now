@@ -8,6 +8,7 @@ const {
   GUIDED_VIEW_DIR
 } = require('../../constants');
 const { generateThumbnail } = require('../library-pages');
+const { SUPPORTED_COMIC_EXTENSIONS } = require('../comic-formats');
 
 /**
  * Removes missing comics and cleans up orphan thumbnails and guided view sidecars.
@@ -52,6 +53,25 @@ async function cleanupStaleComics({ dbComicsMap, fileSystemComics, unreachableTo
         log('INFO', 'SCAN', `Deleted orphan guided view sidecar: ${path.basename(fullGv)}`);
       }
     }
+
+    // Clean up adjacent ComicInfo.xml sidecar if present, guarded by reachable storage and companion formats
+    const parentDir = path.dirname(p);
+    if (fs.existsSync(parentDir)) {
+      const ext = path.extname(p);
+      const sidecarPath = path.join(parentDir, path.basename(p, ext) + '.ComicInfo.xml');
+      if (fs.existsSync(sidecarPath)) {
+        const stem = path.join(parentDir, path.basename(p, ext));
+        const formats = SUPPORTED_COMIC_EXTENSIONS || ['.cbz', '.cbr', '.pdf', '.epub'];
+        const hasCompanion = formats.some(fExt => fs.existsSync(stem + fExt));
+
+        if (!hasCompanion) {
+          await fs.promises.unlink(sidecarPath).catch(() => {});
+          log('INFO', 'SCAN', `Deleted orphan ComicInfo.xml sidecar: ${path.basename(sidecarPath)}`);
+        } else {
+          log('INFO', 'SCAN', `Preserving ComicInfo.xml sidecar for companion format: ${path.basename(sidecarPath)}`);
+        }
+      }
+    }
   }
 }
 
@@ -65,13 +85,32 @@ async function repairMissingThumbnails() {
   let thumbFail = 0;
 
   try {
-    const missingThumbs = await dbAll(
-      "SELECT id, path, thumbnailPath FROM comics WHERE thumbnailPath IS NULL OR thumbnailPath = ''"
+    const candidateThumbs = await dbAll(
+      "SELECT id, path, thumbnailPath FROM comics"
     );
 
     const thumbsToUpdate = [];
-    for (const item of missingThumbs) {
-      if (fs.existsSync(item.path)) {
+    for (const item of candidateThumbs) {
+      if (!fs.existsSync(item.path)) continue;
+
+      let needsRepair = false;
+      if (!item.thumbnailPath) {
+        needsRepair = true;
+      } else {
+        const full = path.join(THUMBNAILS_DIRECTORY, item.thumbnailPath);
+        if (!fs.existsSync(full)) {
+          needsRepair = true;
+        } else {
+          try {
+            const st = fs.statSync(full);
+            if (st.size === 0) needsRepair = true;
+          } catch (_) {
+            needsRepair = true;
+          }
+        }
+      }
+
+      if (needsRepair) {
         const gen = await generateThumbnail(item.path);
         if (gen) {
           thumbsToUpdate.push({ id: item.id, gen, path: item.path });

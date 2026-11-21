@@ -58,6 +58,61 @@ function showPublisherContextMenu(event, publisherData) {
   const readingItem = createReadingListItem(allComics);
   if (readingItem) menu.appendChild(readingItem);
 
+  // 5. Change Publisher Logo (Admin)
+  const sync = window.syncManager || state.syncManager;
+  const isAdmin = !sync?.authEnabled || sync?.userRole === 'admin' || state.userRole === 'admin' || window.userRole === 'admin';
+  if (isAdmin) {
+    const logoItem = document.createElement('div');
+    logoItem.className = 'comic-context-menu-item';
+    logoItem.innerHTML = '<span>🎨</span><span>Change Publisher Logo</span>';
+    logoItem.addEventListener('click', () => {
+      closeContextMenu();
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = '.svg,.png,.webp,.jpg,.jpeg';
+      input.style.display = 'none';
+      input.addEventListener('change', async () => {
+        const file = input.files?.[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = async () => {
+          try {
+            const base64 = String(reader.result || '');
+            const base = (typeof window !== 'undefined' && window.APP_CONFIG && window.APP_CONFIG.baseUrl)
+              ? window.APP_CONFIG.baseUrl.replace(/\/$/, '')
+              : '';
+            const res = await fetch(`${base}/api/admin/publishers/logos/upload`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                publisher: publisherName,
+                filename: file.name,
+                data: base64,
+                mimeType: file.type
+              })
+            });
+            if (res.ok) {
+              const data = await res.json();
+              window.dispatchEvent(new CustomEvent('PUBLISHER_LOGO_UPDATED', {
+                detail: {
+                  publisher: publisherName,
+                  logoUrl: data.logo
+                }
+              }));
+            }
+          } catch (err) {
+            console.error('Failed to upload publisher logo:', err);
+          }
+        };
+        reader.readAsDataURL(file);
+      });
+      document.body.appendChild(input);
+      input.click();
+      setTimeout(() => input.remove(), 1000);
+    });
+    menu.appendChild(logoItem);
+  }
+
   positionContextMenu(menu, event);
   attachCloseHandler(menu);
 }

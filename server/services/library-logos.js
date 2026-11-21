@@ -2,7 +2,8 @@ const fs = require('fs');
 const path = require('path');
 const sharp = require('sharp');
 const { log } = require('../logger');
-const { isImage } = require('../utils');
+const { isImage, safeDirName } = require('../utils');
+const { LOGOS_DIRECTORY } = require('../constants');
 
 const LOGO_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 const logoCache = new Map();
@@ -33,7 +34,7 @@ async function inspectLogoContrast(fullPath) {
       return { needsLightBackground: false, needsDarkBackground: false };
     }
     const format = (metadata.format || '').toLowerCase();
-    if (format !== 'png' && format !== 'svg' && format !== 'webp') {
+    if (format !== 'png' && format !== 'svg' && format !== 'webp' && format !== 'gif') {
       return { needsLightBackground: false, needsDarkBackground: false };
     }
     if (!metadata.hasAlpha && format !== 'svg') {
@@ -102,6 +103,20 @@ async function resolveLogo(pubLogoDir) {
   return { logoFile, needsBackground, needsDarkBackground };
 }
 
+function invalidateLogo(pubLogoDir) {
+  if (pubLogoDir) {
+    logoCache.delete(pubLogoDir);
+  }
+}
+
+function invalidatePublisher(publisherName) {
+  if (!publisherName) return;
+  const pubDir = path.join(LOGOS_DIRECTORY, safeDirName(publisherName));
+  invalidateLogo(pubDir);
+}
+
 module.exports = {
-  resolveLogo
+  resolveLogo,
+  invalidateLogo,
+  invalidatePublisher
 };

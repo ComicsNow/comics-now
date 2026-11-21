@@ -60,6 +60,7 @@ jest.mock('../../../server/routes/admin/mcp-tools', () => jest.fn());
 jest.mock('../../../server/routes/admin/user-stats', () => jest.fn());
 jest.mock('../../../server/routes/admin/gemini', () => jest.fn());
 jest.mock('../../../server/routes/admin/impersonate', () => jest.fn());
+jest.mock('../../../server/routes/admin/publisher-logos', () => ({ use: jest.fn() }));
 
 const mockSubRouters = [
   './public/auth', './public/health',
