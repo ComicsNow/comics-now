@@ -23,9 +23,13 @@ function getPythonBin() {
 
 const pythonBin = getPythonBin();
 const testsDir = path.join(__dirname, 'modal/tests');
+const modalDir = path.join(__dirname, 'modal');
 const res = spawnSync(pythonBin, ['-m', 'pytest', testsDir], {
   stdio: 'inherit',
-  env: process.env
+  env: {
+    ...process.env,
+    PYTHONPATH: [modalDir, process.env.PYTHONPATH].filter(Boolean).join(path.delimiter)
+  }
 });
 
 process.exit(res.status ?? 0);

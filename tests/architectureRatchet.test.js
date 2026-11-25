@@ -134,7 +134,8 @@ describe('Architectural Ratchet & Code Health Invariants', () => {
     const protectedDirs = [
       path.join(ROOT_DIR, 'public/js/comictagger'),
       path.join(ROOT_DIR, 'public/js/library/render'),
-      path.join(ROOT_DIR, 'public/js/viewer/fullscreen')
+      path.join(ROOT_DIR, 'public/js/viewer/fullscreen'),
+      path.join(ROOT_DIR, 'server/services')
     ];
 
     const inlineViolations = [];
@@ -163,6 +164,8 @@ describe('Architectural Ratchet & Code Health Invariants', () => {
     const scanDirs = [
       path.join(ROOT_DIR, 'server'),
       path.join(ROOT_DIR, 'public/js'),
+      path.join(ROOT_DIR, 'public/plugins'),
+      path.join(ROOT_DIR, 'scripts'),
       path.join(ROOT_DIR, 'tagger/tagger_app'),
       path.join(ROOT_DIR, 'mcp/comics_mcp')
     ];

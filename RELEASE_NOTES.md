@@ -23,3 +23,21 @@
   * Enabled permissive image decoding (`failOn: 'none'`) in Sharp, allowing older scanned archives with non-standard EXIF markers or trailing pre-marker bytes to generate cover thumbnails cleanly without throwing fatal errors.
   * Added 0-byte cache eviction: if an interrupted or corrupted 0-byte thumbnail file is detected on disk, it is immediately unlinked and regenerated rather than cached.
   * Automatic thumbnail repair during library maintenance now detects and heals 0-byte thumbnail files in addition to missing records.
+
+---
+
+## 🐛 Bug Fixes & Security Hardening
+
+* **Security & SVG Static Serving**:
+  * Hardened the SVG logo sanitizer with recursive tag stripping, banning SMIL animations (`<animate>`, `<set>`), and stripping control characters in URL schemes.
+  * Added `Content-Security-Policy: sandbox; default-src 'none'; style-src 'unsafe-inline'` and `X-Content-Type-Options: nosniff` headers to the static `/logos` endpoint.
+* **Publisher Logos & UI Card Preservation**:
+  * Fixed atomic file replacement in publisher logo uploads: new artwork is validated and staged in temporary files before previous logos are unlinked.
+  * Emitted logo events now respect subpath base URLs and include timestamp cache-busting query strings.
+  * Isolated publisher card logos inside dedicated containers, preventing live update events from removing reading progress banners or action buttons.
+  * Resolved event listener leaks and duplicate keydown bindings in the logo zoom lightbox modal.
+* **Reading List MCP Safety**:
+  * Set default parameters on `sync_reading_lists_to_all_users` to non-destructive (`overwrite: false, prune: false`), safeguarding custom lists against unintended pruning.
+* **Safe DOM Construction & Architecture Ratchet**:
+  * Enforced safe text node construction in settings naming rules and sync modals.
+  * Hoisted dynamic runtime imports in log retention services and expanded architectural ratchet test coverage across background scripts and plugins.

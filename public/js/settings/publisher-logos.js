@@ -102,9 +102,14 @@ async function commitChanges() {
   try {
     const changes = Array.from(state.stagedChanges.entries()).map(([publisher, c]) => ({ publisher, type: c.type, data: c.data, filename: c.filename }));
     const res = await apiRequest(`${getApiBase()}/save`, { method: 'POST', body: JSON.stringify({ changes }) });
-    const count = res?.count || changes.length;
+    const count = typeof res?.count === 'number' ? res.count : changes.length;
+    const failures = Array.isArray(res?.results) ? res.results.filter(r => r.action === 'failed') : [];
     state.stagedChanges.clear();
-    showToast(`✓ Successfully saved ${count} publisher logo change(s)!`);
+    if (failures.length > 0) {
+      showToast(`Saved ${count} change(s), but ${failures.length} failed.`, true);
+    } else {
+      showToast(`✓ Successfully saved ${count} publisher logo change(s)!`);
+    }
     if (Array.isArray(res?.results)) {
       res.results.forEach(r => dispatchLogoUpdated(r.publisher, r.logo || null));
     }

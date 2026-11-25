@@ -34,13 +34,13 @@ def create_reading_list(
 
 @mcp.tool()
 def sync_reading_lists_to_all_users(
-    overwrite: bool = True, prune: bool = True
+    overwrite: bool = False, prune: bool = False
 ) -> str:
     """Sync/mirror all curated reading lists from the default/admin account to all registered users in Comics Now!.
 
     Args:
-        overwrite: If True (default), updates existing lists and their comic ordering to match default-user.
-        prune: If True (default), removes obsolete reading lists that were deleted from default-user.
+        overwrite: If True, updates existing lists and their comic ordering to match default-user. Defaults to False.
+        prune: If True, removes obsolete reading lists that were deleted from default-user. Defaults to False (non-destructive).
     """
     return _dump(
         _srv()._request(

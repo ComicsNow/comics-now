@@ -69,7 +69,7 @@ export function renderNamingTokens(apiBaseUrl = '') {
     row.innerHTML = `
       <div class="flex items-center gap-2">
         <span class="w-5 text-gray-500 font-mono text-[11px]">${index + 1}.</span>
-        <span class="font-medium text-white">${labelText}</span>
+        <span class="token-label font-medium text-white"></span>
       </div>
       <div class="flex items-center gap-3">
         <label class="inline-flex items-center gap-1 cursor-pointer select-none text-gray-300">
@@ -91,6 +91,8 @@ export function renderNamingTokens(apiBaseUrl = '') {
     const mandCb = row.querySelector('.token-mand-cb');
     const upBtn = row.querySelector('.token-up-btn');
     const downBtn = row.querySelector('.token-down-btn');
+    const labelSpan = row.querySelector('.token-label');
+    if (labelSpan) labelSpan.textContent = labelText;
 
     enableCb.addEventListener('change', () => {
       token.enabled = enableCb.checked;
@@ -218,7 +220,7 @@ export function renderFolderLevels(apiBaseUrl = '') {
     row.innerHTML = `
       <div class="flex items-center gap-2">
         <span class="w-16 font-mono text-[11px] text-gray-400">Level ${index + 1}:</span>
-        <span class="font-bold text-white uppercase text-[11px] bg-gray-700 px-2 py-0.5 rounded">${labelText}</span>
+        <span class="token-label font-bold text-white uppercase text-[11px] bg-gray-700 px-2 py-0.5 rounded"></span>
       </div>
       <div class="flex items-center gap-2">
         <button class="level-up-btn px-2 py-0.5 bg-gray-700 hover:bg-gray-600 rounded text-gray-200 ${index === 0 ? 'opacity-30 cursor-not-allowed' : ''}">▲</button>
@@ -226,6 +228,9 @@ export function renderFolderLevels(apiBaseUrl = '') {
         <button class="level-remove-btn px-2 py-0.5 bg-red-900/60 hover:bg-red-800 text-red-300 rounded">✕</button>
       </div>
     `;
+
+    const labelSpan = row.querySelector('.token-label');
+    if (labelSpan) labelSpan.textContent = labelText;
 
     const upBtn = row.querySelector('.level-up-btn');
     const downBtn = row.querySelector('.level-down-btn');

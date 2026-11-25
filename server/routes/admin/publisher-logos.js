@@ -22,12 +22,13 @@ function getPubDir(publisher) {
   return path.join(LOGOS_DIRECTORY, safeName);
 }
 
-async function clearExistingLogos(pubDir) {
+async function clearExistingLogos(pubDir, excludeFiles = []) {
   try {
     const files = await fs.readdir(pubDir);
+    const excludeSet = new Set(excludeFiles);
     await Promise.all(
       files
-        .filter((file) => isImage(file) || file.toLowerCase().endsWith('.svg') || /^logo\./i.test(file))
+        .filter((file) => !excludeSet.has(file) && (isImage(file) || file.toLowerCase().endsWith('.svg') || /^logo\./i.test(file)))
         .map((file) => fs.unlink(path.join(pubDir, file)).catch(() => {})),
     );
   } catch (err) {
@@ -164,13 +165,17 @@ router.post('/upload', async (req, res, next) => {
 
     const pubDir = getPubDir(publisher);
     await fs.mkdir(pubDir, { recursive: true });
-    await clearExistingLogos(pubDir);
 
     const targetFilename = `logo.${ext}`;
-    const sanitizeResult = sanitizer.sanitizeLogo(buffer, pubDir, targetFilename);
+    const tempFilename = `.tmp_logo_${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
+    const sanitizeResult = sanitizer.sanitizeLogo(buffer, pubDir, tempFilename);
     if (!sanitizeResult || !sanitizeResult.ok) {
+      try { await fs.unlink(path.join(pubDir, tempFilename)); } catch (_) {}
       return res.status(400).json({ error: sanitizeResult?.reason || 'Failed to sanitize image' });
     }
+
+    await clearExistingLogos(pubDir, [tempFilename]);
+    await fs.rename(path.join(pubDir, tempFilename), path.join(pubDir, targetFilename));
 
     await cache.setLogo(pubDir, targetFilename);
     libraryLogos.invalidatePublisher(publisher);
@@ -291,10 +296,17 @@ router.post('/save', async (req, res, next) => {
         if (!magicResult.ok) continue;
 
         await fs.mkdir(pubDir, { recursive: true });
-        await clearExistingLogos(pubDir);
         const targetFilename = `logo.${ext}`;
-        const sanitizeResult = sanitizer.sanitizeLogo(buffer, pubDir, targetFilename);
-        if (!sanitizeResult || !sanitizeResult.ok) continue;
+        const tempFilename = `.tmp_logo_${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
+        const sanitizeResult = sanitizer.sanitizeLogo(buffer, pubDir, tempFilename);
+        if (!sanitizeResult || !sanitizeResult.ok) {
+          try { await fs.unlink(path.join(pubDir, tempFilename)); } catch (_) {}
+          saved.push({ publisher, action: 'failed', error: sanitizeResult?.reason || 'Failed to sanitize image' });
+          continue;
+        }
+
+        await clearExistingLogos(pubDir, [tempFilename]);
+        await fs.rename(path.join(pubDir, tempFilename), path.join(pubDir, targetFilename));
 
         await cache.setLogo(pubDir, targetFilename);
         libraryLogos.invalidatePublisher(publisher);

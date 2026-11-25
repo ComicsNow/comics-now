@@ -126,6 +126,21 @@ describe('logos/sanitizer SVG XSS sanitization', () => {
     expect(clean).not.toContain('SYSTEM');
   });
 
+  it('recursively removes nested script tags and SMIL animation tags', () => {
+    const nested = '<svg><scr<script>ipt>alert(1)</scr</script>ipt><animate attributeName="href" values="javascript:alert(2)"/><text>clean</text></svg>';
+    const clean = sanitizer.sanitizeSvg(nested);
+    expect(clean).not.toContain('<script');
+    expect(clean).not.toContain('alert(1)');
+    expect(clean).not.toContain('<animate');
+    expect(clean).toContain('<text>clean</text>');
+  });
+
+  it('strips javascript URLs containing control characters', () => {
+    const evil = '<svg><a href="\x01\x02javascript:alert(1)"><text>link</text></a></svg>';
+    const clean = sanitizer.sanitizeSvg(evil);
+    expect(clean).not.toContain('javascript:');
+  });
+
   it('preserves an SVG root element', () => {
     const clean = sanitizer.sanitizeSvg(dirtySvg);
     expect(clean).toContain('<svg');

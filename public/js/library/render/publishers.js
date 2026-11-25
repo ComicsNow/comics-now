@@ -247,7 +247,9 @@ export function renderPublisherCards(publishersToShow) {
         ${safeRaw(mangaBannerHtml)}
         ${safeRaw(downloadButtonHtml)}
         ${safeRaw(publisherStatusButtonHtml)}
-        ${safeRaw(logoContent)}
+        <div class="publisher-logo-slot flex items-center justify-center h-full w-full pointer-events-none">
+          ${safeRaw(logoContent)}
+        </div>
       </div>
       <h3 class="text-lg font-semibold mt-4 text-center text-white truncate w-full px-2">${publisher}</h3>
       ${safeRaw(countsChips)}
@@ -334,28 +336,33 @@ export function renderPublisherCards(publishersToShow) {
     publisherListContainer.appendChild(card);
   }
 }
-if (typeof window !== 'undefined' && !window._publisherLogoListenerBound) {
-  window._publisherLogoListenerBound = true;
+let publisherLogoListenerBound = false;
+if (typeof window !== 'undefined' && !publisherLogoListenerBound) {
+  publisherLogoListenerBound = true;
   window.addEventListener('PUBLISHER_LOGO_UPDATED', (event) => {
-    const { publisher, logoUrl } = event.detail || {};
-    if (!publisher || !logoUrl) return;
-    const escaped = typeof CSS !== 'undefined' && CSS.escape ? CSS.escape(publisher) : publisher.replace(/"/g, '\\"');
-    const cards = document.querySelectorAll(`[data-publisher="${escaped}"]`);
-    cards.forEach((card) => {
-      let img = card.querySelector('img');
-      if (img) {
-        img.src = logoUrl;
-      } else {
-        const logoWrapper = card.querySelector('.flex.items-center.justify-center');
-        if (logoWrapper) {
-          logoWrapper.innerHTML = '';
+      const { publisher, logoUrl } = event.detail || {};
+      if (!publisher) return;
+      const escaped = typeof CSS !== 'undefined' && CSS.escape ? CSS.escape(publisher) : publisher.replace(/"/g, '\\"');
+      const cards = document.querySelectorAll(`[data-publisher="${escaped}"]`);
+      cards.forEach((card) => {
+        const slot = card.querySelector('.publisher-logo-slot');
+        if (!logoUrl) {
+          if (slot) slot.innerHTML = '<svg class="w-16 h-16" fill="currentColor" viewBox="0 0 20 20"><path d="M2 6a2 2 0 012-2h12a2 2 0 012 2v1H4V6zm14 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V8h16zm-2 2H4v4h12v-4z"></path></svg>';
+          return;
+        }
+        const base = (window.APP_CONFIG && window.APP_CONFIG.baseUrl) ? window.APP_CONFIG.baseUrl.replace(/\/$/, '') : '';
+        const fullUrl = (logoUrl.startsWith('http') || logoUrl.startsWith('data:')) ? logoUrl : `${base}/${logoUrl.replace(/^\//, '')}?v=${Date.now()}`;
+        let img = (slot || card).querySelector('img');
+        if (img) {
+          img.src = fullUrl;
+        } else if (slot) {
+          slot.replaceChildren();
           const newImg = document.createElement('img');
-          newImg.src = logoUrl;
+          newImg.src = fullUrl;
           newImg.alt = publisher;
           newImg.className = 'max-h-16 max-w-full object-contain';
-          logoWrapper.appendChild(newImg);
+          slot.appendChild(newImg);
         }
-      }
+      });
     });
-  });
-}
+  }

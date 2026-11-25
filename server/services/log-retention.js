@@ -5,6 +5,8 @@
 const fs = require('fs');
 const path = require('path');
 const { SCAN_LOGS_DIR, LOG_RETENTION_DAYS } = require('../constants');
+const defaultLogger = require('../logger');
+const defaultDb = require('../db');
 
 function pruneScanLogFiles(logsDir = SCAN_LOGS_DIR, maxAgeDays = LOG_RETENTION_DAYS) {
   if (!logsDir || !fs.existsSync(logsDir)) return 0;
@@ -48,8 +50,8 @@ async function pruneAuditLogs(dbInstance, maxAgeDays = LOG_RETENTION_DAYS) {
 }
 
 async function runFullRetentionSweep(deps = {}) {
-  const logger = deps.logger || require('../logger');
-  const db = deps.db || require('../db');
+  const logger = deps.logger || defaultLogger;
+  const db = deps.db || defaultDb;
   const logsDir = deps.logsDir || SCAN_LOGS_DIR;
   const maxDays = deps.maxAgeDays || LOG_RETENTION_DAYS;
 

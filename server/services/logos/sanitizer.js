@@ -140,9 +140,14 @@ function decodeHtmlEntities(value) {
 }
 
 function removeDangerousTags(svg) {
+  let prev;
   let result = svg;
-  result = result.replace(/<(script|foreignObject|iframe|object|embed)\b[^>]*>[\s\S]*?<\/\1\s*>/gi, '');
-  result = result.replace(/<(script|foreignObject|iframe|object|embed)\b[^>]*\/?>/gi, '');
+  const tagRe = /<(script|foreignObject|iframe|object|embed|animate|set|handler|listener)\b[^>]*>[\s\S]*?<\/\1\s*>/gi;
+  const selfClosingRe = /<(script|foreignObject|iframe|object|embed|animate|set|handler|listener)\b[^>]*\/?>/gi;
+  do {
+    prev = result;
+    result = result.replace(tagRe, '').replace(selfClosingRe, '');
+  } while (result !== prev);
   return result;
 }
 
@@ -154,9 +159,8 @@ function removeDangerousStyleBlocks(svg) {
 
 function isDangerousUrl(value) {
   const decoded = decodeHtmlEntities(value);
-  const compact = decoded.trim().replace(/\s+/g, '');
-  const lower = compact.toLowerCase();
-  return lower.startsWith('javascript:') || lower.startsWith('data:');
+  const compact = decoded.replace(/[\x00-\x20\x7f-\x9f]+/g, '').toLowerCase();
+  return compact.startsWith('javascript:') || compact.startsWith('data:') || compact.startsWith('vbscript:');
 }
 
 function sanitizeAttributes(svg) {

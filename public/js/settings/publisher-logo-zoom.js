@@ -142,7 +142,7 @@ function buildModal(imageData) {
     'text-base font-bold text-white truncate',
     titleGroup
   );
-  title.textContent = 'Publisher Logo';
+  title.textContent = imageData.title || 'Publisher Logo';
   const formatBadge = createElement(
     'span',
     'px-2 py-0.5 rounded text-xs font-semibold uppercase bg-red-900/40 text-red-300 border border-red-700/50',
@@ -227,6 +227,7 @@ function closeModal(restoreFocus = true) {
   }
   if (keydownHandler) {
     document.removeEventListener('keydown', keydownHandler, true);
+    document.removeEventListener('keydown', keydownHandler, false);
     keydownHandler = null;
   }
   if (currentTrigger && restoreFocus && document.body.contains(currentTrigger)) {
@@ -264,12 +265,6 @@ function openModal(imageData, trigger = null) {
   };
   root.addEventListener('click', modalClickHandler);
   document.addEventListener('keydown', keydownHandler, true);
-  root.addEventListener('click', modalClickHandler);
-  document.addEventListener('keydown', keydownHandler);
-  closeButton.addEventListener('click', (event) => {
-    event.stopPropagation();
-    closeModal();
-  });
   if (!imageData.width || !imageData.height) {
     const updateResolution = () => {
       if (!modalImage || !modalResolution) return;
@@ -295,7 +290,14 @@ function handleDocumentClick(event) {
 }
 export function openPublisherLogoZoom({ url, title, format, width, height } = {}) {
   if (!url) return;
-  const ext = format || (url.split('.').pop() || '').toLowerCase();
+  let ext = format;
+  if (!ext) {
+    if (url.startsWith('data:image/')) {
+      ext = (url.slice(11).split(';')[0] || 'img').toLowerCase();
+    } else {
+      ext = (url.split('?')[0].split('.').pop() || '').toLowerCase();
+    }
+  }
   openModal({
     src: url,
     title: title || 'Publisher Logo',

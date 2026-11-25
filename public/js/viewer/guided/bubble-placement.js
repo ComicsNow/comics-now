@@ -244,7 +244,7 @@ export function computeSmartBubblePlacement(options = {}) {
   };
 }
 
-// Attach to state.GuidedView and window.GuidedView
+// Attach to state.GuidedView
 state.GuidedView = state.GuidedView || {};
 Object.assign(state.GuidedView, {
   findParentPanel,
@@ -252,8 +252,7 @@ Object.assign(state.GuidedView, {
   computeSmartBubblePlacement
 });
 
-if (typeof window !== 'undefined') {
-  window.GuidedView = window.GuidedView || {};
+if (typeof window !== 'undefined' && window.GuidedView) {
   Object.assign(window.GuidedView, {
     findParentPanel,
     getPagePanels,

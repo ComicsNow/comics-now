@@ -201,6 +201,8 @@ function createStaticRouter({ getConfig, getComicsDirectories, getPublicLibrarie
     lastModified: true,
     setHeaders: (res) => {
       res.setHeader('Cache-Control', 'no-cache, must-revalidate');
+      res.setHeader('Content-Security-Policy', "default-src 'none'; img-src data:; style-src 'unsafe-inline'; sandbox");
+      res.setHeader('X-Content-Type-Options', 'nosniff');
     }
   }));
 

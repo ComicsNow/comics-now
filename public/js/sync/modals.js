@@ -34,11 +34,11 @@ export function createSyncModal(syncData, resolve, onAccept) {
         <div class="grid grid-cols-2 gap-4 text-sm">
           <div class="bg-gray-700 p-3 rounded">
             <div class="text-gray-400 mb-1">Other Device</div>
-            <div class="text-white font-medium">Page ${serverProgress.lastReadPage} of ${serverProgress.totalPages}</div>
+            <div class="text-white font-medium">Page ${Number(serverProgress.lastReadPage || 0)} of ${Number(serverProgress.totalPages || 0)}</div>
           </div>
           <div class="bg-gray-700 p-3 rounded">
             <div class="text-gray-400 mb-1">This Device</div>
-            <div class="text-white font-medium">Page ${clientProgress.lastReadPage} of ${serverProgress.totalPages}</div>
+            <div class="text-white font-medium">Page ${Number(clientProgress.lastReadPage || 0)} of ${Number(serverProgress.totalPages || 0)}</div>
           </div>
         </div>
       </div>
@@ -48,7 +48,7 @@ export function createSyncModal(syncData, resolve, onAccept) {
           Keep Current
         </button>
         <button id="sync-accept" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-full transition-colors">
-          Sync to Page ${serverProgress.lastReadPage}
+          Sync to Page ${Number(serverProgress.lastReadPage || 0)}
         </button>
       </div>
     </div>

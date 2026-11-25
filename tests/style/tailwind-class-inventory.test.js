@@ -38,7 +38,9 @@ function sourceFiles() {
 }
 
 function collectTokens(file) {
-  const source = fs.readFileSync(file, 'utf8');
+  let source = fs.readFileSync(file, 'utf8');
+  // Strip ${...} template literal interpolations so internal expressions are not matched as class tokens
+  source = source.replace(/\$\{[^}]*\}/g, ' ');
   const tokens = new Set();
   const record = (raw) => {
     for (const t of raw.split(/\s+/)) {
