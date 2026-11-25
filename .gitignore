@@ -86,3 +86,5 @@ scripts/colab/
 
 # Generated library audit reports
 /public/reports/
+
+awesome-selfhosted.yml
