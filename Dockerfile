@@ -15,7 +15,7 @@ WORKDIR /app
 # Install Node.js dependencies (including devDependencies for Vite)
 COPY package*.json ./
 COPY scripts/check-dependencies.js ./scripts/
-RUN npm ci --ignore-scripts
+RUN npm ci
 
 # Copy the application source code and compile Vite & Tailwind assets
 COPY . .
