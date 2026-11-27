@@ -129,7 +129,15 @@ export function initLibraryFolderControls() {
   const pathInput = document.getElementById('new-library-path');
   const modeSelect = document.getElementById('new-library-mode');
 
-  if (addBtn && pathInput) {
+  if (addBtn && pathInput && addBtn.dataset.libraryControlsInit !== 'true') {
+    addBtn.dataset.libraryControlsInit = 'true';
+    pathInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        e.stopPropagation();
+        addBtn.click();
+      }
+    });
     addBtn.addEventListener('click', async () => {
       const path = pathInput.value.trim();
       const mode = modeSelect ? modeSelect.value : 'metadata';

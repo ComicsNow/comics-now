@@ -179,4 +179,45 @@ describe('public/js/settings.js', () => {
       expect(JSON.parse(postCall[1].body).pageCacheMaxMb).toBe(700);
     });
   });
+
+  describe('library folder controls', () => {
+    it('submits add library via Enter key in #new-library-path without submitting settings form', async () => {
+      for (const id of ['new-library-path', 'new-library-mode', 'add-library-btn']) {
+        document.getElementById(id)?.remove();
+      }
+      const pathInput = document.createElement('input');
+      pathInput.id = 'new-library-path';
+      pathInput.value = '/media/raza/Media/Comics';
+      const modeSelect = document.createElement('select');
+      modeSelect.id = 'new-library-mode';
+      const opt = document.createElement('option');
+      opt.value = 'metadata';
+      opt.selected = true;
+      modeSelect.appendChild(opt);
+      const addBtn = document.createElement('button');
+      addBtn.id = 'add-library-btn';
+      document.body.append(pathInput, modeSelect, addBtn);
+
+      ctx.sandbox.fetch.mockResolvedValue({
+        ok: true,
+        json: async () => ({ ok: true, libraries: [{ path: '/media/raza/Media/Comics', hierarchyMode: 'metadata' }] })
+      });
+
+      ctx.sandbox.initLibraryFolderControls();
+
+      const keyEvent = new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true });
+      pathInput.dispatchEvent(keyEvent);
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      expect(keyEvent.defaultPrevented).toBe(true);
+      const postCall = ctx.sandbox.fetch.mock.calls.find(
+        ([url, opts]) => url.endsWith('/api/v1/admin/libraries') && opts && opts.method === 'POST'
+      );
+      expect(postCall).toBeDefined();
+      expect(JSON.parse(postCall[1].body)).toEqual({
+        path: '/media/raza/Media/Comics',
+        hierarchyMode: 'metadata'
+      });
+    });
+  });
 });
